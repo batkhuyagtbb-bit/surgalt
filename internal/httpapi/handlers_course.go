@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -276,16 +277,16 @@ func (s *Server) handleReorderLessons(w http.ResponseWriter, r *http.Request) {
 }
 
 // lessonAccess: үнэгүй, багш, дангаар худалдаж авсан, эсвэл үнэтэй багцад элссэн.
-func (s *Server) lessonAccess(r *http.Request, uid string, course *store.Course, l *store.Lesson) (bool, error) {
+func (s *Server) lessonAccess(ctx context.Context, uid string, course *store.Course, l *store.Lesson) (bool, error) {
 	if l.IsFree || course.TeacherID == uid {
 		return true, nil
 	}
 	if course.Price > 0 {
-		if ok, err := s.store.IsEnrolled(r.Context(), uid, course.ID); err != nil || ok {
+		if ok, err := s.store.IsEnrolled(ctx, uid, course.ID); err != nil || ok {
 			return ok, err
 		}
 	}
-	bought, err := s.store.PurchasedLessons(r.Context(), uid, course.ID)
+	bought, err := s.store.PurchasedLessons(ctx, uid, course.ID)
 	if err != nil {
 		return false, err
 	}
@@ -352,7 +353,7 @@ func (s *Server) handleCompleteLesson(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	has, err := s.lessonAccess(r, c.UID, course, l)
+	has, err := s.lessonAccess(r.Context(), c.UID, course, l)
 	if s.storeErr(w, r, err) {
 		return
 	}
@@ -365,7 +366,7 @@ func (s *Server) handleCompleteLesson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if l.ActiveMin > 0 && course.TeacherID != c.UID {
-		done, err := s.lessonActiveSec(r, c.UID, l.ID)
+		done, err := s.lessonActiveSec(r.Context(), c.UID, l.ID)
 		if s.storeErr(w, r, err) {
 			return
 		}
@@ -398,7 +399,7 @@ func (s *Server) handleBuyLesson(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	has, err := s.lessonAccess(r, c.UID, course, l)
+	has, err := s.lessonAccess(r.Context(), c.UID, course, l)
 	if s.storeErr(w, r, err) {
 		return
 	}
@@ -577,7 +578,7 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	has, err := s.lessonAccess(r, c.UID, course, l)
+	has, err := s.lessonAccess(r.Context(), c.UID, course, l)
 	if s.storeErr(w, r, err) {
 		return
 	}

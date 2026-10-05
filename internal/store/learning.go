@@ -7,24 +7,24 @@ import (
 
 // ExamAttempt — суралцагчийн нэг удаагийн шалгалт.
 type ExamAttempt struct {
-	ID         string          `json:"id" bson:"_id"`
-	UserID     string          `json:"user_id" bson:"user_id"`
-	UserName   string          `json:"user_name" bson:"user_name"`
-	CourseID   string          `json:"course_id" bson:"course_id"`
-	LessonID   string          `json:"lesson_id" bson:"lesson_id"`
-	TeacherID  string          `json:"teacher_id" bson:"teacher_id"`
-	StartedAt  time.Time       `json:"started_at" bson:"started_at"`
-	DeadlineAt *time.Time      `json:"deadline_at,omitempty" bson:"deadline_at,omitempty"`
-	FinishedAt *time.Time      `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
-	Status     string          `json:"status" bson:"status"` // active | submitted | terminated | expired
-	Reason     string          `json:"reason,omitempty" bson:"reason,omitempty"`
-	Score      float64         `json:"score" bson:"score"`
-	Max        float64         `json:"max" bson:"max"`
-	Pct        int             `json:"pct" bson:"pct"`
-	Passed     bool            `json:"passed" bson:"passed"`
-	Violations int             `json:"violations" bson:"violations"`
-	Results    map[string]bool `json:"results,omitempty" bson:"results,omitempty"` // асуулт → зөв эсэх
-	Order      []string        `json:"order,omitempty" bson:"order,omitempty"`     // холисон дараалал
+	ID         string          `json:"id"`
+	UserID     string          `json:"user_id"`
+	UserName   string          `json:"user_name"`
+	CourseID   string          `json:"course_id"`
+	LessonID   string          `json:"lesson_id"`
+	TeacherID  string          `json:"teacher_id"`
+	StartedAt  time.Time       `json:"started_at"`
+	DeadlineAt *time.Time      `json:"deadline_at,omitempty"`
+	FinishedAt *time.Time      `json:"finished_at,omitempty"`
+	Status     string          `json:"status"` // active | submitted | terminated | expired
+	Reason     string          `json:"reason,omitempty"`
+	Score      float64         `json:"score"`
+	Max        float64         `json:"max"`
+	Pct        int             `json:"pct"`
+	Passed     bool            `json:"passed"`
+	Violations int             `json:"violations"`
+	Results    map[string]bool `json:"results,omitempty"` // асуулт → зөв эсэх
+	Order      []string        `json:"order,omitempty"`   // холисон дараалал
 }
 
 const (
@@ -37,26 +37,26 @@ const (
 // StudySession — суралцагчийн нэг удаагийн үзэлт (хичээл, шалгалт, ном). Идэвхтэй, идэвхгүй,
 // өөр цонхонд байсан хугацаа ба анхаарлын оноог зүрхний цохилт (heartbeat) бүрээр нэмнэ.
 type StudySession struct {
-	ID        string         `json:"id" bson:"_id"`
-	UserID    string         `json:"user_id" bson:"user_id"`
-	UserName  string         `json:"user_name" bson:"user_name"`
-	CourseID  string         `json:"course_id" bson:"course_id"`
-	LessonID  string         `json:"lesson_id" bson:"lesson_id"`
-	TeacherID string         `json:"teacher_id" bson:"teacher_id"`
-	Kind      string         `json:"kind" bson:"kind"` // lesson | exam | book
-	Title     string         `json:"title" bson:"title"`
-	StartedAt time.Time      `json:"started_at" bson:"started_at"`
-	LastAt    time.Time      `json:"last_at" bson:"last_at"`
-	ActiveSec int            `json:"active_sec" bson:"active_sec"`
-	IdleSec   int            `json:"idle_sec" bson:"idle_sec"`
-	AwaySec   int            `json:"away_sec" bson:"away_sec"`
-	FocusSum  float64        `json:"focus_sum" bson:"focus_sum"`
-	FocusN    int            `json:"focus_n" bson:"focus_n"`
-	Camera    bool           `json:"camera" bson:"camera"`
-	IP        string         `json:"ip" bson:"ip"`
-	Ended     bool           `json:"ended" bson:"ended"`
-	EndReason string         `json:"end_reason,omitempty" bson:"end_reason,omitempty"`
-	Counts    map[string]int `json:"counts" bson:"counts"` // үйл явдлын төрөл → тоо
+	ID        string         `json:"id"`
+	UserID    string         `json:"user_id"`
+	UserName  string         `json:"user_name"`
+	CourseID  string         `json:"course_id"`
+	LessonID  string         `json:"lesson_id"`
+	TeacherID string         `json:"teacher_id"`
+	Kind      string         `json:"kind"` // lesson | exam | book
+	Title     string         `json:"title"`
+	StartedAt time.Time      `json:"started_at"`
+	LastAt    time.Time      `json:"last_at"`
+	ActiveSec int            `json:"active_sec"`
+	IdleSec   int            `json:"idle_sec"`
+	AwaySec   int            `json:"away_sec"`
+	FocusSum  float64        `json:"focus_sum"`
+	FocusN    int            `json:"focus_n"`
+	Camera    bool           `json:"camera"`
+	IP        string         `json:"ip"`
+	Ended     bool           `json:"ended"`
+	EndReason string         `json:"end_reason,omitempty"`
+	Counts    map[string]int `json:"counts"` // үйл явдлын төрөл → тоо
 }
 
 // SessionBeat — нэг зүрхний цохилтын өсөлт.
@@ -71,16 +71,16 @@ type SessionBeat struct {
 
 // ActivityEvent — багшид харагдах лог: зөрчил, анхааруулга, хаалт, шалгалт.
 type ActivityEvent struct {
-	ID        string    `json:"id" bson:"_id"`
-	UserID    string    `json:"user_id" bson:"user_id"`
-	UserName  string    `json:"user_name" bson:"user_name"`
-	CourseID  string    `json:"course_id" bson:"course_id"`
-	LessonID  string    `json:"lesson_id" bson:"lesson_id"`
-	TeacherID string    `json:"teacher_id" bson:"teacher_id"`
-	SessionID string    `json:"session_id" bson:"session_id"`
-	Type      string    `json:"type" bson:"type"`
-	Detail    string    `json:"detail,omitempty" bson:"detail,omitempty"`
-	At        time.Time `json:"at" bson:"at"`
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	CourseID  string    `json:"course_id"`
+	LessonID  string    `json:"lesson_id"`
+	TeacherID string    `json:"teacher_id"`
+	SessionID string    `json:"session_id"`
+	Type      string    `json:"type"`
+	Detail    string    `json:"detail,omitempty"`
+	At        time.Time `json:"at"`
 }
 
 // ActivityFilter — хоосон талбар шүүхгүй.
@@ -91,45 +91,45 @@ type ActivityFilter struct {
 
 // QuizLog — хичээл доторх асуултад өгсөн нэг хариулт ба хариулах хурд (таамаглалыг илрүүлэхэд).
 type QuizLog struct {
-	ID        string    `json:"id" bson:"_id"`
-	UserID    string    `json:"user_id" bson:"user_id"`
-	UserName  string    `json:"user_name" bson:"user_name"`
-	CourseID  string    `json:"course_id" bson:"course_id"`
-	LessonID  string    `json:"lesson_id" bson:"lesson_id"`
-	TeacherID string    `json:"teacher_id" bson:"teacher_id"`
-	BlockID   string    `json:"block_id" bson:"block_id"`
-	Question  string    `json:"question" bson:"question"`
-	Correct   bool      `json:"correct" bson:"correct"`
-	Ms        int       `json:"ms" bson:"ms"` // асуулт харагдсанаас хариулах хүртэл
-	At        time.Time `json:"at" bson:"at"`
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	CourseID  string    `json:"course_id"`
+	LessonID  string    `json:"lesson_id"`
+	TeacherID string    `json:"teacher_id"`
+	BlockID   string    `json:"block_id"`
+	Question  string    `json:"question"`
+	Correct   bool      `json:"correct"`
+	Ms        int       `json:"ms"` // асуулт харагдсанаас хариулах хүртэл
+	At        time.Time `json:"at"`
 }
 
 // Reflection — хичээлийн дараа суралцагчийн бичсэн товч дүгнэлт ("юу сурсан бэ?").
 type Reflection struct {
-	ID        string    `json:"id" bson:"_id"` // user:lesson — нэг хичээлд нэг дүгнэлт
-	UserID    string    `json:"user_id" bson:"user_id"`
-	UserName  string    `json:"user_name" bson:"user_name"`
-	CourseID  string    `json:"course_id" bson:"course_id"`
-	LessonID  string    `json:"lesson_id" bson:"lesson_id"`
-	Lesson    string    `json:"lesson" bson:"lesson"`
-	TeacherID string    `json:"teacher_id" bson:"teacher_id"`
-	Text      string    `json:"text" bson:"text"`
-	Words     int       `json:"words" bson:"words"`
-	At        time.Time `json:"at" bson:"at"`
+	ID        string    `json:"id"` // user:lesson — нэг хичээлд нэг дүгнэлт
+	UserID    string    `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	CourseID  string    `json:"course_id"`
+	LessonID  string    `json:"lesson_id"`
+	Lesson    string    `json:"lesson"`
+	TeacherID string    `json:"teacher_id"`
+	Text      string    `json:"text"`
+	Words     int       `json:"words"`
+	At        time.Time `json:"at"`
 }
 
 // VideoWatch — видеоны хэсэг (10 секунд) бүрийг хэдэн удаа үзсэн (үзэлтийн зураглал).
 type VideoWatch struct {
-	ID        string      `json:"id" bson:"_id"` // user:lesson:block
-	UserID    string      `json:"user_id" bson:"user_id"`
-	UserName  string      `json:"user_name" bson:"user_name"`
-	CourseID  string      `json:"course_id" bson:"course_id"`
-	LessonID  string      `json:"lesson_id" bson:"lesson_id"`
-	TeacherID string      `json:"teacher_id" bson:"teacher_id"`
-	BlockID   string      `json:"block_id" bson:"block_id"`
-	Duration  int         `json:"duration" bson:"duration"` // секунд
-	Buckets   map[int]int `json:"buckets" bson:"buckets"`   // хэсгийн дугаар → үзсэн тоо
-	At        time.Time   `json:"at" bson:"at"`
+	ID        string      `json:"id"` // user:lesson:block
+	UserID    string      `json:"user_id"`
+	UserName  string      `json:"user_name"`
+	CourseID  string      `json:"course_id"`
+	LessonID  string      `json:"lesson_id"`
+	TeacherID string      `json:"teacher_id"`
+	BlockID   string      `json:"block_id"`
+	Duration  int         `json:"duration"` // секунд
+	Buckets   map[int]int `json:"buckets"`  // хэсгийн дугаар → үзсэн тоо
+	At        time.Time   `json:"at"`
 }
 
 // VideoBucketSec — үзэлтийн зураглалын нэг хэсгийн урт.

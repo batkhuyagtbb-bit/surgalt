@@ -1,0 +1,214 @@
+syntax = "proto3";
+
+// surgalt.mn — gRPC + Protobuf API.
+// Нээлттэй уншилт (багш, сургалт, хайлт) ба нэвтэрсэн хэрэглэгчийн идэвхийн урсгал
+// (сесс → цохилт → ClickHouse), багшийн статистик. Токен: metadata "authorization: Bearer <token>".
+package surgalt.v1;
+
+option go_package = "surgalt/internal/pb;pb";
+
+service Surgalt {
+  // ---- нээлттэй ----
+  rpc GetTeacher(GetTeacherRequest) returns (TeacherProfile);
+  rpc GetCourse(GetCourseRequest) returns (CourseDetail);
+  rpc Search(SearchRequest) returns (SearchResponse);
+
+  // ---- нэвтэрсэн хэрэглэгч ----
+  rpc Me(MeRequest) returns (User);
+  // Хичээл үзэх идэвхийн сесс нээнэ (хяналтын бодлого, усан тэмдэг буцаана).
+  rpc StartSession(StartSessionRequest) returns (StartSessionResponse);
+  // Клиент урсгалаар 15 секунд тутмын идэвхийн тайлан илгээнэ; сервер нийт идэвхтэй секундийг буцаана.
+  rpc Beat(stream BeatRequest) returns (stream BeatResponse);
+
+  // ---- багш ----
+  rpc GetAnalytics(AnalyticsRequest) returns (AnalyticsResponse);
+}
+
+message GetTeacherRequest { string username = 1; }
+
+message Link { string key = 1; string label = 2; string url = 3; }
+
+message Teacher {
+  string id = 1;
+  string username = 2;
+  string display_name = 3;
+  string headline = 4;
+  string bio = 5;
+  string avatar_url = 6;
+  string cover_url = 7;
+  repeated string subjects = 8;
+  string location = 9;
+  repeated Link links = 10;
+  int32 joined_year = 11;
+  int64 student_count = 12;
+  int32 course_count = 13;
+  int32 lesson_count = 14;
+  int32 free_lesson_count = 15;
+}
+
+message Course {
+  string id = 1;
+  string teacher_id = 2;
+  string title = 3;
+  string description = 4;
+  int64 price = 5;
+  bool published = 6;
+  bool drip = 7;
+  bool unlock_all_paid = 8;
+  string camera = 9;
+  bool certificate = 10;
+  int32 lesson_count = 11;
+  int32 free_lesson_count = 12;
+  int64 views = 13;
+  int64 created_at_unix = 14;
+}
+
+message TeacherProfile {
+  Teacher teacher = 1;
+  repeated Course courses = 2;
+  string top_course_id = 3;
+}
+
+message GetCourseRequest { string id = 1; }
+
+message Lesson {
+  string id = 1;
+  string title = 2;
+  bool is_free = 3;
+  int64 price = 4;
+  int32 position = 5;
+  int32 unlock_after_h = 6;
+  bool always_open = 7;
+  string format = 8;
+  string mode = 9;
+  string section = 10;
+  int32 active_min = 11;
+  bool exam = 12;
+}
+
+message CourseDetail {
+  Course course = 1;
+  Teacher teacher = 2;
+  repeated Lesson lessons = 3;
+}
+
+message SearchRequest {
+  string query = 1;
+  string tag = 2;   // free | paid | cert | exam | ""
+  int32 page = 3;
+}
+
+message SearchHit {
+  string course_id = 1;
+  string title = 2;
+  Teacher teacher = 3;
+  int64 price = 4;
+  int32 lessons = 5;
+  int32 free_lessons = 6;
+  int64 views = 7;
+  repeated string tags = 8;
+  string match = 9;
+}
+
+message SearchResponse {
+  repeated SearchHit items = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 pages = 4;
+  int32 per_page = 5;
+}
+
+message MeRequest {}
+
+message User {
+  string id = 1;
+  string username = 2;
+  string role = 3;
+  string display_name = 4;
+  string avatar_url = 5;
+}
+
+message StartSessionRequest {
+  string course_id = 1;
+  string lesson_id = 2;
+  string kind = 3; // lesson | exam
+}
+
+message Watermark { string name = 1; string id = 2; string ip = 3; }
+
+message Policy {
+  string camera = 1;
+  int32 ping_sec = 2;
+  int32 ping_answer_sec = 3;
+  int32 idle_sec = 4;
+  int32 beat_sec = 5;
+  int32 active_min = 6;
+  int32 active_done_sec = 7;
+  bool owner = 8;
+}
+
+message StartSessionResponse {
+  string session_id = 1;
+  Watermark watermark = 2;
+  Policy policy = 3;
+}
+
+message BeatEvent { string type = 1; string detail = 2; }
+
+message BeatRequest {
+  string session_id = 1;
+  int32 active = 2;
+  int32 idle = 3;
+  int32 away = 4;
+  double focus_sum = 5;
+  int32 focus_n = 6;
+  bool camera = 7;
+  string attempt_id = 8;
+  string end = 9;
+  repeated BeatEvent events = 10;
+}
+
+message BeatResponse {
+  bool ok = 1;
+  int32 active_done_sec = 2;
+}
+
+message AnalyticsRequest {
+  string course_id = 1; // хоосон = бүх сургалт
+  int32 days = 2;       // 0 = 30
+}
+
+message StudentStat {
+  string user_id = 1;
+  string name = 2;
+  int32 sessions = 3;
+  int32 total_sec = 4;
+  int32 active_sec = 5;
+  int32 active_pct = 6;
+  int32 attention = 7;
+  int32 violations = 8;
+  int32 lessons = 9;
+  int32 exam_best = 10;
+  int32 quiz_accuracy = 11;
+  int32 quiz_total = 12;
+  int32 reflections = 13;
+  int32 video_coverage = 14;
+  int32 streak_days = 15;
+  int32 learn_score = 16;
+  string risk = 17;
+  int64 last_at_unix = 18;
+  map<string, int32> counts = 19;
+}
+
+message DailyActivity { string day = 1; int32 active_sec = 2; int32 inactive_sec = 3; }
+
+message AnalyticsResponse {
+  repeated StudentStat students = 1;
+  repeated DailyActivity daily = 2;
+  int32 total_students = 3;
+  int32 live = 4;
+  int32 active_pct = 5;
+  int32 attention = 6;
+  int32 violations = 7;
+  int32 learn_score = 8;
+}

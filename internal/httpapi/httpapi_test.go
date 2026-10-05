@@ -2,6 +2,9 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"image"
@@ -14,6 +17,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -24,8 +28,39 @@ import (
 	"surgalt/internal/store"
 )
 
+// newTestStore: анхдагчаар санах ойн store. SURGALT_TEST_CLICKHOUSE_DSN өгвөл тест бүр өөрийн
+// ClickHouse сан дээр ажиллаж, дуусахад устгана — бүх API-г жинхэнэ сан дээр шалгана.
+func newTestStore(t *testing.T) store.Store {
+	t.Helper()
+	dsn := os.Getenv("SURGALT_TEST_CLICKHOUSE_DSN")
+	if dsn == "" {
+		return store.NewMemory()
+	}
+	u, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rb [6]byte
+	_, _ = rand.Read(rb[:])
+	db := "t_" + hex.EncodeToString(rb[:])
+	u.Path = "/" + db
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	ch, err := store.NewClickHouse(ctx, store.ClickHouseOptions{DSN: u.String()})
+	if err != nil {
+		t.Fatalf("clickhouse: %v", err)
+	}
+	t.Cleanup(func() {
+		cctx, c2 := context.WithTimeout(context.Background(), 30*time.Second)
+		defer c2()
+		_ = ch.DropDatabase(cctx, db)
+		ch.Close()
+	})
+	return ch
+}
+
 func newTestServer(t *testing.T) (*httptest.Server, store.Store) {
-	st := store.NewMemory()
+	st := newTestStore(t)
 	fs, err := files.New(t.TempDir(), []byte("k"), 10<<20)
 	if err != nil {
 		t.Fatal(err)

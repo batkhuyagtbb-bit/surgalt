@@ -6,12 +6,16 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"google.golang.org/grpc"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
+	"surgalt/internal/grpcapi"
 	"syscall"
 	"time"
 
@@ -111,9 +115,9 @@ func run(log *slog.Logger) error {
 	defer stop()
 
 	secret := os.Getenv("TOKEN_SECRET")
-	mongoURI := os.Getenv("MONGO_URI")
+	chDSN := os.Getenv("CLICKHOUSE_DSN")
 	if secret == "" {
-		if mongoURI != "" {
+		if chDSN != "" {
 			return errors.New("TOKEN_SECRET заавал тохируулна (32+ тэмдэгт)")
 		}
 		b := make([]byte, 32)
@@ -122,24 +126,20 @@ func run(log *slog.Logger) error {
 		log.Warn("TOKEN_SECRET тохируулаагүй — түр нууц үүсгэлээ (dev горим)")
 	}
 
-	// Өгөгдлийн сан
+	// Өгөгдлийн сан: бүх өгөгдөл ClickHouse-д. DSN хоосон бол санах ойн store (хөгжүүлэлт).
 	var st store.Store
-	var mg *store.Mongo
-	if mongoURI != "" {
-		cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-		var err error
-		mg, err = store.NewMongo(cctx, store.MongoOptions{
-			URI: mongoURI, Database: env("MONGO_DB", "surgalt"), MaxPoolSize: uint64(envInt("MONGO_POOL", 200)),
-		})
+	if chDSN != "" {
+		cctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		ch, err := store.NewClickHouse(cctx, store.ClickHouseOptions{DSN: chDSN})
 		cancel()
 		if err != nil {
 			return err
 		}
-		st = mg
-		log.Info("MongoDB холбогдлоо")
+		st = ch
+		log.Info("ClickHouse холбогдлоо")
 	} else {
 		st = store.NewMemory()
-		log.Warn("MONGO_URI хоосон — санах ойн store (өгөгдөл хадгалагдахгүй)")
+		log.Warn("CLICKHOUSE_DSN хоосон — санах ойн store (өгөгдөл хадгалагдахгүй)")
 	}
 	defer st.Close()
 
@@ -186,19 +186,6 @@ func run(log *slog.Logger) error {
 		}
 	}
 
-	// Чатыг олон серверт түгээх: MongoDB change stream (replica set шаардана).
-	if mg != nil {
-		if err := mg.WatchMessages(ctx, log, hub.Deliver); err != nil {
-			log.Warn("change stream ажиллахгүй (replica set биш?) — чат зөвхөн энэ серверт түгээгдэнэ", "err", err)
-		} else {
-			srv.Publish = nil // MongoDB бүх сервер рүү түгээнэ
-			log.Info("чат: MongoDB change stream-ээр бүх сервер рүү түгээнэ")
-		}
-		if err := mg.WatchNotifications(ctx, log, hub.Notify); err == nil {
-			srv.PublishNotif = nil
-		}
-	}
-
 	if envBool("SEED_DEMO") {
 		if err := seedDemo(ctx, st, fstore); err != nil {
 			log.Warn("seed", "err", err)
@@ -220,12 +207,30 @@ func run(log *slog.Logger) error {
 		log.Info("сервер эхэллээ", "addr", hs.Addr)
 		errc <- hs.ListenAndServe()
 	}()
+	// gRPC + Protobuf API (мобайл, сервис хоорондын харилцаа) — ижил логик, ижил ClickHouse.
+	var gs *grpc.Server
+	if addr := os.Getenv("GRPC_ADDR"); addr != "" {
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
+			return fmt.Errorf("grpc listen: %w", err)
+		}
+		gs = grpcapi.New(srv)
+		go func() {
+			log.Info("gRPC сервер эхэллээ", "addr", addr)
+			if err := gs.Serve(ln); err != nil {
+				errc <- fmt.Errorf("grpc: %w", err)
+			}
+		}()
+	}
 	select {
 	case err := <-errc:
 		return err
 	case <-ctx.Done():
 	}
 	log.Info("зогсож байна — идэвхтэй хүсэлтүүдийг дуусгаж байна")
+	if gs != nil {
+		gs.GracefulStop()
+	}
 	sctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	return hs.Shutdown(sctx)

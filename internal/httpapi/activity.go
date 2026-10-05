@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -49,11 +50,11 @@ func eventLabel(t string) string {
 }
 
 // logEvents нь логт бичиж, ноцтой зөрчлийг багшид мэдэгдэнэ (нэг суралцагч, нэг төрлөөр 2 минутад нэг).
-func (s *Server) logEvents(r *http.Request, evs []store.ActivityEvent) {
+func (s *Server) logEvents(ctx context.Context, evs []store.ActivityEvent) {
 	if len(evs) == 0 {
 		return
 	}
-	if err := s.store.AddActivityEvents(r.Context(), evs); err != nil {
+	if err := s.store.AddActivityEvents(ctx, evs); err != nil {
 		s.log.Warn("activity events", "err", err)
 	}
 	var ns []*store.Notification
@@ -72,7 +73,7 @@ func (s *Server) logEvents(r *http.Request, evs []store.ActivityEvent) {
 		ns = append(ns, &store.Notification{UserID: e.TeacherID, Type: "violation", Title: "⚠️ " + e.UserName + ": " + m.Label, Body: short(e.Detail), Link: "/me#students"})
 	}
 	n.mu.Unlock()
-	s.notify(r.Context(), ns...)
+	s.notify(ctx, ns...)
 }
 
 // handleActivityStart: POST /api/activity/start {"course_id","lesson_id","kind"}
@@ -89,38 +90,15 @@ func (s *Server) handleActivityStart(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if in.Kind != "exam" {
-		in.Kind = "lesson"
-	}
-	course, l, ok := s.lessonForUser(w, r, c.UID, in.CourseID, in.LessonID)
-	if !ok {
+	out, err := s.StartActivity(r.Context(), c.UID, c.Name, s.clientIP(r), in.CourseID, in.LessonID, in.Kind)
+	if s.apiErr(w, r, err) {
 		return
 	}
-	name := s.displayName(r, c.UID, c.Name)
-	sess := &store.StudySession{UserID: c.UID, UserName: name, CourseID: course.ID, LessonID: l.ID, TeacherID: course.TeacherID, Kind: in.Kind, Title: l.Title,
-		StartedAt: time.Now(), LastAt: time.Now(), IP: s.clientIP(r)}
-	if err := s.store.CreateSession(r.Context(), sess); s.storeErr(w, r, err) {
-		return
-	}
-	done, err := s.lessonActiveSec(r, c.UID, l.ID)
-	if s.storeErr(w, r, err) {
-		return
-	}
-	camera := course.Camera
-	if camera == "" {
-		camera = "optional"
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"session_id": sess.ID,
-		"watermark":  map[string]string{"name": name, "id": tail(c.UID, 6), "ip": sess.IP},
-		"policy": map[string]any{"camera": camera, "ping_sec": 300, "ping_answer_sec": 30, "idle_sec": 120, "beat_sec": 15,
-			"active_min": l.ActiveMin, "active_done_sec": done, "owner": course.TeacherID == c.UID},
-	})
+	writeJSON(w, http.StatusOK, out)
 }
 
-// lessonActiveSec — суралцагчийн тухайн хичээлд нийт идэвхтэй суралцсан секунд.
-func (s *Server) lessonActiveSec(r *http.Request, uid, lessonID string) (int, error) {
-	ss, err := s.store.Sessions(r.Context(), store.ActivityFilter{UserID: uid, LessonID: lessonID}, 1000)
+func (s *Server) lessonActiveSec(ctx context.Context, uid, lessonID string) (int, error) {
+	ss, err := s.store.Sessions(ctx, store.ActivityFilter{UserID: uid, LessonID: lessonID}, 1000)
 	total := 0
 	for _, x := range ss {
 		total += x.ActiveSec
@@ -137,84 +115,17 @@ func (s *Server) handleActivityBeat(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var in struct {
-		SessionID string  `json:"session_id"`
-		Active    int     `json:"active"`
-		Idle      int     `json:"idle"`
-		Away      int     `json:"away"`
-		FocusSum  float64 `json:"focus_sum"`
-		FocusN    int     `json:"focus_n"`
-		Camera    bool    `json:"camera"`
-		AttemptID string  `json:"attempt_id"`
-		End       string  `json:"end"`
-		Events    []struct {
-			Type   string `json:"type"`
-			Detail string `json:"detail"`
-		} `json:"events"`
-	}
+	var in BeatInput
 	if !decode(w, r, &in) {
 		return
 	}
-	sess, err := s.store.SessionByID(r.Context(), in.SessionID)
-	if err != nil || sess.UserID != c.UID {
-		writeErr(w, http.StatusNotFound, "сесс олдсонгүй")
+	done, err := s.RecordBeat(r.Context(), c.UID, in)
+	if s.apiErr(w, r, err) {
 		return
 	}
-	if sess.Ended {
-		writeErr(w, http.StatusConflict, "сесс дууссан")
-		return
-	}
-	// Өнгөрсөн бодит хугацаанаас их секунд тоолохгүй (хуурамч "идэвхтэй" цагаас хамгаална).
-	budget := int(time.Since(sess.LastAt).Seconds()) + 5
-	budget = min(max(budget, 0), 180)
-	clamp := func(v int) int {
-		v = min(max(v, 0), budget)
-		budget -= v
-		return v
-	}
-	b := store.SessionBeat{ActiveSec: clamp(in.Active), IdleSec: clamp(in.Idle), AwaySec: clamp(in.Away), Camera: in.Camera, Counts: map[string]int{}}
-	if in.FocusN > 0 && in.FocusN <= 400 {
-		b.FocusN, b.FocusSum = in.FocusN, min(max(in.FocusSum, 0), float64(in.FocusN))
-	}
-	if in.End != "" {
-		if _, ok := eventInfo[in.End]; ok || in.End == "closed" {
-			b.End = in.End
-		} else {
-			b.End = "closed"
-		}
-	}
-	var evs []store.ActivityEvent
-	for i, e := range in.Events {
-		if i >= maxBeatEvents {
-			break
-		}
-		if _, ok := eventInfo[e.Type]; !ok || strings.HasPrefix(e.Type, "exam_") || e.Type == "teacher_remind" {
-			continue
-		}
-		b.Counts[e.Type]++
-		d := e.Detail
-		if utf8.RuneCountInString(d) > 200 {
-			d = string([]rune(d)[:200])
-		}
-		evs = append(evs, store.ActivityEvent{UserID: c.UID, UserName: sess.UserName, CourseID: sess.CourseID, LessonID: sess.LessonID, TeacherID: sess.TeacherID,
-			SessionID: sess.ID, Type: e.Type, Detail: strings.TrimSpace(sess.Title + " · " + d)})
-	}
-	if err := s.store.AddSessionBeat(r.Context(), sess.ID, b); s.storeErr(w, r, err) {
-		return
-	}
-	s.logEvents(r, evs)
-	if in.AttemptID != "" {
-		for _, e := range evs {
-			if eventInfo[e.Type].Violation {
-				_ = s.store.AddAttemptViolation(r.Context(), in.AttemptID)
-			}
-		}
-	}
-	done, _ := s.lessonActiveSec(r, c.UID, sess.LessonID)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "active_done_sec": done})
 }
 
-// handleRemindStudent: POST /api/me/students/{uid}/remind {"course_id","message"} — багш суралцагчид сануулга илгээнэ.
 func (s *Server) handleRemindStudent(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireTeacher(w, r)
 	if !ok {
@@ -248,9 +159,9 @@ func (s *Server) handleRemindStudent(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	teacher := s.displayName(r, c.UID, c.Name)
+	teacher := s.displayName(r.Context(), c.UID, c.Name)
 	s.notify(r.Context(), &store.Notification{UserID: uid, Type: "remind", Title: "📣 " + teacher + " багшаас сануулга", Body: short(in.Message), Link: "/c/" + course.ID})
-	s.logEvents(r, []store.ActivityEvent{{UserID: uid, UserName: s.displayName(r, uid, ""), CourseID: course.ID, TeacherID: c.UID, Type: "teacher_remind", Detail: in.Message}})
+	s.logEvents(r.Context(), []store.ActivityEvent{{UserID: uid, UserName: s.displayName(r.Context(), uid, ""), CourseID: course.ID, TeacherID: c.UID, Type: "teacher_remind", Detail: in.Message}})
 	writeJSON(w, http.StatusOK, map[string]any{"sent": true})
 }
 

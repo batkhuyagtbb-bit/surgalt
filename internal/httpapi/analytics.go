@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"math"
@@ -151,14 +152,14 @@ type analyticsData struct {
 	Totals   map[string]any        `json:"totals"`
 }
 
-func (s *Server) buildAnalytics(r *http.Request, teacherID, courseID, userID string, days int) (*analyticsData, []store.StudySession, []store.ExamAttempt, error) {
+func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID string, days int) (*analyticsData, []store.StudySession, []store.ExamAttempt, error) {
 	since := time.Now().AddDate(0, 0, -days)
 	f := store.ActivityFilter{TeacherID: teacherID, CourseID: courseID, UserID: userID, Since: since}
-	ss, err := s.store.Sessions(r.Context(), f, 20000)
+	ss, err := s.store.Sessions(ctx, f, 20000)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	atts, err := s.store.ExamAttempts(r.Context(), store.ActivityFilter{TeacherID: teacherID, CourseID: courseID, UserID: userID, Since: since})
+	atts, err := s.store.ExamAttempts(ctx, store.ActivityFilter{TeacherID: teacherID, CourseID: courseID, UserID: userID, Since: since})
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -166,19 +167,19 @@ func (s *Server) buildAnalytics(r *http.Request, teacherID, courseID, userID str
 	if userID != "" {
 		evLimit = 500
 	}
-	evs, err := s.store.ActivityEvents(r.Context(), f, evLimit)
+	evs, err := s.store.ActivityEvents(ctx, f, evLimit)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	quizLogs, err := s.store.QuizLogs(r.Context(), f, 20000)
+	quizLogs, err := s.store.QuizLogs(ctx, f, 20000)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	refs, err := s.store.Reflections(r.Context(), f, 20000)
+	refs, err := s.store.Reflections(ctx, f, 20000)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	watches, err := s.store.VideoWatches(r.Context(), f)
+	watches, err := s.store.VideoWatches(ctx, f)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -340,7 +341,7 @@ func (s *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	data, _, _, err := s.buildAnalytics(r, c.UID, r.URL.Query().Get("course"), "", analyticsDays(r))
+	data, _, _, err := s.buildAnalytics(r.Context(), c.UID, r.URL.Query().Get("course"), "", analyticsDays(r))
 	if s.storeErr(w, r, err) {
 		return
 	}
@@ -356,7 +357,7 @@ func (s *Server) handleStudentAnalytics(w http.ResponseWriter, r *http.Request) 
 	uid := r.PathValue("uid")
 	days := analyticsDays(r)
 	courseID := r.URL.Query().Get("course")
-	data, ss, atts, err := s.buildAnalytics(r, c.UID, courseID, uid, days)
+	data, ss, atts, err := s.buildAnalytics(r.Context(), c.UID, courseID, uid, days)
 	if s.storeErr(w, r, err) {
 		return
 	}
@@ -453,7 +454,7 @@ func (s *Server) handleAnalyticsExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	data, ss, atts, err := s.buildAnalytics(r, c.UID, q.Get("course"), q.Get("student"), analyticsDays(r))
+	data, ss, atts, err := s.buildAnalytics(r.Context(), c.UID, q.Get("course"), q.Get("student"), analyticsDays(r))
 	if s.storeErr(w, r, err) {
 		return
 	}

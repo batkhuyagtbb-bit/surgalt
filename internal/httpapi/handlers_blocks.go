@@ -133,7 +133,7 @@ func (s *Server) handleAnswerQuiz(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusUnauthorized, "нэвтэрнэ үү")
 			return
 		}
-		has, err := s.lessonAccess(r, uid, course, l)
+		has, err := s.lessonAccess(r.Context(), uid, course, l)
 		if s.storeErr(w, r, err) {
 			return
 		}
@@ -173,7 +173,7 @@ func (s *Server) handleAnswerQuiz(w http.ResponseWriter, r *http.Request) {
 		if err := s.store.SaveQuizResult(r.Context(), uid, course.ID, l.ID, bid, correct); s.storeErr(w, r, err) {
 			return
 		}
-		s.store.AddQuizLog(r.Context(), store.QuizLog{UserID: uid, UserName: s.displayName(r, uid, ""), CourseID: course.ID, LessonID: l.ID, TeacherID: course.TeacherID, BlockID: bid,
+		s.store.AddQuizLog(r.Context(), store.QuizLog{UserID: uid, UserName: s.displayName(r.Context(), uid, ""), CourseID: course.ID, LessonID: l.ID, TeacherID: course.TeacherID, BlockID: bid,
 			Question: short(q.Question), Correct: correct, Ms: min(max(in.Ms, 0), 3600_000)})
 	}
 	out := revealQuiz(bid, q)

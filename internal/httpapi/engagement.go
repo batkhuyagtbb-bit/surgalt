@@ -44,7 +44,7 @@ func (s *Server) handleSaveReflection(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "дор хаяж 3 үгээр бичнэ үү")
 		return
 	}
-	ref := &store.Reflection{UserID: c.UID, UserName: s.displayName(r, c.UID, c.Name), CourseID: course.ID, LessonID: l.ID, Lesson: l.Title,
+	ref := &store.Reflection{UserID: c.UID, UserName: s.displayName(r.Context(), c.UID, c.Name), CourseID: course.ID, LessonID: l.ID, Lesson: l.Title,
 		TeacherID: course.TeacherID, Text: in.Text, Words: words}
 	if err := s.store.SaveReflection(r.Context(), ref); s.storeErr(w, r, err) {
 		return
@@ -88,7 +88,7 @@ func (s *Server) handleVideoProgress(w http.ResponseWriter, r *http.Request) {
 		}
 		clean[k] = min(n, 50)
 	}
-	v := store.VideoWatch{UserID: c.UID, UserName: s.displayName(r, c.UID, c.Name), CourseID: course.ID, LessonID: l.ID, TeacherID: course.TeacherID, BlockID: bid,
+	v := store.VideoWatch{UserID: c.UID, UserName: s.displayName(r.Context(), c.UID, c.Name), CourseID: course.ID, LessonID: l.ID, TeacherID: course.TeacherID, BlockID: bid,
 		Duration: min(max(in.Duration, 0), videoWatchMaxBuckets*store.VideoBucketSec), Buckets: clean}
 	if err := s.store.AddVideoWatch(r.Context(), v); s.storeErr(w, r, err) {
 		return

@@ -16,6 +16,6 @@ RUN apk add --no-cache ca-certificates tzdata ffmpeg libwebp \
 COPY --from=build /out/surgalt /usr/local/bin/surgalt
 USER app
 ENV ADDR=:8080 STORAGE_DIR=/data TZ=Asia/Ulaanbaatar
-EXPOSE 8080
+EXPOSE 8080 9090
 HEALTHCHECK --interval=10s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1
 ENTRYPOINT ["surgalt"]

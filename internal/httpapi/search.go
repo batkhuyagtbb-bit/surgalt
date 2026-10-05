@@ -328,18 +328,25 @@ type SearchHit struct {
 }
 
 // handleSearch: GET /api/search?q=&tag=free|paid|cert|exam&page=1
-func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
-	query := strings.TrimSpace(q.Get("q"))
+// SearchResult — хайлтын нэг хуудас.
+type SearchResult struct {
+	Items   []SearchHit `json:"items"`
+	Total   int         `json:"total"`
+	Page    int         `json:"page"`
+	Pages   int         `json:"pages"`
+	PerPage int         `json:"per_page"`
+}
+
+// SearchCourses нь нийтлэгдсэн сургалтуудаас хайна (HTTP ба gRPC хоёулаа үүнийг дуудна).
+func (s *Server) SearchCourses(ctx context.Context, query, tag string, page int) (*SearchResult, error) {
+	query = strings.TrimSpace(query)
 	if utf8.RuneCountInString(query) > 100 {
 		query = string([]rune(query)[:100])
 	}
-	tag := q.Get("tag")
-	page, _ := strconv.Atoi(q.Get("page"))
 	page = max(page, 1)
-	docs, err := s.searchDocs(r.Context())
-	if s.storeErr(w, r, err) {
-		return
+	docs, err := s.searchDocs(ctx)
+	if err != nil {
+		return nil, err
 	}
 	qt := tokens(query)
 	if len(qt) > 8 {
@@ -413,6 +420,17 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if items == nil {
 		items = []SearchHit{}
 	}
+	return &SearchResult{Items: items, Total: total, Page: page, Pages: pages, PerPage: searchPageSize}, nil
+}
+
+// handleSearch: GET /api/search?q=&tag=free|paid|cert|exam&page=1
+func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	page, _ := strconv.Atoi(q.Get("page"))
+	res, err := s.SearchCourses(r.Context(), q.Get("q"), q.Get("tag"), page)
+	if s.storeErr(w, r, err) {
+		return
+	}
 	w.Header().Set("Cache-Control", "public, max-age=15")
-	writeJSON(w, http.StatusOK, map[string]any{"items": items, "total": total, "page": page, "pages": pages, "per_page": searchPageSize})
+	writeJSON(w, http.StatusOK, res)
 }

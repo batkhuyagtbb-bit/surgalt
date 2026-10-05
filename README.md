@@ -34,24 +34,63 @@ Go дээр бичигдсэн, **секундэд 10 000+ хүсэлт** даа
 | Мэдэгдэл | Үзэлт, худалдан авалт, элсэлт, мессеж → бодит цагийн мэдэгдэл + браузерийн notification |
 | Responsive | Утас (≤560px), таблет (561–1100px), компьютер — бүгд шалгагдсан |
 
+## Өгөгдлийн сан: ClickHouse (бүх өгөгдөл)
+
+Хэрэглэгч, сургалт, хичээл, захиалга, чат, мэдэгдэл, шалгалт, идэвхийн лог, ном — бүгд ClickHouse-д.
+`CLICKHOUSE_DSN` хоосон бол санах ойн store (хөгжүүлэлт, өгөгдөл хадгалагдахгүй).
+
+```sh
+# Локал (Docker-гүй): нэг binary
+sh deploy/clickhouse-local.sh                      # :9000 native, :8123 http
+CLICKHOUSE_DSN=clickhouse://127.0.0.1:9000/surgalt ./surgalt
+# Docker: docker compose up -d --build  (ClickHouse + app + nginx)
+```
+
+ClickHouse нь OLAP сан тул store дараах зарчмаар бичигдсэн (`internal/store/clickhouse*.go`):
+
+- Өөрчлөгддөг entity бүр `ReplacingMergeTree(ver)`: засвар = шинэ хувилбартай мөр, уншихдаа `FINAL`; устгал = `deleted` тэмдэг.
+- Зөвхөн нэмэгддэг өгөгдөл (мессеж, лог, үйл явдал) — `MergeTree`; тоолуур — `SummingMergeTree`.
+- Имэйл/нэрний давхардал, төлбөрийн "яг нэг удаа", pending захиалгын дедуп — процесс доторх түгжээ.
+  **Тиймээс app-ийг нэг хуулбараар ажиллуулна**; олон хуулбар хэрэгтэй бол гадаад түгжээ (Redis) нэмнэ.
+- Тестийн суурь: `SURGALT_TEST_CLICKHOUSE_DSN=clickhouse://127.0.0.1:9000/default go test ./internal/httpapi`
+  — HTTP API-ийн бүх тест жинхэнэ ClickHouse дээр ажиллана (тест бүр өөрийн түр сантай).
+
+## gRPC + Protobuf API
+
+Схем: `proto/surgalt/v1/surgalt.proto`, үүсгэсэн код: `internal/pb`, үйлчилгээ: `internal/grpcapi`.
+`GRPC_ADDR` (анхдагч `:9090`) тохируулбал HTTP-тэй зэрэг асна; nginx `:9090`-ийг `grpc_pass`-аар дамжуулна.
+HTTP болон gRPC нэг л бизнес логик (`httpapi.Server`-ийн экспортлосон функцүүд), нэг л ClickHouse ашиглана.
+
+| RPC | Хэн | Юу |
+|---|---|---|
+| `GetTeacher`, `GetCourse`, `Search` | нээлттэй | Профайл, сургалт + хичээлийн тойм, ухаалаг хайлт |
+| `Me` | нэвтэрсэн | Өөрийн мэдээлэл (metadata: `authorization: Bearer <token>`) |
+| `StartSession`, `Beat` (stream) | нэвтэрсэн | Идэвхийн сесс, 15 сек тутмын тайлан → ClickHouse |
+| `GetAnalytics` | багш | Суралцагч бүрийн идэвх, анхаарал, суралцсан оноо |
+
+Код дахин үүсгэх: `protoc --proto_path=proto --go_out=internal/pb --go_opt=module=surgalt/internal/pb --go-grpc_out=internal/pb --go-grpc_opt=module=surgalt/internal/pb proto/surgalt/v1/surgalt.proto`
+(`protoc-gen-go`, `protoc-gen-go-grpc` нь `go install`-аар).
+
 ## Архитектур
 
 ```
 nginx (load balancer, WebSocket, том upload урсгал)
    │
-   ├── app ×3 (Go, stateless) ──── MongoDB replica set
+   ├── app (Go) ──── ClickHouse (бүх өгөгдөл: хэрэглэгч, сургалт, захиалга, чат, лог)
+   │     ├─ gRPC + Protobuf API (:9090) — мобайл/сервис хоорондын typed API
    │     ├─ процесс доторх кэш + singleflight (stampede хамгаалалт)
    │     ├─ урьдчилан рендерлэсэн HTML/JSON + ETag/304
    │     ├─ IP тус бүрийн rate limit, bcrypt-ийн зэрэгцээг хязгаарлана
    │     ├─ үзэлтийг санах ойд нэгтгэж 30с тутам багцаар бичнэ
-   │     └─ чат/мэдэгдэл: MongoDB change stream → бүх сервер рүү
+   │     └─ чат/мэдэгдэл: процесс доторх WebSocket hub
    └── файлын сан (хуваалцсан volume)
 ```
 
 ```
 cmd/server        — эхлэл, тохиргоо, демо өгөгдөл
 cmd/loadtest      — open-model ачааллын тест
-internal/store    — Store интерфэйс; MongoDB + санах ойн (dev/тест) хэрэгжүүлэлт
+internal/store    — Store интерфэйс; ClickHouse (ReplacingMergeTree + FINAL) ба санах ойн (dev/тест) хэрэгжүүлэлт
+internal/grpcapi  — gRPC + Protobuf үйлчилгээ (proto/surgalt/v1)
 internal/httpapi  — REST API, WebSocket, HTML загвар, статик (embed)
 internal/cache    — shard-лагдсан TTL кэш + singleflight
 internal/files    — багшийн файлын сан, WebP, видео/баримт хөрвүүлэлт, гарын үсэгтэй URL
@@ -64,7 +103,7 @@ internal/ratelimit
 
 ## Ачааллын тестийн үр дүн
 
-8 цөмтэй нэг машин дээр (клиент ба сервер хамт), MongoDB-тэй, 1 сервер:
+8 цөмтэй нэг машин дээр (клиент ба сервер хамт), ClickHouse-тэй, 1 сервер:
 
 | Ачаалал | Амжилттай | p50 | p99 | Серверийн санах ой |
 |---|---|---|---|---|

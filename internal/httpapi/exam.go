@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -14,40 +15,9 @@ import (
 // lessonForUser — суралцагч (эсвэл багш) энэ хичээлийг үзэх эрхтэй эсэхийг бүрэн шалгана:
 // нийтлэгдсэн, төлбөр, дараалсан нээлт. Эрхгүй бол хариуг бичээд false.
 func (s *Server) lessonForUser(w http.ResponseWriter, r *http.Request, uid, cid, lid string) (*store.Course, *store.Lesson, bool) {
-	course, err := s.store.CourseByID(r.Context(), cid)
-	if s.storeErr(w, r, err) {
+	course, l, err := s.LessonFor(r.Context(), uid, cid, lid)
+	if s.apiErr(w, r, err) {
 		return nil, nil, false
-	}
-	if !course.Published && course.TeacherID != uid {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
-		return nil, nil, false
-	}
-	l, err := s.store.LessonByID(r.Context(), cid, lid)
-	if s.storeErr(w, r, err) {
-		return nil, nil, false
-	}
-	has, err := s.lessonAccess(r, uid, course, l)
-	if s.storeErr(w, r, err) {
-		return nil, nil, false
-	}
-	if !has {
-		writeJSON(w, http.StatusPaymentRequired, map[string]any{"error": "энэ хичээл төлбөртэй", "lesson_price": l.Price, "course_price": course.Price})
-		return nil, nil, false
-	}
-	if course.Drip && !l.AlwaysOpen && course.TeacherID != uid {
-		lessons, err := s.store.LessonsByCourse(r.Context(), course.ID)
-		if s.storeErr(w, r, err) {
-			return nil, nil, false
-		}
-		progress, err := s.store.LessonProgress(r.Context(), uid, course.ID)
-		if s.storeErr(w, r, err) {
-			return nil, nil, false
-		}
-		enrolled, _ := s.store.IsEnrolled(r.Context(), uid, course.ID)
-		if st := dripState(course, lessons, l, progress, fullAccess(course, uid, enrolled), time.Now()); !st.Open {
-			writeJSON(w, http.StatusLocked, map[string]any{"error": "энэ хичээл хараахан нээгдээгүй", "state": st})
-			return nil, nil, false
-		}
 	}
 	return course, l, true
 }
@@ -163,7 +133,7 @@ func (s *Server) handleExamStart(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, fmt.Sprintf("оролдлогын тоо дууссан (%d)", l.Exam.Attempts))
 		return
 	}
-	a := &store.ExamAttempt{UserID: c.UID, UserName: s.displayName(r, c.UID, c.Name), CourseID: course.ID, LessonID: l.ID, TeacherID: course.TeacherID,
+	a := &store.ExamAttempt{UserID: c.UID, UserName: s.displayName(r.Context(), c.UID, c.Name), CourseID: course.ID, LessonID: l.ID, TeacherID: course.TeacherID,
 		StartedAt: time.Now(), Status: store.AttemptActive}
 	if l.Exam.TimeMin > 0 {
 		d := a.StartedAt.Add(time.Duration(l.Exam.TimeMin) * time.Minute)
@@ -178,7 +148,7 @@ func (s *Server) handleExamStart(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.CreateExamAttempt(r.Context(), a); s.storeErr(w, r, err) {
 		return
 	}
-	s.logEvents(r, []store.ActivityEvent{{UserID: c.UID, UserName: a.UserName, CourseID: course.ID, LessonID: l.ID, TeacherID: course.TeacherID, Type: "exam_start", Detail: l.Title}})
+	s.logEvents(r.Context(), []store.ActivityEvent{{UserID: c.UID, UserName: a.UserName, CourseID: course.ID, LessonID: l.ID, TeacherID: course.TeacherID, Type: "exam_start", Detail: l.Title}})
 	writeJSON(w, http.StatusCreated, s.attemptView(a, l))
 }
 
@@ -268,7 +238,7 @@ func (s *Server) finishAttempt(r *http.Request, a *store.ExamAttempt, l *store.L
 	if status == store.AttemptTerminated {
 		typ, title = "exam_terminated", fmt.Sprintf("⛔ %s-ийн шалгалт зөрчлөөр хаагдлаа", a.UserName)
 	}
-	s.logEvents(r, []store.ActivityEvent{{UserID: a.UserID, UserName: a.UserName, CourseID: a.CourseID, LessonID: a.LessonID, TeacherID: a.TeacherID,
+	s.logEvents(r.Context(), []store.ActivityEvent{{UserID: a.UserID, UserName: a.UserName, CourseID: a.CourseID, LessonID: a.LessonID, TeacherID: a.TeacherID,
 		Type: typ, Detail: fmt.Sprintf("%s · %d%% · %s", l.Title, a.Pct, reason)}})
 	if a.UserID != course.TeacherID {
 		s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: "exam", Title: title, Body: short(l.Title + " · " + reason), Link: "/me#students"})
@@ -279,8 +249,8 @@ func (s *Server) finishAttempt(r *http.Request, a *store.ExamAttempt, l *store.L
 	return true
 }
 
-func (s *Server) displayName(r *http.Request, uid, fallback string) string {
-	if u, err := s.store.UserByID(r.Context(), uid); err == nil && u.DisplayName != "" {
+func (s *Server) displayName(ctx context.Context, uid, fallback string) string {
+	if u, err := s.store.UserByID(ctx, uid); err == nil && u.DisplayName != "" {
 		return u.DisplayName
 	}
 	return fallback

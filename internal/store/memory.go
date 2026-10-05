@@ -5,7 +5,6 @@ import (
 	"context"
 	"slices"
 
-	"go.mongodb.org/mongo-driver/v2/bson"
 	"sort"
 	"strings"
 	"sync"
@@ -50,7 +49,7 @@ func NewMemory() *Memory {
 func (m *Memory) Close() {}
 
 // next нь процесс дотор өсөх дараалалтай ObjectID үүсгэнэ.
-func (m *Memory) next() string { return bson.NewObjectID().Hex() }
+func (m *Memory) next() string { return NewID() }
 
 func (m *Memory) CreateUser(_ context.Context, u *User) error {
 	m.mu.Lock()

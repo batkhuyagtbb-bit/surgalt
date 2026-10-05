@@ -1,5 +1,5 @@
 // Package store нь өгөгдлийн давхарга: загварууд болон Store интерфэйс.
-// ID бүр MongoDB ObjectID-ийн hex мөр (24 тэмдэгт).
+// ID бүр 24 тэмдэгттэй hex мөр (цаг хугацаагаар эрэмбэлэгддэг, store.NewID).
 package store
 
 import (
@@ -151,40 +151,40 @@ type Lesson struct {
 // энгийн тэмдэглэгээ: **тод**, *налуу*, __доогуур__, ==тодруулга==, [холбоос](https://…), "- " жагсаалт, "> " ишлэл),
 // heading-д гарчиг, медиа төрөлд тайлбар.
 type Block struct {
-	ID   string `json:"id" bson:"id"`
-	Type string `json:"type" bson:"type"`
-	Text string `json:"text,omitempty" bson:"text,omitempty"`
-	URL  string `json:"url,omitempty" bson:"url,omitempty"`
-	Name string `json:"name,omitempty" bson:"name,omitempty"`
-	Size int64  `json:"size,omitempty" bson:"size,omitempty"`
-	Quiz *Quiz  `json:"quiz,omitempty" bson:"quiz,omitempty"`
+	ID   string `json:"id"`
+	Type string `json:"type"`
+	Text string `json:"text,omitempty"`
+	URL  string `json:"url,omitempty"`
+	Name string `json:"name,omitempty"`
+	Size int64  `json:"size,omitempty"`
+	Quiz *Quiz  `json:"quiz,omitempty"`
 	// Download — файлын хэсэгт: суралцагч татаж авахыг багш зөвшөөрсөн эсэх (анхдагч: зөвхөн үзнэ).
-	Download bool `json:"download,omitempty" bson:"download,omitempty"`
+	Download bool `json:"download,omitempty"`
 }
 
 // Quiz — нэг асуулт. Зөв хариулт (Correct, Answers, Spot, Right-ийн дараалал) ба Explain нь
 // суралцагчид хариулахаас өмнө илгээгдэхгүй.
 type Quiz struct {
 	// Kind: single (нэг сонголт), multi (олон сонголт), text (бичгээр), match (харгалзуулах), image (зурган дээр заах).
-	Kind     string   `json:"kind,omitempty" bson:"kind,omitempty"`
-	Question string   `json:"question" bson:"question"`
-	Image    string   `json:"image,omitempty" bson:"image,omitempty"` // асуултын зураг; image төрөлд заавал
-	Options  []string `json:"options,omitempty" bson:"options,omitempty"`
-	Correct  []int    `json:"correct,omitempty" bson:"correct,omitempty"`
-	Multi    bool     `json:"multi,omitempty" bson:"multi,omitempty"`
-	Answers  []string `json:"answers,omitempty" bson:"answers,omitempty"` // text: зөвд тооцох хариултууд
-	Left     []string `json:"left,omitempty" bson:"left,omitempty"`       // match: зүүн багана
-	Right    []string `json:"right,omitempty" bson:"right,omitempty"`     // match: Right[i] нь Left[i]-ийн хос
-	Spot     *Spot    `json:"spot,omitempty" bson:"spot,omitempty"`       // image: зөв хэсэг (хувиар)
-	Points   int      `json:"points,omitempty" bson:"points,omitempty"`   // шалгалтын оноо (0 = 1)
-	Explain  string   `json:"explain,omitempty" bson:"explain,omitempty"`
+	Kind     string   `json:"kind,omitempty"`
+	Question string   `json:"question"`
+	Image    string   `json:"image,omitempty"` // асуултын зураг; image төрөлд заавал
+	Options  []string `json:"options,omitempty"`
+	Correct  []int    `json:"correct,omitempty"`
+	Multi    bool     `json:"multi,omitempty"`
+	Answers  []string `json:"answers,omitempty"` // text: зөвд тооцох хариултууд
+	Left     []string `json:"left,omitempty"`    // match: зүүн багана
+	Right    []string `json:"right,omitempty"`   // match: Right[i] нь Left[i]-ийн хос
+	Spot     *Spot    `json:"spot,omitempty"`    // image: зөв хэсэг (хувиар)
+	Points   int      `json:"points,omitempty"`  // шалгалтын оноо (0 = 1)
+	Explain  string   `json:"explain,omitempty"`
 }
 
 // Spot — зураг дээрх зөв хэсэг: төв (X, Y) ба радиус R, зургийн өргөн/өндрийн хувиар.
 type Spot struct {
-	X float64 `json:"x" bson:"x"`
-	Y float64 `json:"y" bson:"y"`
-	R float64 `json:"r" bson:"r"`
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+	R float64 `json:"r"`
 }
 
 // QuizKind нь хуучин (Kind хоосон) асуултыг Multi-аар нь ангилна.
@@ -200,11 +200,11 @@ func (q *Quiz) QuizKind() string {
 
 // Exam — хичээлийг шалгалт болгоно: асуулт блокууд нь шалгалтын даалгавар.
 type Exam struct {
-	TimeMin     int  `json:"time_min" bson:"time_min"`         // хугацаа (минут), 0 = хязгааргүй
-	Attempts    int  `json:"attempts" bson:"attempts"`         // оролдлогын тоо, 0 = хязгааргүй
-	PassPct     int  `json:"pass_pct" bson:"pass_pct"`         // тэнцэх хувь
-	Shuffle     bool `json:"shuffle" bson:"shuffle"`           // асуултын дарааллыг холих
-	ShowAnswers bool `json:"show_answers" bson:"show_answers"` // дууссаны дараа зөв хариултыг харуулах
+	TimeMin     int  `json:"time_min"`     // хугацаа (минут), 0 = хязгааргүй
+	Attempts    int  `json:"attempts"`     // оролдлогын тоо, 0 = хязгааргүй
+	PassPct     int  `json:"pass_pct"`     // тэнцэх хувь
+	Shuffle     bool `json:"shuffle"`      // асуултын дарааллыг холих
+	ShowAnswers bool `json:"show_answers"` // дууссаны дараа зөв хариултыг харуулах
 }
 
 // BlockTypes — зөвшөөрөгдсөн блокийн төрлүүд.

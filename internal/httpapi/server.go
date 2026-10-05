@@ -57,7 +57,7 @@ type Server struct {
 	Meet *meet.Client
 
 	// Publish нь шинэ мессежийг бусад серверүүдэд хүргэнэ.
-	// Change stream идэвхтэй бол nil (MongoDB өөрөө түгээнэ), үгүй бол локал hub.
+	// nil бол зөвхөн локал hub (ClickHouse store нэг сервер хуулбартай ажилладаг).
 	Publish func(store.Message)
 	// PublishNotif нь мэдэгдлийг түгээнэ (change stream идэвхтэй бол nil).
 	PublishNotif func(store.Notification)

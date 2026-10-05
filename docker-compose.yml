@@ -1,14 +1,20 @@
-# Production-д ойр бүтэц: MongoDB replica set + 3 app хуулбар + nginx load balancer.
+# Production-д ойр бүтэц: ClickHouse + app + nginx load balancer.
 #   cp .env.example .env   # нууц утгуудаа бөглөнө
 #   docker compose up -d --build
+# Анхаар: ClickHouse store нь имэйлийн давхардал, төлбөрийн "яг нэг удаа" зэргийг процесс доторх
+# түгжээгээр хангадаг тул app-ийг НЭГ хуулбараар ажиллуулна (replicas: 1).
 services:
-  mongo:
-    image: mongo:8.0
-    command: ["--replSet", "rs0", "--bind_ip_all", "--wiredTigerCacheSizeGB", "1"]
-    volumes: [mongo:/data/db]
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    environment:
+      CLICKHOUSE_DB: surgalt
+      CLICKHOUSE_USER: surgalt
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-surgalt}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes: [clickhouse:/var/lib/clickhouse]
+    ulimits: { nofile: { soft: 262144, hard: 262144 } }
     healthcheck:
-      # Анх удаа replica set-ийг эхлүүлнэ (change stream-д шаардлагатай).
-      test: mongosh --quiet --eval "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok }"
+      test: wget -qO- http://127.0.0.1:8123/ping || exit 1
       interval: 5s
       retries: 30
     restart: unless-stopped
@@ -17,22 +23,23 @@ services:
     build: .
     env_file: .env
     environment:
-      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      CLICKHOUSE_DSN: clickhouse://surgalt:${CLICKHOUSE_PASSWORD:-surgalt}@clickhouse:9000/surgalt?dial_timeout=10s
       TRUST_PROXY: "1"
-    volumes: [files:/data]   # бүх хуулбар нэг файлын сантай
+      GRPC_ADDR: ":9090"
+    volumes: [files:/data]
     depends_on:
-      mongo: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
     deploy:
-      replicas: 3
+      replicas: 1
     restart: unless-stopped
 
   nginx:
     image: nginx:1.27-alpine
-    ports: ["80:80"]
+    ports: ["80:80", "9090:9090"]
     volumes: [./deploy/nginx.conf:/etc/nginx/nginx.conf:ro]
     depends_on: [app]
     restart: unless-stopped
 
 volumes:
-  mongo:
+  clickhouse:
   files:
