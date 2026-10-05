@@ -1,0 +1,4 @@
+{{template "head" (dict "Title" .Message "Desc" .Message "Page" "error")}}
+<main class="hero"><div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+<div class="hero-inner center"><p class="eyebrow">{{.Status}}</p><h1 class="display split">{{.Message}}</h1><a class="btn btn-gold reveal" href="/">Нүүр хуудас</a></div></main>
+{{template "foot" (dict "Page" "error")}}

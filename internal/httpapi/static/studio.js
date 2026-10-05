@@ -1,0 +1,1571 @@
+/* surgalt.mn — багшийн удирдлагын хэсгүүд (тойм, сургалт, файл, шууд хичээл, тохиргоо, чат).
+   Багшийн өөрийн нээлттэй профайл дээр ачаалагдаж, window.Studio.mount-аар таб дотор рендерлэнэ. */
+(async () => {
+"use strict";
+const isStudio = false; // тусдаа студи хуудас байхгүй; бүх зүйл профайл дээр
+const { $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, msgHTML, celebrate, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT } = window.SG;
+if (!Auth.token) return;
+let me;
+try { me = await api("/api/me"); Auth.set(Auth.token, me); } catch { return; }
+let main = null;
+const teacher = me.role === "teacher";
+const fmtSize = (b) => b >= 1 << 30 ? (b / (1 << 30)).toFixed(2) + " GB" : b >= 1 << 20 ? (b / (1 << 20)).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+const initialsOf = (name) => (name || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+const avatar = (u, cls = "avatar-md") => `<div class="avatar ${cls}" style="--h:${hueOfName(u.username)}">${u.avatar_url ? `<img src="${esc(u.avatar_url)}" alt="">` : esc(initialsOf(u.display_name))}</div>`;
+const countUp = (el, end, fmt = (n) => n.toLocaleString("en-US")) => {
+  if (!el) return;
+  const t0 = performance.now();
+  const f = (t) => { const p = Math.min(1, (t - t0) / 900); el.textContent = fmt(Math.round(end * (1 - Math.pow(1 - p, 4)))); if (p < 1) requestAnimationFrame(f); };
+  requestAnimationFrame(f);
+};
+const panel = (html, d = 0, cls = "") => `<section class="panel ${cls}" style="--d:${d}">${html}</section>`;
+
+/* Нэг хэв маягийн шугаман дүрсүүд (emoji биш — бүх дэлгэцэд ижил, хурц харагдана). */
+const ICON = {
+  home: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/>',
+  courses: '<path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/>',
+  files: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  live: '<rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/>',
+  chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/>',
+  profile: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>',
+  ext: '<path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
+  out: '<path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4"/><path d="m16 8 4 4-4 4"/><path d="M20 12H9"/>',
+  money: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 9v.01M17 15v.01"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.7c2 .7 3.5 2.4 3.5 5.3"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>',
+  book: '<path d="M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h7"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  chevron: '<path d="m9 6 6 6-6 6"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.500 2.500 3.800 5.500 3.800 9s-1.300 6.500-3.800 9c-2.500-2.500-3.800-5.500-3.800-9S9.500 5.500 12 3Z"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.500 6.500 4 4"/>',
+  clip: '<path d="m20 11-8.500 8.500a5 5 0 0 1-7-7L13 4a3.300 3.300 0 0 1 4.700 4.700l-8.400 8.400a1.700 1.700 0 0 1-2.400-2.400L14.500 7"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1"/><path d="M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.500M12 18.500V21M3 12h2.500M18.500 12H21M5.600 5.600l1.800 1.800M16.600 16.600l1.800 1.800M5.600 18.400l1.800-1.800M16.600 7.400l1.800-1.800"/>',
+  back: '<path d="M15 6l-6 6 6 6"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  grip: '<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>',
+  list: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  quiz: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.500 2.300c-.900.400-1 1-1 1.700M12 17h.01"/>',
+  heading: '<path d="M6 4v16M18 4v16M6 12h12"/>',
+  text: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+  up: '<path d="m6 15 6-6 6 6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+};
+const ico = (n, size = 20) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n] || ""}</svg>`;
+
+Live.connect(Auth.token);
+
+const logout = () => { Auth.clear(); location.href = "/"; };
+const setDrawer = () => {};
+let searchCourses = null;
+let cleanup = null;
+
+const views = { overview, courses, books, course: (id) => courseEditor(id), files, live, chat: (id) => chat(id), profile, learning, students };
+
+/* Профайл хуудаснаас дуудагдана: тухайн хэсгийг өгсөн контейнерт рендерлэнэ. */
+window.Studio = {
+  me: () => me,
+  teacher,
+  async mount(container, view, arg) {
+    cleanup?.(); cleanup = null;
+    main = container;
+    main.innerHTML = `<div class="loader"></div>`;
+    try { await (views[view] || views.overview)(arg); }
+    catch (e) { main.innerHTML = panel(`<p class="form-error">${esc(e.message)}</p>`); }
+  },
+};
+
+/* ---------- Нүүр (тойм) ---------- */
+async function overview() {
+  const [sales, courses, storage, meetings, home] = await Promise.all([
+    api("/api/me/sales?limit=8"), api("/api/me/courses"), api("/api/me/storage"), api("/api/me/meetings").catch(() => []), api("/api/me/home")]);
+  me = home.user; Auth.set(Auth.token, me);
+  const tp = home.teacher, ins = tp.insights;
+  const views = courses.reduce((n, c) => n + (c.views || 0), 0);
+  const titleOf = Object.fromEntries(courses.map((c) => [c.id, c.title]));
+  const now = new Date(), hr = now.getHours();
+  const hello = hr < 5 ? "Шөнийн мэнд" : hr < 12 ? "Өглөөний мэнд" : hr < 18 ? "Өдрийн мэнд" : "Оройн мэнд";
+  const dayKey = (d) => new Date(d).toDateString();
+  const until = (t) => {
+    const m = Math.round((new Date(t) - Date.now()) / 60000);
+    if (m <= 0) return "Одоо явагдаж байна";
+    if (m < 60) return m + " мин дараа";
+    if (m < 1440) return Math.floor(m / 60) + " ц " + (m % 60) + " мин дараа";
+    return Math.floor(m / 1440) + " хоногийн дараа";
+  };
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(now); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i); return d; });
+  const perDay = (d) => meetings.filter((m) => dayKey(m.starts_at) === dayKey(d));
+  const next = meetings[0];
+  const todo = ins.tips.filter((t) => !t.done).slice(0, 3);
+  const info = (k, v) => `<div class="info"><dt>${k}</dt><dd>${v ? esc(v) : "—"}</dd></div>`;
+  const tile = (icon, tone, id, label, sub, href) => `<a class="stat-tile" href="${href}"><span class="stat-ico ${tone}">${ico(icon)}</span><b id="${id}">0</b><strong>${label}</strong><small>${sub}</small></a>`;
+
+  main.innerHTML = `<div class="ov">
+    <div class="ov-main">
+      <section class="banner">
+        <div class="grow"><span class="banner-hi">${hello},</span><h1>${esc(me.display_name)}</h1>
+          <div class="banner-chips">
+            <span>${ico("cal", 15)}${fmtDay(now, true)}</span>
+            <span>${ico("courses", 15)}${tp.published}/${tp.courses} сургалт нийтлэгдсэн</span>
+            ${me.headline ? `<span>${ico("profile", 15)}${esc(me.headline)}</span>` : ""}
+          </div></div>
+        <div class="banner-clock"><b id="clock">--:--</b><span>${WEEKDAYS[now.getDay()]} гараг</span></div>
+      </section>
+
+      <div class="stat-tiles">
+        ${tile("money", "t-indigo", "kSum", "Нийт орлого", sales.count + " борлуулалт", "#ov-sales")}
+        ${tile("users", "t-amber", "kStu", "Суралцагч", "элссэн хүмүүс", "#students")}
+        ${tile("eye", "t-teal", "kPv", "Профайл үзэлт", "нээлттэй хуудас", "/t/" + esc(me.username))}
+        ${tile("book", "t-pink", "kCv", "Сургалт үзэлт", courses.length + " сургалт", "#courses")}
+      </div>
+
+      ${panel(`<div class="panel-head"><h2>${ico("courses")}Миний сургалтууд</h2><a class="link" href="#courses">Бүгдийг харах ${ico("chevron", 14)}</a></div>
+        <div class="group-grid">${courses.slice(0, 6).map((c) => `
+          <a class="group" href="#course=${esc(c.id)}" style="--h:${hueOfName(c.title)}"><div class="group-art"><span class="chip">${c.published ? "Нийтлэгдсэн" : "Ноорог"}</span><b>${esc(c.title.trim()[0] || "?")}</b></div>
+          <div class="group-body"><strong>${esc(c.title)}</strong><small>${ico("book", 14)}${c.lesson_count} хичээл · ${ico("eye", 14)}${c.views || 0} · ${money(c.price)}</small></div></a>`).join("")}
+          <a class="group group-new" href="#courses">${ico("plus", 26)}<strong>Шинэ сургалт</strong></a></div>`, 1)}
+
+      <div class="ov-split">
+        ${panel(`<div class="panel-head"><h2>${ico("cal")}Шууд хичээлийн хуваарь</h2><a class="link" href="#live">Товлох ${ico("chevron", 14)}</a></div>
+          <div class="days" id="days">${days.map((d, i) => { const n = perDay(d).length; return `<button class="day ${i ? "" : "active"}" data-i="${i}"><small>${WEEKDAYS_SHORT[d.getDay()]}</small><b>${String(d.getDate()).padStart(2, "0")}</b>${n ? `<i>${n}</i>` : ""}</button>`; }).join("")}</div>
+          <div class="agenda" id="agenda"></div>`, 2)}
+        <div class="ov-stack">
+          ${panel(`<div class="panel-head"><h2>${ico("clock")}Дараагийн хичээл</h2></div>${next ? `
+            <p class="next-when">${fmtDate(next.starts_at)} <span class="chip chip-amber">${until(next.starts_at)}</span></p>
+            <h3 class="next-title">${esc(next.title)}</h3><p class="muted small">${next.duration_min} мин${titleOf[next.course_id] ? " · " + esc(titleOf[next.course_id]) : ""}</p>
+            <div class="hero-cta" style="margin-top:12px"><a class="btn btn-gold btn-sm" href="${esc(next.meet_url)}" target="_blank" rel="noopener">${ico("live", 16)}Live эхлүүлэх</a><a class="btn btn-ghost btn-sm" href="#live">Хуваарь</a></div>`
+            : `<div class="empty" style="padding:22px">Товлосон хичээл алга<br><a class="btn btn-gold btn-sm" style="margin-top:10px" href="#live">Шууд хичээл товлох</a></div>`}`, 3)}
+          ${panel(`<div class="panel-head"><h2>${ico("files")}Файлын сан</h2><a class="link" href="#files">Удирдах ${ico("chevron", 14)}</a></div>
+            <div class="meter"><i id="sMeter"></i></div><p class="muted small" style="margin:.6em 0 0">${fmtSize(storage.used)} / ${fmtSize(storage.quota)} ашигласан</p>`, 4)}
+        </div>
+      </div>
+
+      ${panel(`<div class="panel-head" id="ov-sales"><h2>${ico("money")}Сүүлийн борлуулалт</h2></div>${sales.recent.length ? `<table class="table"><thead><tr><th>Сургалт</th><th>Худалдан авагч</th><th>Дүн</th><th>Огноо</th></tr></thead><tbody>
+        ${sales.recent.map((x) => `<tr><td>${esc(x.course_title)}</td><td>@${esc(x.buyer_username)}</td><td><strong>${money(x.amount)}</strong></td><td class="muted">${fmtDate(x.paid_at)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">Анхны борлуулалтаа хүлээж байна ✨</div>`}`, 5)}
+    </div>
+
+    <aside class="ov-side">
+      ${isStudio ? `<section class="idcard">
+        <div class="idcard-top">
+          <div class="idcard-avatar">${me.avatar_url ? `<img src="${esc(me.avatar_url)}" alt="">` : esc(initialsOf(me.display_name))}</div>
+          <strong>${esc(me.display_name)}</strong><small>@${esc(me.username)}</small><span class="idcard-role">БАГШ</span>
+          <div class="idcard-actions">
+            <a href="#profile">${ico("profile")}<span>Профайл</span></a>
+            <a href="/t/${esc(me.username)}" target="_blank" rel="noopener">${ico("ext")}<span>Нээлттэй</span></a>
+            <button id="idLogout" class="danger">${ico("out")}<span>Гарах</span></button>
+          </div>
+        </div>
+        <dl class="idcard-info"><p class="info-title">Хувийн мэдээлэл</p>
+          ${info("Нэр", me.display_name)}${info("Мэргэжил", me.headline)}${info("Чиглэл", (me.subjects || []).join(", "))}${info("Байршил", me.location)}${info("И-мэйл", me.email)}
+        </dl>
+      </section>` : ""}
+      ${panel(`<div class="strength">${ringHTML(ins.score)}<div><strong>Профайлын бүрдэл</strong><p class="muted small" style="margin:.2em 0 0">${esc(ins.level)} · ${ins.tips.filter((t) => t.done).length}/${ins.tips.length} алхам</p></div></div>
+        ${todo.length ? `<ul class="tips">${todo.map((t) => `<li><a class="tip" href="${esc(t.link)}"><i>✓</i><span><strong>${esc(t.title)}</strong><small>${esc(t.hint)}</small></span></a></li>`).join("")}</ul>` : `<p class="muted small" style="margin:14px 0 0">Профайл тань бүрэн бүрдсэн байна 🎉</p>`}`, 2)}
+      ${isStudio ? panel(`<div class="qr-side"><div class="qr-frame"><img src="/t/${esc(me.username)}/qr.png?size=512" width="132" height="132" alt="Профайлын QR"></div>
+        <strong>Профайлаа түгээ</strong><p class="muted small" style="word-break:break-all;margin:0">${esc(location.host)}/t/${esc(me.username)}</p>
+        <div class="hero-cta" style="margin-top:6px;justify-content:center"><a class="btn btn-gold btn-sm" href="/t/${esc(me.username)}/qr.png?size=1024&download=1">QR татах</a><button class="btn btn-ghost btn-sm" id="copyLink">Хуулах</button></div></div>`, 3) : ""}
+    </aside></div>`;
+
+  // Хавтанд багтахын тулд том дүнг товчилно (1,250,000₮ -> 1.25 сая₮).
+  const short = (n) => (n >= 1e9 ? +(n / 1e9).toFixed(2) + " тэрбум₮" : n >= 1e6 ? +(n / 1e6).toFixed(2) + " сая₮" : n ? money(n) : "0₮");
+  countUp($("#kSum"), sales.total_amount, short);
+  countUp($("#kStu"), tp.students); countUp($("#kPv"), me.profile_views || 0); countUp($("#kCv"), views);
+  requestAnimationFrame(() => { const m = $("#sMeter"); if (m) m.style.width = Math.min(100, (storage.used / storage.quota) * 100) + "%"; });
+  if ($("#copyLink")) $("#copyLink").onclick = () => navigator.clipboard.writeText(`${location.origin}/t/${me.username}`).then(() => toast("Хуулагдлаа ✓"), () => toast(`${location.origin}/t/${me.username}`));
+  if ($("#idLogout")) $("#idLogout").onclick = logout;
+
+  const agenda = (i) => {
+    const list = perDay(days[i]);
+    $("#agenda").innerHTML = list.map((m) => { const end = new Date(new Date(m.starts_at).getTime() + m.duration_min * 60000); return `
+      <div class="slot"><div class="slot-time"><b>${fmtTime(m.starts_at)}</b><small>${fmtTime(end)}</small></div>
+        <div class="slot-body"><div class="slot-top"><span class="chip chip-gold">Live</span>${titleOf[m.course_id] ? `<span class="muted small">${esc(titleOf[m.course_id])}</span>` : ""}<span class="chip chip-amber" style="margin-left:auto">${until(m.starts_at)}</span></div>
+        <strong>${esc(m.title)}</strong><small class="muted">${m.duration_min} мин</small>
+        <div class="slot-actions"><a class="btn btn-sm btn-danger" href="${esc(m.meet_url)}" target="_blank" rel="noopener">${ico("live", 15)}Live</a>${m.course_id ? `<a class="btn btn-sm btn-ghost" href="#course=${esc(m.course_id)}">${ico("courses", 15)}Сургалт</a>` : ""}</div></div></div>`; }).join("") ||
+      `<p class="muted small" style="padding:18px 4px;margin:0">Энэ өдөр товлосон хичээл алга.</p>`;
+  };
+  $("#days").onclick = (e) => { const b = e.target.closest(".day"); if (!b) return; $$(".day", $("#days")).forEach((x) => x.classList.toggle("active", x === b)); agenda(+b.dataset.i); };
+  agenda(0);
+
+  const tick = () => { const c = $("#clock"); if (c) { const d = new Date(); c.innerHTML = `${fmtTime(d)}<small>:${String(d.getSeconds()).padStart(2, "0")}</small>`; } };
+  tick(); const iv = setInterval(tick, 1000);
+  cleanup = () => clearInterval(iv);
+}
+
+/* ---------- Сургалтууд: групп шиг удирдана ----------
+   Сургалт бүр нэг "групп". Дотор нь багш хичээлээ мэдээ нийтэлж байгаа мэт бичиж,
+   хавсралт нэмж, урсгал (feed) хэлбэрээр харж, тэр дор нь засна. */
+
+const courseFormHTML = (c = {}) => `
+  <label>Сургалтын нэр<input name="title" required maxlength="200" value="${esc(c.title || "")}" placeholder="ЭЕШ Математик — Бүрэн бэлтгэл"></label>
+  <label>Тайлбар<textarea name="description" rows="4" placeholder="Энэ сургалтаар юу сурах вэ?">${esc(c.description || "")}</textarea></label>
+  <div class="form-row"><label>Багц үнэ (₮)<input name="price" type="number" min="0" step="1000" value="${c.price || 0}"><small class="muted">0 бол хичээл тус бүрээр зарна</small></label>
+  <label class="check" style="align-self:center"><input type="checkbox" name="published" ${c.published ? "checked" : ""}> Нийтлэх (профайл дээр харагдана)</label></div>
+  <fieldset><legend>Хичээлийн нээлт</legend>
+    <label class="check"><input type="checkbox" name="drip" ${c.drip ? "checked" : ""}> Дарааллаар нээгдэнэ — суралцагч өмнөх хичээлээ үзсэний дараа дараагийнх нь нээгдэнэ</label>
+    <label class="check"><input type="checkbox" name="unlock_all_paid" ${c.unlock_all_paid !== false ? "checked" : ""}> Багцын төлбөр төлсөн суралцагчид бүх хичээл шууд нээлттэй</label>
+    <small class="muted">Хичээл бүрийн хүлээх хугацааг (шууд, цаг, 7 хоног, сар) хичээл дээр нь тохируулна.</small></fieldset>
+  <input type="hidden" name="camera" value="${esc(c.camera || "optional")}">
+  <label class="check"><input type="checkbox" name="certificate" ${c.certificate ? "checked" : ""}> 🎓 Сургалтыг дүүргэсэн суралцагчид сертификат олгоно (хайлтад «Сертификаттай» шошго гарна)</label>`;
+const courseBody = (f) => ({ title: f.title.value, description: f.description.value, price: +f.price.value || 0, published: f.published.checked, drip: f.drip.checked, unlock_all_paid: f.unlock_all_paid.checked, certificate: f.certificate.checked, camera: f.camera.value });
+const FORMATS = [["", "— Сургалтын хэлбэр —"], ["lecture", "Лекц"], ["seminar", "Семинар"], ["practice", "Дадлага"], ["lab", "Лаборатори"]];
+const MODES = [["", "— Заах аргын төрөл —"], ["classroom", "Танхимын"], ["online", "Цахим"], ["blended", "Холимог"]];
+const kindName = (k) => (FORMATS.find(([v]) => v === k)?.[1] || MODES.find(([v]) => v === k)?.[1] || "");
+const UNLOCKS = [[0, "Шууд (өмнөхийг үзмэгц)"], [1, "1 цагийн дараа"], [24, "1 хоногийн дараа"], [72, "3 хоногийн дараа"], [168, "7 хоногийн дараа"], [336, "14 хоногийн дараа"], [720, "1 сарын дараа"]];
+
+async function courses() {
+  const list = await api("/api/me/courses");
+  searchCourses = list;
+  main.innerHTML = `<div class="gp-list-head"><div><h1>Миний сургалтууд</h1><p class="muted">${list.length} сургалт · ${list.filter((c) => c.published).length} нийтлэгдсэн</p></div>
+      <button class="btn btn-gold" id="newCourse">${ico("plus", 18)}Шинэ сургалт үүсгэх</button></div>
+    <div class="group-grid gp-grid">${list.map((c) => `
+      <a class="group" href="#course=${esc(c.id)}" style="--h:${hueOfName(c.title)}"><div class="group-art"><span class="chip">${c.published ? "Нийтлэгдсэн" : "Ноорог"}</span><b>${esc(c.title.trim()[0] || "?")}</b></div>
+      <div class="group-body"><strong>${esc(c.title)}</strong><small>${ico("book", 14)}${c.lesson_count} хичээл · ${c.free_lesson_count} үнэгүй</small><small>${ico("eye", 14)}${c.views || 0} үзэлт · ${money(c.price) === "Үнэгүй" ? "Хичээлээр" : money(c.price)}</small>
+      <span class="btn btn-glass btn-sm" style="margin-top:6px">Удирдах</span></div></a>`).join("")}${list.length ? "" : `
+      <button class="group group-new" id="newCourse2">${ico("plus", 26)}<strong>Анхны сургалтаа үүсгэх</strong></button>`}</div>
+    <div class="modal" id="courseModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+      <h3 class="h3">Шинэ сургалт үүсгэх</h3><form class="form" id="courseForm">${courseFormHTML()}<p class="form-error" role="alert"></p>
+      <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Үүсгэх</button></div></form></div></div>`;
+  const f = $("#courseForm"), open = () => { SG.openModal($("#courseModal")); f.title.focus(); };
+  $("#newCourse").onclick = open; if ($("#newCourse2")) $("#newCourse2").onclick = open;
+  try { if (sessionStorage.getItem("sg_new_course")) { sessionStorage.removeItem("sg_new_course"); open(); } } catch {}
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    try { const c = await api("/api/courses", { method: "POST", body: courseBody(f) }); toast("Сургалт үүслээ ✓"); location.hash = "course=" + c.id; }
+    catch (err) { $(".form-error", f).textContent = err.message; }
+  };
+}
+
+let library = null;
+async function loadLibrary() { library = await api("/api/me/files"); return library; }
+
+/* ---------- Хичээлийн блок засварлагч: текст, гарчиг, зураг, дуу, видео, файл, асуулт ---------- */
+const BE = {
+  text: ["text", "Текст"], heading: ["heading", "Гарчиг"], image: ["image", "Зураг"], audio: ["mic", "Дуу"],
+  video: ["live", "Видео"], file: ["clip", "Файл"], quiz: ["quiz", "Асуулт"],
+};
+// Төрөл тус бүрийн хэмжээний хязгаар (MB). Зургийг сервер WebP болгож 1000px хүртэл багасгана.
+const BE_LIMIT = { image: 20, audio: 100, video: 2048, file: 200 };
+const BE_ACCEPT = { image: "image/png,image/jpeg,image/webp,image/gif", audio: "audio/*,.mp3,.m4a,.wav,.webm", video: "video/*,.mp4,.webm,.mov,.m4v", file: ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.odt,.odp,.rtf,.txt,.zip,.epub" };
+const beId = () => Math.random().toString(36).slice(2, 10).padEnd(6, "0");
+const stripQ = (u) => (u && u.startsWith("/files/") ? u.split("?")[0] : u || "");
+const typeOfFile = (f) => /^image\//.test(f.type) ? "image" : /^audio\//.test(f.type) ? "audio" : /^video\//.test(f.type) ? "video" : "file";
+const typeOfURL = (u) => { const e = SG.extOf(u); return /youtu\.?be|vimeo/.test(u) || [".mp4", ".webm", ".mov", ".m4v"].includes(e) ? "video" : [".mp3", ".m4a", ".wav"].includes(e) ? "audio" : [".webp", ".jpg", ".jpeg", ".png", ".gif"].includes(e) ? "image" : "file"; };
+
+// Хуучин хичээл (content + video_url) → блокууд.
+function lessonBlocks(l) {
+  if (l?.blocks?.length) return l.blocks;
+  const out = [];
+  if (l?.video_url) out.push({ id: beId(), type: typeOfURL(stripQ(l.video_url)), url: l.video_url, name: stripQ(l.video_url).startsWith("/files/") ? decodeURIComponent(stripQ(l.video_url).split("/").pop().replace(/^[0-9a-f]{16}__/, "")) : "Видео холбоос" });
+  if (l?.content) out.push({ id: beId(), type: "text", text: l.content });
+  return out.length ? out : [{ id: beId(), type: "text", text: "" }];
+}
+
+// contenteditable → аюулгүй тэмдэглэгээ (richHTML-ийн эсрэг).
+function domToMd(root) {
+  const inl = (n) => {
+    if (n.nodeType === 3) return n.nodeValue.replace(/ /g, " ");
+    if (n.nodeType !== 1) return "";
+    const t = n.tagName, kids = () => [...n.childNodes].map(inl).join(""), st = n.getAttribute("style") || "";
+    if (t === "BR") return "\n";
+    const k = kids(); if (!k.trim()) return k;
+    if (t === "B" || t === "STRONG" || /font-weight:\s*(bold|[6-9]00)/.test(st)) return `**${k}**`;
+    if (t === "I" || t === "EM" || /font-style:\s*italic/.test(st)) return `*${k}*`;
+    if (t === "U" || /underline/.test(st)) return `__${k}__`;
+    if (t === "MARK" || /background/.test(st)) return `==${k}==`;
+    if (t === "A" && /^https?:\/\//.test(n.getAttribute("href") || "")) return `[${k}](${n.getAttribute("href")})`;
+    return k;
+  };
+  const lines = []; let cur = "";
+  const BLOCK = /^(DIV|P|H\d|UL|OL|BLOCKQUOTE|LI)$/;
+  const flush = () => { if (cur !== "") lines.push(...cur.split("\n")); cur = ""; };
+  const walk = (n) => {
+    for (const c of n.childNodes) {
+      const t = c.nodeType === 1 ? c.tagName : "";
+      if (!BLOCK.test(t)) { cur += inl(c); continue; } // текст ба мөр доторх хэлбэр нэг мөрөнд
+      flush();
+      if (t === "UL" || t === "OL") { [...c.children].forEach((li, i) => lines.push((t === "OL" ? `${i + 1}. ` : "- ") + inl(li).replace(/\n+/g, " ").trim())); lines.push(""); }
+      else if (t === "BLOCKQUOTE") { inl(c).split("\n").forEach((x) => lines.push("> " + x)); lines.push(""); }
+      else if (c.querySelector("ul,ol,blockquote,div,p")) walk(c);
+      else { lines.push(inl(c)); if (t === "P") lines.push(""); }
+    }
+    flush();
+  };
+  walk(root);
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+const QKINDS = [["single", "◉ Нэг сонголт"], ["multi", "☑ Олон сонголт"], ["text", "✎ Бичгээр"], ["match", "⇄ Харгалзуулах"], ["image", "🎯 Зурган дээр заах"]];
+function quizBodyHTML(kind, id, q) {
+  if (kind === "single" || kind === "multi") {
+    const opts = q.options?.length ? q.options : ["", ""];
+    return `<div class="be-opts">${opts.map((o, i) => beOptHTML(id, kind === "multi", o, (q.correct || []).includes(i))).join("")}</div>
+      <div class="be-qfoot"><button type="button" class="btn btn-glass btn-sm" data-opt-add>${ico("plus", 15)}Хариулт нэмэх</button><span class="muted small">Зөв хариулт(ууд)-ын өмнөх тэмдгийг сонгоно.</span></div>`;
+  }
+  if (kind === "text") {
+    const ans = q.answers?.length ? q.answers : [""];
+    return `<div class="be-answers">${ans.map((a) => `<div class="be-opt"><span class="be-ok">✓</span><input class="be-ans" maxlength="200" placeholder="Зөвд тооцох хариулт" value="${esc(a)}"><button type="button" class="icon-btn" data-row-del aria-label="Хасах">${ico("x", 14)}</button></div>`).join("")}</div>
+      <div class="be-qfoot"><button type="button" class="btn btn-glass btn-sm" data-ans-add>${ico("plus", 15)}Өөр хувилбар нэмэх</button><span class="muted small">Том жижиг үсэг, илүүдэл зай, цэг таслалыг тооцохгүй.</span></div>`;
+  }
+  if (kind === "match") {
+    const L = q.left?.length ? q.left : ["", ""], R = q.right?.length ? q.right : ["", ""];
+    return `<div class="be-pairs">${L.map((l, i) => pairHTML(l, R[i] || "")).join("")}</div>
+      <div class="be-qfoot"><button type="button" class="btn btn-glass btn-sm" data-pair-add>${ico("plus", 15)}Хос нэмэх</button><span class="muted small">Зүүн талыг зөв хостой нь нэг мөрөнд бичнэ — суралцагчид баруун тал холилдож харагдана.</span></div>`;
+  }
+  return `<label class="be-radius">Зөв хэсгийн хэмжээ<input type="range" class="be-r" min="2" max="40" value="${q.spot?.r || 8}"></label>
+    <p class="muted small" style="margin:0">Дээрх зураг дээр зөв хариултын хэсгийг дарж тэмдэглэнэ үү.</p>`;
+}
+const pairHTML = (l, r) => `<div class="be-opt be-pair"><input class="be-l" maxlength="200" placeholder="Зүүн (ж: Япон)" value="${esc(l)}"><span>⇄</span><input class="be-rr" maxlength="200" placeholder="Баруун (ж: Токио)" value="${esc(r)}"><button type="button" class="icon-btn" data-row-del aria-label="Хасах">${ico("x", 14)}</button></div>`;
+function qimgHTML(kind, url, spot) {
+  if (!url) return `<button type="button" class="btn btn-glass btn-sm" data-qimg>${ico("image", 15)}${kind === "image" ? "Зураг оруулах (заавал)" : "Асуултад зураг нэмэх"}</button><div class="progress" hidden><i></i></div>`;
+  const r = spot?.r || 8;
+  return `<div class="be-spotwrap ${kind === "image" ? "pick" : ""}"><img src="${esc(url)}" alt="" draggable="false">${kind === "image" && spot?.x != null && spot?.x !== "" ? `<i class="be-spot" style="left:${spot.x}%;top:${spot.y}%;width:${r * 2}%;height:${r * 2}%"></i>` : ""}</div>
+    <div class="be-media-tools"><span class="muted small">${kind === "image" ? "Зураг дээр дарж зөв хэсгийг заана" : "Асуултын зураг"}</span><span><button type="button" class="btn btn-glass btn-sm" data-qimg>Солих</button> <button type="button" class="btn btn-ghost btn-sm" data-qimg-del>Хасах</button></span></div>`;
+}
+function beBlockHTML(b) {
+  const [icn, label] = BE[b.type];
+  let body = "";
+  if (b.type === "text") body = `<div class="be-rt-bar" role="toolbar" aria-label="Текстийн хэлбэр">
+      <button type="button" data-cmd="bold" title="Тод (Ctrl+B)"><b>B</b></button><button type="button" data-cmd="italic" title="Налуу (Ctrl+I)"><i>I</i></button>
+      <button type="button" data-cmd="underline" title="Доогуур зураас (Ctrl+U)"><u>U</u></button><button type="button" data-cmd="mark" title="Тодруулах"><mark>A</mark></button>
+      <span class="be-sep"></span><button type="button" data-cmd="insertUnorderedList" title="Жагсаалт">• —</button><button type="button" data-cmd="insertOrderedList" title="Дугаартай жагсаалт">1.</button>
+      <button type="button" data-cmd="quote" title="Ишлэл">❝</button><button type="button" data-cmd="link" title="Холбоос">${ico("link", 15)}</button><button type="button" data-cmd="removeFormat" title="Хэлбэр арилгах">⨯</button></div>
+    <div class="be-rt rb-text" contenteditable="true" data-ph="Текстээ бичнэ үү… (сонгоод дээрх товчоор хэлбэржүүлнэ)">${SG.richHTML(b.text || "")}</div>`;
+  else if (b.type === "heading") body = `<input class="be-h" maxlength="200" placeholder="Гарчиг бичнэ үү" value="${esc(b.text || "")}">`;
+  else if (b.type === "quiz") {
+    const q = b.quiz || { kind: "single", question: "", options: ["", ""], correct: [0], explain: "" };
+    const kind = q.kind || (q.multi ? "multi" : "single");
+    body = `<div class="be-qhead"><select class="be-qkind" aria-label="Асуултын төрөл">${QKINDS.map(([k, t]) => `<option value="${k}" ${k === kind ? "selected" : ""}>${t}</option>`).join("")}</select>
+        <label class="be-pts">Оноо<input class="be-points" type="number" min="0" max="100" value="${q.points || 1}"></label></div>
+      <input class="be-q" maxlength="1000" placeholder="Асуултаа бичнэ үү" value="${esc(q.question || "")}">
+      <div class="be-qimg" data-url="${esc(stripQ(q.image || ""))}" data-preview="${esc(q.image || "")}" data-x="${q.spot?.x ?? ""}" data-y="${q.spot?.y ?? ""}">${qimgHTML(kind, q.image, q.spot)}</div>
+      <div class="be-qbody">${quizBodyHTML(kind, b.id, q)}</div>
+      <input class="be-ex" maxlength="1000" placeholder="Тайлбар (заавал биш) — хариулсны дараа харагдана" value="${esc(q.explain || "")}">`;
+  } else body = `<div class="be-media" data-url="${esc(stripQ(b.url || ""))}" data-name="${esc(b.name || "")}" data-size="${b.size || 0}">${b.url ? beMediaPreview(b) : beDropHTML(b.type)}</div>
+      <input class="be-cap" maxlength="500" placeholder="Тайлбар (заавал биш)" value="${esc(b.text || "")}" ${b.url ? "" : "hidden"}>
+      ${b.type === "file" ? `<label class="check small be-dl"><input type="checkbox" ${b.download ? "checked" : ""}> Суралцагч татаж авахыг зөвшөөрөх (анхдагч: зөвхөн үзнэ, PDF нь 3D номоор нээгдэнэ)</label>` : ""}`;
+  return `<div class="be-block" data-id="${esc(b.id)}" data-type="${b.type}">
+    <div class="be-side"><button type="button" class="ol-handle" data-be-drag title="Чирж зөөх" aria-label="${label} хэсгийг зөөх (↑↓ товч)">${ico("grip", 18)}</button></div>
+    <div class="be-main"><span class="be-tag">${ico(icn, 14)}${label}</span>${body}</div>
+    <div class="be-acts"><button type="button" class="icon-btn" data-be-del title="Устгах" aria-label="Устгах">${ico("x", 16)}</button></div></div>`;
+}
+const beOptHTML = (id, multi, val, on) => `<div class="be-opt"><input type="${multi ? "checkbox" : "radio"}" name="c-${esc(id)}" ${on ? "checked" : ""} title="Зөв хариулт" aria-label="Зөв хариулт">
+  <input class="be-opt-t" maxlength="300" placeholder="Хариулт" value="${esc(val)}"><button type="button" class="icon-btn" data-opt-del aria-label="Хариулт хасах">${ico("x", 14)}</button></div>`;
+const beDropHTML = (type) => `<div class="be-drop"><span>${ico(BE[type][0], 22)}</span><div><b>${type === "image" ? "Зураг" : type === "audio" ? "Дуу бичлэг" : type === "video" ? "Видео" : "Файл (PDF, Word, PowerPoint…)"}</b>
+    <small class="muted">Энд чирж оруулах эсвэл сонгоно · ${BE_LIMIT[type] >= 1024 ? BE_LIMIT[type] / 1024 + " GB" : BE_LIMIT[type] + " MB"} хүртэл${type === "image" ? " · автоматаар жижгэрнэ" : ""}</small></div>
+    <div class="be-drop-acts"><button type="button" class="btn btn-gold btn-sm" data-pick>${ico("clip", 15)}Файл сонгох</button>
+    ${type === "audio" ? `<button type="button" class="btn btn-glass btn-sm" data-rec>${ico("mic", 15)}Бичлэг хийх</button>` : ""}
+    ${type === "video" ? `<button type="button" class="btn btn-glass btn-sm" data-vurl>${ico("link", 15)}YouTube холбоос</button>` : ""}</div>
+    <div class="progress" hidden><i></i></div></div>`;
+function beMediaPreview(b) {
+  const u = b.preview || b.url;
+  const tools = `<div class="be-media-tools"><span class="muted small">${esc(b.name || "")}${b.size ? " · " + SG.fmtBytes(b.size) : ""}</span><button type="button" class="btn btn-glass btn-sm" data-replace>Солих</button></div>`;
+  if (b.type === "image") return `<img class="be-img" src="${esc(u)}" alt="">${tools}`;
+  if (b.type === "audio") return `<audio src="${esc(u)}" controls preload="metadata" style="width:100%"></audio>${tools}`;
+  if (b.type === "video") return `<div class="player be-player">${SG.mediaHTML(u, b.name)}</div>${tools}`;
+  return `<div class="rb-file"><span class="rb-file-ico">📄</span><span><b>${esc(b.name || "Файл")}</b><small>${esc(SG.extOf(stripQ(u)).slice(1).toUpperCase())}</small></span></div>${tools}`;
+}
+
+// Нэг маягт дээр засварлагчийг холбоно. f._be.collect() → блокууд.
+function mountBlockEditor(f, blocks) {
+  const box = $(".be", f);
+  box.innerHTML = `<div class="be-list">${blocks.map(beBlockHTML).join("")}</div>
+    <div class="be-add"><span class="muted small">Нэмэх:</span>${Object.entries(BE).map(([t, [icn, label]]) => `<button type="button" class="btn btn-glass btn-sm" data-add="${t}">${ico(icn, 15)}${label}</button>`).join("")}</div>
+    <div class="be-import"><button type="button" class="btn btn-glass btn-sm" data-import>${ico("files", 15)}Excel-ээс асуулт оруулах</button>
+      <a class="link small" href="/api/quiz-template.xlsx" download>Excel загвар татах</a><input type="file" class="be-xlsx" accept=".xlsx,.csv" hidden></div>
+    <p class="muted small be-tip">${ico("grip", 13)} Хэсгүүдийг бариад чирж байрлалыг солино. Компьютерээсээ файл чирж оруулж болно.</p>
+    <input type="file" class="be-file" hidden>`;
+  const list = $(".be-list", box), fileIn = $(".be-file", box);
+  let target = null;
+  const add = (type, after, data = {}) => {
+    const b = { id: beId(), type, ...data }; const tmp = document.createElement("div"); tmp.innerHTML = beBlockHTML(b);
+    const el = tmp.firstElementChild; after ? after.after(el) : list.append(el);
+    (el.querySelector(".be-rt, .be-h, .be-q") || el).focus?.();
+    return el;
+  };
+  const setMedia = (el, info) => {
+    const m = $(".be-media", el); m.dataset.url = info.path; m.dataset.name = info.original_name || ""; m.dataset.size = info.size || 0;
+    m.innerHTML = beMediaPreview({ type: el.dataset.type, url: info.path, preview: info.url, name: info.original_name, size: info.size });
+    $(".be-cap", el).hidden = false; SG.hydrateBooks?.(m);
+  };
+  const upload = (el, file) => {
+    const type = el.dataset.type, lim = BE_LIMIT[type];
+    if (file.size > lim * 1048576) { toast(`Файл хэт том: ${SG.fmtBytes(file.size)} — ${BE[type][1].toLowerCase()} ${lim} MB хүртэл`, true); return; }
+    const m = $(".be-media", el); if (!$(".be-drop", m)) m.innerHTML = beDropHTML(type);
+    const bar = $(".progress", m), fill = $("i", bar); bar.hidden = false; fill.style.width = "3%";
+    const x = new XMLHttpRequest(), fd = new FormData(); fd.append("file", file);
+    x.open("POST", "/api/me/files?visibility=private"); x.setRequestHeader("Authorization", "Bearer " + Auth.token);
+    x.upload.onprogress = (e) => { if (e.lengthComputable) fill.style.width = Math.max(3, Math.round(e.loaded / e.total * 100)) + "%"; };
+    x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {} bar.hidden = true;
+      if (x.status >= 300) return toast(d?.error || "Хуулж чадсангүй", true);
+      setMedia(el, d); toast(d.status === "processing" ? "Хуулагдлаа — видеог боловсруулж байна" : "Хуулагдлаа ✓"); library = null; };
+    x.onerror = () => { bar.hidden = true; toast("Сүлжээний алдаа — дахин оролдоно уу", true); };
+    x.send(fd);
+  };
+  const pick = (el) => { target = el; fileIn.accept = BE_ACCEPT[el.dataset.type] || ""; fileIn.value = ""; fileIn.click(); };
+  fileIn.onchange = () => { if (fileIn.files[0] && target) upload(target, fileIn.files[0]); };
+
+  // Дуу бичих (микрофон → webm).
+  let rec = null;
+  const record = async (el, btn) => {
+    if (rec) { rec.stop(); return; }
+    let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { toast("Микрофон ашиглах зөвшөөрөл өгнө үү", true); return; }
+    const chunks = [], mr = new MediaRecorder(stream); rec = mr; const t0 = Date.now();
+    btn.classList.add("rec-on"); const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); btn.textContent = `■ Зогсоох ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }, 500);
+    mr.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    mr.onstop = () => { clearInterval(tick); stream.getTracks().forEach((t) => t.stop()); rec = null;
+      const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" }), ext = (mr.mimeType || "").includes("mp4") ? "m4a" : "webm";
+      upload(el, new File([blob], `bichleg-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.${ext}`, { type: blob.type })); };
+    mr.start();
+  };
+
+  // Асуултын одоогийн утгууд (төрлөөс хамаарна).
+  const quizOf = (el) => {
+    const kind = $(".be-qkind", el).value, qi = $(".be-qimg", el);
+    const q = { kind, question: $(".be-q", el).value.trim(), points: +$(".be-points", el).value || 1, explain: $(".be-ex", el).value, image: qi.dataset.url || "" };
+    if (kind === "single" || kind === "multi") { const opts = $$(".be-opts .be-opt", el); q.options = opts.map((o) => $(".be-opt-t", o).value); q.correct = opts.map((o, i) => ($("input", o).checked ? i : -1)).filter((i) => i >= 0); q.multi = kind === "multi"; }
+    if (kind === "text") q.answers = $$(".be-ans", el).map((i) => i.value);
+    if (kind === "match") { q.left = $$(".be-l", el).map((i) => i.value); q.right = $$(".be-rr", el).map((i) => i.value); }
+    if (kind === "image" && qi.dataset.x !== "" && qi.dataset.x != null) q.spot = { x: +qi.dataset.x, y: +qi.dataset.y, r: +($(".be-r", el)?.value || 8) };
+    return q;
+  };
+  const drawSpot = (el) => {
+    const qi = $(".be-qimg", el), wrap = $(".be-spotwrap", qi); if (!wrap || qi.dataset.x === "" || qi.dataset.x == null) return;
+    const r = +($(".be-r", el)?.value || 8); let dot = $(".be-spot", wrap);
+    if (!dot) { dot = document.createElement("i"); dot.className = "be-spot"; wrap.append(dot); }
+    Object.assign(dot.style, { left: qi.dataset.x + "%", top: qi.dataset.y + "%", width: r * 2 + "%", height: r * 2 + "%" });
+  };
+  const uploadQimg = (el, file) => {
+    if (!file) return;
+    if (file.size > BE_LIMIT.image * 1048576) return toast(`Зураг ${BE_LIMIT.image} MB хүртэл`, true);
+    const qi = $(".be-qimg", el), bar = $(".progress", qi); if (bar) bar.hidden = false;
+    const x = new XMLHttpRequest(), fd = new FormData(); fd.append("file", file);
+    x.open("POST", "/api/me/files?visibility=private"); x.setRequestHeader("Authorization", "Bearer " + Auth.token);
+    x.upload.onprogress = (e) => { if (bar && e.lengthComputable) $("i", bar).style.width = Math.round(e.loaded / e.total * 100) + "%"; };
+    x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {} if (x.status >= 300) return toast(d?.error || "Хуулж чадсангүй", true);
+      qi.dataset.url = d.path; qi.dataset.preview = d.url; qi.dataset.x = ""; qi.innerHTML = qimgHTML($(".be-qkind", el).value, d.url, null); library = null; };
+    x.onerror = () => toast("Сүлжээний алдаа", true);
+    x.send(fd);
+  };
+  // Excel/CSV-ээс асуултууд → засварлагчийн төгсгөлд нэмнэ (хадгалахаас өмнө шалгаж болно).
+  const importXlsx = async (input) => {
+    const file = input.files[0]; if (!file) return;
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const d = await api("/api/me/quiz-import", { method: "POST", body: fd });
+      d.blocks.forEach((b) => add("quiz", null, { quiz: b.quiz }));
+      d.problems ||= []; toast(`${d.blocks.length} асуулт нэмэгдлээ${d.problems.length ? ` · ${d.problems.length} мөр алгассан` : ""}`);
+      if (d.problems.length) alert("Дараах мөрүүдийг алгаслаа:\n\n" + d.problems.join("\n"));
+    } catch (e) { toast(e.message, true); }
+  };
+  const exec = (cmd, rt) => {
+    rt.focus();
+    if (cmd === "mark") document.execCommand("hiliteColor", false, "#fff1a8");
+    else if (cmd === "quote") document.execCommand("formatBlock", false, "blockquote");
+    else if (cmd === "link") { const u = prompt("Холбоос (https://…)"); if (u && /^https?:\/\//.test(u.trim())) document.execCommand("createLink", false, u.trim()); else if (u) toast("Холбоос https:// -ээр эхэлнэ", true); }
+    else document.execCommand(cmd);
+  };
+  box.addEventListener("mousedown", (e) => { if (e.target.closest("[data-cmd]")) e.preventDefault(); }); // сонголтыг алдахгүй
+  box.addEventListener("click", (e) => {
+    const t = e.target, el = t.closest(".be-block");
+    const c = t.closest("[data-cmd]"); if (c && el) return exec(c.dataset.cmd, $(".be-rt", el));
+    if (t.closest("[data-import]")) { const fi = $(".be-xlsx", box); fi.value = ""; fi.click(); return; }
+    const a = t.closest("[data-add]"); if (a) { const nb = add(a.dataset.add); if (["image", "audio", "video", "file"].includes(a.dataset.add) && a.dataset.add !== "video") pick(nb); return; }
+    if (!el) return;
+    if (t.closest("[data-be-del]")) { if ((el.dataset.type === "text" && $(".be-rt", el).textContent.trim()) || el.dataset.type === "quiz") { if (!confirm("Энэ хэсгийг устгах уу?")) return; } el.remove(); return; }
+    if (t.closest("[data-pick], [data-replace]")) return pick(el);
+    if (t.closest("[data-rec]")) return record(el, t.closest("[data-rec]"));
+    if (t.closest("[data-vurl]")) { const u = prompt("YouTube эсвэл Vimeo холбоос"); if (u && /^https?:\/\//.test(u.trim())) setMedia(el, { path: u.trim(), url: u.trim(), original_name: "Видео холбоос" }); return; }
+    if (t.closest("[data-opt-add]")) { const opts = $(".be-opts", el); if (opts.children.length >= 8) return toast("Дээд тал нь 8 хариулт"); opts.insertAdjacentHTML("beforeend", beOptHTML(el.dataset.id, $(".be-qkind", el).value === "multi", "", false)); opts.lastElementChild.querySelector(".be-opt-t").focus(); return; }
+    if (t.closest("[data-opt-del]")) { const opts = $(".be-opts", el); if (opts.children.length <= 2) return toast("Дор хаяж 2 хариулт"); t.closest(".be-opt").remove(); }
+    if (t.closest("[data-ans-add]")) { const a = $(".be-answers", el); if (a.children.length >= 10) return toast("Дээд тал нь 10"); a.insertAdjacentHTML("beforeend", `<div class="be-opt"><span class="be-ok">✓</span><input class="be-ans" maxlength="200" placeholder="Зөвд тооцох хариулт"><button type="button" class="icon-btn" data-row-del aria-label="Хасах">${ico("x", 14)}</button></div>`); a.lastElementChild.querySelector("input").focus(); return; }
+    if (t.closest("[data-pair-add]")) { const a = $(".be-pairs", el); if (a.children.length >= 10) return toast("Дээд тал нь 10 хос"); a.insertAdjacentHTML("beforeend", pairHTML("", "")); a.lastElementChild.querySelector("input").focus(); return; }
+    if (t.closest("[data-row-del]")) { const row = t.closest(".be-opt"), min = row.parentElement.classList.contains("be-pairs") ? 2 : 1; if (row.parentElement.children.length <= min) return toast("Үүнээс цөөн байж болохгүй"); row.remove(); return; }
+    if (t.closest("[data-qimg]")) { let fi = $(".be-qfile", el); if (!fi) { el.insertAdjacentHTML("beforeend", `<input type="file" class="be-qfile" accept="image/*" hidden>`); fi = $(".be-qfile", el); } fi.value = ""; fi.click(); return; }
+    if (t.closest("[data-qimg-del]")) { const qi = $(".be-qimg", el); qi.dataset.url = ""; qi.dataset.preview = ""; qi.dataset.x = ""; qi.innerHTML = qimgHTML($(".be-qkind", el).value, "", null); return; }
+    const pickImg = t.closest(".be-spotwrap.pick");
+    if (pickImg) { // зөв хэсгийг заах
+      const r = pickImg.getBoundingClientRect(), qi = $(".be-qimg", el);
+      qi.dataset.x = Math.round((e.clientX - r.left) / r.width * 1000) / 10; qi.dataset.y = Math.round((e.clientY - r.top) / r.height * 1000) / 10;
+      return drawSpot(el);
+    }
+  });
+  // Асуултын төрөл солиход одоо бичсэнээ хадгалаад шинэ төрлийн маягт гаргана.
+  box.addEventListener("change", async (e) => {
+    const el = e.target.closest(".be-block");
+    if (e.target.classList.contains("be-qkind") && el) {
+      const q = quizOf(el), kind = e.target.value;
+      $(".be-qbody", el).innerHTML = quizBodyHTML(kind, el.dataset.id, q);
+      const qi = $(".be-qimg", el); qi.innerHTML = qimgHTML(kind, qi.dataset.preview || (qi.dataset.url ? qi.dataset.url : ""), q.spot);
+      return;
+    }
+    if (e.target.classList.contains("be-r") && el) return drawSpot(el);
+    if (e.target.classList.contains("be-xlsx")) return importXlsx(e.target);
+    if (e.target.classList.contains("be-qfile") && el) return uploadQimg(el, e.target.files[0]);
+  });
+  box.addEventListener("input", (e) => { const el = e.target.closest(".be-block"); if (e.target.classList.contains("be-r") && el) drawSpot(el); });
+  box.addEventListener("keydown", (e) => {
+    if (e.target.closest("[contenteditable]") && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); exec("link", e.target.closest("[contenteditable]")); }
+    if (e.target.closest(".be-h, .be-q, .be-opt-t, .be-cap, .be-ex") && e.key === "Enter") e.preventDefault(); // маягт илгээгдэхгүй
+    const h = e.target.closest("[data-be-drag]"); if (!h || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault(); const el = h.closest(".be-block");
+    if (e.key === "ArrowUp" && el.previousElementSibling) el.previousElementSibling.before(el);
+    if (e.key === "ArrowDown" && el.nextElementSibling) el.nextElementSibling.after(el);
+    h.focus();
+  });
+  // Буулгах (paste): зураг шууд зураг блок болно, бусад нь энгийн текст.
+  box.addEventListener("paste", (e) => {
+    const rt = e.target.closest?.("[contenteditable]"); if (!rt) return;
+    const img = [...(e.clipboardData?.files || [])].find((f) => /^image\//.test(f.type));
+    e.preventDefault();
+    if (img) { upload(add("image", rt.closest(".be-block")), img); return; }
+    document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+  });
+  // Хэсгүүдийг чирж зөөх (хулгана, хуруу).
+  let drag = null;
+  box.addEventListener("pointerdown", (e) => {
+    const h = e.target.closest("[data-be-drag]"); if (!h || e.button > 0) return;
+    e.preventDefault(); const el = h.closest(".be-block"), r = el.getBoundingClientRect();
+    const ghost = el.cloneNode(true); ghost.classList.add("ol-ghost", "be-ghost"); Object.assign(ghost.style, { width: r.width + "px", left: r.left + "px", top: r.top + "px", maxHeight: "120px", overflow: "hidden" });
+    document.body.append(ghost); el.classList.add("ol-dragging"); drag = { el, ghost, dy: Math.min(e.clientY - r.top, 60) };
+    const move = (ev) => {
+      ghost.style.top = ev.clientY - drag.dy + "px";
+      if (ev.clientY < 90) scrollBy(0, -14); else if (ev.clientY > innerHeight - 60) scrollBy(0, 14);
+      const sibs = $$(":scope > .be-block:not(.ol-dragging)", list), before = sibs.find((x) => { const b = x.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
+      list.insertBefore(el, before || null);
+    };
+    const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); removeEventListener("pointercancel", up); ghost.remove(); el.classList.remove("ol-dragging"); drag = null; };
+    addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
+  });
+  // Компьютерээс файл чирж оруулах: байрлалд нь төрлөөр нь блок үүснэ.
+  box.addEventListener("dragover", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { e.preventDefault(); box.classList.add("be-dropping"); } });
+  box.addEventListener("dragleave", (e) => { if (!box.contains(e.relatedTarget)) box.classList.remove("be-dropping"); });
+  box.addEventListener("drop", (e) => {
+    const fl = [...(e.dataTransfer?.files || [])]; if (!fl.length) return;
+    e.preventDefault(); box.classList.remove("be-dropping");
+    const onBlock = e.target.closest(".be-block"), emptyMedia = onBlock && $(".be-drop", onBlock) && fl.length === 1;
+    if (emptyMedia) return upload(onBlock, fl[0]);
+    let after = onBlock || null;
+    for (const file of fl) { const el = add(typeOfFile(file), after); upload(el, file); after = el; }
+  });
+
+  f._be = {
+    collect() {
+      return $$(":scope > .be-block", list).map((el) => {
+        const id = el.dataset.id, type = el.dataset.type;
+        if (type === "text") { const text = domToMd($(".be-rt", el)); return text ? { id, type, text } : null; }
+        if (type === "heading") { const text = $(".be-h", el).value.trim(); return text ? { id, type, text } : null; }
+        if (type === "quiz") {
+          const quiz = quizOf(el);
+          if (!quiz.question && !quiz.image && [...(quiz.options || []), ...(quiz.answers || []), ...(quiz.left || [])].every((o) => !o.trim())) return null;
+          return { id, type, quiz };
+        }
+        const m = $(".be-media", el); if (!m.dataset.url) return null;
+        return { id, type, url: m.dataset.url, name: m.dataset.name, size: +m.dataset.size || 0, text: $(".be-cap", el).value.trim(), download: !!$(".be-dl input", el)?.checked };
+      }).filter(Boolean);
+    },
+    uploading: () => $$(".be-drop .progress:not([hidden])", box).length > 0,
+  };
+}
+// Блокуудаас товч текст (нийтлэлийн жагсаалт, хайлтад).
+const blocksSummary = (bs) => bs.filter((b) => b.type === "text" || b.type === "heading").map((b) => b.text.replace(/\*\*|__|==|^[>-]\s|\[([^\]]*)\]\([^)]*\)/gm, "$1")).join("\n").slice(0, 1500);
+
+async function courseEditor(id) {
+  let [{ course: c, lessons }, lib, roster] = await Promise.all([api(`/api/me/courses/${id}`), loadLibrary(), api(`/api/me/courses/${id}/students`).catch(() => [])]);
+  const stripSig = (u) => (u && u.startsWith("/files/") ? u.split("?")[0] : u || ""); // гарын үсэгтэй URL-аас query-г хасна
+  const fileName = (u) => { const f = lib.files.find((x) => x.path === stripSig(u)); return f ? f.original_name : decodeURIComponent(stripSig(u).split("/").pop() || ""); };
+  const mediaLabel = (u) => (!u ? "" : /youtu\.?be|vimeo/.test(u) ? "Видео холбоос" : u.startsWith("/files/") ? fileName(u) : u);
+  const isImage = (u) => /\.(webp|jpe?g|png|gif)$/i.test(stripSig(u));
+  const audience = (l) => l.is_free ? `<span class="aud aud-free">${ico("globe", 14)}Үнэгүй · бүгдэд нээлттэй</span>`
+    : `<span class="aud aud-paid">${ico("lock", 14)}${l.price ? money(l.price) : "Зөвхөн багцаар"}</span>`;
+  const libOptions = () => lib.files.filter((f) => f.status !== "failed").map((f) => `<option value="${esc(f.path)}">${esc(f.original_name)} · ${fmtSize(f.size)}${f.status === "processing" ? " (боловсруулж байна)" : ""}</option>`).join("");
+
+  // Бүлгүүд (модуль). Хоосон (хичээлгүй) бүлэг зөвхөн клиент дээр байна: хичээл чирж оруулмагц хадгалагдана.
+  let pending = []; // [{name, at}] — хоосон бүлэг ба хөтөлбөр дээрх байр
+  let view = (() => { try { return localStorage.getItem("sg_course_view") || "outline"; } catch { return "outline"; } })();
+  const groupsModel = () => {
+    const out = [];
+    for (const l of [...lessons].sort((a, b) => a.position - b.position)) {
+      const k = l.section || ""; let g = out.find((x) => x.name === k);
+      if (!g) out.push((g = { name: k, items: [] })); g.items.push(l);
+    }
+    pending = pending.filter((p) => p.name && !out.some((g) => g.name === p.name));
+    for (const p of [...pending].sort((a, b) => a.at - b.at)) out.splice(Math.min(p.at, out.length), 0, { name: p.name, items: [] });
+    return out;
+  };
+  const sections = () => groupsModel().map((g) => g.name).filter(Boolean);
+  const sectionPicker = (cur) => `<div class="pe-section"><span class="muted small">${ico("files", 15)}Бүлэг:</span>
+      <select name="section_pick" aria-label="Хичээлийн бүлэг"><option value="">— Бүлэггүй —</option>${sections().map((n) => `<option value="${esc(n)}" ${n === cur ? "selected" : ""}>${esc(n)}</option>`).join("")}<option value="__new">+ Шинэ бүлэг үүсгэх…</option></select>
+      <input name="section_new" maxlength="80" placeholder="Шинэ бүлгийн нэр (ж: 1-р бүлэг. Алгебр)" hidden></div>`;
+  // Нийтлэл бичих/засах маягт (шинэ хичээл ба засварт ижил). preset — бүлгийн толгойноос "+ Хичээл нэмэх" дарахад.
+  const editorHTML = (l, preset) => `<form class="form post-editor" ${l ? `data-edit="${esc(l.id)}"` : `id="composerForm"`}>
+      <input name="title" required maxlength="200" class="pe-title" placeholder="Хичээлийн гарчиг" value="${esc(l?.title || "")}">
+      ${sectionPicker(l ? l.section || "" : preset || "")}
+      <div class="kind-row">
+        <label>Сургалтын хэлбэр<select name="format">${FORMATS.map(([v, t]) => `<option value="${v}" ${(l?.format || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+        <label>Заах аргын төрөл<select name="mode_kind">${MODES.map(([v, t]) => `<option value="${v}" ${(l?.mode || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+      </div>
+      <details class="pe-more" ${l?.active_min || l?.exam ? "open" : ""}><summary>${ico("gear", 15)}Идэвхтэй хугацаа, шалгалт</summary>
+        <label>Идэвхтэй суралцах хугацаа (минут)<input name="active_min" type="number" min="0" max="600" value="${l?.active_min || 0}"><small class="muted">0 = шаардахгүй. Тавьсан бол суралцагч энэ хугацаанд идэвхтэй үзэж байж «дууслаа» дарна.</small></label>
+        <label class="check"><input type="checkbox" name="is_exam" ${l?.exam ? "checked" : ""}> 📝 Энэ хичээл шалгалт — асуултууд нэг дор өгөгдөж, өөр цонх руу шилжих эсвэл хуулах үед шалгалт шууд хаагдана</label>
+        <div class="pe-exam kind-row" ${l?.exam ? "" : "hidden"}>
+          <label>Хугацаа (мин, 0 = хязгааргүй)<input name="ex_time" type="number" min="0" max="600" value="${l?.exam?.time_min ?? 30}"></label>
+          <label>Оролдлого (0 = хязгааргүй)<input name="ex_attempts" type="number" min="0" max="100" value="${l?.exam?.attempts ?? 1}"></label>
+          <label>Тэнцэх хувь<input name="ex_pass" type="number" min="0" max="100" value="${l?.exam?.pass_pct ?? 60}"></label>
+          <label class="check"><input type="checkbox" name="ex_shuffle" ${l?.exam?.shuffle ? "checked" : ""}> Асуултыг холих</label>
+          <label class="check"><input type="checkbox" name="ex_show" ${l?.exam ? (l.exam.show_answers ? "checked" : "") : "checked"}> Дууссаны дараа зөв хариултыг харуулах</label>
+        </div></details>
+      <div class="be" data-be></div>
+      <div class="pe-foot">
+        <div class="seg" role="radiogroup" aria-label="Хэн үзэх вэ">
+          <label><input type="radio" name="mode" value="free" ${l?.is_free ? "checked" : ""}><span>${ico("globe", 15)}Үнэгүй</span></label>
+          <label><input type="radio" name="mode" value="paid" ${l?.is_free ? "" : "checked"}><span>${ico("lock", 15)}Төлбөртэй</span></label></div>
+        <label class="pe-price" ${l?.is_free ? "hidden" : ""}><input name="price" type="number" min="0" step="500" value="${l ? l.price || 0 : c.price ? 0 : 10000}" aria-label="Үнэ"><span>₮</span></label>
+        <span class="grow"></span>
+        ${l ? `<button type="button" class="btn btn-ghost btn-sm" data-cancel>Болих</button>` : ""}
+        <button class="btn btn-gold btn-sm">${l ? "Хадгалах" : "Нийтлэх"}</button></div>
+      <p class="muted small pe-hint">${c.price ? "Үнэ 0 бол хичээл зөвхөн сургалтын багцаар нээгдэнэ." : "Энэ сургалт багц үнэгүй тул төлбөртэй хичээл бүр өөрийн үнэтэй байна."}</p>
+      ${c.drip ? `<div class="drip-row"><span class="muted small">Өмнөх хичээлийг үзснээс хойш:</span>
+        <select name="unlock_after_h" aria-label="Нээгдэх хугацаа">${UNLOCKS.map(([h, t]) => `<option value="${h}" ${(l?.unlock_after_h || 0) === h ? "selected" : ""}>${t}</option>`).join("")}${l && !UNLOCKS.some(([h]) => h === (l.unlock_after_h || 0)) ? `<option value="${l.unlock_after_h}" selected>${l.unlock_after_h} цаг</option>` : ""}</select>
+        <label class="check small"><input type="checkbox" name="always_open" ${l?.always_open ? "checked" : ""}> Дарааллаас үл хамааран нээлттэй</label></div>` : ""}
+      <p class="form-error" role="alert"></p></form>`;
+
+  // Блоктой нийтлэл: эхний зураг + агуулгын тоо + урьдчилан харах.
+  const blocksPostHTML = (l) => {
+    const n = (t) => l.blocks.filter((b) => b.type === t).length, img = l.blocks.find((b) => b.type === "image");
+    const parts = [["text", "текст"], ["image", "зураг"], ["audio", "дуу"], ["video", "видео"], ["file", "файл"], ["quiz", "асуулт"]].filter(([t]) => n(t)).map(([t, w]) => `${n(t)} ${w}`).join(" · ");
+    return `${img ? `<div class="post-media"><img src="${esc(img.url)}" alt="" loading="lazy"></div>` : ""}
+      <button class="post-attach" data-open-media>${ico("book", 22)}<span><strong>Агуулгыг суралцагчийн нүдээр харах</strong><small class="muted">${parts}</small></span>${ico("chevron", 18)}</button><div class="post-media post-preview" hidden></div>`;
+  };
+  const postHTML = (l) => `<article class="post" data-lid="${esc(l.id)}">
+      <header class="post-head">${avatar(me, "avatar-sm")}<div class="grow"><strong>${esc(me.display_name)}</strong>
+        <small class="muted">Хичээл ${String(l.position).padStart(2, "0")} · ${fmtDate(l.created_at)} · ${audience(l)}${c.drip ? (l.always_open ? ` · <span class="aud">${ico("globe", 14)}Дарааллаас гадуур</span>` : l.position > 1 ? ` · <span class="aud">⏱ ${window.SG_humanHours(l.unlock_after_h)}</span>` : "") : ""}</small></div>
+        <button class="icon-btn" data-edit-post aria-label="Хичээл засах" title="Засах">${ico("edit", 18)}</button></header>
+      <div class="post-body"><h3>${esc(l.title)}</h3>${l.format || l.mode ? `<p style="margin:0 0 8px;display:flex;gap:6px;flex-wrap:wrap">${l.format ? `<span class="kind">${esc(kindName(l.format))}</span>` : ""}${l.mode ? `<span class="kind">${esc(kindName(l.mode))}</span>` : ""}</p>` : ""}${l.content ? `<p class="post-text">${SG.linkify(l.content)}</p>` : ""}</div>
+      ${l.blocks?.length ? blocksPostHTML(l) : l.video_url ? (isImage(l.video_url) ? `<div class="post-media"><img src="${esc(l.video_url)}" alt="" loading="lazy"></div>`
+        : `<button class="post-attach" data-open-media>${ico(/\.pdf$/i.test(stripSig(l.video_url)) ? "book" : "live", 22)}<span><strong>${esc(mediaLabel(l.video_url))}</strong><small class="muted">Дарж нээнэ</small></span>${ico("chevron", 18)}</button><div class="post-media" hidden></div>`) : ""}
+      <footer class="post-foot"><button data-edit-post>${ico("edit", 16)}Засах</button><button data-toggle-free>${ico(l.is_free ? "lock" : "globe", 16)}${l.is_free ? "Төлбөртэй болгох" : "Үнэгүй болгох"}</button>
+        ${c.drip ? `<button data-toggle-always title="Дарааллаас үл хамааран нээлттэй эсэх">${ico(l.always_open ? "lock" : "globe", 16)}${l.always_open ? "Дараалалд оруулах" : "Шууд нээлттэй болгох"}</button>` : ""}
+        ${c.published ? `<a href="/c/${esc(c.id)}#l=${esc(l.id)}" target="_blank" rel="noopener">${ico("eye", 16)}Суралцагчийн нүдээр</a>` : ""}</footer></article>`;
+
+  const free = () => lessons.filter((l) => l.is_free).length;
+  // Бүлэгтэй бол хөтөлбөрийн дарааллаар бүлэг бүрийн доор; бүлэггүй бол нийтлэл шиг шинэ нь дээрээ.
+  const feedHTML = () => {
+    if (!lessons.length) return `<div class="empty">Одоогоор хичээл алга.<br>Дээрх хэсэгт анхны хичээлээ нийтлээрэй.</div>`;
+    if (!sections().length) return [...lessons].sort((a, b) => b.position - a.position).map(postHTML).join("");
+    const ordered = [...lessons].sort((a, b) => a.position - b.position), groups = [];
+    for (const l of ordered) { const k = l.section || ""; let g = groups.find((x) => x.name === k); if (!g) groups.push((g = { name: k, items: [] })); g.items.push(l); }
+    return groups.map((g, i) => `<section class="sec" data-sec="${esc(g.name)}">
+        <header class="sec-head"><span class="lg-num">${String(i + 1).padStart(2, "0")}</span>
+          <h2>${g.name ? esc(g.name) : "Бүлэггүй хичээлүүд"}<small>${g.items.length} хичээл · ${g.items.filter((l) => l.is_free).length} үнэгүй</small></h2>
+          <button class="btn btn-gold btn-sm" data-sec-add>${ico("plus", 15)}Хичээл нэмэх</button></header>
+        ${g.items.map(postHTML).join("")}</section>`).join("");
+  };
+  // Хөтөлбөр: бүлгийн нэрийг шууд бичнэ, хичээлийг чирж (эсвэл ↑↓ товчоор) бүлэг хооронд зөөнө.
+  const rowHTML = (l, n) => `<li class="ol-row" data-lid="${esc(l.id)}">
+      <button type="button" class="ol-handle" data-drag="row" aria-label="«${esc(l.title)}» хичээлийг зөөх (↑↓ товч)" title="Чирж зөөх">${ico("grip", 18)}</button>
+      <span class="ol-num">${String(n).padStart(2, "0")}</span>
+      <span class="ol-title"><strong>${esc(l.title)}</strong><small>${[l.format && kindName(l.format), l.mode && kindName(l.mode)].filter(Boolean).map((k) => `<span class="kind">${esc(k)}</span>`).join("")}${audience(l)}${c.drip && !l.always_open && n > 1 && l.unlock_after_h ? `<span class="aud">⏱ ${window.SG_humanHours(l.unlock_after_h)}</span>` : ""}${l.exam ? `<span class="kind kind-exam">📝 Шалгалт</span>` : ""}${l.active_min ? `<span class="aud">🕒 ${l.active_min} мин идэвхтэй</span>` : ""}</small></span>
+      <button type="button" class="icon-btn" data-edit-post aria-label="Засах" title="Засах">${ico("edit", 17)}</button></li>`;
+  const outlineHTML = () => {
+    const gs = groupsModel(); let n = 0;
+    return `<div class="ol" id="olSecs">${gs.map((g, i) => `<section class="ol-sec" data-sec="${esc(g.name)}">
+        <header class="ol-sec-head"><button type="button" class="ol-handle" data-drag="sec" aria-label="Бүлгийг зөөх" title="Бүлгийг чирж зөөх">${ico("grip", 18)}</button>
+          <span class="lg-num">${String(i + 1).padStart(2, "0")}</span>
+          <input class="ol-sec-name" value="${esc(g.name)}" maxlength="80" placeholder="${g.name || !g.items.length ? "Бүлгийн нэрээ бичнэ үү…" : "Бүлэггүй хичээлүүд — нэр бичвэл бүлэг болно"}" aria-label="Бүлгийн нэр">
+          <small class="muted">${g.items.length} хичээл</small>
+          <button type="button" class="btn btn-glass btn-sm" data-sec-add>${ico("plus", 15)}Хичээл</button>
+          ${g.name ? `<button type="button" class="icon-btn" data-sec-del aria-label="Бүлгийг задлах" title="Бүлгийг задлах (хичээлүүд үлдэнэ)">${ico("x", 16)}</button>` : ""}</header>
+        <ol class="ol-list">${g.items.map((l) => rowHTML(l, ++n)).join("")}</ol></section>`).join("")}</div>
+      <button type="button" class="ol-add" id="olAddSec">${ico("plus", 18)}Бүлэг нэмэх</button>
+      <p class="muted small ol-tip">${ico("grip", 14)} Хичээлийг бариад чирж өөр бүлэг рүү зөөнө. Гараар: зөөх товч дээр ↑ ↓.</p>`;
+  };
+  const render = () => {
+    main.innerHTML = `<section class="gp-head" style="--h:${hueOfName(c.title)}">
+        <div class="gp-cover"><a class="gp-back" href="#courses" aria-label="Сургалтууд руу буцах">${ico("back", 18)}Сургалтууд</a><b>${esc(c.title.trim()[0] || "?")}</b></div>
+        <div class="gp-bar"><div class="grow"><h1>${esc(c.title)}</h1>
+          <p class="muted">${ico(c.published ? "globe" : "lock", 15)}${c.published ? "Нийтлэгдсэн сургалт" : "Ноорог — зөвхөн танд харагдана"} · <b>${roster.length}</b> суралцагч · <b>${lessons.length}</b> хичээл · <b>${free()}</b> үнэгүй · <b>${c.views || 0}</b> үзэлт</p></div>
+          <div class="hero-cta" style="margin:0">${c.published ? `<a class="btn btn-glass" href="/c/${esc(c.id)}" target="_blank" rel="noopener">${ico("ext", 18)}Харах</a>` : `<button class="btn btn-gold" id="gpPublish">${ico("globe", 18)}Нийтлэх</button>`}
+          <button class="btn btn-glass" id="gpSettings">${ico("gear", 18)}Тохиргоо</button></div></div></section>
+      <div class="gp-body">
+        <div class="gp-feed">
+          <section class="card composer-box" id="composer">
+            <button class="composer" id="composerOpen">${avatar(me, "avatar-sm")}<span class="composer-input">Шинэ хичээл нийтлэх…</span></button>
+
+            <div id="composerBody" hidden>${editorHTML(null)}</div></section>
+          ${lessons.length || pending.length ? `<div class="view-tabs" role="tablist">
+            <button role="tab" data-view="outline" aria-selected="${view === "outline"}">${ico("list", 16)}Хөтөлбөр</button>
+            <button role="tab" data-view="posts" aria-selected="${view === "posts"}">${ico("book", 16)}Нийтлэлүүд</button></div>` : ""}
+          <div id="gpView">${view === "outline" && (lessons.length || pending.length) ? outlineHTML() : feedHTML()}</div>
+        </div>
+        <aside class="gp-side">
+          <section class="card"><div class="card-head"><h2>Тухай</h2><button class="icon-btn" id="gpSettings2" aria-label="Сургалтын тохиргоо">${ico("edit", 18)}</button></div>
+            <p class="post-text">${c.description ? esc(c.description) : `<span class="muted">Тайлбар нэмээгүй байна.</span>`}</p>
+            <ul class="pf-facts"><li>${ico("money", 18)}<span>${c.price ? `Багц үнэ <b>${money(c.price)}</b>` : "Хичээл тус бүрээр зарна"}</span></li>
+              <li>${ico(c.published ? "globe" : "lock", 18)}<span>${c.published ? "Профайл дээр харагдаж байна" : "Нийтлээгүй (ноорог)"}</span></li>
+              <li>${ico("clock", 18)}<span>${c.drip ? `Хичээлүүд <b>дарааллаар</b> нээгдэнэ${c.unlock_all_paid && c.price ? ", багц төлсөн бол бүгд шууд" : ""}` : "Бүх хичээл нэг дор нээлттэй"}</span></li>
+              <li>${ico("cal", 18)}<span>${fmtDate(c.created_at)} үүсгэсэн</span></li></ul></section>
+          <section class="card"><div class="card-head"><h2>Суралцагчид</h2><span class="chip">${roster.length}</span></div>
+            <div class="items">${roster.slice(0, 6).map(studentRow).join("") || `<p class="muted small" style="margin:0">Хараахан хэн ч элсээгүй байна.</p>`}</div>
+            ${roster.length > 6 ? `<a class="link" href="#students" style="margin-top:10px;display:inline-flex">Бүгдийг харах (${roster.length}) ${ico("chevron", 14)}</a>` : ""}</section>
+          <section class="card"><div class="card-head"><h2>Бүлэг чат</h2></div><p class="muted small" style="margin:0 0 10px">Энэ сургалтад элссэн бүх суралцагчтай нэг дор ярилцана. Шинэ элсэгч автоматаар орно.</p>
+            <button class="btn btn-gold btn-block" id="gpChat">${ico("chat", 18)}Бүлэг чат нээх</button></section>
+          <section class="card"><div class="card-head"><h2>Шууд хичээл</h2></div><p class="muted small" style="margin:0 0 10px">Элссэн суралцагчидтайгаа Google Meet-ээр уулзана.</p>
+            <a class="btn btn-glass btn-block" href="#live">${ico("live", 18)}Шууд хичээл товлох</a></section>
+        </aside></div>
+      <div class="modal" id="gpModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+        <h3 class="h3">Сургалтын тохиргоо</h3><form class="form" id="gpForm">${courseFormHTML(c)}<p class="form-error" role="alert"></p>
+        <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`;
+    hydrateBooks(main);
+    const cf = $("#composerForm"); if (cf) mountBlockEditor(cf, lessonBlocks(null));
+  };
+
+  const saveCourse = async (body) => { c = { ...c, ...(await api(`/api/courses/${c.id}`, { method: "PUT", body })) }; searchCourses = null; };
+  const lessonBody = (f, l) => {
+    const isFree = f.mode.value === "free";
+    const blocks = f._be.collect();
+    const exam = f.is_exam.checked ? { time_min: +f.ex_time.value || 0, attempts: +f.ex_attempts.value || 0, pass_pct: +f.ex_pass.value || 0, shuffle: f.ex_shuffle.checked, show_answers: f.ex_show.checked } : null;
+    if (exam && !blocks.some((b) => b.type === "quiz")) throw new Error("Шалгалтад дор хаяж нэг асуулт нэмнэ үү");
+    return { title: f.title.value, content: blocksSummary(blocks), video_url: "", blocks, active_min: +f.active_min.value || 0, exam, is_free: isFree, price: isFree ? 0 : +f.price.value || 0,
+      unlock_after_h: f.unlock_after_h ? +f.unlock_after_h.value || 0 : l?.unlock_after_h || 0, always_open: f.always_open ? f.always_open.checked : !!l?.always_open,
+      format: f.format.value, mode: f.mode_kind.value, section: sectionOf(f) };
+  };
+  const sectionOf = (f) => (f.section_pick.value === "__new" ? f.section_new.value : f.section_pick.value).trim();
+  const lessonPut = (l, patch) => api(`/api/courses/${c.id}/lessons/${l.id}`, { method: "PUT", body: { title: l.title, content: l.content, video_url: stripSig(l.video_url), is_free: l.is_free, price: l.price || 0, unlock_after_h: l.unlock_after_h || 0, always_open: !!l.always_open, format: l.format || "", mode: l.mode || "", section: l.section || "", blocks: (l.blocks || []).map((b) => (b.url ? { ...b, url: stripQ(b.url) } : b.quiz?.image ? { ...b, quiz: { ...b.quiz, image: stripQ(b.quiz.image) } } : b)), active_min: l.active_min || 0, exam: l.exam || null, ...patch } });
+  const reload = async () => { ({ course: c, lessons } = await api(`/api/me/courses/${id}`)); roster = await api(`/api/me/courses/${id}/students`).catch(() => roster); render(); };
+
+  // Засварлах маягт + блок засварлагч.
+  const putEditor = (box, l, preset) => { box.innerHTML = editorHTML(l, preset); mountBlockEditor($(".post-editor", box), lessonBlocks(l)); };
+  // ---- Хөтөлбөрийн DOM → хадгалах ----
+  const domSecs = () => $$("#olSecs > .ol-sec");
+  const domNames = () => domSecs().map((x) => x.dataset.sec);
+  const domItems = () => domSecs().flatMap((x) => $$(":scope > .ol-list > .ol-row", x).map((r) => ({ id: r.dataset.lid, section: x.dataset.sec })));
+  const saveOutline = async (msg = "Хөтөлбөр хадгалагдлаа ✓", focusLid) => {
+    const names = domNames(), items = domItems();
+    pending = names.map((name, at) => ({ name, at })).filter((p) => p.name && !items.some((it) => it.section === p.name));
+    const before = [...lessons].sort((a, b) => a.position - b.position).map((l) => l.id + "|" + (l.section || "")).join(",");
+    if (items.map((it) => it.id + "|" + it.section).join(",") === before) return render();
+    try { lessons = await api(`/api/courses/${c.id}/lesson-order`, { method: "PUT", body: { items } }); toast(msg); }
+    catch (err) { toast(err.message, true); await reload(); return; }
+    render();
+    if (focusLid) $(`.ol-row[data-lid="${CSS.escape(focusLid)}"] .ol-handle`)?.focus();
+  };
+  // Шинэ хичээлийг сонгосон бүлгийнхээ төгсгөлд байрлуулна (бүлэг хөтөлбөрийн дунд байсан ч).
+  const placeNew = async (lid, name) => {
+    const gs = groupsModel(), ti = gs.findIndex((g) => g.name === name);
+    if (ti < 0) return;
+    const items = [];
+    gs.forEach((g, i) => { g.items.filter((l) => l.id !== lid).forEach((l) => items.push({ id: l.id, section: g.name })); if (i === ti) items.push({ id: lid, section: name }); });
+    if (items.length !== lessons.length) return;
+    lessons = await api(`/api/courses/${c.id}/lesson-order`, { method: "PUT", body: { items } }).catch(() => lessons);
+  };
+  const renameSection2 = async (secEl, input) => {
+    const to = input.value.replace(/\s+/g, " ").trim(), from = secEl.dataset.sec;
+    if (to === from) return;
+    if (to && to !== from && domNames().includes(to)) toast(`«${to}» бүлэгтэй нэгтгэлээ`);
+    secEl.dataset.sec = to;
+    if (!$$(".ol-row", secEl).length) { // хоосон бүлэг: зөвхөн клиент дээр
+      const names = domNames(); pending = names.map((name, at) => ({ name, at })).filter((p) => p.name && !lessons.some((l) => (l.section || "") === p.name));
+      if (to) toast("Бүлэг нэмэгдлээ — хичээлүүдээ чирж оруулна уу"); return render();
+    }
+    await saveOutline(to ? "Бүлгийн нэр хадгалагдлаа ✓" : "Бүлэг задарлаа");
+  };
+
+  // ---- Чирж зөөх (хулгана ба хуруу: pointer events) ----
+  let drag = null;
+  const onPointerDown = (e) => {
+    const h = e.target.closest("[data-drag]");
+    if (!h || e.button > 0 || $(".ol-row.editing", main)) return;
+    const kind = h.dataset.drag, item = h.closest(kind === "sec" ? ".ol-sec" : ".ol-row");
+    if (!item) return;
+    e.preventDefault();
+    const src = kind === "sec" ? $(".ol-sec-head", item) : item, r = src.getBoundingClientRect();
+    const ghost = src.cloneNode(true); ghost.classList.add("ol-ghost");
+    Object.assign(ghost.style, { width: r.width + "px", left: r.left + "px", top: r.top + "px" });
+    document.body.append(ghost);
+    if (kind === "sec") $("#olSecs").classList.add("ol-compact");
+    item.classList.add("ol-dragging");
+    drag = { kind, item, ghost, dy: e.clientY - r.top, x: r.left + 24, moved: false };
+    window.addEventListener("pointermove", onPointerMove); window.addEventListener("pointerup", onPointerUp); window.addEventListener("pointercancel", onPointerUp);
+  };
+  const onPointerMove = (e) => {
+    if (!drag) return;
+    drag.moved = true; drag.ghost.style.top = e.clientY - drag.dy + "px";
+    if (e.clientY < 90) scrollBy(0, -14); else if (e.clientY > innerHeight - 60) scrollBy(0, 14);
+    const el = document.elementFromPoint(drag.x, e.clientY);
+    const below = (els) => els.find((x) => { const b = x.getBoundingClientRect(); return e.clientY < b.top + b.height / 2; }) || null;
+    if (drag.kind === "row") {
+      const list = el?.closest(".ol-sec")?.querySelector(":scope > .ol-list");
+      if (list && main.contains(list)) list.insertBefore(drag.item, below($$(":scope > .ol-row:not(.ol-dragging)", list)));
+    } else {
+      const box = $("#olSecs"); if (box) box.insertBefore(drag.item, below($$(":scope > .ol-sec:not(.ol-dragging)", box)));
+    }
+  };
+  const onPointerUp = () => {
+    window.removeEventListener("pointermove", onPointerMove); window.removeEventListener("pointerup", onPointerUp); window.removeEventListener("pointercancel", onPointerUp);
+    if (!drag) return;
+    const d = drag; drag = null; d.ghost.remove(); d.item.classList.remove("ol-dragging"); $("#olSecs")?.classList.remove("ol-compact");
+    if (d.moved) saveOutline(d.kind === "sec" ? "Бүлгийн дараалал хадгалагдлаа ✓" : "Хичээл зөөгдлөө ✓");
+  };
+  // Гараар зөөх: зөөх товч дээр ↑ ↓ (бүлгийн хил давж шилжинэ).
+  const onKeyDown = (e) => {
+    const inp = e.target.closest(".ol-sec-name");
+    if (inp && e.key === "Enter") { e.preventDefault(); inp.blur(); return; }
+    if (inp && e.key === "Escape") { inp.value = inp.closest(".ol-sec").dataset.sec; inp.blur(); return; }
+    const h = e.target.closest("[data-drag=row]");
+    if (!h || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    const row = h.closest(".ol-row"), list = row.parentElement, sec = list.closest(".ol-sec"), up = e.key === "ArrowUp";
+    const sib = up ? row.previousElementSibling : row.nextElementSibling;
+    if (sib) up ? list.insertBefore(row, sib) : list.insertBefore(row, sib.nextElementSibling);
+    else { const other = up ? sec.previousElementSibling : sec.nextElementSibling; if (!other) return; const ol = $(":scope > .ol-list", other); up ? ol.append(row) : ol.prepend(row); }
+    saveOutline("Хичээл зөөгдлөө ✓", row.dataset.lid);
+  };
+  const onFocusOut = (e) => {
+    const inp = e.target.closest?.(".ol-sec-name"); if (!inp) return;
+    const secEl = inp.closest(".ol-sec");
+    if (secEl.classList.contains("ol-new") && !inp.value.trim()) { secEl.remove(); return; }
+    renameSection2(secEl, inp);
+  };
+
+  const onClick = async (e) => {
+    const t = e.target;
+    const openComposer = (preset) => { const b = $("#composerBody"); if (preset !== undefined) putEditor(b, null, preset); $("#composerOpen").hidden = true; b.hidden = false; $("#composer").scrollIntoView({ behavior: "smooth", block: "start" }); $("#composerForm").title.focus(); };
+    if (t.closest("#composerOpen")) return openComposer();
+    const sec = t.closest(".sec, .ol-sec");
+    if (t.closest("[data-sec-add]") && sec) return openComposer(sec.dataset.sec);
+    const tab = t.closest("[data-view]");
+    if (tab) { view = tab.dataset.view; try { localStorage.setItem("sg_course_view", view); } catch {} return render(); }
+    if (t.closest("#olAddSec")) {
+      const names = domNames(); pending.push({ name: "", at: names.length });
+      $("#olSecs").insertAdjacentHTML("beforeend", `<section class="ol-sec ol-new" data-sec=""><header class="ol-sec-head"><span class="lg-num">${String(names.length + 1).padStart(2, "0")}</span>
+        <input class="ol-sec-name" maxlength="80" placeholder="Бүлгийн нэрээ бичээд Enter дарна уу" aria-label="Шинэ бүлгийн нэр"></header><ol class="ol-list"></ol></section>`);
+      pending.pop(); $("#olSecs > .ol-sec:last-child .ol-sec-name").focus(); return;
+    }
+    if (t.closest("[data-sec-del]") && sec) {
+      const name = sec.dataset.sec; pending = pending.filter((p) => p.name !== name);
+      sec.dataset.sec = ""; $$(".ol-row", sec).length ? await saveOutline("Бүлэг задарлаа — хичээлүүд бүлэггүй боллоо") : render();
+      return;
+    }
+    if (t.closest("#gpSettings, #gpSettings2")) { SG.openModal($("#gpModal")); return; }
+    if (t.closest("#gpChat")) {
+      const b = $("#gpChat"); b.disabled = true;
+      try { const d = await api(`/api/courses/${c.id}/chat`, { method: "POST" }); Live.reconnect(); window.openRailChat?.(d.conversation.id); }
+      catch (err) { toast(err.message, true); } finally { b.disabled = false; }
+      return;
+    }
+    if (t.closest("#gpPublish")) {
+      try { await saveCourse({ title: c.title, description: c.description, price: c.price, published: true, drip: !!c.drip, unlock_all_paid: !!c.unlock_all_paid, certificate: !!c.certificate, camera: c.camera || "optional" }); toast("Сургалт нийтлэгдлээ ✓"); celebrate(); render(); } catch (err) { toast(err.message, true); }
+      return;
+    }
+    const post = t.closest(".post, .ol-row"), l = post && lessons.find((x) => x.id === post.dataset.lid);
+    if (t.closest("[data-cancel]")) return render();
+    if (t.closest("[data-edit-post]") && l) { post.classList.add("editing"); putEditor(post, l); $("input[name=title]", post).focus(); return; }
+    if (t.closest("[data-open-media]") && l) { // агуулгыг суралцагчийн харах байдлаар урьдчилан үзнэ
+      const box = $(".post-preview", post) || $(".post-media", post); box.hidden = !box.hidden;
+      if (!box.hidden && !box.innerHTML) { box.innerHTML = SG.blocksHTML(lessonBlocks(l)); hydrateBooks(box); SG.mountQuizzes(box, `/api/courses/${c.id}/lessons/${l.id}`); }
+      return;
+    }
+    if (t.closest("[data-toggle-always]") && l) {
+      try { await lessonPut(l, { always_open: !l.always_open }); toast(l.always_open ? "Хичээл дараалалд орлоо" : "Хичээл дарааллаас үл хамааран нээлттэй боллоо ✓"); await reload(); } catch (err) { toast(err.message, true); }
+      return;
+    }
+    if (t.closest("[data-toggle-free]") && l) {
+      const toFree = !l.is_free;
+      if (!toFree && !c.price && !l.price) { putEditor(post, { ...l, is_free: false }); toast("Төлбөртэй хичээлийн үнийг оруулна уу"); return; }
+      try { await lessonPut(l, { is_free: toFree, price: toFree ? 0 : l.price || 0 });
+        toast(toFree ? "Хичээл үнэгүй боллоо ✓" : "Хичээл төлбөртэй боллоо ✓"); await reload(); } catch (err) { toast(err.message, true); }
+    }
+  };
+  const onChange = (e) => {
+    const f = e.target.closest(".post-editor");
+    if (!f) return;
+    if (e.target.name === "mode") $(".pe-price", f).hidden = f.mode.value === "free";
+    if (e.target.name === "is_exam") $(".pe-exam", f).hidden = !f.is_exam.checked;
+    if (e.target.name === "section_pick") { const isNew = f.section_pick.value === "__new"; f.section_new.hidden = !isNew; f.section_new.required = isNew; if (isNew) f.section_new.focus(); }
+  };
+  const onSubmit = async (e) => {
+    const f = e.target; e.preventDefault();
+    const errBox = $(".form-error", f); if (errBox) errBox.textContent = "";
+    try {
+      if (f.id === "gpForm") { await saveCourse(courseBody(f)); SG.closeModal($("#gpModal")); toast("Тохиргоо хадгалагдлаа ✓"); render(); return; }
+      if (!f.classList.contains("post-editor")) return;
+      if (f._be?.uploading()) { toast("Файл хуулагдаж дуустал түр хүлээнэ үү"); return; }
+      if (f.dataset.edit) { await api(`/api/courses/${c.id}/lessons/${f.dataset.edit}`, { method: "PUT", body: lessonBody(f, lessons.find((x) => x.id === f.dataset.edit)) }); toast("Хичээл шинэчлэгдлээ ✓"); }
+      else {
+        const body = lessonBody(f), nl = await api(`/api/courses/${c.id}/lessons`, { method: "POST", body });
+        toast("Хичээл нийтлэгдлээ ✓");
+        if (body.section) { lessons = [...lessons, nl]; await placeNew(nl.id, body.section); }
+      }
+      await reload();
+    } catch (err) { if (errBox) errBox.textContent = err.message; toast(err.message, true); }
+  };
+  const evs = [["click", onClick], ["change", onChange], ["submit", onSubmit], ["pointerdown", onPointerDown], ["keydown", onKeyDown], ["focusout", onFocusOut]];
+  evs.forEach(([n, f]) => main.addEventListener(n, f));
+  cleanup = () => { evs.forEach(([n, f]) => main.removeEventListener(n, f)); onPointerUp(); };
+  render();
+}
+
+/* ---------- Ном, өгүүлэл: зарах, хамгаалах, лог ----------
+   Файлыг багшийн хөтөч дээр хуудас бүрээр зураг болгож илгээнэ — эх PDF уншигчид огт очихгүй. */
+const BOOK_EVENTS = { view: ["👀", "Хуудсыг үзсэн"], preview: ["📖", "Үнэгүй хэсгийг уншсан"], read: ["📚", "Бүтнээр уншсан"], interest: ["♥", "Сонирхсон"],
+  paywall: ["🔒", "Төлбөрийн хананд хүрсэн"], purchase: ["💰", "Худалдаж авсан"], limit: ["⚠️", "Хэт хурдан татах гэсэн"] };
+async function books() {
+  let [list, evs] = await Promise.all([api("/api/me/books"), api("/api/me/book-events?limit=200")]);
+  const sum = (k) => list.reduce((a, b) => a + (b[k] || 0), 0);
+  const cover = (b) => (b.cover_url || (b.pages ? `/api/books/${b.id}/cover?v=${encodeURIComponent(b.updated_at)}` : ""));
+  const render = () => {
+    main.innerHTML = `<div class="gp-list-head"><div><h1>Ном, өгүүлэл</h1><p class="muted">${list.length} ном · ${list.filter((b) => b.published).length} нийтлэгдсэн</p></div>
+        <button class="btn btn-gold" id="bkNew">${ico("plus", 18)}Ном нэмэх</button></div>
+      <div class="bk-stats">${[["Үзсэн", sum("views")], ["Үнэгүй хэсэг уншсан", sum("previews")], ["Бүтнээр уншсан", sum("reads")], ["Сонирхсон", sum("interest")], ["Зарагдсан", sum("sales")], ["Орлого", money(sum("revenue"))]]
+        .map(([k, v]) => `<div class="card bk-stat"><small class="muted">${k}</small><b>${v}</b></div>`).join("")}</div>
+      <div class="bk-manage">${list.map((b) => `<article class="card bk-row" data-bid="${esc(b.id)}">
+          <span class="bc-cover">${cover(b) ? `<img src="${esc(cover(b))}" alt="" loading="lazy">` : ""}</span>
+          <div class="grow"><strong>${esc(b.title)}</strong><small class="muted">${b.kind === "article" ? "Өгүүлэл" : "Ном"}${b.author ? " · " + esc(b.author) : ""} · ${b.pages ? b.pages + " хуудас" : "<b style='color:var(--coral)'>файл оруулаагүй</b>"}</small>
+            <span class="find-tagrow"><span class="ftag ${b.price ? "ftag-paid" : "ftag-free"}">${b.price ? money(b.price) : "Үнэгүй"}</span><span class="ftag ${b.published ? "ftag-free" : ""}">${b.published ? "Нийтлэгдсэн" : "Ноорог"}</span>${b.price ? `<span class="ftag">Эхний ${b.preview_pages} хуудас үнэгүй</span>` : ""}</span>
+            <small class="muted">👀 ${b.views} · 📖 ${b.previews} · 📚 ${b.reads} · ♥ ${b.interest} · 💰 ${b.sales} (${money(b.revenue)})</small></div>
+          <div class="bk-acts"><button class="btn btn-glass btn-sm" data-edit>${ico("edit", 15)}Засах</button>${b.published ? `<a class="btn btn-glass btn-sm" href="/b/${esc(b.id)}" target="_blank" rel="noopener">${ico("eye", 15)}Харах</a>` : ""}<button class="btn btn-ghost btn-sm" data-log>Лог</button></div></article>`).join("") || `<div class="empty">Ном хараахан алга.<br>PDF, Word (DOC, DOCX) файлаа оруулж зарж эхлээрэй.</div>`}</div>
+      <section class="card"><div class="card-head"><h2>Үйлдлийн лог</h2><select id="bkLogFilter" aria-label="Номоор шүүх"><option value="">Бүх ном</option>${list.map((b) => `<option value="${esc(b.id)}">${esc(b.title)}</option>`).join("")}</select></div>
+        <div class="bk-log" id="bkLog">${logHTML(evs)}</div></section>`;
+  };
+  const title = (id) => list.find((b) => b.id === id)?.title || "";
+  const logHTML = (evs) => evs.length ? `<table class="tbl"><thead><tr><th>Цаг</th><th>Хэн</th><th>Үйлдэл</th><th>Ном</th></tr></thead><tbody>${evs.map((e) => `<tr class="ev-${esc(e.type)}">
+      <td>${fmtDate(e.at)}</td><td>${esc(e.user_name || "Зочин")}</td><td>${(BOOK_EVENTS[e.type] || ["•", e.type]).join(" ")}${e.detail ? ` <small class="muted">${esc(e.detail)}</small>` : ""}</td><td>${esc(title(e.book_id))}</td></tr>`).join("")}</tbody></table>` : `<p class="muted small" style="margin:0">Одоогоор лог алга.</p>`;
+  const reload = async () => { list = await api("/api/me/books"); evs = await api("/api/me/book-events?limit=200" + ($("#bkLogFilter")?.value ? "&book=" + $("#bkLogFilter").value : "")); render(); };
+
+  const formHTML = (b = {}) => `<form class="form" id="bkForm">
+      <div class="seg" role="radiogroup" aria-label="Төрөл"><label><input type="radio" name="kind" value="book" ${b.kind !== "article" ? "checked" : ""}><span>📕 Ном</span></label><label><input type="radio" name="kind" value="article" ${b.kind === "article" ? "checked" : ""}><span>📄 Өгүүлэл</span></label></div>
+      <label>Нэр<input name="title" required maxlength="200" value="${esc(b.title || "")}"></label>
+      <label>Зохиогч<input name="author" maxlength="120" value="${esc(b.author || me.display_name || "")}"></label>
+      <label>Тайлбар<textarea name="description" rows="4" placeholder="Энэ номонд юу байгаа вэ?">${esc(b.description || "")}</textarea></label>
+      <div class="kind-row"><label>Үнэ (₮, 0 = үнэгүй)<input name="price" type="number" min="0" step="500" value="${b.price ?? 0}"></label>
+        <label>Үнэгүй үзүүлэх хуудас<input name="preview_pages" type="number" min="1" max="20" value="${b.preview_pages || 3}"></label></div>
+      <fieldset><legend>Номын файл</legend>
+        <p class="muted small" style="margin:0 0 8px">PDF, Word (DOC, DOCX) эсвэл PowerPoint. Хуудас бүр зураг болж хамгаалагдана — эх файл уншигчид очихгүй.${b.pages ? ` Одоо: <b>${b.pages} хуудас</b>.` : ""}</p>
+        <input type="file" name="file" accept=".pdf,.doc,.docx,.odt,.rtf,.ppt,.pptx">
+        <div class="progress" hidden><i></i></div><p class="muted small bk-prog" aria-live="polite"></p></fieldset>
+      <fieldset><legend>Нүүр зураг (заавал биш)</legend><input type="file" name="cover" accept="image/*"><small class="muted">Оруулахгүй бол эхний хуудас нүүр болно.</small></fieldset>
+      <label class="check"><input type="checkbox" name="published" ${b.published ? "checked" : ""}> Нийтлэх — профайл дээр харагдаж, зарагдана</label>
+      <p class="form-error" role="alert"></p>
+      <div class="hero-cta" style="margin:0;justify-content:space-between">${b.id && !b.sales ? `<button type="button" class="btn btn-ghost" data-del>Устгах</button>` : "<span></span>"}
+        <span style="display:flex;gap:8px"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></span></div></form>`;
+  const openForm = (b) => {
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="bkModal"><div class="modal-card" style="width:min(640px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button><h3 class="h3">${b ? "Ном засах" : "Ном нэмэх"}</h3>${formHTML(b)}</div></div>`);
+    const modal = $("#bkModal"), f = $("#bkForm", modal);
+    SG.openModal(modal);
+    const closeIt = () => { SG.closeModal(modal); setTimeout(() => modal.remove(), 300); };
+    modal.addEventListener("click", (e) => { if (e.target === modal || e.target.closest("[data-close]")) { e.preventDefault(); closeIt(); } });
+    $("[data-del]", f)?.addEventListener("click", async () => {
+      if (!confirm("Энэ номыг устгах уу?")) return;
+      try { await api(`/api/me/books/${b.id}`, { method: "DELETE" }); toast("Устгагдлаа"); closeIt(); reload(); } catch (e) { toast(e.message, true); }
+    });
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      const err = $(".form-error", f), btn = $("button.btn-gold", f); err.textContent = ""; btn.disabled = true;
+      try {
+        let coverURL = b?.cover_url || "";
+        if (f.cover.files[0]) { const fd = new FormData(); fd.append("file", f.cover.files[0]); coverURL = (await api("/api/me/files?visibility=public", { method: "POST", body: fd })).path; }
+        const body = { kind: f.kind.value, title: f.title.value, author: f.author.value, description: f.description.value, price: +f.price.value || 0, preview_pages: +f.preview_pages.value || 3, cover_url: coverURL, published: false };
+        const saved = b ? await api(`/api/me/books/${b.id}`, { method: "PUT", body: { ...body, published: b.pages ? f.published.checked : false } }) : await api("/api/me/books", { method: "POST", body });
+        let pages = saved.pages || b?.pages || 0;
+        if (f.file.files[0]) pages = await preparePages(saved.id, f.file.files[0], f);
+        if (f.published.checked && pages) await api(`/api/me/books/${saved.id}`, { method: "PUT", body: { ...body, published: true } });
+        else if (f.published.checked) throw new Error("Нийтлэхийн тулд номын файлаа оруулна уу");
+        toast("Хадгалагдлаа ✓"); closeIt(); reload();
+      } catch (ex) { err.textContent = ex.message; } finally { btn.disabled = false; }
+    };
+  };
+  // Файл → PDF → хуудас бүрийг JPEG болгож илгээнэ.
+  const preparePages = async (bookId, file, f) => {
+    const bar = $(".progress", f), fill = $("i", bar), msg = $(".bk-prog", f);
+    const say = (t, pct) => { msg.textContent = t; bar.hidden = pct == null; if (pct != null) fill.style.width = pct + "%"; };
+    let src;
+    if (/\.pdf$/i.test(file.name)) src = { data: new Uint8Array(await file.arrayBuffer()) };
+    else { // Word/PowerPoint: сервер PDF болгоно (LibreOffice)
+      say("Word файлыг PDF болгож байна…", 10);
+      const fd = new FormData(); fd.append("file", file);
+      let info = await api("/api/me/files?visibility=private", { method: "POST", body: fd });
+      if (!/\.pdf$/i.test(info.path)) throw new Error("Сервер дээр LibreOffice суугаагүй тул Word файлыг хөрвүүлэх боломжгүй — PDF болгож оруулна уу");
+      for (let i = 0; info.status === "processing" && i < 120; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const lib = await api("/api/me/files"); info = lib.files.find((x) => x.path === info.path) || info;
+      }
+      if (info.status !== "ready") throw new Error("PDF болгож чадсангүй");
+      src = { url: info.url };
+    }
+    const pdf = await (await SG.pdfLib()).getDocument(src).promise, n = pdf.numPages;
+    if (n > 3000) throw new Error("3000-аас олон хуудастай");
+    let done = 0;
+    const one = async (p) => {
+      const page = await pdf.getPage(p), base = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: Math.min(3, 1400 / base.width) });
+      const cv = document.createElement("canvas"); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      const ctx = cv.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      const blob = await new Promise((r) => cv.toBlob(r, "image/jpeg", 0.86));
+      for (let t = 0; ; t++) {
+        const res = await fetch(`/api/me/books/${bookId}/pages/${p}`, { method: "POST", headers: { Authorization: "Bearer " + Auth.token, "Content-Type": "image/jpeg" }, body: blob });
+        if (res.ok) break;
+        if (t >= 2) throw new Error((await res.json().catch(() => null))?.error || `${p}-р хуудсыг илгээж чадсангүй`);
+      }
+      page.cleanup(); done++; say(`Хуудас бэлтгэж байна: ${done}/${n}`, Math.round(done / n * 100));
+    };
+    let next = 1;
+    await Promise.all([0, 1, 2].map(async () => { while (next <= n) await one(next++); }));
+    await api(`/api/me/books/${bookId}/pages-done`, { method: "POST", body: { total: n } });
+    say(`✓ ${n} хуудас хамгаалагдан бэлэн боллоо`, null);
+    return n;
+  };
+  const onClick = (e) => {
+    if (e.target.closest("#bkNew")) return openForm(null);
+    const row = e.target.closest(".bk-row"), b = row && list.find((x) => x.id === row.dataset.bid);
+    if (e.target.closest("[data-edit]") && b) return openForm(b);
+    if (e.target.closest("[data-log]") && b) { $("#bkLogFilter").value = b.id; $("#bkLogFilter").dispatchEvent(new Event("change", { bubbles: true })); $("#bkLog").scrollIntoView({ behavior: "smooth" }); }
+  };
+  const onChange = async (e) => { if (e.target.id === "bkLogFilter") { evs = await api("/api/me/book-events?limit=200" + (e.target.value ? "&book=" + e.target.value : "")); $("#bkLog").innerHTML = logHTML(evs); } };
+  main.addEventListener("click", onClick); main.addEventListener("change", onChange);
+  cleanup = () => { main.removeEventListener("click", onClick); main.removeEventListener("change", onChange); };
+  render();
+}
+
+/* ---------- Файлын сан ---------- */
+async function files() {
+  const [lib, st, plans] = await Promise.all([loadLibrary(), api("/api/me/storage"), api("/api/storage/plans", { token: null })]);
+  const perMB = Math.min(...plans.plans.map((p) => p.price_month / p.mb));
+  const pct = Math.min(100, (st.used / st.quota) * 100);
+  main.innerHTML = panel(`<div class="panel-head"><h2>Файлын сан</h2><span class="chip ${pct > 85 ? "chip-coral" : "chip-gold"}">${fmtSize(st.used)} / ${fmtSize(st.quota)}</span></div>
+      <div class="meter"><i id="fMeter"></i></div>
+      <p class="muted small">Үнэгүй ${plans.free_label}${st.plan_active ? ` + ${esc(String(st.plan_mb >= 1024 ? st.plan_mb / 1024 + "GB" : st.plan_mb + "MB"))} багц (${fmtDate(st.expires_at)} хүртэл)` : ""}.
+      Зураг автоматаар <b>WebP</b> болж ${plans.max_image_side}px хүртэл багасна, видео <b>WebM</b>, Word/PowerPoint <b>PDF (3D ном)</b> болно.</p>
+      <div class="dropzone" id="drop" tabindex="0"><strong>📤 Файлаа энд чирж оруулах эсвэл дарж сонгох</strong><span class="muted small">Видео, PDF, Word, PowerPoint, зураг, аудио</span>
+        <select id="vis" style="width:auto" onclick="event.stopPropagation()"><option value="private">🔒 Хаалттай (төлбөртэй хичээлд)</option><option value="public">🌐 Нээлттэй (профайл зураг г.м)</option></select>
+        <input type="file" id="fileIn" multiple hidden></div>
+      <div id="uploads" class="list" style="margin-top:12px"></div>`) +
+    panel(`<div class="panel-head"><h2>Миний файлууд</h2><span class="muted small" id="fCount">${lib.files.length} файл</span></div>
+      <div class="fl-bar">
+        <div class="find-tags" id="fType" style="justify-content:flex-start">${FILE_TYPES.map(([k, t]) => `<button type="button" data-ft="${k}" aria-pressed="${k === fstate.type}">${t} <i>${lib.files.filter((f) => k === "all" || fileType(f) === k).length}</i></button>`).join("")}</div>
+        <div class="fl-tools"><label class="rail-search">${ico("search", 16)}<input type="search" id="fSearch" placeholder="Файлын нэрээр хайх…" aria-label="Файл хайх" value="${esc(fstate.q)}"></label>
+          <select id="fSort" aria-label="Эрэмбэлэх"><option value="new">Шинэ нь эхэнд</option><option value="old">Хуучин нь эхэнд</option><option value="big">Том нь эхэнд</option><option value="name">Нэрээр</option></select>
+          <span class="fl-view" role="tablist"><button type="button" data-fv="tree" aria-pressed="${fstate.view === "tree"}" title="Модон бүтэц">🌳 Мод</button><button type="button" data-fv="grid" aria-pressed="${fstate.view === "grid"}" title="Карт">▦ Карт</button></span>
+          <select id="fUse" aria-label="Ашиглалт"><option value="">Бүгд</option><option value="used">Хичээлд ашигласан</option><option value="unused">Ашиглаагүй</option></select></div></div>
+      <div class="file-grid" id="fGrid"></div>`, 1) +
+    panel(`<div class="panel-head"><h2>Багтаамж нэмэх</h2><span class="muted small">сарын төлбөр</span></div>
+      <div class="plans">${plans.plans.map((p, i) => `<div class="plan ${i === 1 ? "sel" : ""}" data-mb="${p.mb}"><b>${esc(p.label)}</b><span>${money(p.price_month)}</span><small class="muted">/ сар</small></div>`).join("")}</div>
+      <div class="form-row" style="margin-top:14px"><label>Хугацаа<select id="months">${plans.months.map((m) => `<option value="${m}">${m} сар</option>`).join("")}</select></label>
+      <button class="btn btn-gold" id="buyPlan" style="align-self:end">Худалдаж авах · <span id="planTotal"></span></button></div>`, 2);
+  requestAnimationFrame(() => ($("#fMeter").style.width = pct + "%"));
+  $("#fSort").value = fstate.sort; $("#fUse").value = fstate.use;
+  // Цэгцлэх: төрөл, хайлт, эрэмбэ, хичээлд ашигласан эсэх.
+  const [usage, myBooks] = await Promise.all([api("/api/me/files/usage").catch(() => ({})), api("/api/me/books").catch(() => [])]);
+  const drawFiles = () => {
+    const q = fstate.q.toLowerCase();
+    let fl = lib.files.filter((f) => (fstate.type === "all" || fileType(f) === fstate.type) && (!q || f.original_name.toLowerCase().includes(q)) &&
+      (!fstate.use || (fstate.use === "used") === !!usage[f.path]?.length));
+    const by = { new: (a, b) => new Date(b.mod_time) - new Date(a.mod_time), old: (a, b) => new Date(a.mod_time) - new Date(b.mod_time), big: (a, b) => b.size - a.size, name: (a, b) => a.original_name.localeCompare(b.original_name) };
+    fl.sort(by[fstate.sort]);
+    $("#fCount").textContent = `${fl.length} / ${lib.files.length} файл`;
+    const grid = $("#fGrid"); grid.classList.toggle("as-tree", fstate.view === "tree");
+    if (fstate.view === "tree") { grid.innerHTML = filesTree(fl, usage, q || fstate.type !== "all" ? [] : myBooks); return; }
+    grid.innerHTML = fl.map((f) => fileCard(f, perMB, usage[f.path])).join("") || `<div class="empty" style="grid-column:1/-1">Тохирох файл алга</div>`;
+    hydrateBooks($("#fGrid"));
+  };
+  drawFiles();
+  $("#fType").onclick = (e) => { const b = e.target.closest("[data-ft]"); if (!b) return; fstate.type = b.dataset.ft; $$("#fType [data-ft]").forEach((x) => x.setAttribute("aria-pressed", x === b)); drawFiles(); };
+  $("#fSearch").oninput = (e) => { fstate.q = e.target.value; drawFiles(); };
+  $("#fSort").onchange = (e) => { fstate.sort = e.target.value; drawFiles(); };
+  $("#fUse").onchange = (e) => { fstate.use = e.target.value; drawFiles(); };
+  $$("[data-fv]").forEach((b) => (b.onclick = () => { fstate.view = b.dataset.fv; try { localStorage.setItem("sg_files_view", fstate.view); } catch {} $$("[data-fv]").forEach((x) => x.setAttribute("aria-pressed", x === b)); drawFiles(); }));
+
+  // Багц сонгох
+  const total = () => { const p = plans.plans.find((x) => x.mb == $(".plan.sel").dataset.mb); $("#planTotal").textContent = money(p.price_month * +$("#months").value); };
+  $$(".plan").forEach((p) => (p.onclick = () => { $$(".plan").forEach((x) => x.classList.toggle("sel", x === p)); total(); }));
+  $("#months").onchange = total; total();
+  $("#buyPlan").onclick = async () => {
+    try {
+      const d = await api("/api/me/storage/purchase", { method: "POST", body: { mb: +$(".plan.sel").dataset.mb, months: +$("#months").value } });
+      if (d.payment.dev_pay && confirm(`Захиалга: ${money(d.order.amount)}\n(Демо) Төлсөн гэж баталгаажуулах уу?`)) {
+        await api(`/api/orders/${d.order.id}/dev-pay`, { method: "POST" }); toast("💾 Багтаамж нэмэгдлээ"); celebrate(); files();
+      } else toast(`Захиалга үүслээ: ${money(d.order.amount)}. Төлбөр баталгаажмагц нэмэгдэнэ.`);
+    } catch (e) { toast(e.message, true); }
+  };
+
+  // Upload
+  const drop = $("#drop"), input = $("#fileIn");
+  drop.onclick = () => input.click();
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); upload([...e.dataTransfer.files]); };
+  input.onchange = () => upload([...input.files]);
+  async function upload(list) {
+    for (const file of list) {
+      const row = document.createElement("div");
+      row.className = "row"; row.innerHTML = `<div class="grow"><strong>${esc(file.name)}</strong><div class="progress"><i></i></div></div><span class="muted small">${fmtSize(file.size)}</span>`;
+      $("#uploads").append(row);
+      try {
+        await new Promise((res, rej) => {
+          const xhr = new XMLHttpRequest(), fd = new FormData();
+          fd.append("file", file);
+          xhr.open("POST", "/api/me/files?visibility=" + $("#vis").value);
+          xhr.setRequestHeader("Authorization", "Bearer " + Auth.token);
+          xhr.upload.onprogress = (e) => e.lengthComputable && ($("i", row).style.width = (e.loaded / e.total) * 100 + "%");
+          xhr.onload = () => (xhr.status < 300 ? res() : rej(new Error(JSON.parse(xhr.responseText || "{}").error || "Алдаа")));
+          xhr.onerror = () => rej(new Error("Сүлжээний алдаа"));
+          xhr.send(fd);
+        });
+        $("i", row).style.width = "100%"; row.style.opacity = ".6";
+      } catch (e) { row.querySelector(".grow").insertAdjacentHTML("beforeend", `<span class="form-error small">${esc(e.message)}</span>`); }
+    }
+    setTimeout(files, 600);
+  }
+  main.onclick = async (e) => {
+    const del = e.target.closest("[data-del]"), cp = e.target.closest("[data-copy]");
+    if (cp) { navigator.clipboard.writeText(cp.dataset.copy); toast("Зам хуулагдлаа — хичээлд холбоно уу"); }
+    if (del && confirm("Устгах уу?")) { try { await api(`/api/me/files/${del.dataset.del}`, { method: "DELETE" }); toast("Устгагдлаа"); files(); } catch (x) { toast(x.message, true); } }
+  };
+  // Боловсруулж буй файл байвал үе үе шинэчилнэ.
+  const t = lib.files.some((f) => f.status === "processing") ? setInterval(async () => {
+    const l = await api("/api/me/files").catch(() => null);
+    if (l && !l.files.some((f) => f.status === "processing")) { clearInterval(t); files(); }
+  }, 5000) : null;
+  cleanup = () => { clearInterval(t); main.onclick = null; };
+}
+
+const FILE_TYPES = [["all", "Бүгд"], ["video", "🎬 Видео"], ["image", "🖼 Зураг"], ["audio", "🎧 Дуу"], ["doc", "📄 Баримт"], ["other", "📦 Бусад"]];
+const fstate = { type: "all", q: "", sort: "new", use: "", view: (() => { try { return localStorage.getItem("sg_files_view") || "tree"; } catch { return "tree"; } })() };
+const FICON = { video: "🎬", image: "🖼", audio: "🎧", doc: "📄", other: "📦" };
+const FGROUP = { video: "Видео", image: "Зураг", audio: "Дуу", doc: "Баримт", other: "Бусад" };
+// Модон бүтцийн нэг файл: картын үйлдлүүдтэй ижил data-* тул main.onclick ажиллана.
+const treeFile = (f) => `<li class="tf"><span class="tf-ico">${FICON[fileType(f)]}</span>
+  <span class="tf-name" title="${esc(f.original_name)}">${esc(f.original_name)}</span>
+  <span class="tf-meta">${fmtSize(f.size)} · ${f.visibility === "public" ? "🌐" : "🔒"}</span>
+  <span class="tf-acts"><button class="icon-btn" data-copy="${esc(f.path)}" title="Зам хуулах">🔗</button>${f.status === "ready" ? `<a class="icon-btn" href="${esc(f.url)}" target="_blank" rel="noopener" title="Нээх">↗</a>` : ""}<button class="icon-btn" data-del="${esc(f.visibility)}/${encodeURIComponent(f.name)}" title="Устгах">🗑</button></span></li>`;
+const treeNode = (icon, label, count, inner, open) => `<li class="tn"><details ${open ? "open" : ""}><summary><span class="tn-ico">${icon}</span><span class="tn-name">${esc(label)}</span><span class="tn-count">${count}</span></summary><ul>${inner}</ul></details></li>`;
+// Файлын сангийн модон бүтэц: Сургалт → Бүлэг → Хичээл → Файл, Номууд, Ашиглаагүй файлууд (төрлөөр).
+function filesTree(files, usage, books) {
+  const courses = new Map();
+  const used = new Set(), few = files.length <= 30; // цөөн бол бүгдийг дэлгэнэ
+  for (const f of files) {
+    for (const u of usage[f.path] || []) {
+      if (!u.course_id) continue;
+      used.add(f.path);
+      let c = courses.get(u.course_id);
+      if (!c) courses.set(u.course_id, (c = { title: u.course, sections: new Map() }));
+      const sk = u.section || "";
+      let sec = c.sections.get(sk);
+      if (!sec) c.sections.set(sk, (sec = new Map()));
+      let l = sec.get(u.lesson_id);
+      if (!l) sec.set(u.lesson_id, (l = { title: u.lesson, pos: u.position || 0, files: [] }));
+      if (!l.files.includes(f)) l.files.push(f);
+    }
+  }
+  const lessonsHTML = (sec) => [...sec.values()].sort((a, b) => a.pos - b.pos)
+    .map((l) => treeNode("📝", l.title, l.files.length, l.files.map(treeFile).join(""), few)).join("");
+  const courseHTML = [...courses.values()].map((c) => {
+    const n = [...c.sections.values()].reduce((k, s) => k + [...s.values()].reduce((m, l) => m + l.files.length, 0), 0);
+    const inner = [...c.sections.entries()].map(([name, sec]) => name
+      ? treeNode("📂", name, [...sec.values()].reduce((m, l) => m + l.files.length, 0), lessonsHTML(sec), true)
+      : lessonsHTML(sec)).join("");
+    return treeNode("📘", c.title, n, inner, true);
+  }).join("");
+  const unused = files.filter((f) => !used.has(f.path));
+  const byType = Object.keys(FGROUP).map((t) => [t, unused.filter((f) => fileType(f) === t)]).filter(([, fs]) => fs.length);
+  const unusedHTML = byType.map(([t, fs]) => treeNode(FICON[t], FGROUP[t], fs.length, fs.map(treeFile).join(""), few)).join("");
+  const bookHTML = books.map((b) => `<li class="tf"><span class="tf-ico">📗</span><span class="tf-name">${esc(b.title)}</span><span class="tf-meta">${b.pages} хуудас · 🔒 хамгаалагдсан</span><span class="tf-acts">${b.published ? `<a class="icon-btn" href="/b/${esc(b.id)}" target="_blank" rel="noopener" title="Харах">↗</a>` : ""}</span></li>`).join("");
+  return `<ul class="ftree">${treeNode("🗂", "Бүх файл", files.length, [
+    courseHTML ? treeNode("📚", "Сургалтууд", used.size, courseHTML, true) : "",
+    books.length ? treeNode("📕", "Номууд", books.length, bookHTML, false) : "",
+    unused.length ? treeNode("🗃", "Ашиглаагүй файлууд", unused.length, unusedHTML, true) : "",
+  ].join("") || `<li class="muted small">Файл алга</li>`, true)}</ul>`;
+}
+const fileType = (f) => { const t = f.content_type || "", e = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
+  return t.startsWith("video/") ? "video" : t.startsWith("image/") ? "image" : t.startsWith("audio/") ? "audio" : [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".odt", ".odp", ".rtf", ".txt", ".epub"].includes(e) ? "doc" : "other"; };
+function fileCard(f, perMB, used) {
+  const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
+  let thumb;
+  if (f.status === "processing") thumb = `<span class="status-processing small">${ext === ".pdf" ? "PDF болгож" : "WebM болгож"} байна…</span>`;
+  else if (f.status === "failed") thumb = `<span class="form-error small">Хөрвүүлэлт амжилтгүй</span>`;
+  else if (f.content_type.startsWith("image/")) thumb = `<img src="${esc(f.url)}" alt="" loading="lazy">`;
+  else if (f.content_type.startsWith("video/")) thumb = `<video src="${esc(f.url)}#t=1" preload="metadata" muted></video>`;
+  else if (ext === ".pdf") thumb = book3dHTML(f.url, f.original_name);
+  else thumb = `<span style="font-size:2.4rem">📄</span>`;
+  const cost = Math.max(1, Math.round((f.size / (1 << 20)) * perMB));
+  return `<div class="file"><div class="file-thumb">${thumb}</div><div class="file-name">${esc(f.original_name)}</div>
+    <span class="muted small">${fmtSize(f.size)} · ≈${money(cost)}/сар · ${f.visibility === "public" ? "🌐" : "🔒"} · ${fmtDate(f.mod_time)}</span>
+    <span class="file-use ${used?.length ? "on" : ""}" title="${esc((used || []).map((u) => u.course + " › " + u.lesson).join("\n"))}">${used?.length ? `📌 ${esc(used[0].lesson)}${used.length > 1 ? ` +${used.length - 1}` : ""}` : "Ашиглаагүй"}</span>
+    <div class="file-actions"><button class="btn btn-ghost btn-sm" data-copy="${esc(f.path)}" title="Хичээлд холбох зам">🔗</button>
+    ${f.status === "ready" ? `<a class="btn btn-ghost btn-sm" href="${esc(f.url)}" target="_blank" rel="noopener">↗</a>` : ""}
+    <button class="btn btn-danger btn-sm" data-del="${esc(f.visibility)}/${encodeURIComponent(f.name)}">🗑</button></div></div>`;
+}
+
+/* ---------- Шууд хичээл (Google Meet) ---------- */
+async function live() {
+  const [meetings, list] = await Promise.all([api("/api/me/meetings"), api("/api/me/courses")]);
+  const fresh = await api("/api/me"); me = fresh;
+  const dt = new Date(Date.now() + 3600e3); dt.setMinutes(0, 0, 0);
+  const local = new Date(dt - dt.getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
+  main.innerHTML = panel(`<div class="panel-head"><h2>Google Meet</h2>${me.meet_connected ? `<span class="chip chip-teal">✓ Холбогдсон</span>` : `<span class="chip">Холбогдоогүй</span>`}</div>
+      <p class="muted">Холбосноор шууд хичээл товлоход болон чатаас нэг товчоор Google Meet холбоос автоматаар үүснэ. Холбоос таны Google Calendar-т хадгалагдана.</p>
+      ${me.meet_connected ? `<button class="btn btn-ghost btn-sm" id="meetOff">Салгах</button>` : `<button class="btn btn-gold" id="meetOn">📹 Google Meet холбох</button>`}`) +
+    panel(`<h2>Шууд хичээл товлох</h2><form class="form" id="meetForm">
+      <label>Сэдэв<input name="title" required maxlength="200" placeholder="ЭЕШ давтлага — Логарифм"></label>
+      <div class="form-row"><label>Эхлэх цаг<input name="start" type="datetime-local" value="${local}" required></label>
+      <label>Үргэлжлэх (мин)<input name="dur" type="number" min="10" max="480" value="60"></label></div>
+      <label>Сургалт (элссэн суралцагчид харна)<select name="course"><option value="">— Ерөнхий —</option>${list.map((c) => `<option value="${c.id}">${esc(c.title)}</option>`).join("")}</select></label>
+      <button class="btn btn-gold" ${me.meet_connected ? "" : "disabled"}>Товлох</button></form>`, 1) +
+    panel(`<h2>Удахгүй болох</h2><div class="meet-list">${meetings.map((m) => `<div class="meet-item"><time>${fmtDate(m.starts_at)}</time><span style="flex:1">${esc(m.title)} · ${m.duration_min} мин</span><a class="btn btn-teal btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">📹 Нээх</a></div>`).join("") || `<div class="empty">Товлосон хичээл алга</div>`}</div>`, 2);
+  $("#meetOn")?.addEventListener("click", async () => { try { const d = await api("/api/me/meet/connect", { method: "POST" }); location.href = d.url; } catch (e) { toast(e.message, true); } });
+  $("#meetOff")?.addEventListener("click", async () => { await api("/api/me/meet", { method: "DELETE" }); live(); });
+  const f = $("#meetForm");
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api("/api/me/meetings", { method: "POST", body: { title: f.title.value, starts_at: new Date(f.start.value).toISOString(), duration_min: +f.dur.value, course_id: f.course.value } });
+      toast("📹 Meet үүслээ"); live();
+    } catch (err) { toast(err.message, true); }
+  };
+}
+
+/* ---------- Чат (inbox) ---------- */
+async function chat(openId) {
+  const convs = await api("/api/me/conversations");
+  main.innerHTML = `<div class="inbox panel" style="padding:0">
+    <div class="inbox-list" id="ibList">${convs.map(convItem).join("") || `<div class="empty" style="margin:14px">Одоогоор чат алга. Профайлаа түгээгээрэй!</div>`}</div>
+    <div class="inbox-thread"><div class="chat-head" id="ibHead"><span class="muted">Яриа сонгоно уу</span></div>
+      <div class="chat-body"><ol class="chat-msgs" id="ibMsgs"></ol></div>
+      <form class="chat-input" id="ibForm" hidden><button type="button" class="btn btn-teal btn-sm" id="ibMeet" title="Google Meet үүсгээд илгээх">📹 Meet</button>
+        <input name="body" maxlength="2000" autocomplete="off" placeholder="Хариу бичих…" required><button class="btn btn-gold btn-icon">➤</button></form></div></div>`;
+  let cur = null;
+  const list = $("#ibList"), msgs = $("#ibMsgs"), form = $("#ibForm"), body = msgs.parentElement;
+  const open = async (id) => {
+    cur = id;
+    $$(".inbox-item", list).forEach((x) => x.classList.toggle("active", x.dataset.id === id));
+    $(`.inbox-item[data-id="${id}"]`)?.classList.remove("unread");
+    const d = await api(`/api/chat/${id}/messages`);
+    $("#ibHead").innerHTML = `<strong>${esc(d.conversation.visitor_name)}</strong><span class="muted small">${d.conversation.user_id ? "Бүртгэлтэй" : "Зочин"}</span>`;
+    msgs.innerHTML = d.messages.map((m) => msgHTML(m, "teacher")).join("");
+    form.hidden = false; body.scrollTop = body.scrollHeight; form.body.focus();
+    history.replaceState(null, "", "#chat=" + id);
+  };
+  list.onclick = (e) => { const it = e.target.closest(".inbox-item"); if (it) open(it.dataset.id); };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const text = form.body.value.trim(); if (!text || !cur) return;
+    form.body.value = "";
+    try { const m = await api(`/api/chat/${cur}/messages`, { method: "POST", body: { body: text } }); append(m); } catch (x) { toast(x.message, true); form.body.value = text; }
+  };
+  $("#ibMeet").onclick = async () => {
+    try { const d = await api(`/api/chat/${cur}/meet`, { method: "POST" }); append(d.message); toast("📹 Meet холбоос илгээгдлээ"); }
+    catch (x) { toast(x.message, true); if (x.status === 428) location.hash = "live"; }
+  };
+  const append = (m) => { if (!msgs.querySelector(`[data-id="${m.id}"]`)) { msgs.insertAdjacentHTML("beforeend", msgHTML(m, "teacher")); body.scrollTop = body.scrollHeight; } };
+  const handler = async (d) => {
+    if (d.type !== "message") return;
+    const m = d.message;
+    if (m.conversation_id === cur) append(m);
+    let it = $(`.inbox-item[data-id="${m.conversation_id}"]`);
+    if (!it) { const fresh = await api("/api/me/conversations"); list.innerHTML = fresh.map(convItem).join(""); it = $(`.inbox-item[data-id="${m.conversation_id}"]`); }
+    if (it) { $("small", it).textContent = m.body; list.prepend(it); if (m.conversation_id !== cur) it.classList.add("unread"); it.animate([{ background: "rgba(31,60,143,.18)" }, { background: "transparent" }], { duration: 1200 }); }
+  };
+  Live.on(handler);
+  cleanup = () => Live.handlers.delete(handler);
+  if (openId) open(openId);
+}
+
+/* ---------- Профайл ---------- */
+const LINKS = [["website", "Вэб сайт", "https://example.mn"], ["facebook", "Facebook", "facebook.com/таны-хуудас"], ["instagram", "Instagram", "instagram.com/таны-нэр"], ["youtube", "YouTube", "youtube.com/@таны-суваг"]];
+async function profile() {
+  const insights = teacher ? await api("/api/me/profile/insights") : null;
+  const tipsHTML = (ins) => `<div class="strength">${ringHTML(ins.score)}<div><h2 style="margin:0">Ухаалаг профайл · ${esc(ins.level)}</h2>
+      <p class="muted" style="margin:.3em 0 0">Доорх алхмуудыг гүйцээх тусам суралцагчид танд илүү итгэж, худалдан авах магадлал өснө.</p></div></div>
+    <ul class="tips tips-grid">${ins.tips.map((t) => `<li><${t.done ? "div" : `a href="${esc(t.link)}"`} class="tip ${t.done ? "done" : ""}" data-tip="${esc(t.key)}"><i>✓</i><span><strong>${esc(t.title)}</strong><small>${esc(t.hint)}</small></span>${t.done ? "" : `<span class="chip chip-gold">Хийх</span>`}</${t.done ? "div" : "a"}></li>`).join("")}</ul>`;
+  const linkPanel = teacher ? panel(`<div class="panel-head"><h2>Профайлын холбоос</h2><a class="btn btn-ghost btn-sm" id="unOpen" href="/t/${esc(me.username)}" target="_blank" rel="noopener">${ico("ext", 16)}Нээх</a></div>
+      <p class="muted small" style="margin:-6px 0 14px">Бүртгүүлэхэд автоматаар үүссэн. Суралцагчдад санахад амар нэрээр сольж болно.</p>
+      <form class="link-form" id="unForm" novalidate>
+        <label class="link-field"><span>${esc(location.host)}/t/</span><input name="username" value="${esc(me.username)}" maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Профайлын холбоос"></label>
+        <button class="btn btn-gold" disabled>Солих</button><button type="button" class="btn btn-ghost" id="unCopy">Хуулах</button>
+      </form>
+      <p class="link-hint" id="unHint">3–32 тэмдэгт: a–z, 0–9, доогуур зураас.</p>`, 1) : "";
+  main.innerHTML = (teacher ? panel(`<div id="insBox">${tipsHTML(insights)}</div>`) : "") + linkPanel +
+    panel(`<div class="panel-head"><h2>${teacher ? "Нээлттэй профайл" : "Миний мэдээлэл"}</h2>${teacher ? `<a class="btn btn-gold btn-sm" href="/t/${esc(me.username)}">${ico("ext", 16)}Профайл дээрээ шууд засах</a>` : ""}</div>
+    ${teacher ? `<p class="muted small" style="margin:-6px 0 14px">Нүүр зураг болон профайл зургаа нээлттэй профайл дээрээ камерын товчоор солино.</p>` : ""}
+    <form class="form" id="pf">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap" id="avBox">${avatar(me, "avatar-xl")}${teacher ? `<div style="display:grid;gap:8px">
+        <button type="button" class="btn btn-glass btn-sm" id="avUp">Зураг оруулах</button><span class="muted small">WebP болж, 1000px хүртэл автоматаар багасна</span></div>
+        <input type="file" id="avIn" accept="image/*" hidden>` : ""}</div>
+      <label>Нэр<input name="display_name" required maxlength="80" value="${esc(me.display_name)}"></label>
+      ${teacher ? `<label>Мэргэжил / гарчиг<input name="headline" maxlength="120" value="${esc(me.headline)}" placeholder="Математикийн багш · 12 жилийн туршлага"></label>
+      <label>Танилцуулга <small class="muted" id="bioCount"></small><textarea name="bio" maxlength="4000" rows="6" placeholder="Туршлага, заах арга барил, суралцагчдын амжилт…">${esc(me.bio)}</textarea></label>
+      <div class="form-row">
+        <label>Заадаг чиглэлүүд <small class="muted">таслалаар тусгаарлана, 8 хүртэл</small><input name="subjects" value="${esc((me.subjects || []).join(", "))}" placeholder="Математик, ЭЕШ бэлтгэл, Геометр"></label>
+        <label>Байршил<input name="location" maxlength="60" value="${esc(me.location || "")}" placeholder="Улаанбаатар"></label>
+      </div>
+      <div class="tags" id="subjPreview" style="margin-top:-4px"></div>
+      <fieldset><legend>Сошиал холбоос</legend><div class="form-row">${LINKS.map(([k, label, ph]) => `<label>${label}<input name="link_${k}" maxlength="300" inputmode="url" value="${esc((me.links || {})[k] || "")}" placeholder="${ph}"></label>`).join("")}</div></fieldset>` : ""}
+      <input type="hidden" name="avatar_url" value="${esc(me.avatar_url)}"><input type="hidden" name="cover_url" value="${esc(me.cover_url || "")}">
+      <p class="form-error" id="pfErr" role="alert"></p>
+      <button class="btn btn-gold" style="justify-self:start">Хадгалах</button></form>`, 2);
+  const f = $("#pf");
+  if (teacher) usernameForm();
+  const subjects = () => (f.subjects ? f.subjects.value.split(/[,،\n]/).map((x) => x.trim()).filter(Boolean) : me.subjects || []);
+  if (teacher) {
+    const preview = () => ($("#subjPreview").innerHTML = subjects().map((x) => `<span class="tag">${esc(x)}</span>`).join(""));
+    const count = () => { const n = [...f.bio.value.trim()].length; $("#bioCount").textContent = n >= 120 ? `${n} тэмдэгт ✓` : `${n}/120 — дор хаяж 120 тэмдэгт бичвэл сайн`; };
+    f.subjects.addEventListener("input", preview); f.bio.addEventListener("input", count); preview(); count();
+    $("#avUp").onclick = () => $("#avIn").click();
+    $("#avIn").onchange = async () => {
+      const fd = new FormData(); fd.append("file", $("#avIn").files[0]);
+      try {
+        const info = await api("/api/me/files?visibility=public", { method: "POST", body: fd });
+        f.avatar_url.value = info.path;
+        $("#avBox .avatar").innerHTML = `<img src="${esc(info.path)}" alt="">`;
+        toast("Зураг бэлэн — Хадгалах дарна уу");
+      } catch (e) { toast(e.message, true); }
+    };
+  }
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    $("#pfErr").textContent = "";
+    const body = teacher
+      ? { display_name: f.display_name.value, headline: f.headline.value, bio: f.bio.value, avatar_url: f.avatar_url.value, cover_url: f.cover_url.value, subjects: subjects(), location: f.location.value,
+          links: Object.fromEntries(LINKS.map(([k]) => [k, f["link_" + k].value.trim()]).filter(([, v]) => v)) }
+      : { display_name: f.display_name.value, headline: me.headline || "", bio: me.bio || "", avatar_url: me.avatar_url || "", cover_url: me.cover_url || "", subjects: me.subjects || [], location: me.location || "", links: me.links || {} };
+    try {
+      me = await api("/api/me/profile", { method: "PUT", body });
+      Auth.set(Auth.token, me);
+      toast("Профайл шинэчлэгдлээ ✓");
+      if (teacher) {
+        LINKS.forEach(([k]) => (f["link_" + k].value = (me.links || {})[k] || "")); // серверийн цэгцэлсэн хэлбэр
+        const before = insights.score, ins = await api("/api/me/profile/insights");
+        $("#insBox").innerHTML = tipsHTML(ins); insights.score = ins.score;
+        if (ins.score === 100 && before < 100) celebrate();
+      }
+    } catch (err) { $("#pfErr").textContent = err.message; toast(err.message, true); }
+  };
+}
+
+/* Профайлын холбоос солих: бичих зуур шалгаж, чөлөөтэй эсэхийг урьдчилан харуулна. */
+function usernameForm() {
+  const f = $("#unForm"), input = f.username, btn = $("button.btn-gold", f), hint = $("#unHint");
+  let timer = 0, seq = 0;
+  const say = (text, tone = "") => { hint.textContent = text; hint.className = "link-hint " + tone; };
+  const check = () => {
+    const v = (input.value = input.value.toLowerCase().replace(/\s+/g, "_"));
+    clearTimeout(timer); btn.disabled = true;
+    if (v === me.username) return say("Одоогийн холбоос.");
+    if (!/^[a-z0-9_]{3,32}$/.test(v)) return say("3–32 тэмдэгт: зөвхөн a–z, 0–9, доогуур зураас.", v ? "bad" : "");
+    say("Шалгаж байна…");
+    const my = ++seq;
+    // Багшийн нэртэй давхцвал энд мэдэгдэнэ; суралцагчийн нэртэй давхцлыг сервер хадгалах үед шалгана.
+    timer = setTimeout(async () => {
+      const res = await api("/api/teachers/" + encodeURIComponent(v), { raw: true, token: null }).catch(() => null);
+      if (my !== seq) return;
+      if (res?.status === 200) return say("Энэ холбоос эзэнтэй байна.", "bad");
+      say(`Чөлөөтэй: ${location.host}/t/${v}`, "ok"); btn.disabled = false;
+    }, 350);
+  };
+  input.addEventListener("input", check);
+  $("#unCopy").onclick = () => { const url = `${location.origin}/t/${me.username}`; navigator.clipboard.writeText(url).then(() => toast("Хуулагдлаа ✓"), () => toast(url)); };
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const v = input.value.trim();
+    if (btn.disabled || v === me.username) return;
+    if (!confirm(`Холбоосыг /t/${v} болгох уу?\n\nХуучин холбоос (/t/${me.username}) болон өмнө нь хэвлэсэн QR код ажиллахгүй болно.`)) return;
+    btn.disabled = true;
+    try {
+      const d = await api("/api/me/username", { method: "PUT", body: { username: v } });
+      Auth.set(d.token, d.user); me = d.user; searchCourses = null;
+      Live.connect(d.token);
+      $("#sideFoot a")?.setAttribute("href", "/t/" + me.username);
+      toast("Хуудас шинэ холбоосоор нээгдэнэ"); setTimeout(() => location.replace("/t/" + me.username + "#settings"), 900); return;
+      toast("Профайлын холбоос солигдлоо ✓");
+      await profile();
+    } catch (err) { say(err.message, "bad"); toast(err.message, true); }
+  };
+}
+
+/* ---------- Суралцагчид: хэн элссэн, юу авсан, шууд чат ---------- */
+const studentRow = (r) => {
+  const total = r.courses.length, lessons = r.courses.reduce((n, c) => n + c.lessons.length, 0);
+  const since = r.courses.map((c) => c.enrolled_at).filter(Boolean).sort()[0];
+  return `<div class="item student" data-uid="${esc(r.user.id)}" data-conv="${esc(r.conv_id || "")}">${avatar(r.user, "avatar-sm")}
+    <span class="grow"><strong>${esc(r.user.display_name)}</strong><small>${r.courses.map((c) => `${esc(c.course_title)}: ${c.enrolled ? "элссэн" : ""}${c.enrolled && c.lessons.length ? ", " : ""}${c.lessons.length ? c.lessons.length + " хичээл авсан" : ""}`).join(" · ")}${since ? " · " + fmtDay(since) : ""}</small></span>
+    ${total > 1 ? `<span class="chip">${total} сургалт</span>` : ""}${lessons ? `<span class="chip chip-gold">${lessons} хичээл</span>` : ""}
+    <button class="btn btn-gold btn-sm" data-chat-student>${ico("chat", 16)}Чат</button></div>`;
+};
+// Суралцагчтай чат: өмнө нь яриа байвал нээнэ, үгүй бол шинээр эхлүүлнэ.
+async function chatWithStudent(el) {
+  const b = el.querySelector("[data-chat-student]"); if (b) b.disabled = true;
+  try {
+    let id = el.dataset.conv;
+    if (!id) { const d = await api(`/api/me/students/${el.dataset.uid}/chat`, { method: "POST" }); id = d.conversation.id; el.dataset.conv = id; Live.reconnect?.(); }
+    window.openRailChat?.(id);
+  } catch (e) { toast(e.message, true); } finally { if (b) b.disabled = false; }
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-chat-student]"); if (b) chatWithStudent(b.closest(".student")); });
+
+async function students() {
+  const [rows, courseList] = await Promise.all([api("/api/me/students"), api("/api/me/courses")]);
+  const st = { course: "", days: 30 };
+  let data = null, labels = {}, timer = null;
+  const dur = (sec) => sec < 60 ? `${sec} сек` : sec < 3600 ? `${Math.round(sec / 60)} мин` : `${Math.floor(sec / 3600)} ц ${String(Math.round(sec % 3600 / 60)).padStart(2, "0")} мин`;
+  const RISK = { ok: ["Хэвийн", "ok"], watch: ["Анхаарах", "watch"], risk: ["Эрсдэлтэй", "risk"] };
+  const bar = (v) => `<span class="an-bar"><i style="width:${Math.max(0, Math.min(100, v))}%;background:${v >= 70 ? "#0f9d8a" : v >= 40 ? "var(--accent)" : "var(--coral)"}"></i></span><b>${v}%</b>`;
+  const chart = (daily) => {
+    const max = Math.max(...daily.map((d) => d.active_sec + d.inactive_sec)), w = 100 / daily.length;
+    if (!max) return `<p class="muted small an-empty">Энэ хугацаанд хичээл үзсэн идэвх бүртгэгдээгүй байна.</p>`;
+    return `<svg class="an-chart" viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label="Өдөр бүрийн идэвхтэй ба идэвхгүй минут">${daily.map((d, i) => {
+      const ha = d.active_sec / max * 38, hi = d.inactive_sec / max * 38;
+      return `<rect x="${i * w + w * 0.15}" y="${40 - ha}" width="${w * 0.7}" height="${ha}" fill="#1f3c8f"><title>${d.day}: идэвхтэй ${dur(d.active_sec)}</title></rect><rect x="${i * w + w * 0.15}" y="${40 - ha - hi}" width="${w * 0.7}" height="${hi}" fill="#eaa02e" opacity=".75"><title>${d.day}: идэвхгүй ${dur(d.inactive_sec)}</title></rect>`;
+    }).join("")}</svg><div class="an-legend"><span><i style="background:#1f3c8f"></i>Идэвхтэй</span><span><i style="background:#eaa02e"></i>Идэвхгүй, өөр цонхонд</span><span class="muted">${daily[0]?.day || ""} — ${daily[daily.length - 1]?.day || ""}</span></div>`;
+  };
+  const evRow = (e) => `<tr><td>${fmtDate(e.at)}</td><td>${esc(e.user_name || "")}</td><td>${esc(labels[e.type] || e.type)}</td><td class="muted">${esc(e.detail || "")}</td></tr>`;
+  // Хүснэгтэд: суралцсан оноог юунаас бүрдсэнийг нэг мөрөөр.
+  const learnHint = (x) => {
+    const p = [];
+    if (x.quiz_total) p.push(`✅ ${x.quiz_accuracy}% (${x.quiz_total})`);
+    if (x.video_clips) p.push(`▶ ${x.video_coverage}%`);
+    if (x.reflections) p.push(`✍️ ${x.reflections}`);
+    if (x.streak_days > 1) p.push(`🔥 ${x.streak_days} өдөр`);
+    return p.join(" · ") || "Мэдээлэл алга";
+  };
+  // Видеоны үзэлтийн heatmap: хэсэг бүрийг хэдэн удаа үзсэнээр өнгөөр ялгана (саарал = огт үзээгүй).
+  const heatmap = (w) => {
+    if (!w.buckets?.length) return "";
+    const max = Math.max(1, ...w.buckets);
+    return `<div class="vh-row"><small class="vh-title">${esc(w.lesson || "")}</small><div class="vh-bar">${w.buckets.map((n, i) => {
+      const pct = n / max, bg = n === 0 ? "#e1e6f0" : `rgba(31,60,143,${0.25 + pct * 0.65})`;
+      const mm = Math.floor(i * 10 / 60), ss = String(i * 10 % 60).padStart(2, "0");
+      return `<i style="background:${bg}" title="${mm}:${ss} — ${n ? n + " удаа үзсэн" : "алгассан"}"></i>`;
+    }).join("")}</div></div>`;
+  };
+  const qs = () => `course=${encodeURIComponent(st.course)}&days=${st.days}`;
+  const render = () => {
+    const t = data.totals, list = data.students;
+    main.innerHTML = panel(`<div class="panel-head"><h2>${ico("users")}Хяналт ба статистик</h2>
+        <div class="an-filters"><select id="anCourse" aria-label="Сургалт"><option value="">Бүх сургалт</option>${courseList.map((c) => `<option value="${esc(c.id)}" ${c.id === st.course ? "selected" : ""}>${esc(c.title)}</option>`).join("")}</select>
+          <select id="anDays" aria-label="Хугацаа">${[7, 30, 90].map((d) => `<option value="${d}" ${d === st.days ? "selected" : ""}>Сүүлийн ${d} хоног</option>`).join("")}</select>
+          <a class="btn btn-glass btn-sm" id="anCsv" href="#" title="Excel-д нээгдэх тайлан">${ico("files", 15)}Excel</a><button class="btn btn-glass btn-sm" id="anPdf">${ico("book", 15)}PDF</button></div></div>
+      <div class="an-tiles">
+        <div class="an-tile"><small>Суралцагч</small><b>${t.students}</b>${t.live ? `<span class="an-live">● ${t.live} одоо үзэж байна</span>` : ""}</div>
+        <div class="an-tile"><small>Идэвхтэй хугацаа</small><b>${dur(t.active_sec)}</b><span class="muted small">нийт ${dur(t.total_sec)}-аас</span></div>
+        <div class="an-tile"><small>Идэвхтэй хувь</small><b>${t.active_pct}%</b></div>
+        <div class="an-tile"><small>Анхаарлын индекс</small><b>${t.attention}%</b></div>
+        <div class="an-tile ${t.violations ? "warn" : ""}"><small>Зөрчил</small><b>${t.violations}</b></div>
+        <div class="an-tile"><small>Шалгалт</small><b>${t.exams}</b></div>
+        <div class="an-tile learn"><small>🧠 Суралцсан оноо</small><b>${t.learn_score}%</b><span class="muted small">бодит хариулт, дүгнэлт, тогтмол байдал</span></div>
+        <div class="an-tile"><small>✍️ Бичсэн дүгнэлт</small><b>${t.reflections}</b></div></div>
+      ${chart(data.daily)}`) +
+      panel(`<div class="panel-head"><h2>Суралцагч бүрээр</h2><label class="rail-search" style="width:min(260px,100%)">${ico("search", 16)}<input type="search" id="anSearch" placeholder="Нэрээр хайх…" aria-label="Хайх"></label></div>
+      <p class="muted small" style="margin:-4px 0 10px">Сурагч дээр дарж дэлгэрэнгүйг (бичсэн дүгнэлт, асуултын хариулт, видео үзэлтийн зураглал) харна уу.</p>
+      <div class="an-table-wrap"><table class="tbl an-table"><thead><tr><th>Суралцагч</th><th>Идэвхтэй</th><th>Анхаарал</th><th>🧠 Суралцсан</th><th>Зөрчил</th><th>Шалгалт</th><th>Төлөв</th><th></th></tr></thead><tbody>
+      ${list.map((x) => `<tr class="an-row" data-uid="${esc(x.user_id)}"><td><b>${esc(x.name)}</b>${x.live ? ` <span class="an-live">●</span>` : ""}<br><small class="muted">${x.lessons} хичээл · ${fmtDate(x.last_at)}</small></td>
+        <td>${dur(x.active_sec)}<br><small class="muted">нийт ${dur(x.total_sec)}</small></td><td>${bar(x.attention)}</td>
+        <td>${bar(x.learn_score)}<br><small class="muted">${learnHint(x)}</small></td>
+        <td>${x.violations ? `<b class="an-bad">${x.violations}</b><br><small class="muted">${["tab_switch", "copy", "auto_block"].filter((k) => x.counts[k]).map((k) => `${esc(labels[k] || k)}: ${x.counts[k]}`).join(", ")}</small>` : "0"}</td>
+        <td>${x.exam_best >= 0 ? `${x.exam_best}%${x.terminated ? `<br><small class="an-bad">${x.terminated} хаагдсан</small>` : ""}` : `<span class="muted">—</span>`}</td>
+        <td><span class="an-risk ${RISK[x.risk][1]}">${RISK[x.risk][0]}</span></td>
+        <td class="an-acts"><button class="icon-btn" data-detail title="Дэлгэрэнгүй" aria-label="Дэлгэрэнгүй">${ico("eye", 17)}</button><button class="icon-btn" data-remind title="Сануулга илгээх" aria-label="Сануулга илгээх">${ico("chat", 17)}</button></td></tr>`).join("") || `<tr><td colspan="8" class="muted">Энэ хугацаанд хичээл үзсэн суралцагч алга.</td></tr>`}
+      </tbody></table></div>`, 1) +
+      panel(`<div class="panel-head"><h2>Сүүлийн үйл явдал</h2><span class="muted small">зөрчил, сануулга, шалгалт</span></div>
+        <div class="bk-log"><table class="tbl"><thead><tr><th>Цаг</th><th>Хэн</th><th>Үйл явдал</th><th>Дэлгэрэнгүй</th></tr></thead><tbody>${data.events.map(evRow).join("") || `<tr><td colspan="4" class="muted">Одоогоор алга.</td></tr>`}</tbody></table></div>`, 2) +
+      panel(`<div class="panel-head"><h2>Бүх суралцагчид</h2><span class="chip">${rows.length}</span></div>
+        <p class="muted small" style="margin:-6px 0 14px">Таны сургалтад элссэн эсвэл хичээл худалдаж авсан хүмүүс. "Чат" дарахад баруун талд яриа нээгдэнэ.</p>
+        <div class="items" id="stuList">${rows.map(studentRow).join("") || `<div class="empty">Одоогоор суралцагч алга. Профайлаа түгээж, үнэгүй хичээл нийтлээрэй.</div>`}</div>`, 3);
+    $("#anCsv").href = "#";
+  };
+  const load = async () => { const d = await api(`/api/me/analytics?${qs()}`); data = d.data; labels = d.labels; render(); };
+  // Тайлан: CSV-г токентой татна; PDF-г хэвлэх цонхоор.
+  const download = async (url, name) => {
+    const res = await fetch(url, { headers: { Authorization: "Bearer " + Auth.token } });
+    if (!res.ok) return toast("Тайлан татаж чадсангүй", true);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(await res.blob()); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  const printReport = (title, html) => {
+    const w = open("", "_blank"); if (!w) return toast("Шинэ цонх нээгдсэнгүй — хөтчийн popup зөвшөөрнө үү", true);
+    w.document.write(`<!doctype html><html lang="mn"><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font:13px system-ui,sans-serif;color:#121829;margin:28px}h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d6dbe6;padding:6px 8px;text-align:left;vertical-align:top}th{background:#eef2fb}.m{color:#59637a}</style></head><body>${html}<p class="m">surgalt.mn · ${new Date().toLocaleString()}</p></body></html>`);
+    w.document.close(); setTimeout(() => w.print(), 300);
+  };
+  const classReport = () => {
+    const c = courseList.find((x) => x.id === st.course);
+    printReport("Ангийн тайлан", `<h1>Ангийн тайлан${c ? " — " + esc(c.title) : ""}</h1><p class="m">Сүүлийн ${st.days} хоног · ${data.totals.students} суралцагч · идэвхтэй ${data.totals.active_pct}% · анхаарал ${data.totals.attention}%</p>
+      <table><tr><th>Суралцагч</th><th>Идэвхтэй</th><th>Нийт</th><th>Идэвхтэй %</th><th>Анхаарал %</th><th>Зөрчил</th><th>Шалгалт</th><th>Төлөв</th></tr>
+      ${data.students.map((x) => `<tr><td>${esc(x.name)}</td><td>${dur(x.active_sec)}</td><td>${dur(x.total_sec)}</td><td>${x.active_pct}</td><td>${x.attention}</td><td>${x.violations}</td><td>${x.exam_best >= 0 ? x.exam_best + "%" : "—"}</td><td>${RISK[x.risk][0]}</td></tr>`).join("")}</table>`);
+  };
+  // Суралцагчийн дэлгэрэнгүй
+  const detail = async (uid) => {
+    const d = await api(`/api/me/analytics/students/${uid}?${qs()}`), x = d.student;
+    if (!x) return toast("Мэдээлэл алга");
+    const html = `<h3 class="h3">${esc(x.name)}</h3>
+      <div class="an-tiles"><div class="an-tile"><small>Идэвхтэй</small><b>${dur(x.active_sec)}</b></div><div class="an-tile"><small>Идэвхтэй хувь</small><b>${x.active_pct}%</b></div>
+        <div class="an-tile"><small>Анхаарал</small><b>${x.attention}%</b></div><div class="an-tile ${x.violations ? "warn" : ""}"><small>Зөрчил</small><b>${x.violations}</b></div>
+        <div class="an-tile learn"><small>🧠 Суралцсан оноо</small><b>${x.learn_score}%</b></div>
+        <div class="an-tile"><small>🔥 Тогтмол байдал</small><b>${x.streak_days}</b><span class="muted small">дараалсан өдөр · ${x.active_days} нийт өдөр</span></div></div>
+      ${chart(d.daily)}
+      <h4>Идэвхтэй суралцсаны нотолгоо</h4>
+      <div class="an-tiles">
+        <div class="an-tile"><small>✅ Асуултад зөв хариулсан</small><b>${x.quiz_total ? x.quiz_accuracy + "%" : "—"}</b><span class="muted small">${x.quiz_total} асуулт${x.quiz_total ? `, дундаж ${Math.round(x.quiz_avg_ms / 1000)} сек` : ""}</span></div>
+        <div class="an-tile ${x.quiz_guesses > 2 ? "warn" : ""}"><small>⚡ Хэт хурдан хариулсан</small><b>${x.quiz_guesses}</b><span class="muted small">1.5 сек-ээс богино (таамаг)</span></div>
+        <div class="an-tile"><small>▶ Видео үзэлт</small><b>${x.video_clips ? x.video_coverage + "%" : "—"}</b><span class="muted small">${x.video_clips} видео</span></div>
+        <div class="an-tile"><small>✍️ Дүгнэлт бичсэн</small><b>${x.reflections}</b><span class="muted small">${x.reflections ? `дундаж ${x.reflection_words} үг` : "одоогоор алга"}</span></div></div>
+      ${d.watches?.length ? `<h4>Видеоны үзэлтийн зураглал</h4><p class="muted small" style="margin:0 0 8px">Бараан хэсэг = давтаж үзсэн, цайвар саарал = алгассан хэсэг.</p><div class="vh">${d.watches.map(heatmap).join("")}</div>` : ""}
+      ${d.reflections?.length ? `<h4>Бичсэн дүгнэлтүүд</h4><div class="refl-list">${d.reflections.map((r) => `<div class="refl-item"><b>${esc(r.lesson)}</b><small class="muted">${fmtDate(r.at)}</small><p>${esc(r.text)}</p></div>`).join("")}</div>` : ""}
+      ${d.quiz_logs?.length ? `<h4>Сүүлийн асуултын хариултууд</h4><table class="tbl"><thead><tr><th>Асуулт</th><th>Хариулт</th><th>Хугацаа</th></tr></thead><tbody>${d.quiz_logs.slice(0, 15).map((q) => `<tr class="${q.correct ? "" : "an-wrongq"}"><td>${esc(q.question)}</td><td>${q.correct ? "✓ Зөв" : "✗ Буруу"}</td><td>${q.ms ? (q.ms / 1000).toFixed(1) + " сек" + (q.ms < 1500 ? " ⚡" : "") : "—"}</td></tr>`).join("")}</tbody></table>` : ""}
+      <h4>Хичээл тус бүрээр</h4><table class="tbl"><thead><tr><th>Хичээл</th><th>Идэвхтэй</th><th>Нийт</th><th>Удаа</th><th>Зөрчил</th></tr></thead><tbody>${d.lessons.map((l) => `<tr><td>${esc(l.title)}</td><td>${dur(l.active_sec)}</td><td>${dur(l.total_sec)}</td><td>${l.sessions}</td><td>${l.violations}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">Алга</td></tr>`}</tbody></table>
+      <h4>Шалгалтууд</h4><table class="tbl"><thead><tr><th>Огноо</th><th>Оноо</th><th>Төлөв</th><th>Зөрчил</th></tr></thead><tbody>${d.exams.map((a) => `<tr><td>${fmtDate(a.started_at)}</td><td>${a.pct}%${a.passed ? " ✓" : ""}</td><td>${a.status === "terminated" ? `<b class="an-bad">Хаагдсан</b> · ${esc(a.reason || "")}` : a.status === "submitted" ? "Өгсөн" : a.status === "expired" ? "Хугацаа хэтэрсэн" : "Явагдаж байна"}</td><td>${a.violations}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">Алга</td></tr>`}</tbody></table>
+      <h4>Лог</h4><div class="bk-log"><table class="tbl"><tbody>${d.events.map(evRow).join("") || `<tr><td class="muted">Алга</td></tr>`}</tbody></table></div>`;
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="anModal"><div class="modal-card" style="width:min(900px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}
+      <div class="hero-cta" style="margin:16px 0 0;justify-content:flex-end"><button class="btn btn-glass" data-x="csv">${ico("files", 16)}Excel</button><button class="btn btn-glass" data-x="pdf">${ico("book", 16)}PDF</button><button class="btn btn-gold" data-x="remind">${ico("chat", 16)}Сануулга илгээх</button></div></div></div>`);
+    const m = $("#anModal"); SG.openModal(m);
+    m.addEventListener("click", (e) => {
+      if (e.target === m || e.target.closest("[data-close]")) { SG.closeModal(m); setTimeout(() => m.remove(), 300); return; }
+      const b = e.target.closest("[data-x]"); if (!b) return;
+      if (b.dataset.x === "csv") download(`/api/me/analytics/export?${qs()}&student=${uid}`, `suragch-${x.name}.csv`);
+      if (b.dataset.x === "pdf") printReport("Суралцагчийн тайлан", `<h1>${esc(x.name)}</h1>${html.replace(/<svg[\s\S]*?<\/svg>/, "")}`);
+      if (b.dataset.x === "remind") remind(uid, x.name);
+    });
+  };
+  // Сануулга: суралцагчид мэдэгдэл очно.
+  const remind = (uid, name) => {
+    const r = rows.find((x) => x.user.id === uid), cs = r ? r.courses : [];
+    const opts = (cs.length ? cs.map((c) => [c.course_id, c.course_title]) : courseList.map((c) => [c.id, c.title]));
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="rmModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+      <h3 class="h3">${esc(name)}-д сануулга</h3><form class="form" id="rmForm"><label>Сургалт<select name="course">${opts.map(([id, t]) => `<option value="${esc(id)}" ${id === st.course ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+      <div class="find-chips" style="justify-content:flex-start">${["Хичээлээ анхааралтай, бусад цонхоо хаагаад үзээрэй.", "Даалгавраа хугацаанд нь хийгээрэй.", "Шалгалтдаа сайн бэлдээрэй, амжилт!"].map((t) => `<button type="button" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+      <label>Мессеж<textarea name="message" rows="3" maxlength="500" required></textarea></label><p class="form-error" role="alert"></p>
+      <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Илгээх</button></div></form></div></div>`);
+    const m = $("#rmModal"), f = $("#rmForm", m); SG.openModal(m); f.message.focus();
+    const close = () => { SG.closeModal(m); setTimeout(() => m.remove(), 300); };
+    m.addEventListener("click", (e) => { if (e.target === m || e.target.closest("[data-close]")) { e.preventDefault(); close(); } const t = e.target.closest("[data-t]"); if (t) f.message.value = t.dataset.t; });
+    f.onsubmit = async (e) => { e.preventDefault();
+      try { await api(`/api/me/students/${uid}/remind`, { method: "POST", body: { course_id: f.course.value, message: f.message.value } }); toast("Сануулга илгээгдлээ ✓"); close(); load(); }
+      catch (err) { $(".form-error", f).textContent = err.message; } };
+  };
+  const onClick = (e) => {
+    const tr = e.target.closest("tr[data-uid]");
+    if (e.target.closest("#anCsv")) { e.preventDefault(); return download(`/api/me/analytics/export?${qs()}`, "angi-tailan.csv"); }
+    if (e.target.closest("#anPdf")) return classReport();
+    if (tr && e.target.closest("[data-remind]")) return remind(tr.dataset.uid, $("b", tr).textContent);
+    if (tr) return detail(tr.dataset.uid); // мөр хаана ч дарсан дэлгэрэнгүй нээнэ
+  };
+  const onChange = (e) => { if (e.target.id === "anCourse") { st.course = e.target.value; load(); } if (e.target.id === "anDays") { st.days = +e.target.value; load(); } };
+  const onInput = (e) => { if (e.target.id !== "anSearch") return; const q = e.target.value.trim().toLowerCase(); $$(".an-table tbody tr[data-uid]").forEach((tr) => (tr.hidden = !!q && !tr.textContent.toLowerCase().includes(q))); };
+  main.addEventListener("click", onClick); main.addEventListener("change", onChange); main.addEventListener("input", onInput);
+  timer = setInterval(() => { if (!document.hidden && !$(".modal.open")) load().catch(() => {}); }, 30000); // бодит хугацаанд ойрхон
+  cleanup = () => { clearInterval(timer); main.removeEventListener("click", onClick); main.removeEventListener("change", onChange); main.removeEventListener("input", onInput); };
+  await load();
+}
+
+/* ---------- Суралцагч ---------- */
+async function learning() {
+  const h = await api("/api/me/home");
+  main.innerHTML = panel(`<div class="panel-head"><h2>Миний сургалтууд</h2><a class="btn btn-ghost btn-sm" href="/">Нүүр хуудас</a></div><div class="course-grid">${h.courses.map((c, i) => `
+    <a class="course-card tilt" href="/c/${esc(c.course.id)}" style="--h:${hueOfName(c.course.title)}"><div class="course-art"><span class="course-num">${String(i + 1).padStart(2, "0")}</span><span class="glare"></span></div>
+    <div class="course-body"><h3>${esc(c.course.title)}</h3><div class="course-meta"><span>${c.course.lesson_count} хичээл</span><span class="price free">▶ Үргэлжлүүлэх</span></div></div></a>`).join("") || `<div class="empty">Та одоогоор сургалтад элсээгүй байна</div>`}</div>`);
+}
+
+dispatchEvent(new Event("studio-ready"));
+})();

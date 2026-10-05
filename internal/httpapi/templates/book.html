@@ -1,0 +1,44 @@
+{{$b := .D.Book}}{{$t := .D.Teacher}}
+{{template "head" (dict "Title" (printf "%s — %s" $b.Title $t.DisplayName) "Desc" $b.Description "Image" $b.Cover "Page" "book")}}
+<main class="book-page" data-book="{{$b.ID}}" data-price="{{$b.Price}}" data-pages="{{$b.Pages}}" data-preview="{{$b.PreviewN}}" data-title="{{$b.Title}}">
+  <section class="bk-hero">
+    <div class="bk-cover-wrap">
+      <div class="bk-cover"><img src="{{$b.Cover}}" alt="" draggable="false"><span class="bk-spine"></span></div>
+    </div>
+    <div class="bk-info">
+      <span class="chip">{{if eq $b.Kind "article"}}Өгүүлэл{{else}}Ном{{end}}</span>
+      <h1 class="h2">{{$b.Title}}</h1>
+      {{with $b.Author}}<p class="bk-author">✍️ {{.}}</p>{{end}}
+      <a class="teacher-chip" href="/t/{{$t.Username}}">
+        <span class="avatar avatar-sm" style="--h:{{hue $t.Username}}">{{if $t.AvatarURL}}<img src="{{$t.AvatarURL}}" alt="">{{else}}{{initials $t.DisplayName}}{{end}}</span>
+        <span>{{$t.DisplayName}}{{with $t.Headline}}<small>{{.}}</small>{{end}}</span></a>
+      <div class="bk-facts">
+        <span class="ftag {{if $b.Price}}ftag-paid{{else}}ftag-free{{end}}">{{if $b.Price}}{{money $b.Price}}{{else}}Үнэгүй{{end}}</span>
+        <span class="ftag">{{$b.Pages}} хуудас</span>
+        {{if $b.Price}}<span class="ftag ftag-cert">Эхний {{$b.PreviewN}} хуудас үнэгүй</span>{{end}}
+        <span class="ftag">🔒 Хамгаалагдсан</span>
+      </div>
+      <div class="hero-cta bk-cta">
+        <button class="btn btn-gold" id="bkRead">📖 {{if $b.Price}}Эхний {{$b.PreviewN}} хуудсыг унших{{else}}Унших{{end}}</button>
+        {{if $b.Price}}<button class="btn btn-teal" id="bkBuy">Худалдаж авах · {{money $b.Price}}</button>{{end}}
+        <button class="btn btn-glass" id="bkLike">♡ Сонирхож байна</button>
+      </div>
+      <p class="muted small bk-note" id="bkNote"></p>
+    </div>
+  </section>
+  {{with $b.Description}}<section class="section bk-desc"><h2 class="h3">Тухай</h2><p class="pre">{{.}}</p></section>{{end}}
+</main>
+
+<div class="modal" id="payModal" aria-hidden="true">
+  <div class="modal-card">
+    <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
+    <span class="eyebrow">Төлбөр</span>
+    <h3 class="h3">Захиалга үүслээ</h3>
+    <p class="price-big" id="payAmount"></p>
+    <p class="muted small" id="payNote">Төлбөр баталгаажмагц ном бүтнээрээ нээгдэнэ.</p>
+    <button class="btn btn-gold btn-block" id="devPayBtn" hidden>Төлсөн гэж баталгаажуулах (демо)</button>
+  </div>
+</div>
+
+<footer class="footer"><span class="slogan">Сур, сур, бас дахин сур</span><a href="/t/{{$t.Username}}">← {{$t.DisplayName}}-ийн профайл</a></footer>
+{{template "foot" (dict "Page" "book")}}

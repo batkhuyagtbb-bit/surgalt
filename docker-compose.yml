@@ -1,0 +1,38 @@
+# Production-д ойр бүтэц: MongoDB replica set + 3 app хуулбар + nginx load balancer.
+#   cp .env.example .env   # нууц утгуудаа бөглөнө
+#   docker compose up -d --build
+services:
+  mongo:
+    image: mongo:8.0
+    command: ["--replSet", "rs0", "--bind_ip_all", "--wiredTigerCacheSizeGB", "1"]
+    volumes: [mongo:/data/db]
+    healthcheck:
+      # Анх удаа replica set-ийг эхлүүлнэ (change stream-д шаардлагатай).
+      test: mongosh --quiet --eval "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok }"
+      interval: 5s
+      retries: 30
+    restart: unless-stopped
+
+  app:
+    build: .
+    env_file: .env
+    environment:
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      TRUST_PROXY: "1"
+    volumes: [files:/data]   # бүх хуулбар нэг файлын сантай
+    depends_on:
+      mongo: { condition: service_healthy }
+    deploy:
+      replicas: 3
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports: ["80:80"]
+    volumes: [./deploy/nginx.conf:/etc/nginx/nginx.conf:ro]
+    depends_on: [app]
+    restart: unless-stopped
+
+volumes:
+  mongo:
+  files:

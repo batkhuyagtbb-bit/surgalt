@@ -1,0 +1,237 @@
+{{$t := .D.Teacher}}
+{{template "head" (dict "Title" (printf "%s — %s" $t.DisplayName (or $t.Headline "Багш")) "Desc" (or $t.Headline $t.Bio) "Image" (or $t.AvatarURL $t.CoverURL) "Page" "profile")}}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Person","name":{{$t.DisplayName}},"jobTitle":{{or $t.Headline "Багш"}},"description":{{$t.Bio}},"knowsAbout":{{$t.Subjects}}}</script>
+
+{{/* Бүтэц: нүүр зураг → давхцсан зураг + нэр + үйлдлүүд → таб цэс → зүүн танилцуулга / баруун агуулга.
+     Хуудас бүх зочинд ижил кэшлэгдэнэ; эзэмшигчийн засах хэрэгслийг ([data-owner]) app.js нэвтэрсэн эзэнд л нээнэ. */}}
+<main class="pf" data-teacher="{{$t.Username}}" style="--h:{{hue $t.Username}}">
+  <header class="pf-head">
+    <div class="pf-cover" id="pfCover">{{if $t.CoverURL}}<img src="{{$t.CoverURL}}" alt="">{{end}}
+      <button class="pf-cover-qr" data-open-qr aria-label="QR код томруулах" title="Профайлын QR код">
+        <span class="pf-cover-qr-img"><img src="/t/{{$t.Username}}/qr.png?size=320" alt="" width="132" height="132"><i class="qr-scan"></i></span>
+        <span class="pf-cover-qr-txt"><b>Уншуулаад шууд нэвтэр</b><small>surgalt.mn/t/{{$t.Username}}</small></span>
+      </button>
+      <div class="pf-cover-tools">
+        <button class="pf-cover-btn" data-owner data-upload="cover" hidden>{{icon "camera"}}<span>Нүүр зураг солих</span></button>
+      </div>
+    </div>
+    <div class="pf-bar">
+      <div class="pf-avatar">
+        <div class="avatar" id="pfAvatar" style="--h:{{hue $t.Username}}">{{if $t.AvatarURL}}<img src="{{$t.AvatarURL}}" alt="{{$t.DisplayName}}">{{else}}{{initials $t.DisplayName}}{{end}}</div>
+        <button class="pf-avatar-btn" data-owner data-upload="avatar" hidden aria-label="Профайл зураг солих">{{icon "camera"}}</button>
+      </div>
+      <div class="pf-id">
+        <h1>{{$t.DisplayName}}<span class="pf-verified" title="Баталгаажсан багш">{{icon "check" 14}}</span></h1>
+        {{with $t.Headline}}<p class="pf-headline">{{.}}</p>{{end}}
+        <p class="pf-counts"><b data-count="{{$t.StudentCount}}">{{$t.StudentCount}}</b> суралцагч · <b data-count="{{$t.CourseCount}}">{{$t.CourseCount}}</b> сургалт · <b data-count="{{$t.LessonCount}}">{{$t.LessonCount}}</b> хичээл</p>
+      </div>
+      <div class="pf-actions" data-visitor>
+        <button class="btn btn-gold magnetic" data-open-chat>{{icon "chat"}}Чатлах</button>
+        <a class="btn btn-glass" href="#courses" data-tab-go="courses">{{icon "courses"}}Сургалтууд</a>
+        <button class="btn btn-glass btn-icon" data-open-qr aria-label="QR код" title="QR код">{{icon "qr"}}</button>
+        <button class="btn btn-glass btn-icon" data-share data-title="{{$t.DisplayName}}" aria-label="Хуваалцах" title="Хуваалцах">{{icon "share"}}</button>
+      </div>
+      <div class="pf-actions" data-owner hidden>
+        <button class="btn btn-gold" data-edit-profile>{{icon "edit"}}Профайл засах</button>
+        <button class="btn btn-glass" data-view-as title="Зочид таны профайлыг хэрхэн харахыг үзэх">{{icon "eye"}}Зочны нүдээр</button>
+      </div>
+    </div>
+    <nav class="pf-tabs" id="pfTabs" aria-label="Профайлын хэсгүүд">
+      <span class="pf-mini"><span class="avatar avatar-sm" style="--h:{{hue $t.Username}}">{{if $t.AvatarURL}}<img src="{{$t.AvatarURL}}" alt="">{{else}}{{initials $t.DisplayName}}{{end}}</span><strong>{{$t.DisplayName}}</strong></span>
+      <button class="pf-tab" data-tab="overview" data-owner-tab hidden>Тойм</button>
+      <button class="pf-tab active" data-tab="courses">Сургалтууд <i>{{$t.CourseCount}}</i></button>
+      <button class="pf-tab" data-tab="books" {{if not .D.Books}}data-owner-tab hidden{{end}}>Номууд{{if .D.Books}} <i>{{len .D.Books}}</i>{{end}}</button>
+      <button class="pf-tab" data-tab="live">Шууд хичээл{{if .D.Meetings}} <i>{{len .D.Meetings}}</i>{{end}}</button>
+      <button class="pf-tab" data-tab="students" data-owner-tab hidden>Суралцагчид</button>
+      <button class="pf-tab" data-tab="files" data-owner-tab hidden>Файлын сан</button>
+      <button class="pf-tab" data-tab="about" data-visitor-tab>Тухай</button>
+      <button class="pf-tab" data-tab="settings" data-owner-tab hidden>Тохиргоо</button>
+      <button class="pf-tab" data-tab="qr" data-visitor-tab>QR</button>
+      <span class="pf-ink" aria-hidden="true"></span>
+    </nav>
+  </header>
+
+  <div class="pf-body">
+    <aside class="pf-side">
+      <section class="card" id="ownerCard" data-owner hidden></section>
+
+      <section class="card">
+        <div class="card-head"><h2>Танилцуулга</h2><button class="icon-btn" data-owner data-edit-profile hidden aria-label="Танилцуулга засах">{{icon "edit"}}</button></div>
+        {{if $t.Bio}}<p class="pf-bio clamped" id="pfBio">{{$t.Bio}}</p><button class="link pf-more" id="pfBioMore" hidden>Цааш унших</button>
+        {{else}}<p class="muted" data-visitor>Багш удахгүй танилцуулгаа нэмнэ.</p><button class="btn btn-ghost btn-block" data-owner data-edit-profile hidden>{{icon "plus"}}Танилцуулга нэмэх</button>{{end}}
+        <ul class="pf-facts">
+          {{with $t.Headline}}<li>{{icon "work"}}<span>{{.}}</span></li>{{end}}
+          {{with $t.Location}}<li>{{icon "pin"}}<span><b>{{.}}</b>-д байрладаг</span></li>{{end}}
+          <li>{{icon "users"}}<span><b>{{$t.StudentCount}}</b> суралцагчтай</span></li>
+          <li>{{icon "play"}}<span><b>{{$t.FreeLessonCount}}</b> үнэгүй хичээлтэй</span></li>
+          <li>{{icon "cal"}}<span>{{$t.JoinedYear}} оноос surgalt.mn-д</span></li>
+        </ul>
+        {{if $t.Subjects}}<div class="tags">{{range $t.Subjects}}<span class="tag">{{.}}</span>{{end}}</div>{{end}}
+        {{if $t.Links}}<div class="socials">{{range $t.Links}}<a class="social-link" data-k="{{.Key}}" href="{{.URL}}" target="_blank" rel="noopener nofollow ugc"><i>{{first .Label}}</i>{{.Label}}</a>{{end}}</div>{{end}}
+      </section>
+
+      <section class="card pf-statcard">
+        <div class="stat"><b data-count="{{$t.StudentCount}}">0</b><span>суралцагч</span></div>
+        <div class="stat"><b data-count="{{$t.CourseCount}}">0</b><span>сургалт</span></div>
+        <div class="stat"><b data-count="{{$t.LessonCount}}">0</b><span>хичээл</span></div>
+        <div class="stat"><b data-count="{{$t.FreeLessonCount}}">0</b><span>үнэгүй хичээл</span></div>
+      </section>
+
+      <section class="card pf-qr-mini">
+        <button class="qr-frame" data-open-qr aria-label="QR код томруулах"><img src="/t/{{$t.Username}}/qr.png?size=512" alt="Профайлын QR" width="96" height="96" loading="lazy"></button>
+        <div><strong>QR-аар хуваалцах</strong><p class="muted small">Уншуулахад энэ профайл шууд нээгдэнэ.</p>
+          <button class="link" data-copy-link>{{icon "link" 14}}Холбоос хуулах</button></div>
+      </section>
+    </aside>
+
+    <section class="pf-main">
+      <div class="pf-panel" data-panel="courses" id="courses">
+        <a class="card composer" href="#courses" data-owner hidden>
+          <span class="avatar avatar-sm" style="--h:{{hue $t.Username}}">{{if $t.AvatarURL}}<img src="{{$t.AvatarURL}}" alt="">{{else}}{{initials $t.DisplayName}}{{end}}</span>
+          <span class="composer-input">Шинэ сургалт, хичээл нэмэх…</span><span class="btn btn-gold btn-sm">{{icon "plus" 16}}Нэмэх</span></a>
+
+        {{if .D.Meetings}}{{with index .D.Meetings 0}}
+        <a class="card pf-next" href="/c/{{.CourseID}}"><span class="item-ico">{{icon "live" 20}}</span>
+          <span class="grow"><span class="eyebrow">Удахгүй шууд хичээл</span><strong>{{.Title}}</strong><small class="muted"><time datetime="{{rfc .StartsAt}}" data-dt>{{.StartsAt.Format "01/02 15:04"}}</time> · {{.DurationMin}} мин · {{.CourseTitle}}</small></span>
+          <span class="chip chip-teal">Сургалт руу</span></a>
+        {{end}}{{end}}
+
+        {{if .D.Courses}}
+        {{if gt (len .D.Courses) 3}}
+        <div class="filter-bar card" id="courseFilter">
+          <button class="pill active" data-f="all">Бүгд</button>
+          <button class="pill" data-f="free">Үнэгүй хичээлтэй</button>
+          <button class="pill" data-f="paid">Төлбөртэй</button>
+          <input type="search" placeholder="Сургалт хайх…" aria-label="Сургалт хайх">
+        </div>
+        {{end}}
+        <div class="course-grid" id="courseGrid">
+          {{range $i, $c := .D.Courses}}
+          {{$paid := sub $c.LessonCount $c.FreeLessonCount}}
+          <a class="course-card tilt reveal" href="/c/{{$c.ID}}" style="--h:{{hue $c.Title}};--d:{{$i}}" data-course="{{$c.ID}}" data-free="{{$c.FreeLessonCount}}" data-paid="{{if or $c.Price $paid}}1{{else}}0{{end}}">
+            <div class="course-art"><div class="course-flags">{{if eq $c.ID $.D.TopCourseID}}<span class="flag">Эрэлттэй</span>{{end}}{{if recent $c.CreatedAt}}<span class="flag flag-new">Шинэ</span>{{end}}</div><span class="course-num">{{printf "%02d" (inc $i)}}</span><span class="glare"></span></div>
+            <div class="course-body">
+              <h3>{{$c.Title}}</h3>
+              <p class="clamp muted">{{$c.Description}}</p>
+              <div class="course-meta">
+                <span>{{$c.LessonCount}} хичээл</span>
+                {{if $c.FreeLessonCount}}<span class="chip chip-teal">{{$c.FreeLessonCount}} үнэгүй</span>{{end}}
+                {{if $paid}}<span class="chip chip-gold">{{$paid}} төлбөртэй</span>{{end}}
+                <span class="price {{if and (eq $c.Price 0) (eq $paid 0)}}free{{end}}">{{if $c.Price}}{{money $c.Price}}{{else if $paid}}Хичээлээр{{else}}Үнэгүй{{end}}</span>
+              </div>
+            </div>
+          </a>
+          {{end}}
+        </div>
+        <div class="empty" id="courseNone" hidden>Тохирох сургалт олдсонгүй</div>
+        {{else}}
+        <div class="empty">Удахгүй шинэ сургалт нэмэгдэнэ</div>
+        {{end}}
+      </div>
+
+      <div class="pf-panel" data-panel="about" hidden>
+        <section class="card">
+          <div class="card-head"><h2>Багшийн тухай</h2><button class="icon-btn" data-owner data-edit-profile hidden aria-label="Засах">{{icon "edit"}}</button></div>
+          {{if $t.Bio}}<p class="pf-bio">{{$t.Bio}}</p>{{else}}<p class="muted">Танилцуулга оруулаагүй байна.</p>{{end}}
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>Дэлгэрэнгүй</h2></div>
+          <dl class="pf-details">
+            <div><dt>Мэргэжил</dt><dd>{{or $t.Headline "—"}}</dd></div>
+            <div><dt>Байршил</dt><dd>{{or $t.Location "—"}}</dd></div>
+            <div><dt>Заадаг чиглэл</dt><dd>{{if $t.Subjects}}{{range $i, $s := $t.Subjects}}{{if $i}}, {{end}}{{$s}}{{end}}{{else}}—{{end}}</dd></div>
+            <div><dt>Элссэн</dt><dd>{{$t.JoinedYear}} он</dd></div>
+            <div><dt>Хэрэглэгчийн нэр</dt><dd>@{{$t.Username}}</dd></div>
+          </dl>
+          {{if $t.Links}}<div class="socials">{{range $t.Links}}<a class="social-link" data-k="{{.Key}}" href="{{.URL}}" target="_blank" rel="noopener nofollow ugc"><i>{{first .Label}}</i>{{.Label}}</a>{{end}}</div>{{end}}
+        </section>
+      </div>
+
+      <div class="pf-panel" data-panel="books" id="books" hidden>
+        <div class="book-grid">{{range .D.Books}}
+          <a class="book-card" href="/b/{{.ID}}"><span class="bc-cover"><img src="{{.Cover}}" alt="" loading="lazy" draggable="false"></span>
+            <strong>{{.Title}}</strong>{{with .Author}}<small class="muted">{{.}}</small>{{end}}
+            <span class="find-tagrow"><span class="ftag {{if .Price}}ftag-paid{{else}}ftag-free{{end}}">{{if .Price}}{{money .Price}}{{else}}Үнэгүй{{end}}</span>{{if eq .Kind "article"}}<span class="ftag">Өгүүлэл</span>{{end}}<span class="ftag">{{.Pages}} х.</span></span></a>
+        {{else}}<p class="empty">Ном, өгүүлэл хараахан алга.</p>{{end}}</div>
+      </div>
+      <div class="pf-panel" data-panel="live" id="live" hidden>
+        {{if .D.Meetings}}
+        <div class="meet-list">
+          {{range .D.Meetings}}
+          <a class="meet-item" href="/c/{{.CourseID}}"><time datetime="{{rfc .StartsAt}}" data-dt>{{.StartsAt.Format "01/02 15:04"}}</time>
+            <span class="grow"><strong>{{.Title}}</strong> · {{.DurationMin}} мин<br><span class="muted small">{{.CourseTitle}}</span></span>
+            <span class="chip chip-teal">Сургалт руу</span></a>
+          {{end}}
+        </div>
+        <p class="muted small">Сургалтад элссэн суралцагчид Google Meet-ээр нэгдэнэ.</p>
+        {{else}}
+        <div class="empty">Одоогоор товлосон шууд хичээл алга</div>
+        {{end}}
+      </div>
+
+      {{/* Эзэмшигчийн удирдлагын хэсгүүд — studio.js эндээс рендерлэнэ */}}
+      <div class="pf-panel pf-manage" data-panel="m-overview" hidden></div>
+      <div class="pf-panel pf-manage" data-panel="m-courses" hidden></div>
+      <div class="pf-panel pf-manage" data-panel="m-live" hidden></div>
+      <div class="pf-panel pf-manage" data-panel="m-books" hidden></div>
+      <div class="pf-panel pf-manage" data-panel="m-files" hidden></div>
+      <div class="pf-panel pf-manage" data-panel="m-students" hidden></div>
+      <div class="pf-panel pf-manage" data-panel="m-settings" hidden></div>
+
+      <div class="pf-panel" data-panel="qr" id="qr" hidden>
+        <section class="card qr-card">
+          <div class="qr-frame"><img src="/t/{{$t.Username}}/qr.png?size=512" alt="Профайлын QR" width="220" height="220" loading="lazy"><span class="qr-scan"></span></div>
+          <div>
+            <span class="eyebrow">QR код</span>
+            <h2 class="h2">Утсаараа уншуулаад шууд нээ</h2>
+            <p class="muted">Ангидаа, зурагт хуудас, нэрийн хуудсан дээрээ хэвлээд суралцагчиддаа түгээгээрэй.</p>
+            <div class="hero-cta">
+              <a class="btn btn-gold" href="/t/{{$t.Username}}/qr.png?size=1024&download=1">{{icon "down"}}QR татах</a>
+              <button class="btn btn-ghost" data-copy-link>{{icon "link"}}Холбоос хуулах</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div class="modal" id="qrModal" aria-hidden="true">
+  <div class="modal-card qr-modal">
+    <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
+    <img src="/t/{{$t.Username}}/qr.png?size=512" alt="QR" width="280" height="280" loading="lazy">
+    <p><strong>{{$t.DisplayName}}</strong><br><span class="muted small">Камераа чиглүүлээд уншуулна уу</span></p>
+    <a class="btn btn-gold btn-block" href="/t/{{$t.Username}}/qr.png?size=1024&download=1">{{icon "down"}}Татах</a>
+  </div>
+</div>
+
+{{/* Эзэмшигчийн засах цонх — талбаруудыг app.js /api/me-ээс бөглөнө. */}}
+<div class="modal" id="editModal" aria-hidden="true">
+  <div class="modal-card edit-modal">
+    <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
+    <h3 class="h3">Профайл засах</h3>
+    <form class="form" id="editForm">
+      <label>Нэр<input name="display_name" required maxlength="80"></label>
+      <label>Мэргэжил / гарчиг<input name="headline" maxlength="120" placeholder="Математикийн багш · 12 жилийн туршлага"></label>
+      <label>Танилцуулга<textarea name="bio" maxlength="4000" rows="5" placeholder="Туршлага, заах арга барил, суралцагчдын амжилт…"></textarea></label>
+      <div class="form-row">
+        <label>Заадаг чиглэлүүд<input name="subjects" placeholder="Таслалаар: Математик, ЭЕШ бэлтгэл"></label>
+        <label>Байршил<input name="location" maxlength="60" placeholder="Улаанбаатар"></label>
+      </div>
+      <div class="form-row">
+        <label>Вэб сайт<input name="link_website" maxlength="300" inputmode="url" placeholder="https://"></label>
+        <label>Facebook<input name="link_facebook" maxlength="300" inputmode="url" placeholder="facebook.com/…"></label>
+        <label>Instagram<input name="link_instagram" maxlength="300" inputmode="url" placeholder="instagram.com/…"></label>
+        <label>YouTube<input name="link_youtube" maxlength="300" inputmode="url" placeholder="youtube.com/@…"></label>
+      </div>
+      <p class="form-error" id="editErr" role="alert"></p>
+      <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div>
+    </form>
+  </div>
+</div>
+<input type="file" id="pfFile" accept="image/*" hidden>
+<div class="viewas-bar" id="viewAsBar" hidden><span>{{icon "eye"}}Та профайлаа зочны нүдээр харж байна</span><button class="btn btn-sm" data-view-as>Засах горим руу буцах</button></div>
+
+<footer class="footer"><span class="slogan">Сур, сур, бас дахин сур</span><span>© surgalt.mn</span><a href="/login?role=teacher">Та ч бас багш уу? Профайлаа нээ →</a></footer>
+{{template "chat" $t}}
+{{template "foot" (dict "Page" "profile")}}

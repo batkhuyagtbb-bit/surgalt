@@ -1,0 +1,50 @@
+{{template "head" (dict "Title" "surgalt.mn — Сур, сур, бас дахин сур" "Desc" "Сур, сур, бас дахин сур — багш нар сургалтаа зарж, суралцагчид нэг дороос суралцах платформ" "Page" "home")}}
+<main>
+  <section class="home-top">
+    <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="home-inner">
+      <div class="home-intro landing">
+        <p class="eyebrow">Багш, суралцагчдын платформ</p>
+        <h1 class="home-title display split">Сур, сур, бас дахин сур</h1>
+        <p class="lead">Бүх багшийн сургалт, хичээл, номыг нэг дороос хайж олоорой.</p>
+      </div>
+    <section class="find find-home" id="find" aria-label="Сургалт хайх">
+      <form class="find-bar" role="search" onsubmit="return false">
+        {{icon "search"}}<input type="search" name="q" placeholder="Бүх багшийн сургалт, хичээлээс хайх…" autocomplete="off" aria-label="Хайх үг">
+      </form>
+      <div class="find-tags" role="radiogroup" aria-label="Шүүлтүүр" hidden>
+        <button type="button" data-tag="" aria-pressed="true">Бүгд</button>
+        <button type="button" data-tag="free" aria-pressed="false">Үнэгүй</button>
+        <button type="button" data-tag="paid" aria-pressed="false">Төлбөртэй</button>
+        <button type="button" data-tag="cert" aria-pressed="false">Сертификаттай</button>
+        <button type="button" data-tag="exam" aria-pressed="false">Шалгалттай</button>
+      </div>
+      <p class="find-meta muted small" aria-live="polite"></p>
+      <ol class="find-list"></ol>
+      <nav class="find-pager" aria-label="Хуудас"></nav>
+    </section>
+      <div class="find-chips landing" aria-label="Түгээмэл хайлт"><span class="muted small">Түгээмэл:</span>
+        <button type="button" data-q="Математик">Математик</button><button type="button" data-q="ЭЕШ">ЭЕШ</button><button type="button" data-q="Англи хэл">Англи хэл</button><button type="button" data-q="Геометр">Геометр</button><button type="button" data-q="Логик">Логик</button></div>
+      <div class="home-cta landing">
+        <a class="btn btn-gold btn-lg" href="/login?role=teacher">Багшаар эхлэх</a>
+        <a class="btn btn-glass btn-lg" href="/login">Суралцагчаар нэвтрэх</a>
+      </div>
+    </div>
+  </section>
+  {{/* Нэвтэрсэн хэрэглэгчийн самбар — app.js /api/me/home-оос бөглөнө. Хуудас өөрөө кэшлэгддэг статик HTML. */}}
+  <div class="dash" id="dash" aria-live="polite">
+    <div class="skeleton" style="height:120px"></div>
+    <div class="tiles"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+    <div class="skeleton" style="height:220px;margin-top:24px"></div>
+  </div>
+  <div class="landing">
+  <section class="section features">
+    <div class="feature glass tilt reveal" style="--d:0"><span class="f-ico">◎</span><h3>Ухаалаг профайл</h3><p class="muted">Профайл тань юу дутууг өөрөө хэлж, суралцагчид итгэл төрүүлнэ.</p></div>
+    <div class="feature glass tilt reveal" style="--d:1"><span class="f-ico">▦</span><h3>QR-аар шууд</h3><p class="muted">Уншуулахад профайл тань шууд нээгдэнэ.</p></div>
+    <div class="feature glass tilt reveal" style="--d:2"><span class="f-ico">▶</span><h3>Үнэгүй + төлбөртэй</h3><p class="muted">Үнэгүй хичээлээр итгэл төрүүлж, бүтэн сургалтаа зар.</p></div>
+    <div class="feature glass tilt reveal" style="--d:3"><span class="f-ico">⌂</span><h3>Бүгд нэг дор</h3><p class="muted">Суралцагч нүүр хуудаснаасаа сургалт, хичээл, чат, шууд хичээлдээ орно.</p></div>
+  </section>
+  </div>
+</main>
+<footer class="footer"><span>© surgalt.mn</span><span>Сур, сур, бас дахин сур</span></footer>
+{{template "foot" (dict "Page" "home")}}

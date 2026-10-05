@@ -1,0 +1,30 @@
+{{template "head" (dict "Title" "Нэвтрэх — surgalt.mn" "Desc" "surgalt.mn-д нэвтрэх" "Page" "login")}}
+<main class="auth">
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="auth-card glass reveal">
+    <div class="auth-brand"><span class="wordmark">surgalt<b>.mn</b></span><span class="slogan">Сур, сур, бас дахин сур</span></div>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="login" role="tab">Нэвтрэх</button>
+      <button class="tab" data-tab="register" role="tab">Бүртгүүлэх</button>
+      <span class="tab-ink"></span>
+    </div>
+    <label class="role-toggle"><input type="checkbox" id="asTeacher"><span class="switch"></span>Би бол багш</label>
+    <div class="social" id="social"></div>
+    <div class="divider"><span>эсвэл имэйлээр</span></div>
+    <form id="loginForm" class="form">
+      <label>Имэйл<input type="email" name="email" required autocomplete="email"></label>
+      <label>Нууц үг<span class="pw"><input type="password" name="password" required minlength="6" autocomplete="current-password"><button type="button" class="pw-eye" data-pw-toggle aria-label="Нууц үг харуулах">{{icon "eye"}}</button></span></label>
+      <button class="btn btn-gold btn-block">Нэвтрэх</button>
+    </form>
+    <form id="registerForm" class="form" hidden>
+      <label>Имэйл<input type="email" name="email" required autocomplete="email"></label>
+      <label>Нууц үг<span class="pw"><input type="password" name="password" required minlength="6" maxlength="72" autocomplete="new-password" aria-describedby="pwHint"><button type="button" class="pw-eye" data-pw-toggle aria-label="Нууц үг харуулах">{{icon "eye"}}</button></span>
+        <small class="muted" id="pwHint">Дор хаяж 6 тэмдэгт</small></label>
+      <label>Нууц үг давтах<span class="pw"><input type="password" name="password2" required minlength="6" maxlength="72" autocomplete="new-password" aria-describedby="pwMatch"><button type="button" class="pw-eye" data-pw-toggle aria-label="Нууц үг харуулах">{{icon "eye"}}</button></span>
+        <small class="pw-match" id="pwMatch" aria-live="polite"></small></label>
+      <button class="btn btn-gold btn-block">Бүртгүүлэх</button>
+    </form>
+    <p class="form-error" id="authError" role="alert"></p>
+  </div>
+</main>
+{{template "foot" (dict "Page" "login")}}

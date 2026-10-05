@@ -1,0 +1,90 @@
+{{$c := .D.Course}}{{$t := .D.Teacher}}{{$paid := sub $c.LessonCount $c.FreeLessonCount}}
+{{template "head" (dict "Title" (printf "%s — %s" $c.Title $t.DisplayName) "Desc" $c.Description "Image" $t.AvatarURL "Page" "course")}}
+<main class="course-page" data-course="{{$c.ID}}" data-price="{{$c.Price}}" data-drip="{{if $c.Drip}}1{{else}}0{{end}}" data-mode="{{if $c.Price}}bundle{{else if gt $paid 0}}lessons{{else}}free{{end}}">
+  <section class="hero hero-course" style="--h:{{hue $c.Title}}">
+    <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="hero-inner">
+      <div class="hero-left">
+        <a class="teacher-chip reveal" href="/t/{{$t.Username}}">
+          <span class="avatar avatar-sm" style="--h:{{hue $t.Username}}">{{if $t.AvatarURL}}<img src="{{$t.AvatarURL}}" alt="">{{else}}{{initials $t.DisplayName}}{{end}}</span>
+          <span>{{$t.DisplayName}}{{with $t.Headline}}<small>{{.}}</small>{{end}}</span>
+        </a>
+        <h1 class="display split">{{$c.Title}}</h1>
+        <p class="lead reveal pre">{{$c.Description}}</p>
+        <div class="hero-cta reveal">
+          <button class="btn btn-gold btn-lg magnetic" id="buyBtn">{{if $c.Price}}Бүх хичээл багцаар · {{money $c.Price}}{{else if gt $paid 0}}Хичээлүүдийг сонгох ↓{{else}}Үнэгүй элсэх{{end}}</button>
+          <button class="btn btn-glass btn-lg magnetic" data-open-chat>{{icon "chat"}}Багшаас асуух</button>
+          <button class="btn btn-glass btn-lg" data-open-group title="Сургалтад элссэн суралцагчдын бүлэг">👥 Бүлэг чат</button>
+        </div>
+      </div>
+      <div class="hero-card glass tilt reveal">
+        <div class="stat"><b data-count="{{$c.FreeLessonCount}}">0</b><span>үнэгүй хичээл</span></div>
+        <div class="stat"><b data-count="{{$paid}}">0</b><span>төлбөртэй хичээл</span></div>
+        <div class="stat stat-wide">{{if $c.Price}}<b class="price-big">{{money $c.Price}}</b><span>бүх хичээл багцаар · насан туршийн эрх</span>
+          {{else if gt $paid 0}}<b class="price-big">Хичээлээр</b><span>хэрэгтэй хичээлээ тус тусад нь худалдаж авна</span>
+          {{else}}<b class="price-big">Үнэгүй</b><span>бүх хичээл нээлттэй</span>{{end}}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head reveal"><span class="eyebrow">Хөтөлбөр</span><h2 class="h2">Хичээлүүд</h2>
+      {{if $c.Drip}}<p class="muted">Хичээлүүд дарааллаар нээгдэнэ: өмнөх хичээлээ үзсэний дараа дараагийнх нь тохируулсан хугацаанд нээгдэнэ.{{if and $c.UnlockAllPaid $c.Price}} Багцаар авсан бол бүгд шууд нээлттэй.{{end}}</p>{{end}}
+      <div class="progress-line" id="courseProgress" hidden><div class="meter"><i></i></div><span class="muted small"></span></div></div>
+    {{if .D.Grouped}}
+    <ol class="lessons lessons-grouped" id="lessons">
+      {{range $si, $sec := .D.Sections}}
+      <li class="lesson-group reveal" style="--d:{{$si}}" data-section="{{$sec.Title}}">
+        <details open>
+          <summary class="lg-head"><span class="lg-num">{{printf "%02d" (add $si 1)}}</span>
+            <span class="lg-title">{{if $sec.Title}}{{$sec.Title}}{{else}}Бусад хичээлүүд{{end}}<small class="lg-meta"><span class="lg-count">{{len $sec.Lessons}} хичээл</span><span class="lg-prog" hidden></span></small></span>
+            <span class="lg-chev" aria-hidden="true">▾</span></summary>
+          <ol class="lessons lg-list">{{range $i, $l := $sec.Lessons}}{{template "lessonRow" $l}}{{end}}</ol>
+        </details>
+      </li>
+      {{end}}
+    </ol>
+    {{else}}
+    <ol class="lessons" id="lessons">
+      {{range $i, $l := .D.Lessons}}{{template "lessonRow" $l}}
+      {{else}}
+      <li class="empty">Хичээл удахгүй нэмэгдэнэ</li>
+      {{end}}
+    </ol>
+    {{end}}
+  </section>
+</main>
+
+<div class="modal" id="lessonModal" aria-hidden="true">
+  <div class="modal-card lesson-modal">
+    <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
+    <div class="player" id="player"></div>
+    <h3 id="lessonTitle"></h3>
+    <div class="lesson-content pre" id="lessonContent"></div>
+    <div class="lesson-done" id="lessonDone" hidden><span class="active-need" hidden></span><button class="btn btn-teal" data-complete>✓ Энэ хичээлийг дууслаа</button><span class="muted small">Дууссан гэж тэмдэглэхэд явц тань хадгалагдана.</span></div>
+  </div>
+</div>
+
+<div class="modal" id="payModal" aria-hidden="true">
+  <div class="modal-card">
+    <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
+    <span class="eyebrow">Төлбөр</span>
+    <h3 class="h3">Захиалга үүслээ</h3>
+    <p class="price-big" id="payAmount"></p>
+    <p class="muted small" id="payNote">Төлбөр баталгаажмагц бүх хичээл автоматаар нээгдэнэ.</p>
+    <button class="btn btn-gold btn-block" id="devPayBtn" hidden>Төлсөн гэж баталгаажуулах (демо)</button>
+  </div>
+</div>
+
+<footer class="footer"><span class="slogan">Сур, сур, бас дахин сур</span><a href="/t/{{$t.Username}}">← {{$t.DisplayName}}-ийн профайл</a></footer>
+{{template "chat" $t}}
+{{template "foot" (dict "Page" "course")}}
+
+{{define "lessonRow"}}{{$l := .}}
+      <li class="lesson reveal {{if $l.IsFree}}is-free{{else}}is-locked{{end}}" data-lesson="{{$l.ID}}" data-price="{{$l.Price}}" data-unlock="{{$l.UnlockAfterH}}" data-always="{{if $l.AlwaysOpen}}1{{else}}0{{end}}">
+        <span class="lesson-num">{{printf "%02d" $l.Position}}</span>
+        <span class="lesson-title">{{$l.Title}}{{if or $l.Format $l.Mode}}<span class="lesson-kind">{{with $l.Format}}<em>{{fmtName .}}</em>{{end}}{{with $l.Mode}}<em>{{modeName .}}</em>{{end}}</span>{{end}}<span class="lesson-state" hidden></span></span>
+        {{if $l.IsFree}}<span class="chip chip-teal">Үнэгүй</span><button class="btn btn-sm btn-teal" data-play="{{$l.ID}}">▶ Үзэх</button>
+        {{else}}<span class="chip chip-gold lesson-price">{{if $l.Price}}{{money $l.Price}}{{else}}Багцад багтсан{{end}}</span>
+        <button class="btn btn-sm {{if $l.Price}}btn-gold{{else}}btn-ghost{{end}} lock" data-play="{{$l.ID}}"><span class="lock-ico">🔒</span><span class="lock-txt">{{if $l.Price}}Худалдаж авах{{else}}Багцаар нээх{{end}}</span></button>{{end}}
+      </li>{{end}}
