@@ -1,8 +1,9 @@
 syntax = "proto3";
 
 // surgalt.mn — gRPC + Protobuf API.
-// Нээлттэй уншилт (багш, сургалт, хайлт) ба нэвтэрсэн хэрэглэгчийн идэвхийн урсгал
-// (сесс → цохилт → ClickHouse), багшийн статистик. Токен: metadata "authorization: Bearer <token>".
+// Нэг handler гурван протоколоор үйлчилнэ (Connect): gRPC (мобайл, сервис), gRPC-Web, Connect-JSON
+// (хөтөч энгийн fetch-ээр: POST /surgalt.v1.Surgalt/<Method>, Content-Type: application/json).
+// Токен: header "Authorization: Bearer <token>".
 package surgalt.v1;
 
 option go_package = "surgalt/internal/pb;pb";
@@ -19,6 +20,8 @@ service Surgalt {
   rpc StartSession(StartSessionRequest) returns (StartSessionResponse);
   // Клиент урсгалаар 15 секунд тутмын идэвхийн тайлан илгээнэ; сервер нийт идэвхтэй секундийг буцаана.
   rpc Beat(stream BeatRequest) returns (stream BeatResponse);
+  // Нэг удаагийн тайлан (хөтөч: fetch-ээр, урсгалгүй).
+  rpc BeatOnce(BeatRequest) returns (BeatResponse);
 
   // ---- багш ----
   rpc GetAnalytics(AnalyticsRequest) returns (AnalyticsResponse);

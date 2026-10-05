@@ -1,9 +1,18 @@
-# Production-д ойр бүтэц: ClickHouse + app + nginx load balancer.
+# Production-д ойр бүтэц: ClickHouse + ClickHouse Keeper + app ×3 + nginx load balancer.
 #   cp .env.example .env   # нууц утгуудаа бөглөнө
 #   docker compose up -d --build
-# Анхаар: ClickHouse store нь имэйлийн давхардал, төлбөрийн "яг нэг удаа" зэргийг процесс доторх
-# түгжээгээр хангадаг тул app-ийг НЭГ хуулбараар ажиллуулна (replicas: 1).
+# Олон app хуулбар: имэйлийн давхардал, төлбөрийн "яг нэг удаа" зэргийг Keeper дээрх түгжээгээр,
+# чат/мэдэгдлийн түгээлтийг ClickHouse-оор дамжуулан бүх хуулбарт хангана (Redis, Kafka хэрэггүй).
 services:
+  keeper:
+    image: clickhouse/clickhouse-keeper:25.8
+    volumes: [keeper:/var/lib/clickhouse-keeper]
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc -w 1 127.0.0.1 9181 | grep -q imok"]
+      interval: 5s
+      retries: 30
+    restart: unless-stopped
+
   clickhouse:
     image: clickhouse/clickhouse-server:25.8
     environment:
@@ -24,13 +33,15 @@ services:
     env_file: .env
     environment:
       CLICKHOUSE_DSN: clickhouse://surgalt:${CLICKHOUSE_PASSWORD:-surgalt}@clickhouse:9000/surgalt?dial_timeout=10s
+      CLICKHOUSE_KEEPER: keeper:9181
       TRUST_PROXY: "1"
       GRPC_ADDR: ":9090"
-    volumes: [files:/data]
+    volumes: [files:/data]   # бүх хуулбар нэг файлын сантай
     depends_on:
       clickhouse: { condition: service_healthy }
+      keeper: { condition: service_healthy }
     deploy:
-      replicas: 1
+      replicas: 3
     restart: unless-stopped
 
   nginx:
@@ -41,5 +52,6 @@ services:
     restart: unless-stopped
 
 volumes:
+  keeper:
   clickhouse:
   files:

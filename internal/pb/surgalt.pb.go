@@ -5,8 +5,9 @@
 // source: surgalt/v1/surgalt.proto
 
 // surgalt.mn — gRPC + Protobuf API.
-// Нээлттэй уншилт (багш, сургалт, хайлт) ба нэвтэрсэн хэрэглэгчийн идэвхийн урсгал
-// (сесс → цохилт → ClickHouse), багшийн статистик. Токен: metadata "authorization: Bearer <token>".
+// Нэг handler гурван протоколоор үйлчилнэ (Connect): gRPC (мобайл, сервис), gRPC-Web, Connect-JSON
+// (хөтөч энгийн fetch-ээр: POST /surgalt.v1.Surgalt/<Method>, Content-Type: application/json).
+// Токен: header "Authorization: Bearer <token>".
 
 package pb
 
@@ -2182,7 +2183,7 @@ const file_surgalt_v1_surgalt_proto_rawDesc = "" +
 	"violations\x18\a \x01(\x05R\n" +
 	"violations\x12\x1f\n" +
 	"\vlearn_score\x18\b \x01(\x05R\n" +
-	"learnScore2\xe6\x03\n" +
+	"learnScore2\xa5\x04\n" +
 	"\aSurgalt\x12G\n" +
 	"\n" +
 	"GetTeacher\x12\x1d.surgalt.v1.GetTeacherRequest\x1a\x1a.surgalt.v1.TeacherProfile\x12C\n" +
@@ -2190,7 +2191,8 @@ const file_surgalt_v1_surgalt_proto_rawDesc = "" +
 	"\x06Search\x12\x19.surgalt.v1.SearchRequest\x1a\x1a.surgalt.v1.SearchResponse\x12-\n" +
 	"\x02Me\x12\x15.surgalt.v1.MeRequest\x1a\x10.surgalt.v1.User\x12Q\n" +
 	"\fStartSession\x12\x1f.surgalt.v1.StartSessionRequest\x1a .surgalt.v1.StartSessionResponse\x12=\n" +
-	"\x04Beat\x12\x17.surgalt.v1.BeatRequest\x1a\x18.surgalt.v1.BeatResponse(\x010\x01\x12K\n" +
+	"\x04Beat\x12\x17.surgalt.v1.BeatRequest\x1a\x18.surgalt.v1.BeatResponse(\x010\x01\x12=\n" +
+	"\bBeatOnce\x12\x17.surgalt.v1.BeatRequest\x1a\x18.surgalt.v1.BeatResponse\x12K\n" +
 	"\fGetAnalytics\x12\x1c.surgalt.v1.AnalyticsRequest\x1a\x1d.surgalt.v1.AnalyticsResponseB\x18Z\x16surgalt/internal/pb;pbb\x06proto3"
 
 var (
@@ -2254,16 +2256,18 @@ var file_surgalt_v1_surgalt_proto_depIdxs = []int32{
 	11, // 17: surgalt.v1.Surgalt.Me:input_type -> surgalt.v1.MeRequest
 	13, // 18: surgalt.v1.Surgalt.StartSession:input_type -> surgalt.v1.StartSessionRequest
 	18, // 19: surgalt.v1.Surgalt.Beat:input_type -> surgalt.v1.BeatRequest
-	20, // 20: surgalt.v1.Surgalt.GetAnalytics:input_type -> surgalt.v1.AnalyticsRequest
-	4,  // 21: surgalt.v1.Surgalt.GetTeacher:output_type -> surgalt.v1.TeacherProfile
-	7,  // 22: surgalt.v1.Surgalt.GetCourse:output_type -> surgalt.v1.CourseDetail
-	10, // 23: surgalt.v1.Surgalt.Search:output_type -> surgalt.v1.SearchResponse
-	12, // 24: surgalt.v1.Surgalt.Me:output_type -> surgalt.v1.User
-	16, // 25: surgalt.v1.Surgalt.StartSession:output_type -> surgalt.v1.StartSessionResponse
-	19, // 26: surgalt.v1.Surgalt.Beat:output_type -> surgalt.v1.BeatResponse
-	23, // 27: surgalt.v1.Surgalt.GetAnalytics:output_type -> surgalt.v1.AnalyticsResponse
-	21, // [21:28] is the sub-list for method output_type
-	14, // [14:21] is the sub-list for method input_type
+	18, // 20: surgalt.v1.Surgalt.BeatOnce:input_type -> surgalt.v1.BeatRequest
+	20, // 21: surgalt.v1.Surgalt.GetAnalytics:input_type -> surgalt.v1.AnalyticsRequest
+	4,  // 22: surgalt.v1.Surgalt.GetTeacher:output_type -> surgalt.v1.TeacherProfile
+	7,  // 23: surgalt.v1.Surgalt.GetCourse:output_type -> surgalt.v1.CourseDetail
+	10, // 24: surgalt.v1.Surgalt.Search:output_type -> surgalt.v1.SearchResponse
+	12, // 25: surgalt.v1.Surgalt.Me:output_type -> surgalt.v1.User
+	16, // 26: surgalt.v1.Surgalt.StartSession:output_type -> surgalt.v1.StartSessionResponse
+	19, // 27: surgalt.v1.Surgalt.Beat:output_type -> surgalt.v1.BeatResponse
+	19, // 28: surgalt.v1.Surgalt.BeatOnce:output_type -> surgalt.v1.BeatResponse
+	23, // 29: surgalt.v1.Surgalt.GetAnalytics:output_type -> surgalt.v1.AnalyticsResponse
+	22, // [22:30] is the sub-list for method output_type
+	14, // [14:22] is the sub-list for method input_type
 	14, // [14:14] is the sub-list for extension type_name
 	14, // [14:14] is the sub-list for extension extendee
 	0,  // [0:14] is the sub-list for field type_name

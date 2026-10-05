@@ -89,7 +89,10 @@ func (c *ClickHouse) CreateCourse(ctx context.Context, co *Course) error {
 }
 
 func (c *ClickHouse) UpdateCourse(ctx context.Context, co *Course) error {
-	unlock := c.lock("course:" + co.ID)
+	unlock, err := c.lock(ctx, "course:"+co.ID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	cur, err := c.CourseByID(ctx, co.ID)
 	if err != nil {
@@ -205,7 +208,10 @@ func (c *ClickHouse) lessonsWhere(ctx context.Context, where string, args ...any
 }
 
 func (c *ClickHouse) CreateLesson(ctx context.Context, l *Lesson) error {
-	unlock := c.lock("lessons:" + l.CourseID)
+	unlock, err := c.lock(ctx, "lessons:"+l.CourseID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	if _, err := c.CourseByID(ctx, l.CourseID); err != nil {
 		return err
@@ -234,7 +240,10 @@ func (c *ClickHouse) LessonByID(ctx context.Context, courseID, lessonID string) 
 }
 
 func (c *ClickHouse) UpdateLesson(ctx context.Context, l *Lesson) error {
-	unlock := c.lock("lessons:" + l.CourseID)
+	unlock, err := c.lock(ctx, "lessons:"+l.CourseID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	cur, err := c.LessonByID(ctx, l.CourseID, l.ID)
 	if err != nil {
@@ -251,7 +260,10 @@ func (c *ClickHouse) UpdateLesson(ctx context.Context, l *Lesson) error {
 }
 
 func (c *ClickHouse) ReorderLessons(ctx context.Context, courseID string, items []LessonOrder) error {
-	unlock := c.lock("lessons:" + courseID)
+	unlock, err := c.lock(ctx, "lessons:"+courseID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	cur, err := c.LessonsByCourse(ctx, courseID)
 	if err != nil {
@@ -326,7 +338,10 @@ func (c *ClickHouse) writeProgress(ctx context.Context, userID, courseID string,
 }
 
 func (c *ClickHouse) MarkLessonViewed(ctx context.Context, userID, courseID, lessonID string) error {
-	unlock := c.lock("prog:" + userID + ":" + lessonID)
+	unlock, err := c.lock(ctx, "prog:"+userID+":"+lessonID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	p, _, err := c.progressRow(ctx, userID, lessonID)
 	if err != nil || p != nil {
@@ -336,7 +351,10 @@ func (c *ClickHouse) MarkLessonViewed(ctx context.Context, userID, courseID, les
 }
 
 func (c *ClickHouse) MarkLessonCompleted(ctx context.Context, userID, courseID, lessonID string) error {
-	unlock := c.lock("prog:" + userID + ":" + lessonID)
+	unlock, err := c.lock(ctx, "prog:"+userID+":"+lessonID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	p, _, err := c.progressRow(ctx, userID, lessonID)
 	if err != nil {
@@ -354,7 +372,10 @@ func (c *ClickHouse) MarkLessonCompleted(ctx context.Context, userID, courseID, 
 }
 
 func (c *ClickHouse) SaveQuizResult(ctx context.Context, userID, courseID, lessonID, blockID string, correct bool) error {
-	unlock := c.lock("prog:" + userID + ":" + lessonID)
+	unlock, err := c.lock(ctx, "prog:"+userID+":"+lessonID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	p, _, err := c.progressRow(ctx, userID, lessonID)
 	if err != nil {
@@ -406,7 +427,10 @@ func (c *ClickHouse) enroll(ctx context.Context, userID, courseID, teacherID str
 }
 
 func (c *ClickHouse) Enroll(ctx context.Context, userID string, co *Course) error {
-	unlock := c.lock("enroll:" + userID + ":" + co.ID)
+	unlock, err := c.lock(ctx, "enroll:"+userID+":"+co.ID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	return c.enroll(ctx, userID, co.ID, co.TeacherID, time.Now())
 }
@@ -561,7 +585,10 @@ func (c *ClickHouse) OrderByID(ctx context.Context, id string) (*Order, error) {
 
 // pendingOrder нь хүлээгдэж буй захиалгыг нэг л байлгана (давхар дарсан ч нэг захиалга).
 func (c *ClickHouse) pendingOrder(ctx context.Context, key, where string, args []any, fresh *Order) (*Order, error) {
-	unlock := c.lock("pend:" + key)
+	unlock, err := c.lock(ctx, "pend:"+key)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	os, err := c.ordersWhere(ctx, where+" AND status = ?", "ORDER BY created_at DESC LIMIT 1", append(args, string(OrderPending))...)
 	if err != nil {
@@ -602,7 +629,10 @@ func (c *ClickHouse) CreateStorageOrder(ctx context.Context, userID string, mb i
 // MarkOrderPaid: процесс доторх түгжээ + applied тэмдэг → давтан дуудахад (webhook давхардсан ч)
 // элсэлт, багтаамж, номын эрх нэг л удаа хэрэгжинэ.
 func (c *ClickHouse) MarkOrderPaid(ctx context.Context, orderID string, amount int64) (*Order, error) {
-	unlock := c.lock("order:" + orderID)
+	unlock, err := c.lock(ctx, "order:"+orderID)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	row, err := c.orderRowByID(ctx, orderID)
 	if err != nil {
@@ -648,7 +678,10 @@ func (c *ClickHouse) MarkOrderPaid(ctx context.Context, orderID string, amount i
 }
 
 func (c *ClickHouse) applyStorage(ctx context.Context, o *Order) error {
-	unlock := c.lock("user:" + o.UserID)
+	unlock, err := c.lock(ctx, "user:"+o.UserID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	u, err := c.UserByID(ctx, o.UserID)
 	if err != nil {

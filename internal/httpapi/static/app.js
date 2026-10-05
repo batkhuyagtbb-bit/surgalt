@@ -44,7 +44,7 @@ async function api(path, { method = "GET", body, token = Auth.token, raw } = {})
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) {
     if (res.status === 401 && token && token === Auth.token) { Auth.clear(); }
-    const e = new Error(data?.error || "Алдаа гарлаа (" + res.status + ")");
+    const e = new Error(data?.error || data?.message || "Алдаа гарлаа (" + res.status + ")");
     e.status = res.status; e.data = data; throw e;
   }
   return data;
@@ -542,15 +542,16 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive }) {
     tick();
     win.push([acc.active, acc.active + acc.idle + acc.away]); while (win.length > 20) win.shift();
     if (!sid) return;
-    const body = JSON.stringify({ session_id: sid, ...acc, events, end: end || "" });
+    const body = JSON.stringify({ sessionId: sid, ...acc, events, end: end || "" });
     acc = { active: 0, idle: 0, away: 0 }; events = [];
-    fetch("/api/activity/beat", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json", Authorization: "Bearer " + Auth.token }, body })
-      .then((r) => r.json()).then((d) => { if (d?.active_done_sec != null) onActive?.(d.active_done_sec); }).catch(() => {});
+    // Protobuf API (Connect-JSON): BeatOnce — gRPC Beat урсгалтай ижил логик.
+    fetch("/surgalt.v1.Surgalt/BeatOnce", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json", Authorization: "Bearer " + Auth.token }, body })
+      .then((r) => r.json()).then((d) => { if (d?.activeDoneSec != null || d?.ok) onActive?.(d.activeDoneSec || 0); }).catch(() => {});
   };
-  api("/api/activity/start", { method: "POST", body: { course_id: courseId, lesson_id: lessonId } })
+  api("/surgalt.v1.Surgalt/StartSession", { method: "POST", body: { courseId, lessonId } })
     .then((d) => {
-      sid = d.session_id; owner = !!d.policy?.owner;
-      onActive?.(d.policy?.active_done_sec || 0);
+      sid = d.sessionId; owner = !!d.policy?.owner;
+      onActive?.(d.policy?.activeDoneSec || 0);
       if (owner) { badge.remove(); return; }
       // Усан тэмдэг: хуудсыг зураг авбал хэн болох нь харагдана.
       const w = d.watermark || {};
@@ -757,11 +758,11 @@ function runExam({ base, courseId, lessonId, title, data, onClose }) {
     if (left <= 0) submit("", "Хугацаа дууслаа — хариултууд автоматаар илгээгдлээ.");
   }, 500);
   // Идэвхийн сесс (багшийн самбарт), зөрчлийг оролдлоготой холбоно.
-  api("/api/activity/start", { method: "POST", body: { course_id: courseId, lesson_id: lessonId, kind: "exam" } }).then((d) => { sid = d.session_id; }).catch(() => {});
+  api("/surgalt.v1.Surgalt/StartSession", { method: "POST", body: { courseId, lessonId, kind: "exam" } }).then((d) => { sid = d.sessionId; }).catch(() => {});
   let last = Date.now();
   const beatNow = (events = [], end = "") => { if (!sid) return; const dt = Math.round((Date.now() - last) / 1000); last = Date.now();
-    fetch("/api/activity/beat", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json", Authorization: "Bearer " + Auth.token },
-      body: JSON.stringify({ session_id: sid, active: dt, events, end, attempt_id: att.id }) }).catch(() => {}); };
+    fetch("/surgalt.v1.Surgalt/BeatOnce", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json", Authorization: "Bearer " + Auth.token },
+      body: JSON.stringify({ sessionId: sid, active: dt, events, end, attemptId: att.id }) }).catch(() => {}); };
   beat = setInterval(() => beatNow(), 15000);
   // Хатуу хамгаалалт
   const violate = (type, label) => { if (finished) return; beatNow([{ type, detail: "Шалгалтын үеэр: " + label }]); submit(type, `⛔ Шалгалт хаагдлаа: ${label}.`); };
@@ -1872,8 +1873,14 @@ function findCourses() {
     ctl?.abort(); ctl = new AbortController();
     box.classList.add("loading");
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(st.q)}&tag=${st.tag}&page=${st.page}`, { signal: ctl.signal });
-      const d = await res.json(); if (!res.ok) throw new Error(d?.error || "Хайлт амжилтгүй");
+      // Protobuf API (Connect-JSON): POST /surgalt.v1.Surgalt/Search — gRPC-тэй ижил үйлчилгээ, ижил ClickHouse.
+      const res = await fetch("/surgalt.v1.Surgalt/Search", { method: "POST", signal: ctl.signal, headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: st.q, tag: st.tag, page: st.page }) });
+      const raw = await res.json(); if (!res.ok) throw new Error(raw?.message || "Хайлт амжилтгүй");
+      // proto3 JSON: lowerCamelCase, int64 нь мөр, 0/хоосон утга орхигддог.
+      const d = { total: raw.total || 0, page: raw.page || 1, pages: raw.pages || 1, items: (raw.items || []).map((it) => ({
+        course_id: it.courseId, title: it.title || "", match: it.match, tags: it.tags || [], price: +it.price || 0, lessons: it.lessons || 0, views: +it.views || 0,
+        teacher: { username: it.teacher?.username || "", display_name: it.teacher?.displayName || "", avatar_url: it.teacher?.avatarUrl || "" } })) };
       if (cache.size > 60) cache.clear();
       cache.set(key, d); render(d);
     } catch (e) { if (e.name !== "AbortError") meta.textContent = e.message; } finally { box.classList.remove("loading"); }

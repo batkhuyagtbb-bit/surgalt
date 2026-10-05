@@ -107,7 +107,10 @@ func (c *ClickHouse) ExamAttempts(ctx context.Context, f ActivityFilter) ([]Exam
 }
 
 func (c *ClickHouse) FinishExamAttempt(ctx context.Context, a *ExamAttempt) error {
-	unlock := c.lock("attempt:" + a.ID)
+	unlock, err := c.lock(ctx, "attempt:"+a.ID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	cur, err := c.ExamAttemptByID(ctx, a.ID)
 	if err != nil {
@@ -122,7 +125,10 @@ func (c *ClickHouse) FinishExamAttempt(ctx context.Context, a *ExamAttempt) erro
 }
 
 func (c *ClickHouse) AddAttemptViolation(ctx context.Context, id string) error {
-	unlock := c.lock("attempt:" + id)
+	unlock, err := c.lock(ctx, "attempt:"+id)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	cur, err := c.ExamAttemptByID(ctx, id)
 	if err != nil {
@@ -190,7 +196,10 @@ func (c *ClickHouse) SessionByID(ctx context.Context, id string) (*StudySession,
 }
 
 func (c *ClickHouse) AddSessionBeat(ctx context.Context, id string, b SessionBeat) error {
-	unlock := c.lock("session:" + id)
+	unlock, err := c.lock(ctx, "session:"+id)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	s, err := c.SessionByID(ctx, id)
 	if err != nil {
@@ -349,10 +358,13 @@ func (c *ClickHouse) writeWatch(ctx context.Context, v *VideoWatch) error {
 
 func (c *ClickHouse) AddVideoWatch(ctx context.Context, v VideoWatch) error {
 	id := v.UserID + ":" + v.LessonID + ":" + v.BlockID
-	unlock := c.lock("watch:" + id)
+	unlock, err := c.lock(ctx, "watch:"+id)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	var cur *VideoWatch
-	err := c.query(ctx, "SELECT "+watchCols+" FROM video_watches FINAL WHERE id = ? LIMIT 1", []any{id}, func(r driver.Rows) error {
+	err = c.query(ctx, "SELECT "+watchCols+" FROM video_watches FINAL WHERE id = ? LIMIT 1", []any{id}, func(r driver.Rows) error {
 		w, err := scanWatch(r)
 		if err != nil {
 			return err

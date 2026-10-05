@@ -83,7 +83,10 @@ func (c *ClickHouse) ownedBook(ctx context.Context, id, teacherID string) (*Book
 }
 
 func (c *ClickHouse) UpdateBook(ctx context.Context, b *Book) error {
-	unlock := c.lock("book:" + b.ID)
+	unlock, err := c.lock(ctx, "book:"+b.ID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	cur, err := c.ownedBook(ctx, b.ID, b.TeacherID)
 	if err != nil {
@@ -99,7 +102,10 @@ func (c *ClickHouse) UpdateBook(ctx context.Context, b *Book) error {
 }
 
 func (c *ClickHouse) SetBookPages(ctx context.Context, id, teacherID string, pages int) error {
-	unlock := c.lock("book:" + id)
+	unlock, err := c.lock(ctx, "book:"+id)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	cur, err := c.ownedBook(ctx, id, teacherID)
 	if err != nil {
@@ -110,7 +116,10 @@ func (c *ClickHouse) SetBookPages(ctx context.Context, id, teacherID string, pag
 }
 
 func (c *ClickHouse) DeleteBook(ctx context.Context, id, teacherID string) error {
-	unlock := c.lock("book:" + id)
+	unlock, err := c.lock(ctx, "book:"+id)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	cur, err := c.ownedBook(ctx, id, teacherID)
 	if err != nil {

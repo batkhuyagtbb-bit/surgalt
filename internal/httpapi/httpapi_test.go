@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -46,7 +47,16 @@ func newTestStore(t *testing.T) store.Store {
 	u.Path = "/" + db
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	ch, err := store.NewClickHouse(ctx, store.ClickHouseOptions{DSN: u.String()})
+	var locker store.Locker
+	var keeper *store.KeeperLocker
+	if ka := os.Getenv("SURGALT_TEST_KEEPER"); ka != "" { // олон хуулбарын түгжээг ч жинхэнэ Keeper дээр шалгана
+		keeper, err = store.NewKeeperLocker(ctx, strings.Split(ka, ","), "/"+db)
+		if err != nil {
+			t.Fatalf("keeper: %v", err)
+		}
+		locker = keeper
+	}
+	ch, err := store.NewClickHouse(ctx, store.ClickHouseOptions{DSN: u.String(), Locker: locker})
 	if err != nil {
 		t.Fatalf("clickhouse: %v", err)
 	}
@@ -55,6 +65,9 @@ func newTestStore(t *testing.T) store.Store {
 		defer c2()
 		_ = ch.DropDatabase(cctx, db)
 		ch.Close()
+		if keeper != nil {
+			keeper.Close()
+		}
 	})
 	return ch
 }
@@ -65,7 +78,7 @@ func newTestServer(t *testing.T) (*httptest.Server, store.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := New(Config{DevPayments: true, WebhookSecret: "wh", StorageFreeMB: 10, StoragePlans: []StoragePlan{{MB: 300, Price: 5000}}},
+	s := New(Config{TrustProxy: true, DevPayments: true, WebhookSecret: "wh", StorageFreeMB: 10, StoragePlans: []StoragePlan{{MB: 300, Price: 5000}}},
 		st, auth.NewSigner("test", time.Hour), chat.NewHub(), fs, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	return httptest.NewServer(s.Handler()), st
 }
@@ -1375,5 +1388,53 @@ func TestEngagementEvidence(t *testing.T) {
 	// Эрхгүй/буруу тохиолдлууд.
 	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lid+"/progress/qfast", "", `{"duration":10,"buckets":{"0":1}}`); code != http.StatusUnauthorized {
 		t.Fatal("нэвтрээгүй хэрэглэгч видео явц илгээх ёсгүй")
+	}
+}
+
+// TestRegisterDuplicateEmailConcurrent: нэг имэйлээр 20 хүсэлт ЗЭРЭГ бүртгүүлэхэд яг нэг нь л амжилттай.
+func TestRegisterDuplicateEmailConcurrent(t *testing.T) {
+	srv, st := newTestServer(t)
+	defer srv.Close()
+	var wg sync.WaitGroup
+	codes := make([]int, 20)
+	for i := range codes {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			body := `{"email":"same@x.mn","password":"password1","role":"student"}`
+			req, _ := http.NewRequest("POST", srv.URL+"/api/auth/register", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Real-IP", fmt.Sprintf("10.9.0.%d", i+1)) // 20 өөр хэрэглэгч (IP) яг нэг мөчид
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			res.Body.Close()
+			codes[i] = res.StatusCode
+		}(i)
+	}
+	wg.Wait()
+	ok, conflict := 0, 0
+	for _, c := range codes {
+		switch c {
+		case 201:
+			ok++
+		case 409:
+			conflict++
+		default:
+			t.Errorf("гэнэтийн код %d", c)
+		}
+	}
+	if ok != 1 || conflict != 19 {
+		t.Fatalf("яг 1 амжилт, 19 давхардал байх ёстой: ok=%d conflict=%d", ok, conflict)
+	}
+	u, err := st.UserByEmail(context.Background(), "same@x.mn")
+	if err != nil || u.Email != "same@x.mn" {
+		t.Fatalf("бүртгэгдсэн хэрэглэгч олдохгүй: %v", err)
+	}
+	// Мөн нэвтрэх хэвийн.
+	if code, _ := call(t, srv, "POST", "/api/auth/login", "", `{"email":"same@x.mn","password":"password1"}`); code != 200 {
+		t.Fatalf("нэвтрэх: %d", code)
 	}
 }

@@ -5,8 +5,9 @@
 // source: surgalt/v1/surgalt.proto
 
 // surgalt.mn — gRPC + Protobuf API.
-// Нээлттэй уншилт (багш, сургалт, хайлт) ба нэвтэрсэн хэрэглэгчийн идэвхийн урсгал
-// (сесс → цохилт → ClickHouse), багшийн статистик. Токен: metadata "authorization: Bearer <token>".
+// Нэг handler гурван протоколоор үйлчилнэ (Connect): gRPC (мобайл, сервис), gRPC-Web, Connect-JSON
+// (хөтөч энгийн fetch-ээр: POST /surgalt.v1.Surgalt/<Method>, Content-Type: application/json).
+// Токен: header "Authorization: Bearer <token>".
 
 package pb
 
@@ -29,6 +30,7 @@ const (
 	Surgalt_Me_FullMethodName           = "/surgalt.v1.Surgalt/Me"
 	Surgalt_StartSession_FullMethodName = "/surgalt.v1.Surgalt/StartSession"
 	Surgalt_Beat_FullMethodName         = "/surgalt.v1.Surgalt/Beat"
+	Surgalt_BeatOnce_FullMethodName     = "/surgalt.v1.Surgalt/BeatOnce"
 	Surgalt_GetAnalytics_FullMethodName = "/surgalt.v1.Surgalt/GetAnalytics"
 )
 
@@ -46,6 +48,8 @@ type SurgaltClient interface {
 	StartSession(ctx context.Context, in *StartSessionRequest, opts ...grpc.CallOption) (*StartSessionResponse, error)
 	// Клиент урсгалаар 15 секунд тутмын идэвхийн тайлан илгээнэ; сервер нийт идэвхтэй секундийг буцаана.
 	Beat(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[BeatRequest, BeatResponse], error)
+	// Нэг удаагийн тайлан (хөтөч: fetch-ээр, урсгалгүй).
+	BeatOnce(ctx context.Context, in *BeatRequest, opts ...grpc.CallOption) (*BeatResponse, error)
 	// ---- багш ----
 	GetAnalytics(ctx context.Context, in *AnalyticsRequest, opts ...grpc.CallOption) (*AnalyticsResponse, error)
 }
@@ -121,6 +125,16 @@ func (c *surgaltClient) Beat(ctx context.Context, opts ...grpc.CallOption) (grpc
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Surgalt_BeatClient = grpc.BidiStreamingClient[BeatRequest, BeatResponse]
 
+func (c *surgaltClient) BeatOnce(ctx context.Context, in *BeatRequest, opts ...grpc.CallOption) (*BeatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BeatResponse)
+	err := c.cc.Invoke(ctx, Surgalt_BeatOnce_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *surgaltClient) GetAnalytics(ctx context.Context, in *AnalyticsRequest, opts ...grpc.CallOption) (*AnalyticsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AnalyticsResponse)
@@ -145,6 +159,8 @@ type SurgaltServer interface {
 	StartSession(context.Context, *StartSessionRequest) (*StartSessionResponse, error)
 	// Клиент урсгалаар 15 секунд тутмын идэвхийн тайлан илгээнэ; сервер нийт идэвхтэй секундийг буцаана.
 	Beat(grpc.BidiStreamingServer[BeatRequest, BeatResponse]) error
+	// Нэг удаагийн тайлан (хөтөч: fetch-ээр, урсгалгүй).
+	BeatOnce(context.Context, *BeatRequest) (*BeatResponse, error)
 	// ---- багш ----
 	GetAnalytics(context.Context, *AnalyticsRequest) (*AnalyticsResponse, error)
 	mustEmbedUnimplementedSurgaltServer()
@@ -174,6 +190,9 @@ func (UnimplementedSurgaltServer) StartSession(context.Context, *StartSessionReq
 }
 func (UnimplementedSurgaltServer) Beat(grpc.BidiStreamingServer[BeatRequest, BeatResponse]) error {
 	return status.Error(codes.Unimplemented, "method Beat not implemented")
+}
+func (UnimplementedSurgaltServer) BeatOnce(context.Context, *BeatRequest) (*BeatResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BeatOnce not implemented")
 }
 func (UnimplementedSurgaltServer) GetAnalytics(context.Context, *AnalyticsRequest) (*AnalyticsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAnalytics not implemented")
@@ -296,6 +315,24 @@ func _Surgalt_Beat_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Surgalt_BeatServer = grpc.BidiStreamingServer[BeatRequest, BeatResponse]
 
+func _Surgalt_BeatOnce_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BeatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SurgaltServer).BeatOnce(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Surgalt_BeatOnce_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SurgaltServer).BeatOnce(ctx, req.(*BeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Surgalt_GetAnalytics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AnalyticsRequest)
 	if err := dec(in); err != nil {
@@ -340,6 +377,10 @@ var Surgalt_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StartSession",
 			Handler:    _Surgalt_StartSession_Handler,
+		},
+		{
+			MethodName: "BeatOnce",
+			Handler:    _Surgalt_BeatOnce_Handler,
 		},
 		{
 			MethodName: "GetAnalytics",

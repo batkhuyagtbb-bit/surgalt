@@ -37,7 +37,10 @@ func (c *ClickHouse) convsWhere(ctx context.Context, where, order string, args .
 }
 
 func (c *ClickHouse) GetOrCreateConversation(ctx context.Context, teacherID, visitorKey, visitorName, userID string) (*Conversation, error) {
-	unlock := c.lock("conv:" + teacherID + "|" + visitorKey)
+	unlock, err := c.lock(ctx, "conv:"+teacherID+"|"+visitorKey)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	if _, err := c.UserByID(ctx, teacherID); err != nil {
 		return nil, err
@@ -55,7 +58,10 @@ func (c *ClickHouse) GetOrCreateConversation(ctx context.Context, teacherID, vis
 }
 
 func (c *ClickHouse) GetOrCreateGroupConversation(ctx context.Context, teacherID, courseID, title string) (*Conversation, error) {
-	unlock := c.lock("conv:group:" + courseID)
+	unlock, err := c.lock(ctx, "conv:group:"+courseID)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	cs, err := c.convsWhere(ctx, "kind = ? AND course_id = ?", "LIMIT 1", ConvGroup, courseID)
 	if err != nil {
@@ -114,7 +120,10 @@ func (c *ClickHouse) UserConversations(ctx context.Context, userID string, limit
 }
 
 func (c *ClickHouse) AddMessage(ctx context.Context, m *Message) error {
-	unlock := c.lock("conv:" + m.ConversationID)
+	unlock, err := c.lock(ctx, "conv:"+m.ConversationID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	cv, err := c.ConversationByID(ctx, m.ConversationID)
 	if err != nil {

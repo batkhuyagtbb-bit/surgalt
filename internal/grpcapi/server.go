@@ -1,8 +1,10 @@
-// Package grpcapi — surgalt.mn-ийн gRPC + Protobuf үйлчилгээ.
+// Package grpcapi — surgalt.mn-ийн Protobuf API. Нэг handler (Connect) гурван протоколоор үйлчилнэ:
+//   - gRPC (HTTP/2): мобайл апп, сервис хоорондын клиент (grpc-go, grpc-swift, grpc-kotlin ...)
+//   - gRPC-Web: хөтчийн gRPC-Web клиент
+//   - Connect-JSON: хөтөч энгийн fetch-ээр — POST /surgalt.v1.Surgalt/<Method>, Content-Type: application/json
 //
 // HTTP API-тай ижил бизнес логикийг (httpapi.Server-ийн экспортлосон функцүүд) дуудна, тиймээс
-// хоёр API нэг л дүрэм, нэг л ClickHouse сан дээр ажиллана. Хөтөч HTML/JSON-оор, мобайл ба
-// сервис хоорондын клиент gRPC-ээр холбогдоно.
+// бүх клиент нэг л дүрэм, нэг л ClickHouse сан дээр ажиллана.
 package grpcapi
 
 import (
@@ -12,101 +14,92 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/peer"
-	"google.golang.org/grpc/status"
+	"connectrpc.com/connect"
 
 	"surgalt/internal/httpapi"
 	"surgalt/internal/pb"
+	"surgalt/internal/pb/pbconnect"
 	"surgalt/internal/store"
 )
 
 type Server struct {
-	pb.UnimplementedSurgaltServer
 	api *httpapi.Server
 }
 
-// New нь gRPC серверийг үүсгэж үйлчилгээг бүртгэнэ.
-func New(api *httpapi.Server, opts ...grpc.ServerOption) *grpc.Server {
-	gs := grpc.NewServer(append([]grpc.ServerOption{grpc.MaxRecvMsgSize(4 << 20)}, opts...)...)
-	pb.RegisterSurgaltServer(gs, &Server{api: api})
-	return gs
+// Handler нь (зам, handler) буцаана; HTTP mux-д `mux.Handle(path, h)` гэж байрлуулна.
+// Урсгалтай RPC (Beat) серверийн Read/WriteTimeout-оос урт байж болох тул deadline-ийг цэвэрлэнэ.
+func Handler(api *httpapi.Server) (string, http.Handler) {
+	path, h := pbconnect.NewSurgaltHandler(&Server{api: api}, connect.WithCompressMinBytes(1024))
+	return path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := http.NewResponseController(w)
+		_ = rc.SetReadDeadline(time.Time{})
+		_ = rc.SetWriteDeadline(time.Time{})
+		h.ServeHTTP(w, r)
+	})
 }
 
 // ---- алдаа ----
 
-func toStatus(err error) error {
+func toConnect(err error) error {
 	if err == nil {
 		return nil
 	}
 	var ae *httpapi.APIError
 	if errors.As(err, &ae) {
-		return status.Error(httpCode(ae.Code), ae.Msg)
+		return connect.NewError(codeOf(ae.Code), errors.New(ae.Msg))
 	}
 	if errors.Is(err, store.ErrNotFound) {
-		return status.Error(codes.NotFound, "олдсонгүй")
+		return connect.NewError(connect.CodeNotFound, errors.New("олдсонгүй"))
 	}
 	if errors.Is(err, store.ErrConflict) {
-		return status.Error(codes.AlreadyExists, "давхардсан")
+		return connect.NewError(connect.CodeAlreadyExists, errors.New("давхардсан"))
 	}
-	return status.Error(codes.Internal, "алдаа гарлаа")
+	return connect.NewError(connect.CodeInternal, errors.New("алдаа гарлаа"))
 }
 
-func httpCode(c int) codes.Code {
-	switch c {
+func codeOf(httpCode int) connect.Code {
+	switch httpCode {
 	case http.StatusNotFound:
-		return codes.NotFound
+		return connect.CodeNotFound
 	case http.StatusPaymentRequired, http.StatusForbidden:
-		return codes.PermissionDenied
-	case http.StatusLocked:
-		return codes.FailedPrecondition
-	case http.StatusConflict:
-		return codes.FailedPrecondition
+		return connect.CodePermissionDenied
+	case http.StatusLocked, http.StatusConflict:
+		return connect.CodeFailedPrecondition
 	case http.StatusBadRequest:
-		return codes.InvalidArgument
+		return connect.CodeInvalidArgument
 	case http.StatusUnauthorized:
-		return codes.Unauthenticated
+		return connect.CodeUnauthenticated
 	}
-	return codes.Internal
+	return connect.CodeInternal
 }
 
 // ---- нэвтрэлт ----
 
 type principal struct{ uid, role, name string }
 
-// auth нь metadata "authorization: Bearer <token>"-оос хэрэглэгчийг танина.
-func (s *Server) auth(ctx context.Context) (principal, error) {
-	md, _ := metadata.FromIncomingContext(ctx)
-	var tok string
-	for _, v := range md.Get("authorization") {
-		tok = strings.TrimSpace(strings.TrimPrefix(v, "Bearer "))
-	}
+// auth: "Authorization: Bearer <token>" толгойгоос хэрэглэгчийг танина.
+func (s *Server) auth(h http.Header) (principal, error) {
+	tok := strings.TrimSpace(strings.TrimPrefix(h.Get("Authorization"), "Bearer "))
 	if tok == "" {
-		return principal{}, status.Error(codes.Unauthenticated, "нэвтэрнэ үү")
+		return principal{}, connect.NewError(connect.CodeUnauthenticated, errors.New("нэвтэрнэ үү"))
 	}
 	uid, role, name, err := s.api.VerifyToken(tok)
 	if err != nil || uid == "" {
-		return principal{}, status.Error(codes.Unauthenticated, "токен хүчингүй")
+		return principal{}, connect.NewError(connect.CodeUnauthenticated, errors.New("токен хүчингүй"))
 	}
 	return principal{uid, role, name}, nil
 }
 
-func clientIP(ctx context.Context) string {
-	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		if v := md.Get("x-real-ip"); len(v) > 0 {
-			return v[0]
-		}
+func clientIP(h http.Header, peer connect.Peer) string {
+	if v := h.Get("X-Real-IP"); v != "" {
+		return v
 	}
-	if p, ok := peer.FromContext(ctx); ok && p.Addr != nil {
-		if host, _, err := net.SplitHostPort(p.Addr.String()); err == nil {
-			return host
-		}
-		return p.Addr.String()
+	if host, _, err := net.SplitHostPort(peer.Addr); err == nil {
+		return host
 	}
-	return ""
+	return peer.Addr
 }
 
 // ---- хөрвүүлэлт ----
@@ -128,24 +121,33 @@ func coursePB(c store.Course) *pb.Course {
 		LessonCount: int32(c.LessonCount), FreeLessonCount: int32(c.FreeLessonCount), Views: c.Views, CreatedAtUnix: c.CreatedAt.Unix()}
 }
 
+func beatInput(in *pb.BeatRequest) httpapi.BeatInput {
+	b := httpapi.BeatInput{SessionID: in.GetSessionId(), Active: int(in.GetActive()), Idle: int(in.GetIdle()), Away: int(in.GetAway()),
+		FocusSum: in.GetFocusSum(), FocusN: int(in.GetFocusN()), Camera: in.GetCamera(), AttemptID: in.GetAttemptId(), End: in.GetEnd()}
+	for _, e := range in.GetEvents() {
+		b.Events = append(b.Events, httpapi.BeatEvent{Type: e.GetType(), Detail: e.GetDetail()})
+	}
+	return b
+}
+
 // ---- нээлттэй ----
 
-func (s *Server) GetTeacher(ctx context.Context, in *pb.GetTeacherRequest) (*pb.TeacherProfile, error) {
-	p, err := s.api.PublicTeacherByUsername(ctx, in.GetUsername())
+func (s *Server) GetTeacher(ctx context.Context, req *connect.Request[pb.GetTeacherRequest]) (*connect.Response[pb.TeacherProfile], error) {
+	p, err := s.api.PublicTeacherByUsername(ctx, req.Msg.GetUsername())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, toConnect(err)
 	}
 	out := &pb.TeacherProfile{Teacher: teacherPB(p.Teacher), TopCourseId: p.TopCourseID}
 	for _, c := range p.Courses {
 		out.Courses = append(out.Courses, coursePB(c))
 	}
-	return out, nil
+	return connect.NewResponse(out), nil
 }
 
-func (s *Server) GetCourse(ctx context.Context, in *pb.GetCourseRequest) (*pb.CourseDetail, error) {
-	c, err := s.api.PublicCourseByID(ctx, in.GetId())
+func (s *Server) GetCourse(ctx context.Context, req *connect.Request[pb.GetCourseRequest]) (*connect.Response[pb.CourseDetail], error) {
+	c, err := s.api.PublicCourseByID(ctx, req.Msg.GetId())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, toConnect(err)
 	}
 	out := &pb.CourseDetail{Course: coursePB(c.Course), Teacher: teacherPB(c.Teacher)}
 	for _, l := range c.Lessons {
@@ -153,77 +155,73 @@ func (s *Server) GetCourse(ctx context.Context, in *pb.GetCourseRequest) (*pb.Co
 			UnlockAfterH: int32(l.UnlockAfterH), AlwaysOpen: l.AlwaysOpen, Format: l.Format, Mode: l.Mode, Section: l.Section,
 			ActiveMin: int32(l.ActiveMin), Exam: l.Exam != nil})
 	}
-	return out, nil
+	return connect.NewResponse(out), nil
 }
 
-func (s *Server) Search(ctx context.Context, in *pb.SearchRequest) (*pb.SearchResponse, error) {
-	res, err := s.api.SearchCourses(ctx, in.GetQuery(), in.GetTag(), int(in.GetPage()))
+func (s *Server) Search(ctx context.Context, req *connect.Request[pb.SearchRequest]) (*connect.Response[pb.SearchResponse], error) {
+	res, err := s.api.SearchCourses(ctx, req.Msg.GetQuery(), req.Msg.GetTag(), int(req.Msg.GetPage()))
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, toConnect(err)
 	}
 	out := &pb.SearchResponse{Total: int32(res.Total), Page: int32(res.Page), Pages: int32(res.Pages), PerPage: int32(res.PerPage)}
 	for _, h := range res.Items {
 		out.Items = append(out.Items, &pb.SearchHit{CourseId: h.CourseID, Title: h.Title, Teacher: teacherPB(h.Teacher), Price: h.Price,
 			Lessons: int32(h.Lessons), FreeLessons: int32(h.FreeLessons), Views: h.Views, Tags: h.Tags, Match: h.Match})
 	}
-	return out, nil
+	resp := connect.NewResponse(out)
+	resp.Header().Set("Cache-Control", "public, max-age=15")
+	return resp, nil
 }
 
 // ---- нэвтэрсэн ----
 
-func (s *Server) Me(ctx context.Context, _ *pb.MeRequest) (*pb.User, error) {
-	p, err := s.auth(ctx)
+func (s *Server) Me(ctx context.Context, req *connect.Request[pb.MeRequest]) (*connect.Response[pb.User], error) {
+	p, err := s.auth(req.Header())
 	if err != nil {
 		return nil, err
 	}
 	u, err := s.api.Store().UserByID(ctx, p.uid)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, toConnect(err)
 	}
-	return &pb.User{Id: u.ID, Username: u.Username, Role: string(u.Role), DisplayName: u.DisplayName, AvatarUrl: u.AvatarURL}, nil
+	return connect.NewResponse(&pb.User{Id: u.ID, Username: u.Username, Role: string(u.Role), DisplayName: u.DisplayName, AvatarUrl: u.AvatarURL}), nil
 }
 
-func (s *Server) StartSession(ctx context.Context, in *pb.StartSessionRequest) (*pb.StartSessionResponse, error) {
-	p, err := s.auth(ctx)
+func (s *Server) StartSession(ctx context.Context, req *connect.Request[pb.StartSessionRequest]) (*connect.Response[pb.StartSessionResponse], error) {
+	p, err := s.auth(req.Header())
 	if err != nil {
 		return nil, err
 	}
-	st, err := s.api.StartActivity(ctx, p.uid, p.name, clientIP(ctx), in.GetCourseId(), in.GetLessonId(), in.GetKind())
+	st, err := s.api.StartActivity(ctx, p.uid, p.name, clientIP(req.Header(), req.Peer()), req.Msg.GetCourseId(), req.Msg.GetLessonId(), req.Msg.GetKind())
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, toConnect(err)
 	}
-	return &pb.StartSessionResponse{
+	return connect.NewResponse(&pb.StartSessionResponse{
 		SessionId: st.SessionID,
 		Watermark: &pb.Watermark{Name: st.Watermark["name"], Id: st.Watermark["id"], Ip: st.Watermark["ip"]},
 		Policy: &pb.Policy{Camera: st.Policy.Camera, PingSec: int32(st.Policy.PingSec), PingAnswerSec: int32(st.Policy.PingAnswerSec),
 			IdleSec: int32(st.Policy.IdleSec), BeatSec: int32(st.Policy.BeatSec), ActiveMin: int32(st.Policy.ActiveMin),
 			ActiveDoneSec: int32(st.Policy.ActiveDoneSec), Owner: st.Policy.Owner},
-	}, nil
+	}), nil
 }
 
-// Beat — хоёр чиглэлт урсгал: клиент тайлан бүрт сервер нийт идэвхтэй секундийг буцаана.
-func (s *Server) Beat(stream pb.Surgalt_BeatServer) error {
-	ctx := stream.Context()
-	p, err := s.auth(ctx)
+// Beat — хоёр чиглэлт урсгал (gRPC клиентэд): тайлан бүрт нийт идэвхтэй секундийг буцаана.
+func (s *Server) Beat(ctx context.Context, stream *connect.BidiStream[pb.BeatRequest, pb.BeatResponse]) error {
+	p, err := s.auth(stream.RequestHeader())
 	if err != nil {
 		return err
 	}
 	for {
-		in, err := stream.Recv()
-		if err == io.EOF {
+		in, err := stream.Receive()
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 		if err != nil {
 			return err
 		}
-		b := httpapi.BeatInput{SessionID: in.GetSessionId(), Active: int(in.GetActive()), Idle: int(in.GetIdle()), Away: int(in.GetAway()),
-			FocusSum: in.GetFocusSum(), FocusN: int(in.GetFocusN()), Camera: in.GetCamera(), AttemptID: in.GetAttemptId(), End: in.GetEnd()}
-		for _, e := range in.GetEvents() {
-			b.Events = append(b.Events, httpapi.BeatEvent{Type: e.GetType(), Detail: e.GetDetail()})
-		}
-		done, err := s.api.RecordBeat(ctx, p.uid, b)
+		done, err := s.api.RecordBeat(ctx, p.uid, beatInput(in))
 		if err != nil {
-			return toStatus(err)
+			return toConnect(err)
 		}
 		if err := stream.Send(&pb.BeatResponse{Ok: true, ActiveDoneSec: int32(done)}); err != nil {
 			return err
@@ -231,19 +229,32 @@ func (s *Server) Beat(stream pb.Surgalt_BeatServer) error {
 	}
 }
 
+// BeatOnce — нэг удаагийн тайлан (хөтөч fetch-ээр дуудна).
+func (s *Server) BeatOnce(ctx context.Context, req *connect.Request[pb.BeatRequest]) (*connect.Response[pb.BeatResponse], error) {
+	p, err := s.auth(req.Header())
+	if err != nil {
+		return nil, err
+	}
+	done, err := s.api.RecordBeat(ctx, p.uid, beatInput(req.Msg))
+	if err != nil {
+		return nil, toConnect(err)
+	}
+	return connect.NewResponse(&pb.BeatResponse{Ok: true, ActiveDoneSec: int32(done)}), nil
+}
+
 // ---- багш ----
 
-func (s *Server) GetAnalytics(ctx context.Context, in *pb.AnalyticsRequest) (*pb.AnalyticsResponse, error) {
-	p, err := s.auth(ctx)
+func (s *Server) GetAnalytics(ctx context.Context, req *connect.Request[pb.AnalyticsRequest]) (*connect.Response[pb.AnalyticsResponse], error) {
+	p, err := s.auth(req.Header())
 	if err != nil {
 		return nil, err
 	}
 	if p.role != string(store.RoleTeacher) {
-		return nil, status.Error(codes.PermissionDenied, "зөвхөн багш")
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("зөвхөн багш"))
 	}
-	data, err := s.api.Analytics(ctx, p.uid, in.GetCourseId(), int(in.GetDays()))
+	data, err := s.api.Analytics(ctx, p.uid, req.Msg.GetCourseId(), int(req.Msg.GetDays()))
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, toConnect(err)
 	}
 	out := &pb.AnalyticsResponse{}
 	for _, st := range data.Students {
@@ -263,7 +274,7 @@ func (s *Server) GetAnalytics(ctx context.Context, in *pb.AnalyticsRequest) (*pb
 	t := data.Totals
 	out.TotalStudents, out.Live, out.ActivePct = i32(t["students"]), i32(t["live"]), i32(t["active_pct"])
 	out.Attention, out.Violations, out.LearnScore = i32(t["attention"]), i32(t["violations"]), i32(t["learn_score"])
-	return out, nil
+	return connect.NewResponse(out), nil
 }
 
 func str(v any) string {

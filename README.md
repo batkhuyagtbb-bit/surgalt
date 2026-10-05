@@ -43,46 +43,59 @@ Go дээр бичигдсэн, **секундэд 10 000+ хүсэлт** даа
 # Локал (Docker-гүй): нэг binary
 sh deploy/clickhouse-local.sh                      # :9000 native, :8123 http
 CLICKHOUSE_DSN=clickhouse://127.0.0.1:9000/surgalt ./surgalt
-# Docker: docker compose up -d --build  (ClickHouse + app + nginx)
+# Docker: docker compose up -d --build  (Keeper + ClickHouse + app ×3 + nginx)
 ```
 
 ClickHouse нь OLAP сан тул store дараах зарчмаар бичигдсэн (`internal/store/clickhouse*.go`):
 
 - Өөрчлөгддөг entity бүр `ReplacingMergeTree(ver)`: засвар = шинэ хувилбартай мөр, уншихдаа `FINAL`; устгал = `deleted` тэмдэг.
 - Зөвхөн нэмэгддэг өгөгдөл (мессеж, лог, үйл явдал) — `MergeTree`; тоолуур — `SummingMergeTree`.
-- Имэйл/нэрний давхардал, төлбөрийн "яг нэг удаа", pending захиалгын дедуп — процесс доторх түгжээ.
-  **Тиймээс app-ийг нэг хуулбараар ажиллуулна**; олон хуулбар хэрэгтэй бол гадаад түгжээ (Redis) нэмнэ.
-- Тестийн суурь: `SURGALT_TEST_CLICKHOUSE_DSN=clickhouse://127.0.0.1:9000/default go test ./internal/httpapi`
-  — HTTP API-ийн бүх тест жинхэнэ ClickHouse дээр ажиллана (тест бүр өөрийн түр сантай).
+- **Давхардал ба "яг нэг удаа"** (имэйл/нэрний давхардал, төлбөр, pending захиалга) — `Locker` (`internal/store/locker.go`):
+  нэг хуулбарт процесс доторх мутекс; олон хуулбарт **ClickHouse Keeper** (ZooKeeper-compatible, ClickHouse-ийн нэг хэсэг)
+  дээрх түгжээ (`CLICKHOUSE_KEEPER=host:9181`). Имэйлд нэмээд бичсэний дараах шалгалт бий: ижил имэйлтэй хэд хэдэн
+  мөр үүсвэл хамгийн эрт ID нь үлдэж, бусад нь `409` авна — түгжээ алдагдсан ч давхардахгүй.
+- **Олон хуулбарт чат, мэдэгдэл**: Keeper тохируулсан үед хуулбар бүр ClickHouse-оос шинэ мөрүүдийг (300мс) санамж авч
+  өөрийн WebSocket-ууд руу хүргэнэ — ClickHouse өөрөө "bus", нэмэлт брокер хэрэггүй.
+- Тест: `SURGALT_TEST_CLICKHOUSE_DSN=clickhouse://127.0.0.1:9000/default [SURGALT_TEST_KEEPER=127.0.0.1:9181] go test ./internal/httpapi`
+  — HTTP API-ийн бүх тест жинхэнэ ClickHouse (+Keeper түгжээ) дээр ажиллана; `TestRegisterDuplicateEmailConcurrent`
+  нэг имэйлээр 20 зэрэг бүртгэлээс яг 1 амжилттай гарахыг шалгана.
 
-## gRPC + Protobuf API
+## Protobuf API: gRPC + gRPC-Web + Connect-JSON (нэг handler)
 
-Схем: `proto/surgalt/v1/surgalt.proto`, үүсгэсэн код: `internal/pb`, үйлчилгээ: `internal/grpcapi`.
-`GRPC_ADDR` (анхдагч `:9090`) тохируулбал HTTP-тэй зэрэг асна; nginx `:9090`-ийг `grpc_pass`-аар дамжуулна.
-HTTP болон gRPC нэг л бизнес логик (`httpapi.Server`-ийн экспортлосон функцүүд), нэг л ClickHouse ашиглана.
+Схем: `proto/surgalt/v1/surgalt.proto` → `internal/pb` (+ `internal/pb/pbconnect`), үйлчилгээ: `internal/grpcapi`.
+[Connect](https://connectrpc.com) handler нэг замаар (`/surgalt.v1.Surgalt/<Method>`) гурван протоколыг үйлчилнэ:
+
+| Клиент | Протокол | Хэрхэн |
+|---|---|---|
+| Мобайл, сервис (grpc-go, Swift, Kotlin …) | gRPC (HTTP/2, h2c) | `:8080` эсвэл `GRPC_ADDR` (`:9090`, nginx `grpc_pass`) |
+| Хөтөч (gRPC-Web клиент) | gRPC-Web | ижил зам |
+| Хөтөч (энгийн `fetch`) | Connect-JSON | `POST /surgalt.v1.Surgalt/Search`, `Content-Type: application/json` |
+
+Вэб хэсэг өөрөө энэ API-г ашигладаг: нүүрийн хайлт (`Search`), хичээлийн идэвхийн сесс (`StartSession`, `BeatOnce`).
+Токен: `Authorization: Bearer <token>`. HTTP ба Protobuf API нэг л бизнес логик (`httpapi/service.go`), нэг л ClickHouse.
 
 | RPC | Хэн | Юу |
 |---|---|---|
 | `GetTeacher`, `GetCourse`, `Search` | нээлттэй | Профайл, сургалт + хичээлийн тойм, ухаалаг хайлт |
-| `Me` | нэвтэрсэн | Өөрийн мэдээлэл (metadata: `authorization: Bearer <token>`) |
-| `StartSession`, `Beat` (stream) | нэвтэрсэн | Идэвхийн сесс, 15 сек тутмын тайлан → ClickHouse |
+| `Me` | нэвтэрсэн | Өөрийн мэдээлэл |
+| `StartSession`, `Beat` (bidi stream), `BeatOnce` | нэвтэрсэн | Идэвхийн сесс, 15 сек тутмын тайлан → ClickHouse |
 | `GetAnalytics` | багш | Суралцагч бүрийн идэвх, анхаарал, суралцсан оноо |
 
-Код дахин үүсгэх: `protoc --proto_path=proto --go_out=internal/pb --go_opt=module=surgalt/internal/pb --go-grpc_out=internal/pb --go-grpc_opt=module=surgalt/internal/pb proto/surgalt/v1/surgalt.proto`
-(`protoc-gen-go`, `protoc-gen-go-grpc` нь `go install`-аар).
+Код дахин үүсгэх (`protoc-gen-go`, `protoc-gen-go-grpc`, `protoc-gen-connect-go` нь `go install`-аар):
+`protoc --proto_path=proto --go_out=internal/pb --go_opt=module=surgalt/internal/pb --go-grpc_out=internal/pb --go-grpc_opt=module=surgalt/internal/pb --connect-go_out=internal/pb --connect-go_opt=module=surgalt/internal/pb proto/surgalt/v1/surgalt.proto`
 
 ## Архитектур
 
 ```
 nginx (load balancer, WebSocket, том upload урсгал)
    │
-   ├── app (Go) ──── ClickHouse (бүх өгөгдөл: хэрэглэгч, сургалт, захиалга, чат, лог)
-   │     ├─ gRPC + Protobuf API (:9090) — мобайл/сервис хоорондын typed API
+   ├── app ×3 (Go) ──── ClickHouse (бүх өгөгдөл) + ClickHouse Keeper (хуулбар хоорондын түгжээ)
+   │     ├─ Protobuf API (Connect): gRPC / gRPC-Web / JSON — хөтөч, мобайл, сервис нэг зам
    │     ├─ процесс доторх кэш + singleflight (stampede хамгаалалт)
    │     ├─ урьдчилан рендерлэсэн HTML/JSON + ETag/304
    │     ├─ IP тус бүрийн rate limit, bcrypt-ийн зэрэгцээг хязгаарлана
    │     ├─ үзэлтийг санах ойд нэгтгэж 30с тутам багцаар бичнэ
-   │     └─ чат/мэдэгдэл: процесс доторх WebSocket hub
+   │     └─ чат/мэдэгдэл: WebSocket hub; олон хуулбарт ClickHouse-оор дамжуулан түгээнэ
    └── файлын сан (хуваалцсан volume)
 ```
 

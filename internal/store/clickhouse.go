@@ -21,18 +21,19 @@ import (
 //   - Тоолуур (үзэлт, борлуулалт) нь SummingMergeTree "counters" хүснэгт: нэмэх = мөр нэмэх,
 //     унших = sum().
 //   - Имэйл/нэрний давхардалгүй байдал, "яг нэг удаа" төлбөр, pending захиалгын дедуп зэргийг
-//     процесс доторх түгжээгээр (userMu, keyed locks) хангана. Энэ нь НЭГ сервер
-//     хуулбартай үед зөв; олон хуулбар ажиллуулахад гадаад түгжээ (Redis г.м) нэмэх шаардлагатай.
+//     Locker-ээр хангана: нэг хуулбарт процесс доторх мутекс, олон хуулбарт ClickHouse Keeper
+//     дээрх түгжээ (locker.go). Имэйлийн давхардалд нэмээд бичсэний дараах шалгалт (CreateUser) бий.
 type ClickHouse struct {
 	conn   driver.Conn
-	userMu sync.Mutex // имэйл, хэрэглэгчийн нэрний давхардал
-	locks  sync.Map   // key -> *sync.Mutex (захиалга, сесс, явц, яриа ...)
+	locker Locker // процесс доторх эсвэл Keeper дээрх түгжээ (олон хуулбарт)
 }
 
 type ClickHouseOptions struct {
 	// DSN: clickhouse://user:pass@host:9000/surgalt?dial_timeout=5s
 	// (ClickHouse-ийн тохиргоог query параметрээр дамжуулж болно, ж: &async_insert=1&wait_for_async_insert=1)
 	DSN string
+	// Locker: nil бол процесс доторх (нэг хуулбар). Олон хуулбарт NewKeeperLocker өгнө.
+	Locker Locker
 }
 
 func NewClickHouse(ctx context.Context, o ClickHouseOptions) (*ClickHouse, error) {
@@ -72,7 +73,10 @@ func NewClickHouse(ctx context.Context, o ClickHouseOptions) (*ClickHouse, error
 	if err != nil {
 		return nil, fmt.Errorf("clickhouse connect: %w", err)
 	}
-	c := &ClickHouse{conn: conn}
+	c := &ClickHouse{conn: conn, locker: o.Locker}
+	if c.locker == nil {
+		c.locker = &LocalLocker{}
+	}
 	if err := c.ensureSchema(ctx); err != nil {
 		_ = conn.Close()
 		return nil, err
@@ -114,12 +118,9 @@ func ver() uint64 {
 	return v
 }
 
-// lock нь түлхүүрээр процесс доторх түгжээ авна; буцаасан функцээр тавина.
-func (c *ClickHouse) lock(key string) func() {
-	v, _ := c.locks.LoadOrStore(key, &sync.Mutex{})
-	mu := v.(*sync.Mutex)
-	mu.Lock()
-	return mu.Unlock
+// lock нь түлхүүрээр түгжээ авна (Locker-ээс хамаарч процесс доторх эсвэл Keeper); буцаасан функцээр тавина.
+func (c *ClickHouse) lock(ctx context.Context, key string) (func(), error) {
+	return c.locker.Lock(ctx, key)
 }
 
 // ---- схем ----
@@ -398,8 +399,11 @@ func (c *ClickHouse) userWhere(ctx context.Context, where string, args ...any) (
 }
 
 func (c *ClickHouse) CreateUser(ctx context.Context, u *User) error {
-	c.userMu.Lock()
-	defer c.userMu.Unlock()
+	unlock, err := c.lock(ctx, "users")
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	email := strings.ToLower(u.Email)
 	n, err := c.count(ctx, "SELECT count() FROM users FINAL WHERE deleted = false AND (email = ? OR username = ?)", email, u.Username)
 	if err != nil {
@@ -409,7 +413,21 @@ func (c *ClickHouse) CreateUser(ctx context.Context, u *User) error {
 		return ErrConflict
 	}
 	u.ID, u.CreatedAt, u.Email = NewID(), time.Now(), email
-	return c.writeUser(ctx, u, false)
+	if err := c.writeUser(ctx, u, false); err != nil {
+		return err
+	}
+	// Хоёр дахь хамгаалалт (түгжээ алдагдсан ч): ижил имэйл/нэртэй хэд хэдэн мөр үүссэн бол зөвхөн
+	// хамгийн эрт ID-тай нь үлдэнэ — ID цаг хугацаагаар өсдөг тул бүх хуулбар ижил шийдвэрт хүрнэ.
+	var first string
+	if err := c.query(ctx, "SELECT min(id) FROM users FINAL WHERE deleted = false AND (email = ? OR username = ?)", []any{email, u.Username},
+		func(r driver.Rows) error { return r.Scan(&first) }); err != nil {
+		return err
+	}
+	if first != "" && first != u.ID {
+		_ = c.writeUser(ctx, u, true) // өөрийн мөрөө устгасан гэж тэмдэглэнэ
+		return ErrConflict
+	}
+	return nil
 }
 
 func (c *ClickHouse) UserByID(ctx context.Context, id string) (*User, error) {
@@ -425,7 +443,10 @@ func (c *ClickHouse) UserByUsername(ctx context.Context, username string) (*User
 }
 
 func (c *ClickHouse) UpdateProfile(ctx context.Context, id string, p ProfileUpdate) error {
-	unlock := c.lock("user:" + id)
+	unlock, err := c.lock(ctx, "user:"+id)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	u, err := c.UserByID(ctx, id)
 	if err != nil {
@@ -437,8 +458,11 @@ func (c *ClickHouse) UpdateProfile(ctx context.Context, id string, p ProfileUpda
 }
 
 func (c *ClickHouse) UpdateUsername(ctx context.Context, id, username string) error {
-	c.userMu.Lock()
-	defer c.userMu.Unlock()
+	unlock, err := c.lock(ctx, "users")
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	n, err := c.count(ctx, "SELECT count() FROM users FINAL WHERE deleted = false AND username = ? AND id != ?", username, id)
 	if err != nil {
 		return err
@@ -489,7 +513,10 @@ func (c *ClickHouse) TeacherStudentCount(ctx context.Context, teacherID string) 
 }
 
 func (c *ClickHouse) SetGoogleToken(ctx context.Context, userID, encrypted string) error {
-	unlock := c.lock("user:" + userID)
+	unlock, err := c.lock(ctx, "user:"+userID)
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	u, err := c.UserByID(ctx, userID)
 	if err != nil {

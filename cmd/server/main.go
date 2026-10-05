@@ -7,9 +7,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -128,9 +128,25 @@ func run(log *slog.Logger) error {
 
 	// Өгөгдлийн сан: бүх өгөгдөл ClickHouse-д. DSN хоосон бол санах ойн store (хөгжүүлэлт).
 	var st store.Store
+	var ch *store.ClickHouse
+	var keeper *store.KeeperLocker
 	if chDSN != "" {
 		cctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-		ch, err := store.NewClickHouse(cctx, store.ClickHouseOptions{DSN: chDSN})
+		var locker store.Locker
+		// Олон app хуулбар: имэйлийн давхардал, төлбөрийн "яг нэг удаа" зэргийг ClickHouse Keeper дээрх
+		// түгжээгээр бүх хуулбарт нэг мөр хангана (CLICKHOUSE_KEEPER=host:9181[,host:9181]).
+		if ka := os.Getenv("CLICKHOUSE_KEEPER"); ka != "" {
+			var err error
+			keeper, err = store.NewKeeperLocker(cctx, strings.Split(ka, ","), env("KEEPER_PREFIX", "/surgalt"))
+			if err != nil {
+				cancel()
+				return err
+			}
+			locker = keeper
+			log.Info("ClickHouse Keeper холбогдлоо (олон хуулбарын түгжээ)", "addr", ka)
+		}
+		var err error
+		ch, err = store.NewClickHouse(cctx, store.ClickHouseOptions{DSN: chDSN, Locker: locker})
 		cancel()
 		if err != nil {
 			return err
@@ -142,6 +158,9 @@ func run(log *slog.Logger) error {
 		log.Warn("CLICKHOUSE_DSN хоосон — санах ойн store (өгөгдөл хадгалагдахгүй)")
 	}
 	defer st.Close()
+	if keeper != nil {
+		defer keeper.Close()
+	}
 
 	fstore, err := files.New(env("STORAGE_DIR", "./data"), []byte(secret), envInt("MAX_FILE_MB", 2048)<<20)
 	if err != nil {
@@ -186,6 +205,19 @@ func run(log *slog.Logger) error {
 		}
 	}
 
+	// Олон хуулбарт чат, мэдэгдлийг ClickHouse-оор дамжуулан бүх сервер рүү түгээнэ
+	// (хуулбар бүр шинэ мөрүүдийг богино хугацаанд санамж авна; нэмэлт брокер хэрэггүй).
+	if ch != nil && keeper != nil {
+		if err := ch.WatchMessages(ctx, 300*time.Millisecond, log, hub.Deliver); err != nil {
+			return err
+		}
+		if err := ch.WatchNotifications(ctx, 500*time.Millisecond, log, hub.Notify); err != nil {
+			return err
+		}
+		srv.Publish, srv.PublishNotif = nil, nil // зөвхөн ClickHouse-оор (давхардахгүй)
+		log.Info("чат/мэдэгдэл: ClickHouse-оор бүх хуулбар руу түгээнэ")
+	}
+
 	if envBool("SEED_DEMO") {
 		if err := seedDemo(ctx, st, fstore); err != nil {
 			log.Warn("seed", "err", err)
@@ -193,9 +225,15 @@ func run(log *slog.Logger) error {
 	}
 
 	srv.Background(ctx)
+	// Protobuf API (Connect): нэг handler gRPC + gRPC-Web + JSON. Үндсэн порт дээр HTML/JSON-той зэрэгцэн,
+	// h2c-ээр энгийн HTTP/2 (нээлттэй gRPC) ч үйлчилнэ.
+	grpcPath, grpcHandler := grpcapi.Handler(srv)
+	root := http.NewServeMux()
+	root.Handle(grpcPath, grpcHandler)
+	root.Handle("/", srv.Handler())
 	hs := &http.Server{
 		Addr:              env("ADDR", ":8080"),
-		Handler:           srv.Handler(),
+		Handler:           h2c.NewHandler(root, &http2.Server{}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -207,17 +245,15 @@ func run(log *slog.Logger) error {
 		log.Info("сервер эхэллээ", "addr", hs.Addr)
 		errc <- hs.ListenAndServe()
 	}()
-	// gRPC + Protobuf API (мобайл, сервис хоорондын харилцаа) — ижил логик, ижил ClickHouse.
-	var gs *grpc.Server
+	// GRPC_ADDR: зөвхөн Protobuf API-г тусдаа порт дээр (nginx grpc_pass, мобайл) — ижил handler.
+	var gs *http.Server
 	if addr := os.Getenv("GRPC_ADDR"); addr != "" {
-		ln, err := net.Listen("tcp", addr)
-		if err != nil {
-			return fmt.Errorf("grpc listen: %w", err)
-		}
-		gs = grpcapi.New(srv)
+		gmux := http.NewServeMux()
+		gmux.Handle(grpcPath, grpcHandler)
+		gs = &http.Server{Addr: addr, Handler: h2c.NewHandler(gmux, &http2.Server{}), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 120 * time.Second}
 		go func() {
-			log.Info("gRPC сервер эхэллээ", "addr", addr)
-			if err := gs.Serve(ln); err != nil {
+			log.Info("gRPC/Connect сервер эхэллээ", "addr", addr, "path", grpcPath)
+			if err := gs.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				errc <- fmt.Errorf("grpc: %w", err)
 			}
 		}()
@@ -228,10 +264,10 @@ func run(log *slog.Logger) error {
 	case <-ctx.Done():
 	}
 	log.Info("зогсож байна — идэвхтэй хүсэлтүүдийг дуусгаж байна")
-	if gs != nil {
-		gs.GracefulStop()
-	}
 	sctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
+	if gs != nil {
+		_ = gs.Shutdown(sctx)
+	}
 	return hs.Shutdown(sctx)
 }
