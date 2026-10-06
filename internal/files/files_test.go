@@ -2,12 +2,14 @@ package files
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"image"
 	"image/color"
 	"image/png"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -107,5 +109,41 @@ func TestJPEGOrientation(t *testing.T) {
 	src := image.NewNRGBA(image.Rect(0, 0, 4, 2))
 	if b := applyOrientation(src, 6).Bounds(); b.Dx() != 2 || b.Dy() != 4 {
 		t.Fatal("90° эргээгүй")
+	}
+}
+
+// 6 минутаар хуваагдсан видео: эхний хэсэг жагсаалтад (нийт хэмжээ, хэсгийн тоотой), бусад нь нуугдмал;
+// Parts бүх хэсгийн замыг өгнө; устгахад бүх хэсэг устана.
+func TestVideoParts(t *testing.T) {
+	s, err := New(t.TempDir(), []byte("k"), 1<<30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tid := "6ac3c8afa622636405bd89b5"
+	dir := filepath.Join(s.root, "teachers", tid, Private)
+	_ = os.MkdirAll(dir, 0o755)
+	names := []string{"0123456789abcdef__lec.webm", "0123456789abcdef__lec.p02.webm", "0123456789abcdef__lec.p03.webm"}
+	for i, n := range names {
+		_ = os.WriteFile(filepath.Join(dir, n), make([]byte, 100*(i+1)), 0o644)
+	}
+	b, _ := json.Marshal(names)
+	_ = os.WriteFile(filepath.Join(dir, ".0123456789abcdef__lec.webm.parts"), b, 0o644)
+	list, _ := s.List(tid)
+	if len(list) != 1 || list[0].Parts != 3 || list[0].Size != 600 {
+		t.Fatalf("жагсаалтад нэг мөр, 3 хэсэг, нийт 600 байт: %+v", list)
+	}
+	ps := s.Parts(list[0].Path)
+	if len(ps) != 3 || !strings.HasSuffix(ps[2], "lec.p03.webm") {
+		t.Fatalf("Parts: %v", ps)
+	}
+	if s.Parts("/files/"+tid+"/private/0123456789abcdef__other.webm") != nil {
+		t.Fatal("хуваагдаагүй видео nil")
+	}
+	if err := s.Delete(tid, Private, names[0]); err != nil {
+		t.Fatal(err)
+	}
+	left, _ := os.ReadDir(dir)
+	if len(left) != 0 {
+		t.Fatalf("бүх хэсэг устах ёстой: %v", left)
 	}
 }

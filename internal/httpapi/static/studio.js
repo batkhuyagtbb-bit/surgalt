@@ -251,7 +251,7 @@ async function loadLibrary() { library = await api("/api/me/files"); return libr
 /* ---------- Хичээлийн блок засварлагч: текст, гарчиг, зураг, дуу, видео, файл, асуулт ---------- */
 const BE = {
   text: ["text", "Текст"], heading: ["heading", "Гарчиг"], image: ["image", "Зураг"], audio: ["mic", "Дуу"],
-  video: ["live", "Видео"], file: ["clip", "Файл"], quiz: ["quiz", "Асуулт"],
+  video: ["live", "Видео"], file: ["clip", "Файл"], quiz: ["quiz", "Асуулт"], embed: ["link", "HTML embed"],
 };
 // Төрөл тус бүрийн хэмжээний хязгаар (MB). Зургийг сервер WebP болгож 1000px хүртэл багасгана.
 const BE_LIMIT = { image: 20, audio: 100, video: 2048, file: 200 };
@@ -341,6 +341,9 @@ function beBlockHTML(b) {
       <button type="button" data-cmd="quote" title="Ишлэл">❝</button><button type="button" data-cmd="link" title="Холбоос">${ico("link", 15)}</button><button type="button" data-cmd="removeFormat" title="Хэлбэр арилгах">⨯</button></div>
     <div class="be-rt rb-text" contenteditable="true" data-ph="Текстээ бичнэ үү… (сонгоод дээрх товчоор хэлбэржүүлнэ)">${SG.richHTML(b.text || "")}</div>`;
   else if (b.type === "heading") body = `<input class="be-h" maxlength="200" placeholder="Гарчиг бичнэ үү" value="${esc(b.text || "")}">`;
+  else if (b.type === "embed") body = `<textarea class="be-embed" rows="5" maxlength="60000" spellcheck="false" placeholder="HTML код буулгана уу — жишээ: <iframe src=&quot;https://…&quot;></iframe>, Google Forms, Canva, GeoGebra, Desmos, Padlet, Quizlet…">${esc(b.text || "")}</textarea>
+      <div class="be-embed-bar"><label class="small">Өндөр<input class="be-embed-h" type="number" min="80" max="2000" step="20" value="${b.height || 420}"> px</label><button type="button" class="btn btn-glass btn-sm" data-embed-preview>Урьдчилан харах</button><span class="muted small">Тусгаарлагдсан хүрээнд аюулгүй ажиллана</span></div>
+      <div class="be-embed-prev"></div>`;
   else if (b.type === "quiz") {
     const q = b.quiz || { kind: "single", question: "", options: ["", ""], correct: [0], explain: "" };
     const kind = q.kind || (q.multi ? "multi" : "single");
@@ -479,6 +482,8 @@ function mountBlockEditor(f, blocks) {
     const t = e.target, el = t.closest(".be-block");
     const c = t.closest("[data-cmd]"); if (c && el) return exec(c.dataset.cmd, $(".be-rt", el));
     if (t.closest("[data-import]")) { const fi = $(".be-xlsx", box); fi.value = ""; fi.click(); return; }
+    const ep = t.closest("[data-embed-preview]");
+    if (ep) { const el = ep.closest(".be-block"), html = $(".be-embed", el).value.trim(), box = $(".be-embed-prev", el); box.innerHTML = html ? `<iframe sandbox="allow-scripts allow-popups allow-forms allow-presentation" allowfullscreen style="width:100%;height:${+$(".be-embed-h", el).value || 420}px;border:1px solid var(--line);border-radius:12px" srcdoc="${esc(SG.embedDoc(html))}"></iframe>` : ""; return; }
     const a = t.closest("[data-add]"); if (a) { const nb = add(a.dataset.add); if (["image", "audio", "video", "file"].includes(a.dataset.add) && a.dataset.add !== "video") pick(nb); return; }
     if (!el) return;
     if (t.closest("[data-be-del]")) { if ((el.dataset.type === "text" && $(".be-rt", el).textContent.trim()) || el.dataset.type === "quiz") { if (!confirm("Энэ хэсгийг устгах уу?")) return; } el.remove(); return; }
@@ -564,6 +569,7 @@ function mountBlockEditor(f, blocks) {
         const id = el.dataset.id, type = el.dataset.type;
         if (type === "text") { const text = domToMd($(".be-rt", el)); return text ? { id, type, text } : null; }
         if (type === "heading") { const text = $(".be-h", el).value.trim(); return text ? { id, type, text } : null; }
+        if (type === "embed") { const text = $(".be-embed", el).value.trim(); return text ? { id, type, text, height: +$(".be-embed-h", el).value || 420 } : null; }
         if (type === "quiz") {
           const quiz = quizOf(el);
           if (!quiz.question && !quiz.image && [...(quiz.options || []), ...(quiz.answers || []), ...(quiz.left || [])].every((o) => !o.trim())) return null;

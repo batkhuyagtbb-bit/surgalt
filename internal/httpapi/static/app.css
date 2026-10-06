@@ -2016,3 +2016,39 @@ html.reader-open{overflow:hidden}
 .warn-set{margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
 .warn-set legend{font-weight:800;font-size:.85rem;padding:0 6px}
 .bell-unblock{max-width:100%;white-space:normal;text-align:left;line-height:1.3}
+
+/* 6 минутын видео хэсгүүд */
+.vparts{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0 0}
+.vparts button{padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font:inherit;font-size:.78rem;font-weight:700;color:var(--text);cursor:pointer}
+.vparts button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.vparts button:disabled{opacity:.45;cursor:not-allowed}
+
+/* HTML embed */
+.rb-embed{margin:12px 0}
+.rb-embed iframe{display:block;width:100%;border:1px solid var(--line);border-radius:14px;background:#fff}
+.be-embed{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.82rem;line-height:1.45;padding:10px 12px;border-radius:10px}
+.be-embed-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.be-embed-bar input{width:80px;padding:6px 8px;margin:0 4px}
+.be-embed-prev:not(:empty){margin-top:8px}
+
+/* Гадаад видео (YouTube/Vimeo): холбоос, лого дарагдахгүй хамгаалалт */
+.yt-wrap{position:relative;width:100%;aspect-ratio:16/9;background:#000;overflow:hidden;user-select:none}
+.yt-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none}
+.yt-wrap.vm iframe{pointer-events:auto}
+.yt-shield{position:absolute;inset:0 0 44px 0;z-index:2;display:grid;place-items:center;cursor:pointer;background:transparent}
+.yt-big{width:68px;height:68px;border-radius:50%;display:grid;place-items:center;font-size:1.6rem;color:#fff;background:rgba(15,23,42,.6);transition:opacity .2s}
+.yt-wrap.playing .yt-big{opacity:0}
+.yt-bar{position:absolute;left:0;right:0;bottom:0;z-index:3;height:44px;background:linear-gradient(transparent,rgba(0,0,0,.85))}
+.yt-bar .vg-prog{cursor:not-allowed}
+.yt-bar .vg-prog.seekable{cursor:pointer}
+.yt-wrap:fullscreen{aspect-ratio:auto}
+.vm-shield-top{position:absolute;top:0;left:0;right:0;height:70px;z-index:2}
+.vm-shield-logo{position:absolute;right:0;bottom:0;width:110px;height:56px;z-index:2}
+
+/* Тоглоогүй/зогссон үед YouTube-ийн гарчиг, "Watch on YouTube"-ийг өөрийн бүрхүүлээр нууна */
+.yt-cover{position:absolute;inset:0;z-index:1;background:#000 center/cover no-repeat;transition:opacity .25s}
+.yt-cover::after{content:"";position:absolute;inset:0;background:rgba(10,16,40,.35)}
+.yt-wrap.playing .yt-cover{opacity:0;pointer-events:none}
+.yt-wrap.playing .yt-shield{background:linear-gradient(rgba(0,0,0,0) 0,rgba(0,0,0,0) 100%)}
+.yt-wrap::before{content:"";position:absolute;left:0;right:0;top:0;height:64px;z-index:1;background:linear-gradient(rgba(0,0,0,.55),transparent);pointer-events:none;opacity:0;transition:opacity .2s}
+.yt-wrap.playing::before{opacity:1}

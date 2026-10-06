@@ -2,15 +2,25 @@ package files
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// Видеог вэбд зориулсан WebM (VP9 + Opus) болгон ард хөрвүүлнэ.
+// Видеог вэбд зориулсан WebM (VP9 + Opus) болгон ард хөрвүүлж, 6 минутаас урт бол 6 минутын
+// хэсгүүдэд хуваана (хэсэг бүр бие даасан WebM, хил дээр keyframe). Эхний хэсэг нь "<нэр>.webm"
+// (хичээлд холбосон зам хэвээр), дараагийнх нь "<нэр>.p02.webm"… Хэсгүүдийн жагсаалт ".<нэр>.webm.parts"
+// нуугдмал файлд хадгалагдана — тоглуулагч тэдгээрийг дараалан тасралтгүй тоглуулна.
 // Хөрвүүлж байх үед эх файл ".processing-<эцсийн нэр>.<эх өргөтгөл>" нэртэй
 // нуугдмал байна; дуусмагц "<эцсийн нэр>.webm" болж, эх нь устана.
 // Эцсийн зам upload-ийн хариунд шууд очих тул хичээлд тэр даруй холбож болно.
@@ -18,7 +28,53 @@ import (
 const (
 	processingPrefix = ".processing-"
 	failedPrefix     = ".failed-"
+	// SegmentSec — видеоны нэг хэсгийн урт (6 минут).
+	SegmentSec = 360
 )
+
+// partRe — эхний хэсгээс бусад хэсгүүдийн нэр ("….p02.webm"); сангийн жагсаалтад тусад нь харуулахгүй.
+var partRe = regexp.MustCompile(`\.p\d{2}\.webm$`)
+
+func partsFile(dst string) string {
+	dir, name := filepath.Split(dst)
+	return filepath.Join(dir, "."+name+".parts")
+}
+
+// Parts нь "/files/<teacher>/<vis>/<name>.webm" видеоны бүх хэсгийн замыг (эхнийхийг оруулаад) буцаана.
+// Хуваагдаагүй бол nil.
+func (s *Store) Parts(path string) []string {
+	if !strings.HasPrefix(path, "/files/") || !strings.HasSuffix(strings.ToLower(path), ".webm") {
+		return nil
+	}
+	rest := strings.Split(strings.TrimPrefix(strings.SplitN(path, "?", 2)[0], "/files/"), "/")
+	if len(rest) != 3 {
+		return nil
+	}
+	name, err := url.PathUnescape(rest[2])
+	if err != nil || !fileNameRe.MatchString(name) || (rest[1] != Public && rest[1] != Private) {
+		return nil
+	}
+	dir, err := s.teacherDir(rest[0])
+	if err != nil {
+		return nil
+	}
+	b, err := os.ReadFile(partsFile(filepath.Join(dir, rest[1], name)))
+	if err != nil {
+		return nil
+	}
+	var names []string
+	if json.Unmarshal(b, &names) != nil || len(names) < 2 {
+		return nil
+	}
+	out := make([]string, 0, len(names))
+	for _, n := range names {
+		if !fileNameRe.MatchString(n) {
+			return nil
+		}
+		out = append(out, "/files/"+rest[0]+"/"+rest[1]+"/"+url.PathEscape(n))
+	}
+	return out
+}
 
 // isOfficeExt: LibreOffice-оор PDF болгож 3D номоор харуулах баримтууд.
 func isOfficeExt(ext string) bool {
@@ -127,27 +183,55 @@ func (t *Transcoder) run(ctx context.Context, j job) {
 		return
 	}
 	start := time.Now()
-	tmp := j.dst + ".part"
-	cctx, cancel := context.WithTimeout(ctx, 3*time.Hour)
+	work, err := os.MkdirTemp(filepath.Dir(j.src), ".video-")
+	if err != nil {
+		t.fail(ctx, j, err, nil)
+		return
+	}
+	defer os.RemoveAll(work)
+	cctx, cancel := context.WithTimeout(ctx, 6*time.Hour)
 	defer cancel()
+	seg := strconv.Itoa(SegmentSec)
 	cmd := exec.CommandContext(cctx, t.ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", j.src,
 		// 1280px-ээс том бол багасгана; VP9 чанарын горим, олон цөм ашиглана.
 		"-vf", "scale='min(1280,iw)':-2",
 		"-c:v", "libvpx-vp9", "-crf", "33", "-b:v", "0", "-row-mt", "1", "-deadline", "good", "-cpu-used", "4",
+		// 6 минут тутам keyframe — хэсгүүд яг хил дээрээ эхэлнэ.
+		"-force_key_frames", "expr:gte(t,n_forced*"+seg+")",
 		"-c:a", "libopus", "-b:a", "96k",
-		"-f", "webm", tmp)
+		"-f", "segment", "-segment_time", seg, "-segment_format", "webm", "-reset_timestamps", "1",
+		filepath.Join(work, "p%03d.webm"))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		os.Remove(tmp)
 		t.fail(ctx, j, err, out)
 		return
 	}
-	if err := os.Rename(tmp, j.dst); err != nil {
-		t.log.Error("видео rename", "err", err)
+	segs, _ := filepath.Glob(filepath.Join(work, "p*.webm"))
+	sort.Strings(segs)
+	if len(segs) == 0 {
+		t.fail(ctx, j, errors.New("ffmpeg гаралт хоосон"), out)
 		return
 	}
+	stem := strings.TrimSuffix(filepath.Base(j.dst), ".webm")
+	dir := filepath.Dir(j.dst)
+	names := make([]string, len(segs))
+	for i, sg := range segs {
+		name := filepath.Base(j.dst)
+		if i > 0 {
+			name = fmt.Sprintf("%s.p%02d.webm", stem, i+1)
+		}
+		if err := os.Rename(sg, filepath.Join(dir, name)); err != nil {
+			t.log.Error("видео хэсэг rename", "err", err)
+			return
+		}
+		names[i] = name
+	}
+	if len(names) > 1 {
+		b, _ := json.Marshal(names)
+		_ = os.WriteFile(partsFile(j.dst), b, 0o644)
+	}
 	os.Remove(j.src)
-	t.log.Info("видео WebM боллоо", "dst", filepath.Base(j.dst), "took", time.Since(start).Round(time.Second))
+	t.log.Info("видео WebM (VP9) боллоо", "dst", filepath.Base(j.dst), "parts", len(names), "took", time.Since(start).Round(time.Second))
 }
 
 func (t *Transcoder) fail(ctx context.Context, j job, err error, out []byte) {

@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -61,8 +62,9 @@ type Info struct {
 	Visibility   string    `json:"visibility"`
 	Size         int64     `json:"size"`
 	ContentType  string    `json:"content_type"`
-	Path         string    `json:"path"` // /files/<teacher>/<visibility>/<name> — хичээлд холбоход
-	URL          string    `json:"url"`  // шууд нээх URL (private бол гарын үсэгтэй)
+	Path         string    `json:"path"`            // /files/<teacher>/<visibility>/<name> — хичээлд холбоход
+	Parts        int       `json:"parts,omitempty"` // видео 6 минутын хэдэн хэсэгт хуваагдсан
+	URL          string    `json:"url"`             // шууд нээх URL (private бол гарын үсэгтэй)
 	ModTime      time.Time `json:"mod_time"`
 	Status       string    `json:"status"` // ready | processing | failed
 }
@@ -258,8 +260,19 @@ func (s *Store) info(teacherID, visibility string, fi fs.FileInfo) *Info {
 	if ct == "" {
 		ct = "application/octet-stream"
 	}
-	return &Info{Name: name, OriginalName: orig, Visibility: visibility, Size: fi.Size(), ContentType: ct,
+	info := &Info{Name: name, OriginalName: orig, Visibility: visibility, Size: fi.Size(), ContentType: ct,
 		Path: path, URL: s.Resolve(path, 6*time.Hour), ModTime: fi.ModTime(), Status: status}
+	if parts := s.Parts(path); len(parts) > 1 { // хуваагдсан видео: нийт хэмжээ, хэсгийн тоо
+		info.Parts = len(parts)
+		for _, p := range parts[1:] {
+			if _, vis, n, ok := SplitPath(p); ok {
+				if st, err := os.Stat(filepath.Join(s.root, "teachers", teacherID, vis, n)); err == nil {
+					info.Size += st.Size()
+				}
+			}
+		}
+	}
+	return info
 }
 
 func (s *Store) List(teacherID string) ([]Info, error) {
@@ -278,8 +291,8 @@ func (s *Store) List(teacherID string) ([]Info, error) {
 		}
 		for _, e := range entries {
 			n := e.Name()
-			if e.IsDir() || (strings.HasPrefix(n, ".") && !strings.HasPrefix(n, processingPrefix) && !strings.HasPrefix(n, failedPrefix)) {
-				continue
+			if e.IsDir() || (strings.HasPrefix(n, ".") && !strings.HasPrefix(n, processingPrefix) && !strings.HasPrefix(n, failedPrefix)) || partRe.MatchString(n) {
+				continue // ".p02.webm" зэрэг видеоны дараагийн хэсгүүд эхний хэсгийнхээ доор
 			}
 			if fi, err := e.Info(); err == nil {
 				out = append(out, *s.info(teacherID, v, fi))
@@ -324,6 +337,17 @@ func (s *Store) Delete(teacherID, visibility, name string) error {
 	}
 	vdir := filepath.Join(dir, visibility)
 	removed := false
+	if b, err := os.ReadFile(partsFile(filepath.Join(vdir, name))); err == nil { // хуваагдсан видео: бүх хэсэг
+		var names []string
+		if json.Unmarshal(b, &names) == nil {
+			for _, n := range names {
+				if n != name && fileNameRe.MatchString(n) {
+					_ = os.Remove(filepath.Join(vdir, n))
+				}
+			}
+		}
+		_ = os.Remove(partsFile(filepath.Join(vdir, name)))
+	}
 	if os.Remove(filepath.Join(vdir, name)) == nil {
 		removed = true
 	}

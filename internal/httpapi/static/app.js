@@ -430,8 +430,17 @@ function bell() {
 function extOf(url) {
   try { const p = new URL(url, location.href).pathname.toLowerCase(); const i = p.lastIndexOf("."); return i < 0 ? "" : p.slice(i); } catch { return ""; }
 }
+// Гадаад видеоны кодолсон ID ("yt:"/"vm:" + урвуу base64url) — жинхэнэ холбоосыг суралцагчид харуулахгүй.
+const unob = (s) => { try { return atob(s.replace(/-/g, "+").replace(/_/g, "/")).split("").reverse().join(""); } catch { return ""; } };
+// YouTube: controls=0 + тунгалаг хамгаалах давхарга + өөрийн удирдлага → лого, гарчиг, "YouTube-д үзэх", хуваалцах дарагдахгүй.
+const ytShieldHTML = (id) => `<div class="yt-wrap" oncontextmenu="return false"><iframe data-yt="${esc(id)}" src="https://www.youtube-nocookie.com/embed/${esc(id)}?rel=0&controls=0&disablekb=1&modestbranding=1&iv_load_policy=3&fs=0&playsinline=1&cc_load_policy=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media" referrerpolicy="strict-origin" tabindex="-1"></iframe>
+  <div class="yt-cover" style="background-image:url('https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg')"></div>
+  <div class="yt-shield" data-yt-toggle title="Тоглуулах / зогсоох"><span class="yt-big">▶</span></div>
+  <div class="vg-bar yt-bar"><button type="button" class="vg-play" data-yt-toggle aria-label="Тоглуулах">▶</button><span class="vg-time">0:00 / 0:00</span><span class="vg-prog"><i></i></span><button type="button" class="vg-mute" aria-label="Дуу">🔊</button><button type="button" class="vg-full" aria-label="Бүтэн дэлгэц">⛶</button></div></div>`;
 function mediaHTML(url, title) {
   if (!url) return "";
+  if (url.startsWith("yt:")) return ytShieldHTML(unob(url.slice(3)));
+  if (url.startsWith("vm:")) { const id = unob(url.slice(3)); return `<div class="yt-wrap vm" oncontextmenu="return false"><iframe src="https://player.vimeo.com/video/${esc(id)}?title=0&byline=0&portrait=0&dnt=1&pip=0" allow="autoplay; fullscreen" allowfullscreen referrerpolicy="strict-origin"></iframe><div class="vm-shield-top"></div><div class="vm-shield-logo"></div></div>`; }
   const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
   if (yt) return `<iframe data-yt="${yt[1]}" src="https://www.youtube-nocookie.com/embed/${yt[1]}?rel=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
   const vm = url.match(/vimeo\.com\/(\d+)/);
@@ -472,14 +481,18 @@ function richHTML(src) {
   return out.join("");
 }
 const fmtBytes = (b) => !b ? "" : b >= 1 << 20 ? (b / (1 << 20)).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+// Embed-ийн HTML-ийг бүтэн баримт болгоно (хоосон зай, хэмжээ тохируулна).
+const embedDoc = (html) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;font-family:system-ui,sans-serif}iframe,video,img{max-width:100%}body>iframe:only-child{width:100%;height:100vh;border:0;display:block}</style></head><body>${html}</body></html>`;
 function blockHTML(b) {
   const cap = b.text && b.type !== "text" && b.type !== "heading" ? `<figcaption>${esc(b.text)}</figcaption>` : "";
   switch (b.type) {
     case "heading": return `<h3 class="rb-h">${esc(b.text)}</h3>`;
+    // HTML embed: sandbox (allow-same-origin-гүй) — скрипт ажиллана, гэхдээ сайтын нэвтрэлт, өгөгдөлд хүрэхгүй.
+    case "embed": return `<figure class="rb-embed"><iframe sandbox="allow-scripts allow-popups allow-forms allow-presentation allow-popups-to-escape-sandbox" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" referrerpolicy="no-referrer" style="height:${Math.max(80, Math.min(2000, +b.height || 420))}px" srcdoc="${esc(embedDoc(b.text))}" title="Embed"></iframe></figure>`;
     case "text": return `<div class="rb-text">${richHTML(b.text)}</div>`;
     case "image": return `<figure class="rb-fig"><img src="${esc(b.url)}" alt="${esc(b.text || "")}" loading="lazy">${cap}</figure>`;
     case "audio": return `<figure class="rb-audio"><span class="rb-audio-ico">🎧</span><div><b>${esc(b.name || "Дуу бичлэг")}</b><audio src="${esc(b.url)}" controls preload="metadata" controlslist="nodownload" oncontextmenu="return false"></audio></div>${cap}</figure>`;
-    case "video": return `<figure class="rb-video" data-bid="${esc(b.id)}"><div class="player">${mediaHTML(b.url, b.name)}</div>${cap}</figure>`;
+    case "video": return `<figure class="rb-video" data-bid="${esc(b.id)}" ${b.parts?.length > 1 ? `data-parts="${esc(JSON.stringify(b.parts))}"` : ""}><div class="player">${mediaHTML(b.url, b.name)}</div>${b.parts?.length > 1 ? `<div class="vparts" aria-label="Видеоны хэсгүүд">${b.parts.map((_, i) => `<button type="button" data-vpart="${i}" class="${i ? "" : "on"}">${i + 1}-р хэсэг</button>`).join("")}<span class="muted small">6 минутын ${b.parts.length} хэсэг · дараалан тоглоно</span></div>` : ""}${cap}</figure>`;
     case "file": {
       const meta = esc([extOf(b.url).slice(1).toUpperCase(), fmtBytes(b.size)].filter(Boolean).join(" · ")) + (b.text ? " · " + esc(b.text) : "");
       if (extOf(b.url) === ".pdf") return `<figure class="rb-file-pdf" ${b.download ? "data-dl" : "data-nodl"}>${mediaHTML(b.url, b.name || "PDF")}${cap}</figure>`;
@@ -893,15 +906,27 @@ function guardVideos(box, { watched = {}, owner = false, onWatched, modal, progr
     const flushTimer = progressBase ? setInterval(flush, 20000) : null;
     stoppers.push(() => { clearInterval(flushTimer); flush(); });
     if (v.tagName === "VIDEO") {
-      let lastBucket = -1;
+      // 6 минутын хэсгүүдтэй бол дараалан тасралтгүй тоглоно; явц, гүйлгэх хориг нь нийт хугацаагаар.
+      const fig = v.closest("[data-parts]"), parts = fig ? JSON.parse(fig.dataset.parts || "[]") : [];
+      let lastBucket = -1, idx = 0, offset = 0, maxPart = 0, unlockedPart = 0;
+      const btns = fig ? $$("[data-vpart]", fig) : [];
+      const paintParts = () => btns.forEach((b, i) => { b.classList.toggle("on", i === idx); b.disabled = !free && i > unlockedPart; });
+      const loadPart = (i, autoplay) => { idx = i; offset = 0; for (let k = 0; k < i; k++) offset += SEG; maxPart = 0; v.src = parts[i]; if (autoplay) v.play().catch(() => {}); paintParts(); };
+      const SEG = 360;
+      paintParts();
+      btns.forEach((b) => b.addEventListener("click", () => { const i = +b.dataset.vpart; if (!free && i > unlockedPart) { note(); return; } loadPart(i, true); }));
       v.addEventListener("timeupdate", () => {
-        if (!v.seeking && v.currentTime > max && v.currentTime - max < 3) max = v.currentTime;
-        const b = Math.floor(v.currentTime / BUCKET); if (b !== lastBucket) { lastBucket = b; mark(v.currentTime); }
+        if (!v.seeking && v.currentTime > maxPart && v.currentTime - maxPart < 3) maxPart = v.currentTime;
+        const g = offset + v.currentTime; if (!v.seeking && g > max && g - max < 3) max = g;
+        const b = Math.floor(g / BUCKET); if (b !== lastBucket) { lastBucket = b; mark(g); }
       });
-      v.addEventListener("seeking", () => { if (!free && v.currentTime > max + 1) { v.currentTime = max; note(); } });
+      v.addEventListener("seeking", () => { if (!free && idx >= unlockedPart && v.currentTime > maxPart + 1) { v.currentTime = maxPart; note(); } });
       v.addEventListener("ratechange", () => { if (!free && v.playbackRate > 2) v.playbackRate = 2; });
       const release = lockedControls(v, () => free, note);
-      v.addEventListener("ended", () => { if (!free) { free = true; onWatched?.(bid); release(); } flush(); });
+      v.addEventListener("ended", () => {
+        if (parts.length > 1 && idx < parts.length - 1) { unlockedPart = Math.max(unlockedPart, idx + 1); loadPart(idx + 1, true); return; } // дараагийн хэсэг
+        if (!free) { free = true; onWatched?.(bid); release(); paintParts(); } flush();
+      });
       if (free) release();
       continue;
     }
@@ -915,6 +940,27 @@ function guardVideos(box, { watched = {}, owner = false, onWatched, modal, progr
         },
       } });
       modal._ytPause = () => { try { p.pauseVideo(); } catch {} };
+      // Хамгаалах давхарга ба өөрийн удирдлага (YouTube-ийн холбоос, лого дарагдахгүй).
+      const wrap = v.closest(".yt-wrap");
+      if (wrap) {
+        const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+        const toggle = () => { try { p.getPlayerState() === YT.PlayerState.PLAYING ? p.pauseVideo() : p.playVideo(); } catch {} };
+        $$("[data-yt-toggle]", wrap).forEach((b) => (b.onclick = toggle));
+        $(".vg-mute", wrap).onclick = () => { try { p.isMuted() ? p.unMute() : p.mute(); } catch {} };
+        $(".vg-full", wrap).onclick = () => (document.fullscreenElement ? document.exitFullscreen?.() : wrap.requestFullscreen?.());
+        $(".vg-prog", wrap).onclick = (e) => { // бүрэн үзсэний дараа л гүйлгэнэ
+          if (!free) return note();
+          const r = e.currentTarget.getBoundingClientRect(), d = p.getDuration?.() || 0; p.seekTo(d * (e.clientX - r.left) / r.width, true);
+        };
+        wrap.addEventListener("keydown", (e) => { if (e.key === " ") { e.preventDefault(); toggle(); } });
+        setInterval(() => {
+          if (typeof p.getCurrentTime !== "function") return;
+          const t = p.getCurrentTime() || 0, d = p.getDuration?.() || 0, st = p.getPlayerState?.();
+          $(".vg-time", wrap).textContent = `${fmt(t)} / ${fmt(d)}`; $(".vg-prog i", wrap).style.width = d ? (t / d) * 100 + "%" : "0";
+          const playing = st === YT.PlayerState.PLAYING; $(".vg-play", wrap).textContent = playing ? "❚❚" : "▶"; wrap.classList.toggle("playing", playing);
+          $(".vg-mute", wrap).textContent = p.isMuted?.() ? "🔇" : "🔊"; $(".vg-prog", wrap).classList.toggle("seekable", free);
+        }, 400);
+      }
       poll = setInterval(() => {
         if (!document.body.contains(v) && !p.getIframe?.()?.isConnected) return clearInterval(poll);
         if (typeof p.getCurrentTime !== "function") return;
@@ -2624,7 +2670,7 @@ function loginPage() {
 }
 
 /* ---------- эхлүүлэх ---------- */
-window.SG = { ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
+window.SG = { embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх

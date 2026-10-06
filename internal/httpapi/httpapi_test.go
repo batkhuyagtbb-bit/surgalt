@@ -2591,3 +2591,78 @@ func TestExamTerminatedBlock(t *testing.T) {
 		t.Fatalf("нээсний дараа дахин эхэлнэ: %d %v", code, r)
 	}
 }
+
+// HTML embed блок: хадгалагдана, хэмжээ шалгагдана.
+func TestEmbedBlock(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Embed","price":0,"published":true}`)
+	cid := c["id"].(string)
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"x","is_free":true,"blocks":[{"id":"emb1","type":"embed","text":"  "}]}`); code != 400 {
+		t.Fatal("хоосон embed татгалзагдана")
+	}
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"x","is_free":true,"blocks":[{"id":"emb1","type":"embed","text":"<b>x</b>","height":5000}]}`); code != 400 {
+		t.Fatal("хэт өндөр татгалзагдана")
+	}
+	code, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Desmos","is_free":true,"blocks":[{"id":"emb1","type":"embed","text":"<iframe src=\"https://www.desmos.com/calculator\"></iframe>"}]}`)
+	b := l["blocks"].([]any)[0].(map[string]any)
+	if code != 201 || b["type"] != "embed" || b["height"].(float64) != 420 || !strings.Contains(b["text"].(string), "desmos") {
+		t.Fatalf("embed хадгалагдсангүй: %d %v", code, l)
+	}
+}
+
+// Гадаад видео холбоос суралцагчид харагдахгүй: YouTube/Vimeo → кодолсон ID, бусад mp4 → proxy тасалбар;
+// дотоод хаяг руу proxy хийхийг хориглоно (SSRF).
+func TestExternalVideoHidden(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Гадаад","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true,"blocks":[
+		{"id":"ytb1","type":"video","url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+		{"id":"vmo1","type":"video","url":"https://vimeo.com/76979871"},
+		{"id":"mp41","type":"video","url":"https://127.0.0.1/secret/lecture.mp4"}]}`)
+	lid := l["id"].(string)
+	s1, _ := register(t, srv, "stud", "student")
+	_, got := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid, s1, "")
+	raw := fmt.Sprint(got)
+	for _, leak := range []string{"youtube.com", "dQw4w9WgXcQ", "vimeo.com", "76979871", "127.0.0.1", "lecture.mp4"} {
+		if strings.Contains(raw, leak) {
+			t.Fatalf("суралцагчид холбоос задарсан (%s): %s", leak, raw)
+		}
+	}
+	bs := got["blocks"].([]any)
+	yt, vm, mp := bs[0].(map[string]any)["url"].(string), bs[1].(map[string]any)["url"].(string), bs[2].(map[string]any)["url"].(string)
+	if !strings.HasPrefix(yt, "yt:") || !strings.HasPrefix(vm, "vm:") || !strings.HasPrefix(mp, "/api/media/") {
+		t.Fatalf("хэлбэр буруу: %s %s %s", yt, vm, mp)
+	}
+	if obfuscate("dQw4w9WgXcQ") != yt[3:] {
+		t.Fatal("YouTube ID кодлол")
+	}
+	// Proxy: дотоод хаяг руу хандахгүй (502); хуудас болгон нээхэд 403.
+	req, _ := http.NewRequest("GET", srv.URL+mp, nil)
+	req.Header.Set("Sec-Fetch-Dest", "video")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusBadGateway {
+		t.Fatalf("SSRF хамгаалалт: дотоод хаяг 502 байх ёстой: %d", res.StatusCode)
+	}
+	req, _ = http.NewRequest("GET", srv.URL+mp, nil)
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	res, _ = http.DefaultClient.Do(req)
+	res.Body.Close()
+	if res.StatusCode != 403 {
+		t.Fatalf("шинэ таб-д нээхэд 403: %d", res.StatusCode)
+	}
+	// Багш өөрийн засварт жинхэнэ холбоосыг харна.
+	_, mine := call(t, srv, "GET", "/api/me/courses/"+cid, tt, "")
+	if !strings.Contains(fmt.Sprint(mine), "dQw4w9WgXcQ") {
+		t.Fatal("багшид жинхэнэ холбоос харагдах ёстой")
+	}
+}

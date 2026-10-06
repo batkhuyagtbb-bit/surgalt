@@ -31,6 +31,7 @@ func validateBlocks(bs []store.Block, teacherID string) string {
 	total := 0
 	for i := range bs {
 		b := &bs[i]
+		b.Parts = nil // сервер тооцоолдог талбар
 		if !blockIDRe.MatchString(b.ID) || seen[b.ID] {
 			return "агуулгын хэсгийн ID буруу"
 		}
@@ -50,6 +51,18 @@ func validateBlocks(bs []store.Block, teacherID string) string {
 			}
 			if utf8.RuneCountInString(b.Text) > maxTextRunes {
 				return "нэг текстийн хэсэг 20,000 тэмдэгтээс хэтрэхгүй"
+			}
+		case "embed": // HTML embed: суралцагчид sandbox iframe-д (эх хуудастай холбоогүй) харагдана
+			b.URL, b.Quiz = "", nil
+			b.Text = strings.TrimSpace(b.Text)
+			if b.Text == "" || len(b.Text) > 60_000 {
+				return "HTML embed 1-60,000 тэмдэгт"
+			}
+			if b.Height == 0 {
+				b.Height = 420
+			}
+			if b.Height < 80 || b.Height > 2000 {
+				return "embed-ийн өндөр 80-2000 px"
 			}
 		case "heading":
 			b.URL, b.Quiz = "", nil
@@ -98,6 +111,12 @@ func (s *Server) viewerBlocks(bs []store.Block) []store.Block {
 	out := make([]store.Block, len(bs))
 	for i, b := range bs {
 		if b.URL != "" {
+			if parts := s.files.Parts(b.URL); b.Type == "video" && len(parts) > 1 { // 6 минутын хэсгүүд дараалан
+				b.Parts = make([]string, len(parts))
+				for k, p := range parts {
+					b.Parts[k] = s.viewerMedia(p, "")
+				}
+			}
 			b.URL = s.viewerMedia(b.URL, "") // видео/аудио → нуусан тасалбар, бусад → гарын үсэгтэй URL
 		}
 		if b.Quiz != nil {

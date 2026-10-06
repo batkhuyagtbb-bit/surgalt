@@ -580,6 +580,12 @@ func (s *Server) handleMyCourse(w http.ResponseWriter, r *http.Request) {
 		lessons[i].VideoURL = s.media(lessons[i].VideoURL)
 		for j := range lessons[i].Blocks { // багш өөрийн хувийн файлыг засварлагч дээр урьдчилан харна
 			if u := lessons[i].Blocks[j].URL; u != "" {
+				if parts := s.files.Parts(u); lessons[i].Blocks[j].Type == "video" && len(parts) > 1 {
+					lessons[i].Blocks[j].Parts = make([]string, len(parts))
+					for k, p := range parts {
+						lessons[i].Blocks[j].Parts[k] = s.media(p)
+					}
+				}
 				lessons[i].Blocks[j].URL = s.media(u)
 			}
 			if q := lessons[i].Blocks[j].Quiz; q != nil && q.Image != "" {

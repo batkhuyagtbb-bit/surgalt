@@ -172,6 +172,10 @@ type Block struct {
 	Name string `json:"name,omitempty"`
 	Size int64  `json:"size,omitempty"`
 	Quiz *Quiz  `json:"quiz,omitempty"`
+	// Height — embed (HTML) хэсгийн өндөр, px.
+	Height int `json:"height,omitempty"`
+	// Parts — 6 минутаар хуваагдсан видеоны хэсгүүдийн URL (хариу буцаахад бөглөгдөнө, хадгалагдахгүй).
+	Parts []string `json:"parts,omitempty"`
 	// Download — файлын хэсэгт: суралцагч татаж авахыг багш зөвшөөрсөн эсэх (анхдагч: зөвхөн үзнэ).
 	Download bool `json:"download,omitempty"`
 }
@@ -301,7 +305,7 @@ type Submission struct {
 }
 
 // BlockTypes — зөвшөөрөгдсөн блокийн төрлүүд.
-var BlockTypes = map[string]bool{"text": true, "heading": true, "image": true, "audio": true, "video": true, "file": true, "quiz": true}
+var BlockTypes = map[string]bool{"text": true, "heading": true, "image": true, "audio": true, "video": true, "file": true, "quiz": true, "embed": true}
 
 // LessonOrder — чирж зөөсний дараах нэг хичээлийн байр: ID ба бүлэг.
 type LessonOrder struct {
