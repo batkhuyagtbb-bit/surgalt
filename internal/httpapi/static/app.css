@@ -1654,3 +1654,37 @@ html.reader-open{overflow:hidden}
 .reply-bar button{border:0;background:none;font-size:.95rem;cursor:pointer;color:var(--muted)}
 .msg-gap{margin:12px 0 4px;text-transform:none;letter-spacing:0;font-weight:600}
 .msg-gap span{background:none}
+
+/* Чатын бичих мөр — Messenger маягийн */
+.composer-bar{position:relative;display:flex;align-items:flex-end;gap:6px;padding:8px 10px;border-top:1px solid var(--line);flex-wrap:wrap}
+.composer-bar .reply-bar{order:-1}
+.cb-left{display:flex;gap:2px;align-items:center;flex:0 0 auto;padding-bottom:3px}
+.cb-ic{width:34px;height:34px;border:0;border-radius:50%;background:none;color:var(--brand);display:grid;place-items:center;cursor:pointer;font-size:1.25rem;font-weight:700;line-height:1}
+.cb-ic:hover{background:var(--brand-soft)}
+.cb-gif{font-size:.62rem;font-weight:900;letter-spacing:.02em;border:2px solid var(--brand);width:30px;height:22px;border-radius:7px;margin:0 2px}
+.composer-bar.has-text .cb-left .cb-ic:not(:first-child){display:none} /* бичиж эхлэхэд зай гаргана (Messenger шиг) */
+.cb-input{flex:1;min-width:120px;display:flex;align-items:flex-end;gap:4px;padding:4px 4px 4px 14px;border-radius:20px;background:var(--ink-2)}
+.cb-input textarea{flex:1;min-height:0;height:auto;max-height:140px;border:0;background:none;box-shadow:none;resize:none;padding:7px 0;font:inherit;line-height:1.4;outline:none}
+.cb-input textarea:focus{border:0;box-shadow:none;outline:none}
+.cb-emoji{width:32px;height:32px;border:0;border-radius:50%;background:none;color:var(--brand);display:grid;place-items:center;cursor:pointer}
+.cb-emoji:hover{background:rgba(31,60,143,.1)}
+.cb-send{width:40px;height:40px;flex:0 0 40px;border:0;border-radius:50%;background:none;cursor:pointer;display:grid;place-items:center;font-size:1.5rem;color:var(--brand)}
+.cb-send .cb-arrow{display:none;font-size:1.1rem}
+.composer-bar.has-text .cb-send{background:var(--brand);color:#fff}
+.composer-bar.has-text .cb-send .cb-like{display:none}
+.composer-bar.has-text .cb-send .cb-arrow{display:inline}
+.cb-pop{position:absolute;left:10px;right:10px;bottom:calc(100% + 6px);z-index:6;padding:8px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:0 14px 40px rgba(15,23,42,.18);animation:salute-pop .2s cubic-bezier(.2,1.4,.4,1)}
+.cb-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cb-grid button{height:36px;border:0;border-radius:8px;background:none;font-size:1.35rem;cursor:pointer}
+.cb-grid button:hover{background:var(--ink-2);transform:scale(1.15)}
+.cb-grid-big{grid-template-columns:repeat(4,1fr)}
+.cb-grid-big button{height:64px;font-size:2.2rem}
+.cb-menu{display:grid;gap:2px}
+.cb-menu button{display:flex;align-items:center;gap:8px;padding:10px 12px;border:0;border-radius:10px;background:none;font:inherit;font-weight:700;color:var(--text);cursor:pointer;text-align:left}
+.cb-menu button:hover{background:var(--ink-2)}
+.msg-sticker{font-size:3rem;line-height:1;display:block}
+.thread .msg.is-sticker .bubble{background:none;border:0;padding:4px 2px}
+.msg-img{display:block;max-width:240px;margin:2px 0}
+.msg-img img{display:block;max-width:100%;border-radius:12px}
+.thread .msg.has-img .bubble{padding:4px}
+.thread .msg.has-img .msg-text{display:block;padding:4px 9px 6px}

@@ -413,6 +413,9 @@ type Message struct {
 	ReplyTo   string `json:"reply_to,omitempty"`
 	ReplyBody string `json:"reply_body,omitempty"`
 	ReplyName string `json:"reply_name,omitempty"`
+	// Attachment — зураг (багшийн сан дахь /files/... зам); AttachmentURL нь хариуд гарын үсэгтэй холбоос.
+	Attachment    string `json:"attachment,omitempty"`
+	AttachmentURL string `json:"attachment_url,omitempty"`
 	// Реакцууд: эможи → хэн дарсан (хариу буцаахад бөглөгдөнө, хадгалагдахгүй).
 	Reactions map[string][]ReactUser `json:"reactions,omitempty"`
 }

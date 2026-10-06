@@ -138,6 +138,7 @@ var chMigrations = []string{
 	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to String DEFAULT ''",
 	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_body String DEFAULT ''",
 	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_name String DEFAULT ''",
+	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment String DEFAULT ''",
 }
 
 var chTables = []chTable{
@@ -207,7 +208,7 @@ var chTables = []chTable{
 	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
 	{"messages", `(id String, conversation_id String, teacher_id String, visitor_key String, sender String,
 		sender_id String, sender_name String, body String, created_at ` + tsType + `,
-		reply_to String DEFAULT '', reply_body String DEFAULT '', reply_name String DEFAULT '')
+		reply_to String DEFAULT '', reply_body String DEFAULT '', reply_name String DEFAULT '', attachment String DEFAULT '')
 	ENGINE = MergeTree ORDER BY (conversation_id, id)`},
 	{"message_reactions", `(message_id String, user_key String, name String, emoji String, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (message_id, user_key)`},

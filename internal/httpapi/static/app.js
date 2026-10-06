@@ -221,8 +221,7 @@ function chatRail() {
     <div class="rail-view" id="railThread" hidden>
       <header class="rail-head"><button class="icon-btn" id="railBack" aria-label="Жагсаалт руу буцах">${I.back}</button><div class="grow" id="railWho"></div><button class="icon-btn rail-close" data-rail-close aria-label="Чат хаах">${I.x}</button></header>
       <div class="chat-body" id="railBody"><ol class="chat-msgs" id="railMsgs"></ol></div>
-      <form class="chat-input" id="railForm">${teacher ? `<button type="button" class="btn btn-teal btn-icon" id="railMeet" title="Google Meet үүсгээд илгээх" aria-label="Google Meet илгээх">${I.live}</button>` : ""}
-        <textarea name="body" rows="1" maxlength="2000" autocomplete="off" placeholder="Мессеж бичих…" aria-label="Мессеж"></textarea><button class="btn btn-gold btn-icon" aria-label="Илгээх">➤</button></form></div>
+      <form class="chat-input" id="railForm">${teacher ? `<button type="button" id="railMeet" data-plus>${I.live} Google Meet үүсгээд илгээх</button>` : ""}</form></div>
   </aside><div class="rail-scrim" id="railScrim"></div>`);
   $(".nav-links").insertAdjacentHTML("afterbegin", `<button class="icon-btn rail-toggle" id="railToggle" aria-label="Чат" aria-controls="studioRail" aria-expanded="false">${I.chat}<span class="bell-badge" id="railBadge" hidden></span></button>`);
   const rail = $("#studioRail"), home = $("#railHome"), thread = $("#railThread"), msgs = $("#railMsgs"), body = $("#railBody"), form = $("#railForm");
@@ -272,8 +271,8 @@ function chatRail() {
   $("#railBack").onclick = () => { cur = null; thread.hidden = true; home.hidden = false; draw(); };
   $("#railSearch").addEventListener("input", draw);
   $("#railList").addEventListener("click", (e) => { const it = e.target.closest(".rail-item"); if (it) open(it.dataset.id); });
-  $("#railMeet")?.addEventListener("click", async () => {
-    if (!cur) return;
+  form.addEventListener("click", async (e) => {
+    if (!e.target.closest("#railMeet") || !cur) return;
     try { const d = await api(`/api/chat/${cur}/meet`, { method: "POST" }); append(d.message); toast("Meet холбоос илгээгдлээ"); }
     catch (x) { toast(x.message, true); }
   });
@@ -1416,6 +1415,11 @@ function msgHTML(m, me, group) { // хуучин дуудлагад: энгий�
 /* ---------- Чатын урсгал (Messenger маягийн): бүлэглэсэн бөмбөлөг, өдрийн тусгаарлагч, хариулах (quote),
    реакц (👍❤️😂😮😢🙏), "Үзсэн", "бичиж байна…", Enter-ээр илгээх ---------- */
 const REACTS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+const EMOJIS = ["😀", "😂", "🥰", "😍", "😎", "🤔", "😅", "😭", "😡", "🙏", "👍", "👎", "👏", "🙌", "💪", "🔥", "🎉", "❤️", "💙", "✅", "❌", "⭐", "📚", "✍️", "🧠", "💡", "⏰", "🏆"];
+const STICKERS = ["🎉", "👏", "🏆", "💯", "🔥", "🚀", "🧠", "📚", "✅", "🙏", "😎", "🥳", "🤝", "💪", "🌟", "🎯"];
+const ICO_IMG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-9 9"/></svg>`;
+const ICO_STICKER = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6"/><path d="M20 13h-4a3 3 0 0 0-3 3v4l7-7Z"/><path d="M9 10h.01M14 10h.01M9 14c.8.8 1.8 1.2 3 1.2"/></svg>`;
+const ICO_SMILE = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01M8.5 14.5c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg>`;
 function dayLabel(t) {
   const d = new Date(t), now = new Date(), one = 86400000;
   const sd = new Date(d.getFullYear(), d.getMonth(), d.getDate()), sn = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1476,13 +1480,16 @@ class ChatThread {
       const same = (a, b) => a && b && who(a) === who(b) && Math.abs(new Date(a.created_at) - new Date(b.created_at)) < GAP && dayLabel(a.created_at) === dayLabel(b.created_at);
       const first = !same(prev, m), last = !same(m, next), mine = this.mine(m);
       const name = this.group() && !mine && first && m.sender_name ? `<b class="msg-who">${esc(m.sender_name)}${m.sender === "teacher" ? ` <span class="dc-badge">Багш</span>` : ""}</b>` : "";
-      const quote = m.reply_to ? `<button type="button" class="msg-quote" data-goto="${esc(m.reply_to)}"><b>${esc(m.reply_name || "")}</b><span>${esc(m.reply_body || "")}</span></button>` : "";
+      const quote = m.reply_to ? `<button type="button" class="msg-quote" data-goto="${esc(m.reply_to)}"><b>${esc(m.reply_name || "")}</b><span>${esc((m.reply_body || "").replace(/^::sticker::/, ""))}</span></button>` : "";
       const rx = Object.entries(m.reactions || {}).filter(([, u]) => u.length);
       const reacts = rx.length ? `<div class="msg-reacts">${rx.map(([e, u]) => `<button type="button" class="${u.some((x) => x.key === this.meKey) ? "on" : ""}" data-react-one="${e}" title="${esc(u.map((x) => x.name).join(", "))}">${e}${u.length > 1 ? ` ${u.length}` : ""}</button>`).join("")}</div>` : "";
       const av = !mine && last ? `<span class="msg-av">${avatarHTML({ display_name: m.sender_name || (m.sender === "teacher" ? "Багш" : "?") }, "avatar-sm")}</span>` : `<span class="msg-av"></span>`;
       const foot = last || rx.length ? `<div class="msg-foot"><time>${fmtTime(m.created_at)}</time>${mine && seen && seen.id === m.id ? `<span class="msg-seen">✓✓ Үзсэн${this.group() && seen.n > 1 ? ` · ${seen.n}` : ""}</span>` : ""}</div>` : "";
-      out.push(`<li class="msg ${mine ? "me" : "them"} ${first ? "first" : ""} ${last ? "last" : ""}" data-id="${esc(m.id)}">${av}<div class="msg-col">${name}
-        <div class="msg-row"><div class="bubble" title="${fmtDate(m.created_at)}">${quote}<span class="msg-text">${linkify(m.body)}</span></div>
+      const sticker = /^::sticker::(.+)$/.exec(m.body || "");
+      const imgUrl = m.attachment_url || (/^https?:\/\/\S+\.(gif|png|jpe?g|webp)(\?\S*)?$/i.test(m.body || "") ? m.body : "");
+      const content = sticker ? `<span class="msg-sticker">${esc(sticker[1])}</span>` : imgUrl ? `<a class="msg-img" href="${esc(imgUrl)}" target="_blank" rel="noopener"><img src="${esc(imgUrl)}" alt="" loading="lazy"></a>${m.attachment_url && m.body && m.body !== "📷 Зураг" ? `<span class="msg-text">${linkify(m.body)}</span>` : ""}` : `<span class="msg-text">${linkify(m.body)}</span>`;
+      out.push(`<li class="msg ${mine ? "me" : "them"} ${first ? "first" : ""} ${last ? "last" : ""} ${sticker ? "is-sticker" : ""} ${imgUrl ? "has-img" : ""}" data-id="${esc(m.id)}">${av}<div class="msg-col">${name}
+        <div class="msg-row"><div class="bubble" title="${fmtDate(m.created_at)}">${quote}${content}</div>
           <div class="msg-tools"><button type="button" data-react="${esc(m.id)}" title="Реакц">☺</button>${mine ? "" : `<button type="button" data-reply="${esc(m.id)}" title="Хариулах">↩</button>`}</div></div>
         ${reacts}${foot}</div></li>`);
     });
@@ -1517,21 +1524,56 @@ class ChatThread {
     bar.innerHTML = `<span>↩ <b>${esc(this.replyTo.sender_name || (this.replyTo.sender === "teacher" ? "Багш" : "Зочин"))}</b>-д хариулж байна: <em>${esc(this.replyTo.body.slice(0, 80))}</em></span><button type="button" data-cancel-reply aria-label="Болих">✕</button>`;
     bar.querySelector("[data-cancel-reply]").onclick = () => { this.replyTo = null; this.renderReply(); };
   }
+  // Бичих мөр (Messenger маягийн): ➕ цэс · 🖼 зураг · 😊 стикер · GIF · [Aa … 😊] · 👍/➤
   bindForm() {
-    const f = this.form, ta = f.body;
-    const grow = () => { if (ta.tagName === "TEXTAREA") { ta.style.height = "auto"; ta.style.height = Math.min(140, ta.scrollHeight) + "px"; } };
+    const f = this.form, extra = [...f.querySelectorAll("[data-plus]")].map((b) => b.outerHTML).join("");
+    f.classList.add("composer-bar");
+    f.innerHTML = `<div class="cb-left">
+        <button type="button" class="cb-ic" data-cb="plus" aria-label="Нэмэх" title="Нэмэх">＋</button>
+        <button type="button" class="cb-ic" data-cb="img" aria-label="Зураг" title="Зураг илгээх">${ICO_IMG}</button>
+        <button type="button" class="cb-ic" data-cb="sticker" aria-label="Стикер" title="Стикер">${ICO_STICKER}</button>
+        <button type="button" class="cb-ic cb-gif" data-cb="gif" aria-label="GIF" title="GIF">GIF</button></div>
+      <div class="cb-input"><textarea name="body" rows="1" maxlength="2000" placeholder="Aa" aria-label="Мессеж"></textarea><button type="button" class="cb-emoji" data-cb="emoji" aria-label="Эможи">${ICO_SMILE}</button></div>
+      <button class="cb-send" aria-label="Илгээх"><span class="cb-like">👍</span><span class="cb-arrow">➤</span></button>
+      <input type="file" name="image" accept="image/*" hidden>
+      <div class="cb-pop" hidden></div>`;
+    const ta = f.body, pop = $(".cb-pop", f), file = f.image;
+    const grow = () => { ta.style.height = "auto"; ta.style.height = Math.min(140, ta.scrollHeight) + "px"; f.classList.toggle("has-text", !!ta.value.trim()); };
+    const closePop = () => { pop.hidden = true; pop.innerHTML = ""; };
+    const openPop = (html, cls) => { pop.className = "cb-pop " + cls; pop.innerHTML = html; pop.hidden = false; };
+    document.addEventListener("click", (e) => { if (!f.contains(e.target)) closePop(); });
     ta.addEventListener("input", () => { grow(); this.sendTyping(); });
-    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); } if (e.key === "Escape" && this.replyTo) { this.replyTo = null; this.renderReply(); } });
-    f.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const text = ta.value.trim() || (f.querySelector("[data-quick-like]") ? "" : ""), conv = this.convId();
-      if (!conv) return;
-      const body = text || "👍";
-      ta.value = ""; grow();
-      const reply = this.replyTo; this.replyTo = null; this.renderReply();
-      try { const m = await api(`/api/chat/${conv}/messages`, { method: "POST", body: { body, reply_to: reply?.id || "" }, token: this.token() }); this.append(m); this.onSent?.(m); }
-      catch (x) { toast(x.message, true); ta.value = text; grow(); }
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); } if (e.key === "Escape") { closePop(); if (this.replyTo) { this.replyTo = null; this.renderReply(); } } });
+    f.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-cb]"); const emo = e.target.closest("[data-emo]"); const stk = e.target.closest("[data-stk]");
+      if (emo) { const s = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, s) + emo.dataset.emo + ta.value.slice(s); ta.focus(); ta.selectionStart = ta.selectionEnd = s + emo.dataset.emo.length; grow(); return; }
+      if (stk) { closePop(); await this.send("::sticker::" + stk.dataset.stk); return; }
+      if (!b) return;
+      if (!pop.hidden && pop.dataset.kind === b.dataset.cb) { closePop(); return; }
+      pop.dataset.kind = b.dataset.cb;
+      switch (b.dataset.cb) {
+        case "emoji": openPop(`<div class="cb-grid">${EMOJIS.map((x) => `<button type="button" data-emo="${x}">${x}</button>`).join("")}</div>`, "cb-pop-emoji"); break;
+        case "sticker": openPop(`<div class="cb-grid cb-grid-big">${STICKERS.map((x) => `<button type="button" data-stk="${x}">${x}</button>`).join("")}</div>`, "cb-pop-sticker"); break;
+        case "img": closePop(); file.click(); break;
+        case "gif": { closePop(); const u = prompt("GIF-ийн холбоос (https://…gif):"); if (u && /^https?:\/\//.test(u.trim())) await this.send(u.trim()); break; }
+        case "plus": openPop(`<div class="cb-menu">${extra || ""}<button type="button" data-cb="img">${ICO_IMG} Зураг илгээх</button><button type="button" data-cb="gif">GIF холбоос</button></div>`, "cb-pop-menu"); break;
+      }
     });
+    file.addEventListener("change", async () => {
+      const x = file.files[0]; file.value = ""; if (!x || !this.convId()) return;
+      if (x.size > 5 << 20) { toast("Зураг 5MB-аас бага байх ёстой", true); return; }
+      const fd = new FormData(); fd.append("file", x);
+      try { const up = await api(`/api/chat/${this.convId()}/upload`, { method: "POST", body: fd, token: this.token() }); await this.send(ta.value.trim(), up.path); ta.value = ""; grow(); }
+      catch (err) { toast(err.message, true); }
+    });
+    f.addEventListener("submit", async (e) => { e.preventDefault(); const text = ta.value.trim(); ta.value = ""; grow(); if (!(await this.send(text || "👍"))) { ta.value = text; grow(); } });
+    grow();
+  }
+  async send(body, attachment = "") {
+    const conv = this.convId(); if (!conv) return false;
+    const reply = this.replyTo; this.replyTo = null; this.renderReply();
+    try { const m = await api(`/api/chat/${conv}/messages`, { method: "POST", body: { body, reply_to: reply?.id || "", attachment }, token: this.token() }); this.append(m); this.onSent?.(m); return true; }
+    catch (x) { toast(x.message, true); this.replyTo = reply; this.renderReply(); return false; }
   }
   async sendTyping() { if (Date.now() - this.typeAt < 3000 || !this.convId()) return; this.typeAt = Date.now(); try { await api(`/api/chat/${this.convId()}/typing`, { method: "POST", body: {}, token: this.token() }); } catch {} }
 }

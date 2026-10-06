@@ -212,6 +212,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/chat/{id}/react", s.handleReact)
 	mux.HandleFunc("POST /api/chat/{id}/read", s.handleRead)
 	mux.HandleFunc("POST /api/chat/{id}/typing", s.handleTyping)
+	mux.HandleFunc("POST /api/chat/{id}/upload", s.handleChatUpload)
 	mux.HandleFunc("GET /api/chat/ws", s.handleWS)
 
 	// Хуудсууд

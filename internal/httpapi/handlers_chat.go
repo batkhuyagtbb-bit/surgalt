@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -11,6 +12,7 @@ import (
 
 	"surgalt/internal/auth"
 	"surgalt/internal/chat"
+	"surgalt/internal/files"
 	"surgalt/internal/store"
 )
 
@@ -96,6 +98,7 @@ func (s *Server) handleStartChat(w http.ResponseWriter, r *http.Request) {
 	if err := s.attachReactions(r, msgs); s.storeErr(w, r, err) {
 		return
 	}
+	s.signAttachments(msgs)
 	reads, _ := s.store.ConversationReads(r.Context(), conv.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"conversation": conv, "messages": msgs, "me": store.SenderVisitor, "me_key": c.VisitorKey(), "reads": reads})
 }
@@ -112,6 +115,7 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	if err := s.attachReactions(r, msgs); s.storeErr(w, r, err) {
 		return
 	}
+	s.signAttachments(msgs)
 	reads, err := s.store.ConversationReads(r.Context(), conv.ID)
 	if s.storeErr(w, r, err) {
 		return
@@ -234,18 +238,26 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Body    string `json:"body"`
-		ReplyTo string `json:"reply_to"`
+		Body       string `json:"body"`
+		ReplyTo    string `json:"reply_to"`
+		Attachment string `json:"attachment"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
 	in.Body = strings.TrimSpace(in.Body)
+	if in.Attachment != "" && !(files.OwnedBy(in.Attachment, conv.TeacherID) && strings.Contains(in.Attachment, "/"+files.Private+"/chat_")) {
+		writeErr(w, http.StatusBadRequest, "хавсралт буруу")
+		return
+	}
+	if in.Attachment != "" && in.Body == "" {
+		in.Body = "📷 Зураг"
+	}
 	if n := utf8.RuneCountInString(in.Body); n < 1 || n > 2000 {
 		writeErr(w, http.StatusBadRequest, "мессеж 1-2000 тэмдэгт")
 		return
 	}
-	m := &store.Message{ConversationID: conv.ID, Sender: role, Body: in.Body, SenderName: c.Name}
+	m := &store.Message{ConversationID: conv.ID, Sender: role, Body: in.Body, SenderName: c.Name, Attachment: in.Attachment}
 	if in.ReplyTo != "" { // хариулж буй мессежийн товч хуулбарыг хамт хадгална
 		orig, err := s.store.MessageByID(r.Context(), conv.ID, in.ReplyTo)
 		if err != nil {
@@ -263,11 +275,67 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.AddMessage(r.Context(), m); s.storeErr(w, r, err) {
 		return
 	}
+	if m.Attachment != "" {
+		m.AttachmentURL = s.media(m.Attachment)
+	}
 	if s.Publish != nil {
 		s.Publish(*m)
 	}
 	s.notifyMessage(r.Context(), conv, m)
 	writeJSON(w, http.StatusCreated, m)
+}
+
+// signAttachments — зургийн хавсралтад гарын үсэгтэй холбоос.
+func (s *Server) signAttachments(msgs []store.Message) {
+	for i := range msgs {
+		if msgs[i].Attachment != "" {
+			msgs[i].AttachmentURL = s.media(msgs[i].Attachment)
+		}
+	}
+}
+
+// handleChatUpload: POST /api/chat/{id}/upload — зураг (5MB хүртэл) багшийн санд chat_ угтвартай хадгална.
+func (s *Server) handleChatUpload(w http.ResponseWriter, r *http.Request) {
+	c, conv, _, ok := s.loadConv(w, r)
+	if !ok {
+		return
+	}
+	if !s.chatLim.Allow(c.VisitorKey()) {
+		writeErr(w, http.StatusTooManyRequests, "хэт хурдан илгээж байна")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 6<<20)
+	mr, err := r.MultipartReader()
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "multipart/form-data хэлбэрээр илгээнэ үү")
+		return
+	}
+	for {
+		part, err := mr.NextPart()
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "файл олдсонгүй")
+			return
+		}
+		if part.FileName() == "" {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(part.FileName()))
+		if !map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}[ext] {
+			writeErr(w, http.StatusBadRequest, "зөвхөн зураг (JPG, PNG, GIF, WebP)")
+			return
+		}
+		u, err := s.store.UserByID(r.Context(), conv.TeacherID)
+		if s.storeErr(w, r, err) {
+			return
+		}
+		info, err := s.files.Save(conv.TeacherID, files.Private, "chat_"+tail(conv.ID, 6)+"_"+part.FileName(), part, s.quotaOf(u))
+		if err != nil {
+			s.filesErr(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"path": info.Path, "url": s.media(info.Path)})
+		return
+	}
 }
 
 // handleCourseChat: сургалтын бүлэг чат. Багш нээнэ (байхгүй бол үүсгэнэ), элссэн суралцагч орно.

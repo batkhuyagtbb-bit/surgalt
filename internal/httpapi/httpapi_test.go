@@ -2173,6 +2173,48 @@ func TestChatReactionsRepliesReads(t *testing.T) {
 	if !found {
 		t.Fatalf("суралцагчийн уншсан тэмдэг алга: %v", reads)
 	}
+	// Зураг илгээх: зөвхөн зураг; хавсралттай мессеж гарын үсэгтэй URL-тай ирнэ; хуурамч зам → 400.
+	up := func(name string, data []byte) (int, map[string]any) {
+		var buf bytes.Buffer
+		mw := multipart.NewWriter(&buf)
+		fw, _ := mw.CreateFormFile("file", name)
+		fw.Write(data)
+		mw.Close()
+		req, _ := http.NewRequest("POST", srv.URL+"/api/chat/"+conv+"/upload", &buf)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+s1)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(res.Body).Decode(&out)
+		return res.StatusCode, out
+	}
+	if code, _ := up("virus.exe", []byte("x")); code != 400 {
+		t.Fatal("зураг биш файл татгалзагдана")
+	}
+	code, u := up("photo.png", []byte("\x89PNG\r\n\x1a\n fake"))
+	if code != 201 || !strings.Contains(u["path"].(string), "/private/chat_") {
+		t.Fatalf("зураг хуулах: %d %v", code, u)
+	}
+	code, im := call(t, srv, "POST", "/api/chat/"+conv+"/messages", s1, `{"body":"","attachment":"`+u["path"].(string)+`"}`)
+	if code != 201 || im["body"] != "📷 Зураг" || !strings.Contains(im["attachment_url"].(string), "sig=") {
+		t.Fatalf("зурагтай мессеж: %d %v", code, im)
+	}
+	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/messages", s1, `{"body":"x","attachment":"/files/other/private/chat_x.png"}`); code != 400 {
+		t.Fatal("өөр багшийн зам татгалзагдана")
+	}
+	_, lst2 := call(t, srv, "GET", "/api/chat/"+conv+"/messages", tt, "")
+	ms2 := lst2["messages"].([]any)
+	if last := ms2[len(ms2)-1].(map[string]any); !strings.Contains(last["attachment_url"].(string), "/files/") {
+		t.Fatalf("жагсаалтад хавсралтын URL алга: %v", last)
+	}
+	// Стикер — энгийн текст (::sticker::🎉) тул сервер хэвийн хадгална.
+	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/messages", tt, `{"body":"::sticker::🎉"}`); code != 201 {
+		t.Fatal("стикер илгээгдэнэ")
+	}
 	// Гадны хүн реакц дарж чадахгүй.
 	s3, _ := register(t, srv, "outsider", "student")
 	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/react", s3, `{"message_id":"`+m2["id"].(string)+`","emoji":"👍"}`); code != 404 {

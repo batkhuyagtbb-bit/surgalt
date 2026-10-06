@@ -130,8 +130,8 @@ func (c *ClickHouse) AddMessage(ctx context.Context, m *Message) error {
 		return err
 	}
 	m.ID, m.CreatedAt, m.TeacherID, m.VisitorKey = NewID(), time.Now(), cv.TeacherID, cv.VisitorKey
-	if err := c.insert(ctx, "messages", []string{"id", "conversation_id", "teacher_id", "visitor_key", "sender", "sender_id", "sender_name", "body", "created_at", "reply_to", "reply_body", "reply_name"},
-		m.ID, m.ConversationID, m.TeacherID, m.VisitorKey, m.Sender, m.SenderID, m.SenderName, m.Body, m.CreatedAt.UTC(), m.ReplyTo, m.ReplyBody, m.ReplyName); err != nil {
+	if err := c.insert(ctx, "messages", []string{"id", "conversation_id", "teacher_id", "visitor_key", "sender", "sender_id", "sender_name", "body", "created_at", "reply_to", "reply_body", "reply_name", "attachment"},
+		m.ID, m.ConversationID, m.TeacherID, m.VisitorKey, m.Sender, m.SenderID, m.SenderName, m.Body, m.CreatedAt.UTC(), m.ReplyTo, m.ReplyBody, m.ReplyName, m.Attachment); err != nil {
 		return err
 	}
 	cv.LastMessage, cv.LastMessageAt = m.Body, m.CreatedAt
@@ -140,11 +140,11 @@ func (c *ClickHouse) AddMessage(ctx context.Context, m *Message) error {
 
 func (c *ClickHouse) Messages(ctx context.Context, conversationID, beforeID string, limit int) ([]Message, error) {
 	out := []Message{}
-	err := c.query(ctx, `SELECT id, conversation_id, teacher_id, visitor_key, sender, sender_id, sender_name, body, created_at, reply_to, reply_body, reply_name
+	err := c.query(ctx, `SELECT id, conversation_id, teacher_id, visitor_key, sender, sender_id, sender_name, body, created_at, reply_to, reply_body, reply_name, attachment
 		FROM messages WHERE conversation_id = ? AND (? = '' OR id < ?) ORDER BY id DESC LIMIT ?`,
 		[]any{conversationID, beforeID, beforeID, limit}, func(r driver.Rows) error {
 			var m Message
-			if err := r.Scan(&m.ID, &m.ConversationID, &m.TeacherID, &m.VisitorKey, &m.Sender, &m.SenderID, &m.SenderName, &m.Body, &m.CreatedAt, &m.ReplyTo, &m.ReplyBody, &m.ReplyName); err != nil {
+			if err := r.Scan(&m.ID, &m.ConversationID, &m.TeacherID, &m.VisitorKey, &m.Sender, &m.SenderID, &m.SenderName, &m.Body, &m.CreatedAt, &m.ReplyTo, &m.ReplyBody, &m.ReplyName, &m.Attachment); err != nil {
 				return err
 			}
 			out = append(out, m)
@@ -163,10 +163,10 @@ func (c *ClickHouse) Messages(ctx context.Context, conversationID, beforeID stri
 
 func (c *ClickHouse) MessageByID(ctx context.Context, conversationID, id string) (*Message, error) {
 	var out *Message
-	err := c.query(ctx, `SELECT id, conversation_id, teacher_id, visitor_key, sender, sender_id, sender_name, body, created_at, reply_to, reply_body, reply_name
+	err := c.query(ctx, `SELECT id, conversation_id, teacher_id, visitor_key, sender, sender_id, sender_name, body, created_at, reply_to, reply_body, reply_name, attachment
 		FROM messages WHERE conversation_id = ? AND id = ? LIMIT 1`, []any{conversationID, id}, func(r driver.Rows) error {
 		var m Message
-		if err := r.Scan(&m.ID, &m.ConversationID, &m.TeacherID, &m.VisitorKey, &m.Sender, &m.SenderID, &m.SenderName, &m.Body, &m.CreatedAt, &m.ReplyTo, &m.ReplyBody, &m.ReplyName); err != nil {
+		if err := r.Scan(&m.ID, &m.ConversationID, &m.TeacherID, &m.VisitorKey, &m.Sender, &m.SenderID, &m.SenderName, &m.Body, &m.CreatedAt, &m.ReplyTo, &m.ReplyBody, &m.ReplyName, &m.Attachment); err != nil {
 			return err
 		}
 		out = &m

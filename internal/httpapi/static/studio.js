@@ -1325,8 +1325,7 @@ async function chat(openId) {
     <div class="inbox-list" id="ibList">${convs.map(convItem).join("") || `<div class="empty" style="margin:14px">Одоогоор чат алга. Профайлаа түгээгээрэй!</div>`}</div>
     <div class="inbox-thread"><div class="chat-head" id="ibHead"><span class="muted">Яриа сонгоно уу</span></div>
       <div class="chat-body"><ol class="chat-msgs" id="ibMsgs"></ol></div>
-      <form class="chat-input" id="ibForm" hidden><button type="button" class="btn btn-teal btn-sm" id="ibMeet" title="Google Meet үүсгээд илгээх">📹 Meet</button>
-        <textarea name="body" rows="1" maxlength="2000" autocomplete="off" placeholder="Хариу бичих…"></textarea><button class="btn btn-gold btn-icon">➤</button></form></div></div>`;
+      <form class="chat-input" id="ibForm" hidden><button type="button" id="ibMeet" data-plus>📹 Google Meet үүсгээд илгээх</button></form></div></div>`;
   let cur = null, curGroup = false;
   const list = $("#ibList"), msgs = $("#ibMsgs"), form = $("#ibForm"), body = msgs.parentElement;
   const thread = new SG.ChatThread({ ol: msgs, body, form, token: () => SG.Auth.token, convId: () => cur, role: () => "teacher", group: () => curGroup });
@@ -1341,10 +1340,11 @@ async function chat(openId) {
     history.replaceState(null, "", "#chat=" + id);
   };
   list.onclick = (e) => { const it = e.target.closest(".inbox-item"); if (it) open(it.dataset.id); };
-  $("#ibMeet").onclick = async () => {
+  form.addEventListener("click", async (e) => {
+    if (!e.target.closest("#ibMeet") || !cur) return;
     try { const d = await api(`/api/chat/${cur}/meet`, { method: "POST" }); append(d.message); toast("📹 Meet холбоос илгээгдлээ"); }
     catch (x) { toast(x.message, true); if (x.status === 428) location.hash = "live"; }
-  };
+  });
   const append = (m) => thread.append(m);
   const handler = async (d) => {
     if (["reaction", "read", "typing"].includes(d.type)) { thread.event(d); return; }
