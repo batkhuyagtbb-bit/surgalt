@@ -1688,3 +1688,9 @@ html.reader-open{overflow:hidden}
 .msg-img img{display:block;max-width:100%;border-radius:12px}
 .thread .msg.has-img .bubble{padding:4px}
 .thread .msg.has-img .msg-text{display:block;padding:4px 9px 6px}
+
+/* Энгийн бичих мөр: зөвхөн Meet товч */
+.cb-send.has-arrow .cb-arrow{display:inline;font-size:1.1rem}
+.cb-send.has-arrow{background:var(--brand);color:#fff;opacity:.55}
+.composer-bar.has-text .cb-send.has-arrow{opacity:1}
+.composer-bar .cb-left .cb-ic{width:38px;height:38px;background:var(--brand-soft)}

@@ -1524,49 +1524,18 @@ class ChatThread {
     bar.innerHTML = `<span>↩ <b>${esc(this.replyTo.sender_name || (this.replyTo.sender === "teacher" ? "Багш" : "Зочин"))}</b>-д хариулж байна: <em>${esc(this.replyTo.body.slice(0, 80))}</em></span><button type="button" data-cancel-reply aria-label="Болих">✕</button>`;
     bar.querySelector("[data-cancel-reply]").onclick = () => { this.replyTo = null; this.renderReply(); };
   }
-  // Бичих мөр (Messenger маягийн): ➕ цэс · 🖼 зураг · 😊 стикер · GIF · [Aa … 😊] · 👍/➤
+  // Бичих мөр: [📹 Meet (багш)] [Aa] [➤] — энгийн, зөвхөн уулзалтын товчтой.
   bindForm() {
-    const f = this.form, extra = [...f.querySelectorAll("[data-plus]")].map((b) => b.outerHTML).join("");
+    const f = this.form, extra = [...f.querySelectorAll("[data-plus]")];
     f.classList.add("composer-bar");
-    f.innerHTML = `<div class="cb-left">
-        <button type="button" class="cb-ic" data-cb="plus" aria-label="Нэмэх" title="Нэмэх">＋</button>
-        <button type="button" class="cb-ic" data-cb="img" aria-label="Зураг" title="Зураг илгээх">${ICO_IMG}</button>
-        <button type="button" class="cb-ic" data-cb="sticker" aria-label="Стикер" title="Стикер">${ICO_STICKER}</button>
-        <button type="button" class="cb-ic cb-gif" data-cb="gif" aria-label="GIF" title="GIF">GIF</button></div>
-      <div class="cb-input"><textarea name="body" rows="1" maxlength="2000" placeholder="Aa" aria-label="Мессеж"></textarea><button type="button" class="cb-emoji" data-cb="emoji" aria-label="Эможи">${ICO_SMILE}</button></div>
-      <button class="cb-send" aria-label="Илгээх"><span class="cb-like">👍</span><span class="cb-arrow">➤</span></button>
-      <input type="file" name="image" accept="image/*" hidden>
-      <div class="cb-pop" hidden></div>`;
-    const ta = f.body, pop = $(".cb-pop", f), file = f.image;
+    f.innerHTML = `${extra.length ? `<div class="cb-left">${extra.map((b) => `<button type="button" class="cb-ic" id="${esc(b.id)}" title="${esc(b.textContent.trim())}" aria-label="${esc(b.textContent.trim())}">${b.querySelector("svg")?.outerHTML || "📹"}</button>`).join("")}</div>` : ""}
+      <div class="cb-input"><textarea name="body" rows="1" maxlength="2000" placeholder="Aa" aria-label="Мессеж"></textarea></div>
+      <button class="cb-send has-arrow" aria-label="Илгээх"><span class="cb-arrow">➤</span></button>`;
+    const ta = f.body;
     const grow = () => { ta.style.height = "auto"; ta.style.height = Math.min(140, ta.scrollHeight) + "px"; f.classList.toggle("has-text", !!ta.value.trim()); };
-    const closePop = () => { pop.hidden = true; pop.innerHTML = ""; };
-    const openPop = (html, cls) => { pop.className = "cb-pop " + cls; pop.innerHTML = html; pop.hidden = false; };
-    document.addEventListener("click", (e) => { if (!f.contains(e.target)) closePop(); });
     ta.addEventListener("input", () => { grow(); this.sendTyping(); });
-    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); } if (e.key === "Escape") { closePop(); if (this.replyTo) { this.replyTo = null; this.renderReply(); } } });
-    f.addEventListener("click", async (e) => {
-      const b = e.target.closest("[data-cb]"); const emo = e.target.closest("[data-emo]"); const stk = e.target.closest("[data-stk]");
-      if (emo) { const s = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, s) + emo.dataset.emo + ta.value.slice(s); ta.focus(); ta.selectionStart = ta.selectionEnd = s + emo.dataset.emo.length; grow(); return; }
-      if (stk) { closePop(); await this.send("::sticker::" + stk.dataset.stk); return; }
-      if (!b) return;
-      if (!pop.hidden && pop.dataset.kind === b.dataset.cb) { closePop(); return; }
-      pop.dataset.kind = b.dataset.cb;
-      switch (b.dataset.cb) {
-        case "emoji": openPop(`<div class="cb-grid">${EMOJIS.map((x) => `<button type="button" data-emo="${x}">${x}</button>`).join("")}</div>`, "cb-pop-emoji"); break;
-        case "sticker": openPop(`<div class="cb-grid cb-grid-big">${STICKERS.map((x) => `<button type="button" data-stk="${x}">${x}</button>`).join("")}</div>`, "cb-pop-sticker"); break;
-        case "img": closePop(); file.click(); break;
-        case "gif": { closePop(); const u = prompt("GIF-ийн холбоос (https://…gif):"); if (u && /^https?:\/\//.test(u.trim())) await this.send(u.trim()); break; }
-        case "plus": openPop(`<div class="cb-menu">${extra || ""}<button type="button" data-cb="img">${ICO_IMG} Зураг илгээх</button><button type="button" data-cb="gif">GIF холбоос</button></div>`, "cb-pop-menu"); break;
-      }
-    });
-    file.addEventListener("change", async () => {
-      const x = file.files[0]; file.value = ""; if (!x || !this.convId()) return;
-      if (x.size > 5 << 20) { toast("Зураг 5MB-аас бага байх ёстой", true); return; }
-      const fd = new FormData(); fd.append("file", x);
-      try { const up = await api(`/api/chat/${this.convId()}/upload`, { method: "POST", body: fd, token: this.token() }); await this.send(ta.value.trim(), up.path); ta.value = ""; grow(); }
-      catch (err) { toast(err.message, true); }
-    });
-    f.addEventListener("submit", async (e) => { e.preventDefault(); const text = ta.value.trim(); ta.value = ""; grow(); if (!(await this.send(text || "👍"))) { ta.value = text; grow(); } });
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); } if (e.key === "Escape" && this.replyTo) { this.replyTo = null; this.renderReply(); } });
+    f.addEventListener("submit", async (e) => { e.preventDefault(); const text = ta.value.trim(); if (!text) return; ta.value = ""; grow(); if (!(await this.send(text))) { ta.value = text; grow(); } });
     grow();
   }
   async send(body, attachment = "") {
