@@ -2153,9 +2153,9 @@ async function coursePage() {
   // Асуулга/шалгалт амжилттай → access шинэчилнэ; дараагийн хичээл нээгдсэн бол автоматаар шилжинэ.
   const autoAdvance = async () => {
     const curRow = $(".lesson.open"), rowsBefore = lessonRows(), i = curRow ? rowsBefore.indexOf(curRow) : -1;
-    const next = i >= 0 ? rowsBefore[i + 1] : null, wasLocked = next?.classList.contains("is-drip");
+    const next = i >= 0 ? rowsBefore[i + 1] : null;
     await refreshAccess();
-    if (!next || !wasLocked || next.classList.contains("is-drip") || !canOpen(next)) return;
+    if (!next || next.classList.contains("is-drip") || !canOpen(next)) return;
     toast("🎉 Амжилттай! Дараагийн хичээл нээгдлээ — шилжиж байна…");
     setTimeout(() => { if ($(".lesson.open") === curRow) expandRow(next, true); }, 1600);
   };
@@ -2364,12 +2364,31 @@ async function coursePage() {
     // Идэвхтэй суралцах хугацаа
     const need = (l.active_min || 0) * 60, cb = done && $("[data-complete]", done), meter = done && $(".active-need", done);
     if (meter) meter.hidden = !need;
+    // Идэвхтэй хугацаа бүрэн гүйцмэгц: асуултууд (байвал) бүгд зөв бол автоматаар "дууслаа" → дараагийн хичээл рүү шилжинэ.
+    let autoDone = false;
+    const quizIds = (l.blocks || []).filter((b) => b.type === "quiz").map((b) => b.id);
+    const quizzesOk = () => { const q = access?.progress?.[lid]?.quiz || {}; return quizIds.every((qid) => q[qid]); };
+    const finishByTime = async () => {
+      if (autoDone || l.exam || l.assignment || isOwner || !Auth.token) return;
+      autoDone = true;
+      if (!quizzesOk()) { toast(`✓ ${l.active_min} мин гүйцлээ — одоо асуултуудаа дуусгаарай, дараагийн хичээл нээгдэнэ`); autoDone = false; return; }
+      for (let i = 0; i < 4; i++) { // сервер дээрх идэвхтэй хугацаа бага зэрэг хоцорч бүртгэгдэж болно
+        try {
+          await api(`/api/courses/${id}/lessons/${lid}/complete`, { method: "POST" });
+          if (cb) { cb.disabled = true; cb.textContent = "✓ Дууссан"; }
+          toast("✓ Хичээлийн хугацаа бүрэн гүйцлээ — дараагийн хичээл рүү шилжиж байна…");
+          await autoAdvance();
+          return;
+        } catch (e) { if (e.status !== 409) { autoDone = false; return; } await new Promise((r) => setTimeout(r, 6000)); }
+      }
+      autoDone = false;
+    };
     const onActive = (sec) => {
       if (!need || !cb || p?.completed_at) return;
       meter.textContent = `🕒 Идэвхтэй суралцсан: ${Math.floor(Math.min(sec, need) / 60)}/${l.active_min} мин`;
       meter.classList.toggle("ok", sec >= need);
       cb.disabled = sec < need;
-      if (sec < need) cb.textContent = `🕒 ${l.active_min} мин идэвхтэй үзсний дараа дуусгана`; else cb.textContent = "✓ Энэ хичээлийг дууслаа";
+      if (sec < need) cb.textContent = `🕒 ${l.active_min} мин идэвхтэй үзсний дараа дуусгана`; else { cb.textContent = "✓ Энэ хичээлийг дууслаа"; finishByTime(); }
     };
     stopWatch?.();
     stopWatch = l.exam ? null : watchLesson({ courseId: id, lessonId: lid, modal, onStop: () => closeModal(modal), onActive });

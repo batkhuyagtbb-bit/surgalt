@@ -1605,6 +1605,17 @@ func TestQuizMasteryUnlock(t *testing.T) {
 		if code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l5), s1, ""); code != 200 {
 			t.Fatalf("хугацаа гүйцсэн (дууссан) → 5 шууд нээгдэнэ: %d %v", code, r)
 		}
+		// Асуултгүй, идэвхтэй хугацаатай хичээл: минутаа бүрэн үзсэн бол 7 хоногийн таймер үл хамааран шууд.
+		_, l6 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Зургаа","active_min":5}`)
+		_, l7 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Долоо","unlock_after_h":168}`)
+		call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l6), s1, "")
+		if code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l7), s1, ""); code != http.StatusLocked || r["state"].(map[string]any)["reason"] != "active" {
+			t.Fatalf("минут дутуу → active: %d %v", code, r)
+		}
+		mem.MarkLessonCompleted(context.Background(), uid, cid, id(l6))
+		if code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l7), s1, ""); code != 200 {
+			t.Fatalf("минутаа гүйцсэн → таймер үл хамааран нээгдэнэ: %d %v", code, r)
+		}
 	}
 	// Багш өөрөө түгжээгүй.
 	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l3), tt, ""); code != 200 {

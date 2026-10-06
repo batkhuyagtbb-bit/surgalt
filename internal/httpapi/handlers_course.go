@@ -383,7 +383,8 @@ func (s *Server) dripFacts(ctx context.Context, uid, courseID string) dripExtra 
 //  2. Өмнөх хичээлийн идэвхтэй суралцах хугацааг (ActiveMin) гүйцээсэн байх (эсвэл "дууслаа" гэсэн).
 //  3. Өмнөх нь шалгалт бол тэнцсэн, асуулттай бол бүгдэд нь зөв хариулсан байх — тэгвэл цаг, өдрөөс
 //     үл хамааран ШУУД нээгдэнэ (таймер хамаарахгүй).
-//  4. Асуулт, шалгалтгүй хичээл бол тохируулсан хүлээх хугацаа (UnlockAfterH) үйлчилнэ.
+//     Идэвхтэй хугацаатай хичээлийн минутыг бүрэн үзсэн бол мөн шууд нээгдэнэ.
+//  4. Асуулт, шалгалт, идэвхтэй хугацаа аль нь ч үгүй хичээлд л хүлээх хугацаа (UnlockAfterH) үйлчилнэ.
 func dripState(course *store.Course, lessons []store.Lesson, l *store.Lesson, progress map[string]store.LessonProgress, fullAccess bool, now time.Time, x dripExtra) LessonState {
 	if !course.Drip || l.AlwaysOpen || fullAccess {
 		return LessonState{Open: true}
@@ -417,6 +418,9 @@ func dripState(course *store.Course, lessons []store.Lesson, l *store.Lesson, pr
 			return LessonState{Open: true} // асуултуудад бүгдэд нь зөв → цаг, өдөр хамаагүй шууд
 		}
 		return LessonState{Reason: "quiz", PrevTitle: prev.Title, QuizLeft: total - correct, QuizTotal: total}
+	}
+	if prev.ActiveMin > 0 {
+		return LessonState{Open: true} // идэвхтэй минутаа бүрэн үзсэн → цаг, өдөр хамаагүй шууд
 	}
 	base := p.ViewedAt
 	if p.CompletedAt != nil {
