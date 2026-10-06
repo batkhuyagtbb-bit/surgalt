@@ -1962,3 +1962,12 @@ html.reader-open{overflow:hidden}
 .lesson-nav .ln:not([disabled]):hover{transform:translateY(-1px);box-shadow:0 10px 24px -12px rgba(31,60,143,.5);border-color:var(--brand)}
 .lesson-nav .ln[disabled]{opacity:.6;cursor:not-allowed}
 @media (max-width:640px){.lesson-nav{grid-template-columns:1fr}}
+
+/* Хичээл мөрөн дотор задрах (inline) */
+.modal.inline{position:static;inset:auto;display:block;padding:0;background:none;backdrop-filter:none;opacity:1;visibility:visible;z-index:auto}
+.modal.inline .modal-card{width:100%;max-width:none;max-height:none;overflow:visible;padding:18px 18px 14px;border-radius:16px;box-shadow:none;transform:none;cursor:auto}
+.modal.inline .modal-x{top:8px;right:8px}
+.lesson.open{cursor:default;background:var(--surface);box-shadow:0 14px 40px -18px rgba(31,60,143,.35);border-color:var(--brand)}
+.lesson.open>.lesson-num,.lesson.open>.lesson-title{cursor:pointer}
+.lm-body{margin-top:4px;cursor:auto}
+.lm-body .loader{margin:30px auto}

@@ -2207,7 +2207,11 @@ async function coursePage() {
   // Хичээлийн цонх хаагдахад анхаарлын хяналт дуусна, видеоны явц илгээгдэнэ, дүгнэлт асууна.
   let stopWatch = null, stopVideos = null, reflectDone = false, curLesson = null;
   new MutationObserver(() => {
-    if ($("#lessonModal").classList.contains("open")) return;
+    const lm = $("#lessonModal");
+    if (lm.classList.contains("open")) { lm.dataset.wasOpen = "1"; return; }
+    if (!lm.dataset.wasOpen) return; // "inline" нэмэх зэрэг бусад өөрчлөлт — хаагдаагүй
+    delete lm.dataset.wasOpen;
+    if (lm.classList.contains("inline")) setTimeout(() => { if (!lm.classList.contains("open")) collapseAll(); }, 0);
     stopWatch?.(); stopWatch = null;
     stopVideos?.(); stopVideos = null;
     if (curLesson && Auth.token && !reflectDone) askReflection(curLesson.id, curLesson.lid, curLesson.title);
@@ -2252,11 +2256,39 @@ async function coursePage() {
     };
     return `${btn(prev, "prev")}${btn(next, "next")}`;
   };
+  // Мөрийг доош задалж хичээлийн үндсэн агуулгыг (видео, текст, асуулт, хэлэлцүүлэг) мөрөн дотор харуулна.
+  const lessonModalEl = () => $("#lessonModal");
+  const dockModal = () => { const m = lessonModalEl(); if (m && m.classList.contains("inline")) { m.classList.remove("inline"); document.body.append(m); } };
+  const collapseAll = () => {
+    const m = lessonModalEl();
+    if (m?.classList.contains("inline") && m.classList.contains("open")) { delete m.dataset.wasOpen; closeModal(m); } // мөр солих үед ажиглагч дахин хумихгүй
+    dockModal();
+    $$(".lesson.open").forEach((r) => { r.classList.remove("open"); $(".lesson-more", r)?.remove(); });
+  };
+  const canOpen = (row) => !(row.classList.contains("is-locked") && !row.classList.contains("unlocked")) && !row.classList.contains("is-drip");
+  const expandRow = async (row, scroll) => {
+    const was = row.classList.contains("open");
+    collapseAll();
+    if (was) return;
+    const lid = row.dataset.lesson, p = access?.progress?.[lid], rk = access?.ranks?.[lid];
+    const status = p?.completed_at ? `<span class="st-chip ok">✓ Дууссан · ${fmtDate(p.completed_at)}</span>` : p?.viewed_at ? `<span class="st-chip">Үзэж эхэлсэн · ${fmtDate(p.viewed_at)}</span>` : `<span class="st-chip">Шинэ хичээл</span>`;
+    const facts = [status, rk ? `<span class="st-chip ${rk.disqualified ? "bad" : rk.points >= 75 ? "ok" : ""}">🎖 ${esc(rk.rank)} · ${rk.points} оноо</span>` : ""].join("");
+    row.classList.add("open");
+    if (!canOpen(row)) { // түгжээтэй: шалтгаан ба нээх товч
+      const why = row.classList.contains("is-drip") ? esc($(".lesson-state", row)?.textContent || "Түгжээтэй") : "Энэ хичээл төлбөртэй";
+      row.insertAdjacentHTML("beforeend", `<div class="lesson-more"><div class="lm-facts">${facts}<span class="st-chip bad">🔒 ${why}</span></div>${row.classList.contains("is-drip") ? "" : `<div class="lm-acts"><button type="button" class="btn btn-gold btn-sm" data-more-play>🔒 Нээх</button></div>`}</div>`);
+      return;
+    }
+    row.insertAdjacentHTML("beforeend", `<div class="lesson-more"><div class="lm-facts">${facts}</div><div class="lm-body"><div class="loader"></div></div></div>`);
+    const m = lessonModalEl(); m.classList.add("inline"); $(".lm-body", row).replaceChildren(m);
+    try { await play(lid); } catch (err) { toast(err.message, true); collapseAll(); return; }
+    if (scroll) row.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
   const play = async (lid) => {
     const l = await api(`/api/courses/${id}/lessons/${lid}`);
     $("#lessonTitle").textContent = l.title;
     const nav = $("#lessonNav");
-    if (nav) { nav.innerHTML = navHTML(lid); nav.hidden = lessonRows().length < 2; nav.onclick = async (e) => { const b = e.target.closest("[data-nav]"); if (!b || b.disabled) return; const li = lessonRows().find((r) => r.dataset.lesson === b.dataset.nav); $("[data-play]", li)?.click(); $(".lesson-modal")?.scrollTo?.({ top: 0, behavior: "smooth" }); }; }
+    if (nav) { nav.innerHTML = navHTML(lid); nav.hidden = lessonRows().length < 2; nav.onclick = async (e) => { const b = e.target.closest("[data-nav]"); if (!b || b.disabled) return; const li = lessonRows().find((r) => r.dataset.lesson === b.dataset.nav); if (!li) return; if (lessonModalEl().classList.contains("inline") && canOpen(li)) { await expandRow(li, true); return; } $("[data-play]", li)?.click(); $(".lesson-modal")?.scrollTo?.({ top: 0, behavior: "smooth" }); }; }
     const done = $("#lessonDone"), p = access?.progress?.[lid];
     if (done) {
       done.hidden = !Auth.token;
@@ -2318,24 +2350,12 @@ async function coursePage() {
 
   document.addEventListener("click", async (e) => {
     const row = e.target.closest(".lesson[data-lesson]");
-    if (row && !e.target.closest("button, a")) { // мөр дээр дарахад доош задарна: төлөв, оноо, "Үзэх", "Дараагийн хичээл"
-      const was = row.classList.contains("open");
-      $$(".lesson.open").forEach((r) => { r.classList.remove("open"); $(".lesson-more", r)?.remove(); });
-      if (was) return;
-      const rows = lessonRows(), i = rows.indexOf(row), next = rows[i + 1];
-      const p = access?.progress?.[row.dataset.lesson], rk = access?.ranks?.[row.dataset.lesson], st = access?.states?.[row.dataset.lesson];
-      const status = p?.completed_at ? `<span class="st-chip ok">✓ Дууссан · ${fmtDate(p.completed_at)}</span>` : p?.viewed_at ? `<span class="st-chip">Үзэж эхэлсэн · ${fmtDate(p.viewed_at)}</span>` : `<span class="st-chip">Хараахан үзээгүй</span>`;
-      const quiz = p?.quiz ? Object.entries(p.quiz).filter(([k]) => !k.startsWith("watch_") && !k.endsWith("_pass")) : [];
-      const facts = [status, rk ? `<span class="st-chip ${rk.disqualified ? "bad" : rk.points >= 75 ? "ok" : ""}">🎖 ${esc(rk.rank)} · ${rk.points} оноо</span>` : "", quiz.length ? `<span class="st-chip">Асуулга ${quiz.filter(([, v]) => v).length}/${quiz.length}</span>` : "", st && !st.open && !row.classList.contains("is-free") ? `<span class="st-chip bad">${esc($(".lesson-state", row)?.textContent || "Түгжээтэй")}</span>` : ""].filter(Boolean).join("");
-      row.classList.add("open");
-      row.insertAdjacentHTML("beforeend", `<div class="lesson-more"><div class="lm-facts">${facts}</div>
-        <div class="lm-acts"><button type="button" class="btn btn-gold btn-sm" data-more-play>${row.classList.contains("is-locked") && !row.classList.contains("unlocked") ? "🔒 Нээх" : "▶ Хичээл үзэх"}</button>${next ? `<button type="button" class="btn btn-ghost btn-sm" data-more-next="${esc(next.dataset.lesson)}">Дараагийн хичээл: ${esc(rowTitle(next)).slice(0, 40)} →</button>` : `<span class="muted small">Сүүлийн хичээл</span>`}</div></div>`);
-      return;
-    }
+    if (row && !e.target.closest("button, a, .lesson-more")) { await expandRow(row); return; }
     if (e.target.closest("[data-more-play]")) { const r = e.target.closest(".lesson"); $("[data-play]", r)?.click(); return; }
     const mn = e.target.closest("[data-more-next]");
-    if (mn) { const r = lessonRows().find((x) => x.dataset.lesson === mn.dataset.moreNext); r?.scrollIntoView({ block: "center", behavior: "smooth" }); $("[data-play]", r)?.click(); return; }
+    if (mn) { const r = lessonRows().find((x) => x.dataset.lesson === mn.dataset.moreNext); if (r) await expandRow(r, true); return; }
     const b = e.target.closest("[data-play]");
+    if (b && !e.target.closest(".lesson-more") && canOpen(b.closest(".lesson"))) { await expandRow(b.closest(".lesson")); return; }
     if (!b) return;
     const li = b.closest(".lesson"), lid = li.dataset.lesson, price = +li.dataset.price;
     if (li.classList.contains("is-drip")) { li.animate([{ transform: "translateX(0)" }, { transform: "translateX(-8px)" }, { transform: "translateX(8px)" }, { transform: "translateX(0)" }], { duration: 350 }); toast($(".lesson-state", li).textContent); return; }
