@@ -1526,3 +1526,255 @@ func TestDeleteLessonRemovesOrphanFiles(t *testing.T) {
 	}
 	_ = tid
 }
+
+// Дараалсан нээлт: өмнөх хичээлийн бүх асуултад зөв хариулсны дараа л дараагийнх (таймертайгаа) нээгдэнэ;
+// багшийн статистикт асуулгын эзэмшилт, суралцагчийн дэлгэрэнгүйд хичээл бүрийн үнэлгээ харагдана.
+func TestQuizMasteryUnlock(t *testing.T) {
+	srv, st := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Асуулга","price":5000,"published":true,"drip":true}`)
+	cid := c["id"].(string)
+	id := func(m map[string]any) string { return m["id"].(string) }
+	_, l1 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","blocks":[
+		{"id":"q001","type":"quiz","quiz":{"question":"1+1?","options":["1","2"],"correct":[1]}},
+		{"id":"q002","type":"quiz","quiz":{"question":"2+2?","options":["4","5"],"correct":[0]}}]}`)
+	_, l2 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Хоёр","unlock_after_h":0,"blocks":[
+		{"id":"q003","type":"quiz","quiz":{"question":"3+3?","options":["6","7"],"correct":[0]}}]}`)
+	_, l3 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Гурав","unlock_after_h":24}`)
+	s1, uid := register(t, srv, "stud", "student")
+	_, en := call(t, srv, "POST", "/api/courses/"+cid+"/enroll", s1, "")
+	call(t, srv, "POST", "/api/orders/"+en["order"].(map[string]any)["id"].(string)+"/dev-pay", s1, "")
+	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l1), s1, ""); code != 200 { // үзсэн
+		t.Fatalf("1-р хичээл нээлттэй байх ёстой: %d", code)
+	}
+	// Үзсэн ч асуултуудад хариулаагүй → 2 түгжээтэй ("quiz", 2 үлдсэн).
+	code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l2), s1, "")
+	stt, _ := r["state"].(map[string]any)
+	if code != http.StatusLocked || stt["reason"] != "quiz" || stt["quiz_left"].(float64) != 2 {
+		t.Fatalf("асуулга дуусаагүй үед 2 түгжээтэй байх ёстой: %d %v", code, r)
+	}
+	// Нэгийг зөв, нөгөөг буруу → түгжээтэй хэвээр (1 үлдсэн).
+	_, a1 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+id(l1)+"/quiz/q001", s1, `{"answer":[1],"ms":3000}`)
+	if a1["mastered"] != false || a1["quiz_correct"].(float64) != 1 || a1["quiz_total"].(float64) != 2 {
+		t.Fatalf("явцын тоо буруу: %v", a1)
+	}
+	call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+id(l1)+"/quiz/q002", s1, `{"answer":[1],"ms":2000}`)
+	_, acc := call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
+	if s2 := acc["states"].(map[string]any)[id(l2)].(map[string]any); s2["open"] == true || s2["quiz_left"].(float64) != 1 {
+		t.Fatalf("1 үлдсэн байх ёстой: %v", s2)
+	}
+	// Сүүлийнхийг зөв → эзэмшсэн, 2 нээгдэнэ, quiz_done_at хадгалагдана.
+	_, a2 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+id(l1)+"/quiz/q002", s1, `{"answer":[0],"ms":4000}`)
+	if a2["mastered"] != true {
+		t.Fatalf("бүгд зөв болсон: %v", a2)
+	}
+	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l2), s1, ""); code != 200 {
+		t.Fatalf("асуулгыг дуусгасны дараа 2 нээгдэх ёстой: %d", code)
+	}
+	_, acc = call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
+	if p := acc["progress"].(map[string]any)[id(l1)].(map[string]any); p["quiz_done_at"] == nil {
+		t.Fatalf("quiz_done_at алга: %v", p)
+	}
+	// 3: өмнөх (2) асуулттай тул эхлээд асуулга, дараа нь 24 цагийн таймер (асуулга дууссан мөчөөс).
+	if code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l3), s1, ""); code != http.StatusLocked || r["state"].(map[string]any)["reason"] != "quiz" {
+		t.Fatalf("3 нь 2-ын асуулгаас хамаарна: %d %v", code, r)
+	}
+	call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+id(l2)+"/quiz/q003", s1, `{"answer":[0],"ms":2500}`)
+	if code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l3), s1, ""); code != http.StatusLocked || r["state"].(map[string]any)["reason"] != "timer" {
+		t.Fatalf("асуулга дууссан → таймер: %d %v", code, r)
+	}
+	if mem, ok := st.(*store.Memory); ok {
+		mem.BackdateProgress(uid, id(l2), 25*time.Hour)
+		if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l3), s1, ""); code != 200 {
+			t.Fatal("24 цаг өнгөрсний дараа 3 нээгдэх ёстой")
+		}
+	}
+	// Багш өөрөө түгжээгүй.
+	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l3), tt, ""); code != 200 {
+		t.Fatal("багшид бүгд нээлттэй")
+	}
+	// Багшийн статистик: 2 асуулттай хичээл, 2-уулаа эзэмшсэн; анх удаад зөв 2/3 = 67%; 4 оролдлого / 3 асуулт.
+	_, an := call(t, srv, "GET", "/api/me/analytics?course="+cid, tt, "")
+	sts := an["data"].(map[string]any)["students"].([]any)
+	if len(sts) != 1 {
+		t.Fatalf("1 суралцагч: %v", an)
+	}
+	x := sts[0].(map[string]any)
+	if x["quiz_lessons"].(float64) != 2 || x["quiz_mastered"].(float64) != 2 || x["quiz_first_try"].(float64) != 67 || x["quiz_questions"].(float64) != 3 {
+		t.Fatalf("асуулгын эзэмшилт буруу: lessons=%v mastered=%v first=%v q=%v", x["quiz_lessons"], x["quiz_mastered"], x["quiz_first_try"], x["quiz_questions"])
+	}
+	tot := an["data"].(map[string]any)["totals"].(map[string]any)
+	if tot["quiz_mastered"].(float64) != 2 {
+		t.Fatalf("нийт эзэмшилт буруу: %v", tot)
+	}
+	_, det := call(t, srv, "GET", "/api/me/analytics/students/"+uid+"?course="+cid, tt, "")
+	ql := det["quiz_lessons"].([]any)
+	if len(ql) != 2 {
+		t.Fatalf("хичээл бүрийн асуулгын мөр 2 байх ёстой: %v", ql)
+	}
+	var one map[string]any
+	for _, row := range ql {
+		if row.(map[string]any)["lesson_id"] == id(l1) {
+			one = row.(map[string]any)
+		}
+	}
+	if one == nil || one["done"] != true || one["attempts"].(float64) != 3 || one["first_try"].(float64) != 1 || one["correct"].(float64) != 2 {
+		t.Fatalf("1-р хичээлийн үнэлгээ буруу: %v", one)
+	}
+	if len(det["quiz_logs"].([]any)) != 4 || det["lesson_titles"].(map[string]any)[id(l1)] != "Нэг" {
+		t.Fatalf("лог/нэр буруу: %v", det["lesson_titles"])
+	}
+}
+
+// Цэргийн цол: шударга идэвхтэй суралцсан хичээлд цол, хуулах оролдлоготой хичээлд цолгүй; нийлбэрээр нэгдсэн цол.
+func TestMilitaryRanks(t *testing.T) {
+	if r := RankFor(0); r.Name != "Шинэ цэрэг" || r.Next != 60 {
+		t.Fatalf("эхний цол: %+v", r)
+	}
+	if r := RankFor(420); r.Name != "Түрүүч" || r.NextName != "Ахлах түрүүч" || r.Progress != 13 {
+		t.Fatalf("420 оноо: %+v", r)
+	}
+	if r := RankFor(99999); r.Name != "Генерал" || r.Next != 0 || r.Progress != 100 {
+		t.Fatalf("дээд цол: %+v", r)
+	}
+	now := time.Now()
+	l := &store.Lesson{ID: "l1", Title: "Нэг", ActiveMin: 10, Blocks: []store.Block{{ID: "q001", Type: "quiz", Quiz: &store.Quiz{Question: "?"}}, {ID: "v001", Type: "video", URL: "/files/x/private/a.mp4"}}}
+	full := &store.LessonProgress{LessonID: "l1", ViewedAt: now, CompletedAt: &now, Quiz: map[string]bool{"q001": true}, QuizDoneAt: &now}
+	good := []*store.StudySession{{LessonID: "l1", Kind: "lesson", ActiveSec: 700, IdleSec: 60, Counts: map[string]int{}}}
+	if lr := lessonPoints(l, full, good, true, 100, true); lr.Points != 100 || lr.Rank != "Ахлах түрүүч" || lr.Disqualified {
+		t.Fatalf("төгс хичээл 100 оноо байх ёстой: %+v", lr)
+	}
+	// Таб солилт хасна.
+	tabs := []*store.StudySession{{LessonID: "l1", Kind: "lesson", ActiveSec: 700, Counts: map[string]int{"tab_switch": 2}}}
+	if lr := lessonPoints(l, full, tabs, true, 100, true); lr.Points != 90 {
+		t.Fatalf("2 таб солилт −10: %+v", lr)
+	}
+	// Хуулах оролдлого → цолгүй, 0 оноо.
+	cheat := []*store.StudySession{{LessonID: "l1", Kind: "lesson", ActiveSec: 700, Counts: map[string]int{"copy": 1}}}
+	if lr := lessonPoints(l, full, cheat, true, 100, true); !lr.Disqualified || lr.Points != 0 || lr.Rank != "Цолгүй" {
+		t.Fatalf("хуулсан хичээлд цол олгох ёсгүй: %+v", lr)
+	}
+	// Хагас: дуусгаагүй, идэвхтэй хугацаа хагас, асуулга буруу, дүгнэлтгүй, видео 50%.
+	half := &store.LessonProgress{LessonID: "l1", ViewedAt: now, Quiz: map[string]bool{"q001": false}}
+	part := []*store.StudySession{{LessonID: "l1", Kind: "lesson", ActiveSec: 300, Counts: map[string]int{}}}
+	lr := lessonPoints(l, half, part, false, 50, true)
+	if lr.Points != 25 || lr.Rank != "Байлдагч" { // (5 + 15 + 5) / 100
+		t.Fatalf("хагас хичээл: %+v", lr)
+	}
+	// Асуулга, видеогүй хичээл: 5+10+30+15 = 60-аас хувилна.
+	plain := &store.Lesson{ID: "l2", Title: "Хоёр"}
+	if lr := lessonPoints(plain, &store.LessonProgress{LessonID: "l2", ViewedAt: now, CompletedAt: &now}, []*store.StudySession{{LessonID: "l2", ActiveSec: 500, IdleSec: 100, Counts: map[string]int{}}}, false, 0, false); lr.Points != 75 {
+		t.Fatalf("энгийн хичээл (5+10+30)/60: %+v", lr)
+	}
+
+	// Бүтэн урсгал: сурагч хичээл үзэж, асуултад зөв хариулж, дүгнэлт бичнэ → /access-д цол; хуулсан хичээл цолгүй.
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Цол","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l1 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true,"blocks":[{"id":"q001","type":"quiz","quiz":{"question":"?","options":["a","b"],"correct":[0]}}]}`)
+	_, l2 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Хоёр","is_free":true}`)
+	lid1, lid2 := l1["id"].(string), l2["id"].(string)
+	s1, uid := register(t, srv, "stud", "student")
+	call(t, srv, "POST", "/api/courses/"+cid+"/enroll", s1, "")
+	call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lid1+"/quiz/q001", s1, `{"answer":[0],"ms":3000}`)
+	call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lid1+"/reflect", s1, `{"text":"Энэ хичээлээс олон зүйл сурлаа, маш сайн байлаа."}`)
+	call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lid1+"/complete", s1, "")
+	// 1-р хичээл: идэвхтэй сесс; 2-р хичээл: хуулах оролдлоготой сесс.
+	_, ss1 := call(t, srv, "POST", "/api/activity/start", s1, `{"course_id":"`+cid+`","lesson_id":"`+lid1+`","kind":"lesson"}`)
+	call(t, srv, "POST", "/api/activity/beat", s1, `{"session_id":"`+ss1["session_id"].(string)+`","active":600}`)
+	_, ss2 := call(t, srv, "POST", "/api/activity/start", s1, `{"course_id":"`+cid+`","lesson_id":"`+lid2+`","kind":"lesson"}`)
+	call(t, srv, "POST", "/api/activity/beat", s1, `{"session_id":"`+ss2["session_id"].(string)+`","active":300,"events":[{"type":"copy","detail":"ctrl+c"}]}`)
+	_, acc := call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
+	ranks := acc["ranks"].(map[string]any)
+	r1, r2 := ranks[lid1].(map[string]any), ranks[lid2].(map[string]any)
+	if r1["points"].(float64) < 90 || r1["disqualified"] == true {
+		t.Fatalf("1-р хичээл өндөр цолтой байх ёстой: %v", r1)
+	}
+	if r2["disqualified"] != true || r2["rank"] != "Цолгүй" {
+		t.Fatalf("хуулсан хичээл цолгүй байх ёстой: %v", r2)
+	}
+	rank := acc["rank"].(map[string]any)
+	if rank["name"] != "Байлдагч" || rank["cheated"].(float64) != 1 || rank["honest"].(float64) != 1 {
+		t.Fatalf("нэгдсэн цол: %v", rank)
+	}
+	// Багшийн дашбоард: суралцагчийн цол, дэлгэрэнгүйд хичээл бүрийн цол.
+	_, an := call(t, srv, "GET", "/api/me/analytics?course="+cid, tt, "")
+	x := an["data"].(map[string]any)["students"].([]any)[0].(map[string]any)
+	if x["rank"].(map[string]any)["name"] != "Байлдагч" {
+		t.Fatalf("дашбоард дахь цол: %v", x["rank"])
+	}
+	tot := an["data"].(map[string]any)["totals"].(map[string]any)
+	if tot["cheated_lessons"].(float64) != 1 || tot["rank_dist"].(map[string]any)["Байлдагч"].(float64) != 1 {
+		t.Fatalf("нийт цол: %v", tot)
+	}
+	_, det := call(t, srv, "GET", "/api/me/analytics/students/"+uid+"?course="+cid, tt, "")
+	lrs := det["student"].(map[string]any)["lesson_ranks"].([]any)
+	if len(lrs) != 2 {
+		t.Fatalf("хичээл бүрийн цол 2 байх ёстой: %v", lrs)
+	}
+}
+
+// Видео холбоос: суралцагчид бодит /files/... зам харагдахгүй (тасалбар), шинэ таб/татагчаар нээхэд 403,
+// <video>-оос ирэхэд 200 + Range; багш өөрийн засварт ердийн замыг харна.
+func TestMediaTicket(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, tid := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Видео","price":0,"published":true}`)
+	cid := c["id"].(string)
+	vid := uploadFile(t, srv, tt, "secret-lecture.webm", bytes.Repeat([]byte("v"), 4096))
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true,"video_url":"`+vid+`","blocks":[{"id":"vid1","type":"video","url":"`+vid+`"}]}`)
+	lid := l["id"].(string)
+	s1, _ := register(t, srv, "stud", "student")
+	_, got := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid, s1, "")
+	u := got["blocks"].([]any)[0].(map[string]any)["url"].(string)
+	if !strings.HasPrefix(u, "/api/media/") || strings.Contains(u, "secret-lecture") || strings.Contains(u, tid) || !strings.HasSuffix(u, "/video.webm") {
+		t.Fatalf("суралцагчид бодит зам харагдах ёсгүй: %s", u)
+	}
+	if vu := got["video_url"].(string); !strings.HasPrefix(vu, "/api/media/") {
+		t.Fatalf("хичээлийн видео ч тасалбартай байх ёстой: %s", vu)
+	}
+	get := func(dest, mode, rng string) *http.Response {
+		req, _ := http.NewRequest("GET", srv.URL+u, nil)
+		if dest != "" {
+			req.Header.Set("Sec-Fetch-Dest", dest)
+		}
+		if mode != "" {
+			req.Header.Set("Sec-Fetch-Mode", mode)
+		}
+		if rng != "" {
+			req.Header.Set("Range", rng)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res
+	}
+	if r := get("video", "no-cors", "bytes=0-99"); r.StatusCode != 206 || r.Header.Get("Content-Type") != "video/webm" || r.Header.Get("Cache-Control") != "private, no-store" {
+		t.Fatalf("<video>-оос Range хүсэлт 206 байх ёстой: %d %v", r.StatusCode, r.Header)
+	}
+	if r := get("document", "navigate", ""); r.StatusCode != 403 {
+		t.Fatalf("шинэ таб-д нээхэд 403 байх ёстой: %d", r.StatusCode)
+	}
+	if r := get("", "", ""); r.StatusCode != 200 { // Sec-Fetch толгойгүй хуучин хөтөч/плеер
+		t.Fatalf("толгойгүй хүсэлт 200: %d", r.StatusCode)
+	}
+	// Тасалбарыг өөрчилбөл хүчингүй.
+	bad := strings.Replace(u, "/api/media/", "/api/media/x", 1)
+	req, _ := http.NewRequest("GET", srv.URL+bad, nil)
+	req.Header.Set("Sec-Fetch-Dest", "video")
+	if res, _ := http.DefaultClient.Do(req); res.StatusCode != 403 {
+		t.Fatalf("засварласан тасалбар 403: %d", res.StatusCode)
+	}
+	// Багш өөрийн хичээлийг засахдаа ердийн (гарын үсэгтэй) замыг харна.
+	_, mine := call(t, srv, "GET", "/api/me/courses/"+cid, tt, "")
+	mu := mine["lessons"].([]any)[0].(map[string]any)["blocks"].([]any)[0].(map[string]any)["url"].(string)
+	if !strings.HasPrefix(mu, "/files/") {
+		t.Fatalf("багшид /files/ зам байх ёстой: %s", mu)
+	}
+}

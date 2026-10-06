@@ -129,6 +129,11 @@ type chTable struct{ name, ddl string }
 
 const tsType = "DateTime64(3, 'UTC')"
 
+// chMigrations — өмнөх хувилбарын хүснэгтэд багана нэмэх ALTER-ууд (IF NOT EXISTS тул давтахад аюулгүй).
+var chMigrations = []string{
+	"ALTER TABLE lesson_progress ADD COLUMN IF NOT EXISTS quiz_done_at Nullable(" + tsType + ")",
+}
+
 var chTables = []chTable{
 	{"users", `(
 		id String, username String, email String, password_hash String, role String,
@@ -166,7 +171,7 @@ var chTables = []chTable{
 		created_at ` + tsType + `, ver UInt64, deleted Bool DEFAULT false)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (course_id, id)`},
 	{"lesson_progress", `(user_id String, course_id String, lesson_id String, viewed_at ` + tsType + `,
-		completed_at Nullable(` + tsType + `), quiz Map(String, Bool), ver UInt64)
+		completed_at Nullable(` + tsType + `), quiz Map(String, Bool), quiz_done_at Nullable(` + tsType + `), ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, lesson_id)`},
 	{"enrollments", `(user_id String, course_id String, teacher_id String, created_at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, course_id)`},
@@ -229,6 +234,12 @@ func (c *ClickHouse) ensureSchema(ctx context.Context) error {
 	for _, t := range chTables {
 		if err := c.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS "+t.name+" "+t.ddl); err != nil {
 			return fmt.Errorf("clickhouse schema %s: %w", t.name, err)
+		}
+	}
+	// Хуучин сангуудад нэмэгдсэн баганууд (шинэ санд DDL-д байгаа; IF NOT EXISTS тул давтахад аюулгүй).
+	for _, alter := range chMigrations {
+		if err := c.conn.Exec(ctx, alter); err != nil {
+			return fmt.Errorf("clickhouse migrate: %w", err)
 		}
 	}
 	return nil

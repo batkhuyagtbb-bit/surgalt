@@ -98,7 +98,7 @@ func (s *Server) viewerBlocks(bs []store.Block) []store.Block {
 	out := make([]store.Block, len(bs))
 	for i, b := range bs {
 		if b.URL != "" {
-			b.URL = s.media(b.URL)
+			b.URL = s.viewerMedia(b.URL, "") // видео/аудио → нуусан тасалбар, бусад → гарын үсэгтэй URL
 		}
 		if b.Quiz != nil {
 			b.Quiz = s.viewerQuiz(b.ID, b.Quiz)
@@ -178,6 +178,24 @@ func (s *Server) handleAnswerQuiz(w http.ResponseWriter, r *http.Request) {
 	}
 	out := revealQuiz(bid, q)
 	out["correct"] = correct
+	// Хичээлийн бүх асуултад зөв хариулсан эсэх — дараагийн хичээл үүнээс хамаарч нээгдэнэ.
+	if uid != "" && uid != course.TeacherID {
+		prog, err := s.store.LessonProgress(r.Context(), uid, course.ID)
+		if s.storeErr(w, r, err) {
+			return
+		}
+		var pp *store.LessonProgress
+		if p, ok := prog[l.ID]; ok {
+			pp = &p
+		}
+		got, total, done, _ := quizMastery(l, pp)
+		if done && (pp == nil || pp.QuizDoneAt == nil) {
+			if err := s.store.MarkQuizDone(r.Context(), uid, course.ID, l.ID); s.storeErr(w, r, err) {
+				return
+			}
+		}
+		out["quiz_total"], out["quiz_correct"], out["mastered"] = total, got, done
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 

@@ -380,3 +380,55 @@ func (s *Store) Verify(escapedPath, expStr, sig string) bool {
 func OwnedBy(path, teacherID string) bool {
 	return strings.HasPrefix(path, "/files/"+teacherID+"/")
 }
+
+// ---- медиа тасалбар (видео, аудионы бодит замыг нуух) ----
+
+// Ticket нь private файлын замыг нууж, хугацаатай, хэрэглэгчид холбосон тасалбар үүсгэнэ:
+// base64url("path|uid|exp") + "." + HMAC. Суралцагчийн хөтөч файлын нэр, багшийн ID-г харахгүй.
+func (s *Store) Ticket(path, uid string, ttl time.Duration) string {
+	exp := time.Now().Add(ttl).Unix()
+	payload := fmt.Sprintf("%s|%s|%d", path, uid, exp)
+	mac := hmac.New(sha256.New, append([]byte("ticket:"), s.key...))
+	mac.Write([]byte(payload))
+	return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)[:18])
+}
+
+// ResolveTicket нь тасалбарыг шалгаад (гарын үсэг, хугацаа) файлын зам ба хэрэглэгчийн ID-г буцаана.
+func (s *Store) ResolveTicket(t string) (path, uid string, ok bool) {
+	i := strings.LastIndexByte(t, '.')
+	if i <= 0 {
+		return "", "", false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(t[:i])
+	if err != nil {
+		return "", "", false
+	}
+	mac := hmac.New(sha256.New, append([]byte("ticket:"), s.key...))
+	mac.Write(raw)
+	want := base64.RawURLEncoding.EncodeToString(mac.Sum(nil)[:18])
+	if !hmac.Equal([]byte(want), []byte(t[i+1:])) {
+		return "", "", false
+	}
+	parts := strings.Split(string(raw), "|")
+	if len(parts) != 3 {
+		return "", "", false
+	}
+	exp, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil || time.Now().Unix() > exp {
+		return "", "", false
+	}
+	return parts[0], parts[1], true
+}
+
+// SplitPath нь /files/<teacher>/<visibility>/<name> замыг задална (name нь URL-escape-гүй).
+func SplitPath(p string) (teacher, visibility, name string, ok bool) {
+	parts := strings.Split(strings.TrimPrefix(p, "/files/"), "/")
+	if !strings.HasPrefix(p, "/files/") || len(parts) != 3 {
+		return "", "", "", false
+	}
+	n, err := url.PathUnescape(parts[2])
+	if err != nil {
+		return "", "", "", false
+	}
+	return parts[0], parts[1], n, true
+}

@@ -327,14 +327,14 @@ func (c *ClickHouse) LessonOutlines(ctx context.Context, courseIDs []string) ([]
 func (c *ClickHouse) progressRow(ctx context.Context, userID, lessonID string) (*LessonProgress, string, error) {
 	var p *LessonProgress
 	var courseID string
-	err := c.query(ctx, `SELECT course_id, viewed_at, completed_at, quiz FROM lesson_progress FINAL
+	err := c.query(ctx, `SELECT course_id, viewed_at, completed_at, quiz, quiz_done_at FROM lesson_progress FINAL
 		WHERE user_id = ? AND lesson_id = ? LIMIT 1`, []any{userID, lessonID}, func(r driver.Rows) error {
 		var lp LessonProgress
-		var done *time.Time
-		if err := r.Scan(&courseID, &lp.ViewedAt, &done, &lp.Quiz); err != nil {
+		var done, qdone *time.Time
+		if err := r.Scan(&courseID, &lp.ViewedAt, &done, &lp.Quiz, &qdone); err != nil {
 			return err
 		}
-		lp.LessonID, lp.CompletedAt = lessonID, done
+		lp.LessonID, lp.CompletedAt, lp.QuizDoneAt = lessonID, done, qdone
 		p = &lp
 		return nil
 	})
@@ -346,8 +346,8 @@ func (c *ClickHouse) writeProgress(ctx context.Context, userID, courseID string,
 	if quiz == nil {
 		quiz = map[string]bool{}
 	}
-	return c.insert(ctx, "lesson_progress", []string{"user_id", "course_id", "lesson_id", "viewed_at", "completed_at", "quiz", "ver"},
-		userID, courseID, p.LessonID, p.ViewedAt.UTC(), nullTime(p.CompletedAt), quiz, ver())
+	return c.insert(ctx, "lesson_progress", []string{"user_id", "course_id", "lesson_id", "viewed_at", "completed_at", "quiz", "quiz_done_at", "ver"},
+		userID, courseID, p.LessonID, p.ViewedAt.UTC(), nullTime(p.CompletedAt), quiz, nullTime(p.QuizDoneAt), ver())
 }
 
 func (c *ClickHouse) MarkLessonViewed(ctx context.Context, userID, courseID, lessonID string) error {
@@ -404,20 +404,60 @@ func (c *ClickHouse) SaveQuizResult(ctx context.Context, userID, courseID, lesso
 	return c.writeProgress(ctx, userID, courseID, p)
 }
 
+func (c *ClickHouse) MarkQuizDone(ctx context.Context, userID, courseID, lessonID string) error {
+	unlock, err := c.lock(ctx, "prog:"+userID+":"+lessonID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	p, _, err := c.progressRow(ctx, userID, lessonID)
+	if err != nil {
+		return err
+	}
+	if p == nil {
+		p = &LessonProgress{LessonID: lessonID, ViewedAt: time.Now()}
+	}
+	if p.QuizDoneAt != nil {
+		return nil
+	}
+	now := time.Now()
+	p.QuizDoneAt = &now
+	return c.writeProgress(ctx, userID, courseID, p)
+}
+
 func (c *ClickHouse) LessonProgress(ctx context.Context, userID, courseID string) (map[string]LessonProgress, error) {
-	out := map[string]LessonProgress{}
-	err := c.query(ctx, `SELECT lesson_id, viewed_at, completed_at, quiz FROM lesson_progress FINAL
-		WHERE user_id = ? AND course_id = ?`, []any{userID, courseID}, func(r driver.Rows) error {
+	all, err := c.progressWhere(ctx, "user_id = ? AND course_id = ?", userID, courseID)
+	if err != nil {
+		return nil, err
+	}
+	if out := all[userID]; out != nil {
+		return out, nil
+	}
+	return map[string]LessonProgress{}, nil
+}
+
+func (c *ClickHouse) CourseProgress(ctx context.Context, courseID string) (map[string]map[string]LessonProgress, error) {
+	return c.progressWhere(ctx, "course_id = ?", courseID)
+}
+
+func (c *ClickHouse) progressWhere(ctx context.Context, where string, args ...any) (map[string]map[string]LessonProgress, error) {
+	out := map[string]map[string]LessonProgress{}
+	err := c.query(ctx, `SELECT user_id, lesson_id, viewed_at, completed_at, quiz, quiz_done_at FROM lesson_progress FINAL
+		WHERE `+where, args, func(r driver.Rows) error {
 		var lp LessonProgress
-		var done *time.Time
-		if err := r.Scan(&lp.LessonID, &lp.ViewedAt, &done, &lp.Quiz); err != nil {
+		var uid string
+		var done, qdone *time.Time
+		if err := r.Scan(&uid, &lp.LessonID, &lp.ViewedAt, &done, &lp.Quiz, &qdone); err != nil {
 			return err
 		}
-		lp.CompletedAt = done
+		lp.CompletedAt, lp.QuizDoneAt = done, qdone
 		if len(lp.Quiz) == 0 {
 			lp.Quiz = nil
 		}
-		out[lp.LessonID] = lp
+		if out[uid] == nil {
+			out[uid] = map[string]LessonProgress{}
+		}
+		out[uid][lp.LessonID] = lp
 		return nil
 	})
 	return out, err

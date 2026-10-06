@@ -227,6 +227,8 @@ type LessonProgress struct {
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	// Quiz — асуулт (блокийн ID) → сүүлийн хариулт зөв эсэх.
 	Quiz map[string]bool `json:"quiz,omitempty"`
+	// QuizDoneAt — хичээлийн бүх асуултад зөв хариулж дуусгасан мөч (дараагийн хичээлийн таймер эндээс эхэлнэ).
+	QuizDoneAt *time.Time `json:"quiz_done_at,omitempty"`
 }
 
 type OrderStatus string
@@ -375,6 +377,10 @@ type Store interface {
 	// Явц: MarkLessonViewed идемпотент (анхны үзэлтийн цаг хадгална), MarkLessonCompleted дууссаныг тэмдэглэнэ.
 	MarkLessonViewed(ctx context.Context, userID, courseID, lessonID string) error
 	MarkLessonCompleted(ctx context.Context, userID, courseID, lessonID string) error
+	// MarkQuizDone нь хичээлийн бүх асуултад зөв хариулсныг нэг удаа тэмдэглэнэ (идемпотент).
+	MarkQuizDone(ctx context.Context, userID, courseID, lessonID string) error
+	// CourseProgress нь сургалтын бүх суралцагчийн явц: user_id → lesson_id → явц (багшийн статистикт).
+	CourseProgress(ctx context.Context, courseID string) (map[string]map[string]LessonProgress, error)
 	LessonProgress(ctx context.Context, userID, courseID string) (map[string]LessonProgress, error)
 
 	IsEnrolled(ctx context.Context, userID, courseID string) (bool, error)

@@ -52,9 +52,18 @@ type StudentStat struct {
 	ReflectionWords int `json:"reflection_words"` // дундаж үгийн тоо
 	VideoClips      int `json:"video_clips"`      // хэдэн видео эхэлсэн
 	VideoCoverage   int `json:"video_coverage"`   // видеоны дундаж хэдэн хувийг нь үзсэн (0-100)
-	ActiveDays      int `json:"active_days"`      // энэ хугацаанд суралцсан өдрийн тоо
-	StreakDays      int `json:"streak_days"`      // дараалсан өдрийн тоо (өнөөдөр/өчигдрөөс)
-	LearnScore      int `json:"learn_score"`      // идэвхтэй суралцсан нэгдсэн оноо 0-100
+	// Хичээл доторх асуулгын эзэмшилт (сурсан эсэхийн "статик" үнэлгээ).
+	QuizLessons   int `json:"quiz_lessons"`   // асуулттай хичээлээс хэдийг нь эхэлсэн
+	QuizMastered  int `json:"quiz_mastered"`  // хэдийнх нь бүх асуултад зөв хариулж дуусгасан
+	QuizFirstTry  int `json:"quiz_first_try"` // анхны оролдлогоор зөв хариулсан хувь
+	QuizQuestions int `json:"quiz_questions"` // хариулж үзсэн өөр өөр асуултын тоо
+	QuizAttempts  int `json:"quiz_attempts"`  // нэг асуултад дунджаар хэдэн оролдлого (×10: 15 = 1.5)
+	// Цэргийн цол: шударга, идэвхтэй суралцсаны нийлбэр.
+	Rank        RankInfo     `json:"rank"`
+	LessonRanks []LessonRank `json:"lesson_ranks,omitempty"` // зөвхөн суралцагчийн дэлгэрэнгүйд
+	ActiveDays  int          `json:"active_days"`            // энэ хугацаанд суралцсан өдрийн тоо
+	StreakDays  int          `json:"streak_days"`            // дараалсан өдрийн тоо (өнөөдөр/өчигдрөөс)
+	LearnScore  int          `json:"learn_score"`            // идэвхтэй суралцсан нэгдсэн оноо 0-100
 }
 
 func (st *StudentStat) add(x *store.StudySession) {
@@ -217,7 +226,10 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 			userDays[x.UserID][d] = true
 		}
 	}
-	for _, l := range quizLogs {
+	firstTry := map[string][2]int{}           // uid → [анх удаад зөв, нийт асуулт]
+	seenQ := map[string]bool{}                // uid|lesson|block — хамгийн эртний лог = анхны оролдлого
+	for i := len(quizLogs) - 1; i >= 0; i-- { // QuizLogs шинэ → хуучин ирдэг тул урвуугаар
+		l := quizLogs[i]
 		if l.UserID == teacherID {
 			continue
 		}
@@ -229,6 +241,84 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 		}
 		if l.Ms > 0 && l.Ms < 1500 {
 			st.QuizGuesses++
+		}
+		if k := l.UserID + "|" + l.LessonID + "|" + l.BlockID; !seenQ[k] {
+			seenQ[k] = true
+			ft := firstTry[l.UserID]
+			ft[1]++
+			if l.Correct {
+				ft[0]++
+			}
+			firstTry[l.UserID] = ft
+		}
+	}
+	for uid, ft := range firstTry {
+		st := get(uid, "")
+		st.QuizQuestions = ft[1]
+		st.QuizFirstTry = int(math.Round(float64(ft[0]) / float64(ft[1]) * 100))
+		st.QuizAttempts = int(math.Round(float64(st.QuizTotal) / float64(ft[1]) * 10))
+	}
+	// Асуулттай хичээл бүрт: эхэлсэн үү, бүх асуултад зөв хариулж дуусгасан уу (явцаас).
+	scope := s.scopeCourses(ctx, teacherID, courseID)
+	for _, m := range quizMasteryFromScope(scope, userID) {
+		if m.UserID == teacherID {
+			continue
+		}
+		st := get(m.UserID, "")
+		st.QuizLessons++
+		if m.Done {
+			st.QuizMastered++
+		}
+	}
+	// Цэргийн цол: суралцагч × сургалт бүрт нотолгоог нэгтгэж, хичээлийн оноог нийлбэрлэнэ.
+	evidence := map[[2]string]*rankEvidence{} // {uid, course}
+	ev := func(uid, cid string) *rankEvidence {
+		k := [2]string{uid, cid}
+		if evidence[k] == nil {
+			evidence[k] = newRankEvidence()
+		}
+		return evidence[k]
+	}
+	for i := range ss {
+		if ss[i].UserID != teacherID {
+			ev(ss[i].UserID, ss[i].CourseID).addSession(&ss[i])
+		}
+	}
+	for _, rf := range refs {
+		ev(rf.UserID, rf.CourseID).reflect[rf.LessonID] = true
+	}
+	for i := range watches {
+		ev(watches[i].UserID, watches[i].CourseID).addWatch(&watches[i])
+	}
+	rankPts := map[string]int{}
+	rankRows := map[string][]LessonRank{}
+	for _, sc := range scope {
+		users := map[string]bool{}
+		for uid := range sc.progress {
+			users[uid] = true
+		}
+		for k := range evidence {
+			if k[1] == sc.course.ID {
+				users[k[0]] = true
+			}
+		}
+		for uid := range users {
+			if uid == teacherID || (userID != "" && uid != userID) {
+				continue
+			}
+			ranks, sum := computeRanks(sc.lessons, sc.progress[uid], ev(uid, sc.course.ID))
+			if len(ranks) == 0 {
+				continue
+			}
+			rankPts[uid] += sum
+			rankRows[uid] = append(rankRows[uid], ranks...)
+		}
+	}
+	for uid, rows := range rankRows {
+		st := get(uid, "")
+		st.Rank = summarizeRank(rows, rankPts[uid])
+		if userID != "" {
+			st.LessonRanks = rows
 		}
 	}
 	for _, rf := range refs {
@@ -309,11 +399,23 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 		}
 	}
 	total := tot.ActiveSec + tot.IdleSec + tot.AwaySec
-	activePct, attention, learn, reflections := 0, 0, 0, 0
+	activePct, attention, learn, reflections, qLessons, qMastered, cheated := 0, 0, 0, 0, 0, 0, 0
+	rankDist := map[string]int{}
+	topRank := RankInfo{}
 	for _, st := range out.Students {
+		if st.Rank.Name == "" {
+			st.Rank = RankFor(0)
+		}
 		attention += st.Attention
 		learn += st.LearnScore
 		reflections += st.Reflections
+		qLessons += st.QuizLessons
+		qMastered += st.QuizMastered
+		cheated += st.Rank.Cheated
+		rankDist[st.Rank.Name]++
+		if st.Rank.Points > topRank.Points {
+			topRank = st.Rank
+		}
 	}
 	if total > 0 {
 		activePct = int(math.Round(float64(tot.ActiveSec) / float64(total) * 100))
@@ -323,8 +425,92 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 		learn /= n
 	}
 	out.Totals = map[string]any{"students": len(out.Students), "live": live, "active_sec": tot.ActiveSec, "total_sec": total, "active_pct": activePct,
-		"attention": attention, "violations": tot.Violations, "exams": len(atts), "learn_score": learn, "reflections": reflections}
+		"attention": attention, "violations": tot.Violations, "exams": len(atts), "learn_score": learn, "reflections": reflections,
+		"quiz_lessons": qLessons, "quiz_mastered": qMastered, "rank_dist": rankDist, "top_rank": topRank, "cheated_lessons": cheated}
 	return out, ss, atts, nil
+}
+
+// quizMasteryRow — нэг суралцагчийн нэг асуулттай хичээл дэх байдал (багшийн статистик, суралцагчийн дэлгэрэнгүйд).
+type quizMasteryRow struct {
+	UserID   string     `json:"user_id"`
+	CourseID string     `json:"course_id"`
+	LessonID string     `json:"lesson_id"`
+	Title    string     `json:"title"`
+	Total    int        `json:"total"`   // хичээлийн асуултын тоо
+	Correct  int        `json:"correct"` // одоо зөв хариулагдсан нь
+	Done     bool       `json:"done"`
+	DoneAt   *time.Time `json:"done_at,omitempty"`
+	ViewedAt time.Time  `json:"viewed_at"`
+}
+
+// scopedCourse — багшийн нэг сургалт: хичээлүүд ба бүх суралцагчийн явц (статистикт нэг удаа ачаална).
+type scopedCourse struct {
+	course   store.Course
+	lessons  []store.Lesson
+	progress map[string]map[string]store.LessonProgress // uid → lesson → явц
+}
+
+func (s *Server) scopeCourses(ctx context.Context, teacherID, courseID string) []scopedCourse {
+	var courses []store.Course
+	if courseID != "" {
+		if c, err := s.store.CourseByID(ctx, courseID); err == nil && c.TeacherID == teacherID {
+			courses = []store.Course{*c}
+		}
+	} else {
+		courses, _ = s.store.CoursesByTeacher(ctx, teacherID, false)
+	}
+	out := make([]scopedCourse, 0, len(courses))
+	for _, c := range courses {
+		lessons, err := s.store.LessonsByCourse(ctx, c.ID)
+		if err != nil {
+			continue
+		}
+		prog, err := s.store.CourseProgress(ctx, c.ID)
+		if err != nil {
+			continue
+		}
+		out = append(out, scopedCourse{course: c, lessons: lessons, progress: prog})
+	}
+	return out
+}
+
+// quizMasteryRows — багшийн (эсвэл нэг сургалтын) асуулттай хичээл бүрт, эхэлсэн суралцагч бүрийн эзэмшилт.
+func (s *Server) quizMasteryRows(ctx context.Context, teacherID, courseID, userID string) []quizMasteryRow {
+	return quizMasteryFromScope(s.scopeCourses(ctx, teacherID, courseID), userID)
+}
+
+func quizMasteryFromScope(scope []scopedCourse, userID string) []quizMasteryRow {
+	var out []quizMasteryRow
+	for _, sc := range scope {
+		c := sc.course
+		withQuiz := sc.lessons[:0:0]
+		for _, l := range sc.lessons {
+			if len(quizBlockIDs(&l)) > 0 {
+				withQuiz = append(withQuiz, l)
+			}
+		}
+		if len(withQuiz) == 0 {
+			continue
+		}
+		for uid, byLesson := range sc.progress {
+			if userID != "" && uid != userID {
+				continue
+			}
+			for i := range withQuiz {
+				p, ok := byLesson[withQuiz[i].ID]
+				if !ok {
+					continue
+				}
+				got, total, done, at := quizMastery(&withQuiz[i], &p)
+				row := quizMasteryRow{UserID: uid, CourseID: c.ID, LessonID: withQuiz[i].ID, Title: withQuiz[i].Title, Total: total, Correct: got, Done: done, ViewedAt: p.ViewedAt}
+				if done {
+					row.DoneAt = &at
+				}
+				out = append(out, row)
+			}
+		}
+	}
+	return out
 }
 
 func analyticsDays(r *http.Request) int {
@@ -377,6 +563,51 @@ func (s *Server) handleStudentAnalytics(w http.ResponseWriter, r *http.Request) 
 	titleByLesson := map[string]string{}
 	for _, x := range ss {
 		titleByLesson[x.LessonID] = x.Title
+	}
+	// Асуулгын үнэлгээ: хичээл бүрт асуултын тоо, зөв нь, дууссан эсэх, оролдлого, анх удаад зөв, дундаж хугацаа, таамаг.
+	type quizLessonRow struct {
+		quizMasteryRow
+		Attempts  int `json:"attempts"`
+		FirstTry  int `json:"first_try"` // анхны оролдлогоор зөв хариулсан асуулт
+		AvgMs     int `json:"avg_ms"`
+		Guesses   int `json:"guesses"`
+		Questions int `json:"questions"` // хариулж үзсэн асуулт
+	}
+	qrows := map[string]*quizLessonRow{}
+	var qorder []string
+	for _, m := range s.quizMasteryRows(r.Context(), c.UID, courseID, uid) {
+		qrows[m.LessonID] = &quizLessonRow{quizMasteryRow: m}
+		qorder = append(qorder, m.LessonID)
+		titleByLesson[m.LessonID] = m.Title
+	}
+	allLogs, _ := s.store.QuizLogs(r.Context(), f, 20000)
+	seen := map[string]bool{}
+	for i := len(allLogs) - 1; i >= 0; i-- {
+		l := allLogs[i]
+		qr := qrows[l.LessonID]
+		if qr == nil {
+			continue
+		}
+		qr.Attempts++
+		qr.AvgMs += l.Ms
+		if l.Ms > 0 && l.Ms < 1500 {
+			qr.Guesses++
+		}
+		if !seen[l.BlockID+"|"+l.LessonID] {
+			seen[l.BlockID+"|"+l.LessonID] = true
+			qr.Questions++
+			if l.Correct {
+				qr.FirstTry++
+			}
+		}
+	}
+	quizLessons := make([]*quizLessonRow, 0, len(qorder))
+	for _, id := range qorder {
+		qr := qrows[id]
+		if qr.Attempts > 0 {
+			qr.AvgMs /= qr.Attempts
+		}
+		quizLessons = append(quizLessons, qr)
 	}
 	// Видео хэсэг бүрийг хэдэн удаа үзсэн — алгассан ба давтаж үзсэн хэсгийг харуулна.
 	type watchView struct {
@@ -436,7 +667,7 @@ func (s *Server) handleStudentAnalytics(w http.ResponseWriter, r *http.Request) 
 		st = data.Students[0]
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"student": st, "sessions": ss, "lessons": perLesson, "exams": atts, "events": data.Events, "daily": data.Daily, "labels": eventLabels(),
-		"quiz_logs": quizLogs, "reflections": refs, "watches": watchRows})
+		"quiz_logs": quizLogs, "quiz_lessons": quizLessons, "lesson_titles": titleByLesson, "reflections": refs, "watches": watchRows})
 }
 
 func eventLabels() map[string]string {
@@ -468,8 +699,8 @@ func (s *Server) handleAnalyticsExport(w http.ResponseWriter, r *http.Request) {
 	cw := csv.NewWriter(w)
 	_ = cw.Write([]string{"Суралцагч", "Нийт хугацаа (мин)", "Идэвхтэй (мин)", "Идэвхгүй (мин)", "Өөр цонхонд (мин)", "Идэвхтэй хувь %", "Анхаарлын индекс %",
 		"Зөрчил", "Таб шилжсэн", "Хуулах", "Автоматаар зогссон", "Хичээл", "Шалгалтын шилдэг %", "Хаагдсан шалгалт",
-		"Асуултад зөв хариулсан %", "Дундаж хариулах хугацаа (сек)", "Таамагласан хариулт", "Дүгнэлт бичсэн тоо", "Видео үзэлтийн бүрэн байдал %",
-		"Тогтмол ирсэн өдөр", "Суралцсан оноо", "Эрсдэл", "Сүүлд"})
+		"Асуултад зөв хариулсан %", "Дундаж хариулах хугацаа (сек)", "Таамагласан хариулт", "Асуулга дуусгасан хичээл", "Асуулттай хичээл", "Анх удаад зөв %", "Дүгнэлт бичсэн тоо", "Видео үзэлтийн бүрэн байдал %",
+		"Тогтмол ирсэн өдөр", "Суралцсан оноо", "Цэргийн цол", "Цолын оноо", "Цолгүй хичээл", "Эрсдэл", "Сүүлд"})
 	risk := map[string]string{"ok": "Хэвийн", "watch": "Анхаарах", "risk": "Эрсдэлтэй"}
 	for _, st := range data.Students {
 		best := ""
@@ -483,8 +714,8 @@ func (s *Server) handleAnalyticsExport(w http.ResponseWriter, r *http.Request) {
 		_ = cw.Write([]string{st.Name, strconv.Itoa(st.TotalSec / 60), strconv.Itoa(st.ActiveSec / 60), strconv.Itoa(st.IdleSec / 60), strconv.Itoa(st.AwaySec / 60),
 			strconv.Itoa(st.ActivePct), strconv.Itoa(st.Attention), strconv.Itoa(st.Violations), strconv.Itoa(st.Counts["tab_switch"]), strconv.Itoa(st.Counts["copy"]),
 			strconv.Itoa(st.Counts["auto_block"]), strconv.Itoa(st.Lessons), best, strconv.Itoa(st.Terminated),
-			accuracy, strconv.Itoa(st.QuizAvgMs / 1000), strconv.Itoa(st.QuizGuesses), strconv.Itoa(st.Reflections), strconv.Itoa(st.VideoCoverage),
-			strconv.Itoa(st.StreakDays), strconv.Itoa(st.LearnScore), risk[st.Risk], st.LastAt.Local().Format("2006-01-02 15:04")})
+			accuracy, strconv.Itoa(st.QuizAvgMs / 1000), strconv.Itoa(st.QuizGuesses), strconv.Itoa(st.QuizMastered), strconv.Itoa(st.QuizLessons), strconv.Itoa(st.QuizFirstTry), strconv.Itoa(st.Reflections), strconv.Itoa(st.VideoCoverage),
+			strconv.Itoa(st.StreakDays), strconv.Itoa(st.LearnScore), st.Rank.Name, strconv.Itoa(st.Rank.Points), strconv.Itoa(st.Rank.Cheated), risk[st.Risk], st.LastAt.Local().Format("2006-01-02 15:04")})
 	}
 	if q.Get("student") != "" { // суралцагчийн дэлгэрэнгүй: сесс, шалгалт, лог
 		_ = cw.Write(nil)

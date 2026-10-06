@@ -859,20 +859,58 @@ func (m *Memory) MarkLessonCompleted(_ context.Context, userID, courseID, lesson
 	return nil
 }
 
+func (m *Memory) MarkQuizDone(_ context.Context, userID, courseID, lessonID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	k := [2]string{userID, lessonID}
+	p, ok := m.progress[k]
+	if !ok {
+		p = &LessonProgress{LessonID: lessonID, ViewedAt: time.Now()}
+		m.progress[k] = p
+	}
+	if p.QuizDoneAt == nil {
+		now := time.Now()
+		p.QuizDoneAt = &now
+	}
+	return nil
+}
+
+func copyProgress(p *LessonProgress) LessonProgress {
+	cp := *p
+	if p.Quiz != nil {
+		cp.Quiz = make(map[string]bool, len(p.Quiz))
+		for k, v := range p.Quiz {
+			cp.Quiz[k] = v
+		}
+	}
+	return cp
+}
+
 func (m *Memory) LessonProgress(_ context.Context, userID, courseID string) (map[string]LessonProgress, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	out := map[string]LessonProgress{}
 	for _, l := range m.lessons[courseID] {
 		if p, ok := m.progress[[2]string{userID, l.ID}]; ok {
-			cp := *p
-			if p.Quiz != nil {
-				cp.Quiz = make(map[string]bool, len(p.Quiz))
-				for k, v := range p.Quiz {
-					cp.Quiz[k] = v
-				}
+			out[l.ID] = copyProgress(p)
+		}
+	}
+	return out, nil
+}
+
+func (m *Memory) CourseProgress(_ context.Context, courseID string) (map[string]map[string]LessonProgress, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := map[string]map[string]LessonProgress{}
+	for _, l := range m.lessons[courseID] {
+		for k, p := range m.progress {
+			if k[1] != l.ID {
+				continue
 			}
-			out[l.ID] = cp
+			if out[k[0]] == nil {
+				out[k[0]] = map[string]LessonProgress{}
+			}
+			out[k[0]][l.ID] = copyProgress(p)
 		}
 	}
 	return out, nil
@@ -884,6 +922,10 @@ func (m *Memory) BackdateProgress(userID, lessonID string, by time.Duration) {
 	defer m.mu.Unlock()
 	if p, ok := m.progress[[2]string{userID, lessonID}]; ok {
 		p.ViewedAt = p.ViewedAt.Add(-by)
+		if p.QuizDoneAt != nil {
+			t := p.QuizDoneAt.Add(-by)
+			p.QuizDoneAt = &t
+		}
 	}
 }
 

@@ -303,9 +303,46 @@ func (s *Server) lessonAccess(ctx context.Context, uid string, course *store.Cou
 // LessonState нь суралцагчид нэг хичээл одоо нээлттэй юу, үгүй бол яагаад, хэзээ нээгдэхийг хэлнэ.
 type LessonState struct {
 	Open      bool       `json:"open"`
-	Reason    string     `json:"reason,omitempty"` // "prev" — өмнөхөө үзээгүй, "timer" — хугацаа болоогүй
+	Reason    string     `json:"reason,omitempty"` // "prev" — өмнөхөө үзээгүй, "quiz" — өмнөхийн асуултуудад бүрэн зөв хариулаагүй, "timer" — хугацаа болоогүй
 	PrevTitle string     `json:"prev_title,omitempty"`
 	UnlockAt  *time.Time `json:"unlock_at,omitempty"`
+	QuizLeft  int        `json:"quiz_left,omitempty"`  // quiz: хэдэн асуулт зөв хариулагдаагүй үлдсэн
+	QuizTotal int        `json:"quiz_total,omitempty"` // quiz: өмнөх хичээлийн нийт асуулт
+}
+
+// quizBlockIDs — хичээл доторх өөрийгөө сорих асуултуудын ID (шалгалтын хичээлд хамаарахгүй: тэр тусдаа тэнцдэг).
+func quizBlockIDs(l *store.Lesson) []string {
+	if l.Exam != nil {
+		return nil
+	}
+	var ids []string
+	for _, b := range l.Blocks {
+		if b.Type == "quiz" && b.Quiz != nil {
+			ids = append(ids, b.ID)
+		}
+	}
+	return ids
+}
+
+// quizMastery — хичээлийн асуултуудаас хэд нь зөв хариулагдсан, бүгд зөв үү, хэзээ дууссан бэ.
+// QuizDoneAt хадгалагдаагүй хуучин явцад "бүгд зөв" байвал үзсэн цагаар тооцно.
+func quizMastery(l *store.Lesson, p *store.LessonProgress) (correct, total int, done bool, at time.Time) {
+	ids := quizBlockIDs(l)
+	total = len(ids)
+	if p == nil {
+		return 0, total, total == 0, time.Time{}
+	}
+	for _, id := range ids {
+		if p.Quiz[id] {
+			correct++
+		}
+	}
+	done = correct == total
+	at = p.ViewedAt
+	if p.QuizDoneAt != nil {
+		done, at = true, *p.QuizDoneAt
+	}
+	return
 }
 
 // dripState: дараалал идэвхгүй, хичээл үргэлж нээлттэй, эхний хичээл, эсвэл fullAccess (багш /
@@ -327,7 +364,15 @@ func dripState(course *store.Course, lessons []store.Lesson, l *store.Lesson, pr
 	if !ok {
 		return LessonState{Reason: "prev", PrevTitle: prev.Title}
 	}
-	at := p.ViewedAt.Add(time.Duration(l.UnlockAfterH) * time.Hour)
+	// Өмнөх хичээлд асуулт байвал бүгдэд нь зөв хариулж дуусгасан байх ёстой; таймер тэр мөчөөс эхэлнэ.
+	correct, total, done, base := quizMastery(prev, &p)
+	if !done {
+		return LessonState{Reason: "quiz", PrevTitle: prev.Title, QuizLeft: total - correct, QuizTotal: total}
+	}
+	if total == 0 {
+		base = p.ViewedAt
+	}
+	at := base.Add(time.Duration(l.UnlockAfterH) * time.Hour)
 	if now.Before(at) {
 		return LessonState{Reason: "timer", PrevTitle: prev.Title, UnlockAt: &at}
 	}
@@ -527,11 +572,18 @@ func (s *Server) handleCourseAccess(w http.ResponseWriter, r *http.Request) {
 			done++
 		}
 	}
+	// Цэргийн цол: энэ сургалт дахь хичээл бүрийн үнэлгээ ба нийлбэр.
+	ranks, rank := s.courseRanks(r.Context(), c.UID, course.ID, lessons, progress)
+	rankBy := make(map[string]LessonRank, len(ranks))
+	for _, lr := range ranks {
+		rankBy[lr.LessonID] = lr
+	}
 	w.Header().Set("Cache-Control", "private, no-store")
 	// all: бүх хичээл төлбөрийн хувьд нээлттэй (багш эсвэл үнэтэй багц худалдаж авсан).
 	writeJSON(w, http.StatusOK, map[string]any{"enrolled": enrolled, "owner": owner,
 		"all": owner || (enrolled && course.Price > 0), "lessons": bought,
-		"states": states, "progress": progress, "done": done, "total": len(lessons)})
+		"states": states, "progress": progress, "done": done, "total": len(lessons),
+		"ranks": rankBy, "rank": rank})
 }
 
 // handleGetLesson: үнэгүй хичээлийг хэн ч, бусдыг зөвхөн элссэн хүн эсвэл багш үзнэ.
@@ -599,6 +651,9 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 		enrolled, _ := s.store.IsEnrolled(r.Context(), c.UID, course.ID)
 		if st := dripState(course, lessons, l, progress, fullAccess(course, c.UID, enrolled), time.Now()); !st.Open {
 			msg := "Эхлээд «" + st.PrevTitle + "» хичээлийг үзнэ үү"
+			if st.Reason == "quiz" {
+				msg = fmt.Sprintf("Эхлээд «%s» хичээлийн асуултуудад бүгдэд нь зөв хариулна уу (%d/%d үлдсэн)", st.PrevTitle, st.QuizLeft, st.QuizTotal)
+			}
 			if st.Reason == "timer" {
 				msg = "Энэ хичээл " + st.UnlockAt.Local().Format("01/02 15:04") + "-д нээгдэнэ"
 			}
@@ -609,7 +664,7 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 	if course.TeacherID != c.UID {
 		_ = s.store.MarkLessonViewed(r.Context(), c.UID, course.ID, l.ID)
 	}
-	l.VideoURL = s.media(l.VideoURL)
+	l.VideoURL = s.viewerMedia(l.VideoURL, c.UID)
 	l.Blocks = s.viewerBlocks(examIntro(l))
 	writeJSON(w, http.StatusOK, l)
 }

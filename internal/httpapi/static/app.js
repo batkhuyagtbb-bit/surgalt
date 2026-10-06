@@ -495,10 +495,57 @@ function mountQuizzes(box, base, results = {}) {
     try {
       const r = await api(`${base}/quiz/${encodeURIComponent(f.dataset.quiz)}`, { method: "POST", body: ans });
       quizReveal(f, r, r.correct);
-      $(".rq-res", f).textContent = r.correct ? "✓ Зөв! Сайн байна" : "✗ Буруу байна — ногоон нь зөв хариулт";
+      // Хичээлийн асуулгын явц: бүгдэд нь зөв хариулбал дараагийн хичээл нээгдэнэ.
+      const prog = r.quiz_total ? ` · Асуулга ${r.quiz_correct}/${r.quiz_total}` : "";
+      $(".rq-res", f).textContent = (r.correct ? "✓ Зөв! Сайн байна" : "✗ Буруу байна — ногоон нь зөв хариулт") + prog;
       btn.textContent = "Дахин оролдох";
       if (r.correct) celebrate?.();
+      if (r.mastered && r.quiz_total) {
+        if (!box.dataset.masteredShown) { box.dataset.masteredShown = "1"; toast("🎉 Бүх асуултад зөв хариуллаа — дараагийн хичээл нээгдлээ"); }
+        document.dispatchEvent(new CustomEvent("sg:quiz-mastered"));
+      }
     } catch (err) { toast(err.message, true); } finally { btn.disabled = false; }
+  };
+}
+
+// lockedControls: анх үзэж байхад хөтчийн ердийн удирдлагыг нууж, өөрийн удирдлага тавина —
+// явцын мөр дарагдахгүй (гүйлгэх, үсрэх боломжгүй), зөвхөн тоглуулах/зогсоох, дуу, бүтэн дэлгэц.
+// Бүрэн үзсэний дараа release() → ердийн удирдлага (гүйлгэж болно).
+function lockedControls(v, isFree, note) {
+  if (isFree()) return () => {};
+  const wrap = v.parentElement; if (!wrap) return () => {};
+  v.controls = false; v.removeAttribute("controls");
+  wrap.classList.add("vg-locked");
+  const bar = document.createElement("div");
+  bar.className = "vg-bar";
+  bar.innerHTML = `<button type="button" class="vg-play" aria-label="Тоглуулах">▶</button><span class="vg-time">0:00 / 0:00</span>
+    <span class="vg-prog" title="Эхний удаад гүйлгэх боломжгүй — дуустал үзнэ үү"><i></i></span><span class="vg-lock" aria-hidden="true">🔒</span>
+    <button type="button" class="vg-mute" aria-label="Дуу">🔊</button><button type="button" class="vg-full" aria-label="Бүтэн дэлгэц">⛶</button>`;
+  wrap.append(bar);
+  const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+  const play = $(".vg-play", bar), time = $(".vg-time", bar), prog = $(".vg-prog i", bar), mute = $(".vg-mute", bar), full = $(".vg-full", bar);
+  const sync = () => { play.textContent = v.paused ? "▶" : "❚❚"; time.textContent = `${fmt(v.currentTime)} / ${fmt(v.duration || 0)}`; prog.style.width = v.duration ? v.currentTime / v.duration * 100 + "%" : "0"; mute.textContent = v.muted ? "🔇" : "🔊"; };
+  const toggle = () => { if (v.paused) v.play().catch(() => {}); else v.pause(); };
+  play.onclick = toggle;
+  v.addEventListener("click", toggle);
+  mute.onclick = () => { v.muted = !v.muted; sync(); };
+  full.onclick = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else wrap.requestFullscreen?.(); };
+  $(".vg-prog", bar).onclick = () => note?.();
+  ["timeupdate", "play", "pause", "loadedmetadata", "volumechange", "durationchange"].forEach((n) => v.addEventListener(n, sync));
+  const onKey = (e) => { // сум, PageUp/Down, тоонуудаар үсрэхийг хаана
+    if (!wrap.contains(document.activeElement) && document.fullscreenElement !== wrap) return;
+    if (["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(e.key) || /^[0-9]$/.test(e.key)) { e.preventDefault(); note?.(); }
+    if (e.key === " " || e.key === "k") { e.preventDefault(); toggle(); }
+  };
+  document.addEventListener("keydown", onKey);
+  sync();
+  let released = false;
+  return () => {
+    if (released) return; released = true;
+    document.removeEventListener("keydown", onKey);
+    bar.remove(); wrap.classList.remove("vg-locked");
+    v.controls = true; v.setAttribute("controls", "");
+    v.removeEventListener("click", toggle);
   };
 }
 
@@ -673,7 +720,9 @@ function guardVideos(box, { watched = {}, owner = false, onWatched, modal, progr
       });
       v.addEventListener("seeking", () => { if (!free && v.currentTime > max + 1) { v.currentTime = max; note(); } });
       v.addEventListener("ratechange", () => { if (!free && v.playbackRate > 2) v.playbackRate = 2; });
-      v.addEventListener("ended", () => { if (!free) { free = true; onWatched?.(bid); } flush(); });
+      const release = lockedControls(v, () => free, note);
+      v.addEventListener("ended", () => { if (!free) { free = true; onWatched?.(bid); release(); } flush(); });
+      if (free) release();
       continue;
     }
     // YouTube: IFrame API-аар байрлалыг хянана.
@@ -1632,7 +1681,9 @@ async function coursePage() {
       if (!lbl) return;
       if (dripLocked) {
         lbl.hidden = false; lbl.className = "lesson-state " + (st.reason === "timer" ? "timer" : "");
-        lbl.textContent = st.reason === "timer" ? `⏳ ${fmtDate(st.unlock_at)}-д нээгдэнэ` : `🔒 Эхлээд «${st.prev_title}» хичээлийг үзнэ үү`;
+        lbl.textContent = st.reason === "timer" ? `⏳ ${fmtDate(st.unlock_at)}-д нээгдэнэ`
+          : st.reason === "quiz" ? `🔒 «${st.prev_title}» хичээлийн асуултуудад бүгдэд нь зөв хариулсны дараа нээгдэнэ (${st.quiz_left}/${st.quiz_total} үлдсэн)`
+          : `🔒 Эхлээд «${st.prev_title}» хичээлийг үзнэ үү`;
       } else if (p?.completed_at) { lbl.hidden = false; lbl.className = "lesson-state"; lbl.textContent = "✓ Дууссан · " + fmtDate(p.completed_at); }
       else if (drip && +li.dataset.unlock && li.dataset.always !== "1" && !li.classList.contains("is-free")) { lbl.hidden = false; lbl.className = "lesson-state"; lbl.textContent = `⏱ Өмнөхийг үзснээс ${humanHours(li.dataset.unlock)}-ийн дараа`; }
       else lbl.hidden = true;
@@ -1647,8 +1698,27 @@ async function coursePage() {
     });
     const bar = $("#courseProgress");
     if (bar && a.total) { bar.hidden = false; $("i", bar).style.width = Math.round(a.done / a.total * 100) + "%"; $("span", bar).textContent = `${a.done}/${a.total} хичээл дууссан`; }
+    // Цэргийн цол: хичээл бүрийн үнэлгээ (хуулах оролдлоготой бол цолгүй) ба нэгдсэн цол.
+    const ranks = a.ranks || {};
+    $$(".lesson").forEach((li) => {
+      const r = ranks[li.dataset.lesson]; let b = $(".lesson-rank", li);
+      if (!r) { b?.remove(); return; }
+      if (!b) { b = document.createElement("span"); b.className = "lesson-rank"; $(".lesson-title", li)?.append(b); }
+      b.className = "lesson-rank " + (r.disqualified ? "disq" : r.points >= 75 ? "high" : "");
+      b.title = (r.reasons || []).join(", ");
+      b.textContent = r.disqualified ? "⛔ Цолгүй" : `🎖 ${r.rank} · ${r.points}`;
+    });
+    if (a.rank && bar) {
+      let rl = $("#courseRank");
+      if (!rl) { rl = document.createElement("div"); rl.id = "courseRank"; rl.className = "course-rank"; bar.after(rl); }
+      const rk = a.rank;
+      rl.hidden = !rk.lessons;
+      rl.innerHTML = `<span class="cr-sign">${esc(rk.insignia)}</span><b>${esc(rk.name)}</b><span class="muted small">${rk.points} оноо${rk.next ? ` · дараагийн цол «${esc(rk.next_name)}» ${rk.next} оноонд` : " · дээд цол"}${rk.cheated ? ` · <span class="cr-bad">${rk.cheated} хичээлд хуулах оролдлогоос цол олгоогүй</span>` : ""}</span>
+        <span class="meter cr-meter"><i style="width:${rk.progress}%"></i></span>`;
+    }
   };
   const refreshAccess = () => api(`/api/courses/${id}/access`).then((a) => { applyStates(a); return a; }).catch(() => null);
+  document.addEventListener("sg:quiz-mastered", () => refreshAccess()); // асуулгыг дуусгамагц түгжээ шууд нээгдэнэ
   const unlockLesson = (lid) => {
     const li = $(`.lesson[data-lesson="${lid}"]`);
     if (!li || li.classList.contains("is-free")) return;

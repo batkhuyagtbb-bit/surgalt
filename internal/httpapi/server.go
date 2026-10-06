@@ -177,6 +177,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/files/usage", s.handleFileUsage)
 	mux.HandleFunc("DELETE /api/me/files/{visibility}/{name}", s.handleDeleteFile)
 	mux.HandleFunc("GET /files/{teacher}/{visibility}/{name}", s.handleServeFile)
+	mux.HandleFunc("GET /api/media/{ticket}/{name}", s.handleMedia)
 	mux.HandleFunc("GET /api/storage/plans", s.handleStoragePlans)
 	mux.HandleFunc("GET /api/me/storage", s.handleMyStorage)
 	mux.HandleFunc("POST /api/me/storage/purchase", s.handleBuyStorage)

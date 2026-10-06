@@ -1447,3 +1447,25 @@ html.reader-open{overflow:hidden}
 .post-foot>.post-del{flex:0 0 auto;color:var(--muted)}
 .post-foot>.post-del:hover{background:#fee2e2;color:#b91c1c}
 .ol-row .ol-del:hover{color:#b91c1c;background:#fee2e2}
+
+/* Цэргийн цол */
+.lesson-rank{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;background:var(--ink-2);color:var(--muted);font-size:.74rem;font-weight:700;white-space:nowrap}
+.lesson-rank.high{background:#e6f6f1;color:#0f7a63}
+.lesson-rank.disq{background:#fee2e2;color:#b91c1c}
+.course-rank{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 0;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.course-rank .cr-sign{font-size:1.2rem;color:var(--accent)}
+.course-rank .cr-meter{flex:1 1 120px;min-width:100px;height:6px}
+.course-rank .cr-bad{color:#b91c1c}
+.an-rank{display:inline-block;margin-top:2px;padding:0 6px;border-radius:999px;background:#eef2ff;color:#1f3c8f;font-size:.74rem;font-weight:700}
+.an-rank.bad{background:#fee2e2;color:#b91c1c}
+
+/* Видео: анх үзэхэд өөрийн удирдлага — явцын мөр дарагдахгүй */
+.vg-locked{position:relative}
+.vg-locked video{cursor:pointer}
+.vg-bar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,.75));color:#fff;font-size:.8rem;user-select:none}
+.vg-bar button{border:0;background:rgba(255,255,255,.12);color:#fff;border-radius:8px;padding:4px 9px;font:inherit;cursor:pointer}
+.vg-bar button:hover{background:rgba(255,255,255,.25)}
+.vg-bar .vg-time{font-variant-numeric:tabular-nums;white-space:nowrap}
+.vg-bar .vg-prog{flex:1;height:5px;border-radius:3px;background:rgba(255,255,255,.25);overflow:hidden;cursor:not-allowed}
+.vg-bar .vg-prog i{display:block;height:100%;width:0;background:var(--accent)}
+.vg-locked:fullscreen video{width:100%;height:100%;aspect-ratio:auto;object-fit:contain}

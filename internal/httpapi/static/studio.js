@@ -207,7 +207,7 @@ const courseFormHTML = (c = {}) => `
   <div class="form-row"><label>Багц үнэ (₮)<input name="price" type="number" min="0" step="1000" value="${c.price || 0}"><small class="muted">0 бол хичээл тус бүрээр зарна</small></label>
   <label class="check" style="align-self:center"><input type="checkbox" name="published" ${c.published ? "checked" : ""}> Нийтлэх (профайл дээр харагдана)</label></div>
   <fieldset><legend>Хичээлийн нээлт</legend>
-    <label class="check"><input type="checkbox" name="drip" ${c.drip ? "checked" : ""}> Дарааллаар нээгдэнэ — суралцагч өмнөх хичээлээ үзсэний дараа дараагийнх нь нээгдэнэ</label>
+    <label class="check"><input type="checkbox" name="drip" ${c.drip ? "checked" : ""}> Дарааллаар нээгдэнэ — суралцагч өмнөх хичээлээ үзэж, доторх асуултуудад нь бүгдэд нь зөв хариулсны дараа дараагийнх нь (тохируулсан цаг/хоногийн дараа) нээгдэнэ</label>
     <label class="check"><input type="checkbox" name="unlock_all_paid" ${c.unlock_all_paid !== false ? "checked" : ""}> Багцын төлбөр төлсөн суралцагчид бүх хичээл шууд нээлттэй</label>
     <small class="muted">Хичээл бүрийн хүлээх хугацааг (шууд, цаг, 7 хоног, сар) хичээл дээр нь тохируулна.</small></fieldset>
   <input type="hidden" name="camera" value="${esc(c.camera || "optional")}">
@@ -1437,6 +1437,7 @@ async function students() {
   const learnHint = (x) => {
     const p = [];
     if (x.quiz_total) p.push(`✅ ${x.quiz_accuracy}% (${x.quiz_total})`);
+    if (x.quiz_lessons) p.push(`🎯 ${x.quiz_mastered}/${x.quiz_lessons} хичээл`);
     if (x.video_clips) p.push(`▶ ${x.video_coverage}%`);
     if (x.reflections) p.push(`✍️ ${x.reflections}`);
     if (x.streak_days > 1) p.push(`🔥 ${x.streak_days} өдөр`);
@@ -1467,12 +1468,14 @@ async function students() {
         <div class="an-tile ${t.violations ? "warn" : ""}"><small>Зөрчил</small><b>${t.violations}</b></div>
         <div class="an-tile"><small>Шалгалт</small><b>${t.exams}</b></div>
         <div class="an-tile learn"><small>🧠 Суралцсан оноо</small><b>${t.learn_score}%</b><span class="muted small">бодит хариулт, дүгнэлт, тогтмол байдал</span></div>
-        <div class="an-tile"><small>✍️ Бичсэн дүгнэлт</small><b>${t.reflections}</b></div></div>
+        <div class="an-tile"><small>🎯 Асуулга дуусгасан</small><b>${t.quiz_mastered}/${t.quiz_lessons}</b><span class="muted small">суралцагч×хичээл: бүх асуултад зөв</span></div>
+        <div class="an-tile"><small>✍️ Бичсэн дүгнэлт</small><b>${t.reflections}</b></div>
+        <div class="an-tile"><small>🎖 Дээд цол</small><b>${t.top_rank?.lessons ? esc(t.top_rank.name) : "—"}</b><span class="muted small">${Object.entries(t.rank_dist || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${esc(k)} ${v}`).join(" · ") || "цол олгогдоогүй"}${t.cheated_lessons ? ` · ⛔ ${t.cheated_lessons} хичээлд хуулсан` : ""}</span></div></div>
       ${chart(data.daily)}`) +
       panel(`<div class="panel-head"><h2>Суралцагч бүрээр</h2><label class="rail-search" style="width:min(260px,100%)">${ico("search", 16)}<input type="search" id="anSearch" placeholder="Нэрээр хайх…" aria-label="Хайх"></label></div>
       <p class="muted small" style="margin:-4px 0 10px">Сурагч дээр дарж дэлгэрэнгүйг (бичсэн дүгнэлт, асуултын хариулт, видео үзэлтийн зураглал) харна уу.</p>
       <div class="an-table-wrap"><table class="tbl an-table"><thead><tr><th>Суралцагч</th><th>Идэвхтэй</th><th>Анхаарал</th><th>🧠 Суралцсан</th><th>Зөрчил</th><th>Шалгалт</th><th>Төлөв</th><th></th></tr></thead><tbody>
-      ${list.map((x) => `<tr class="an-row" data-uid="${esc(x.user_id)}"><td><b>${esc(x.name)}</b>${x.live ? ` <span class="an-live">●</span>` : ""}<br><small class="muted">${x.lessons} хичээл · ${fmtDate(x.last_at)}</small></td>
+      ${list.map((x) => `<tr class="an-row" data-uid="${esc(x.user_id)}"><td><b>${esc(x.name)}</b>${x.live ? ` <span class="an-live">●</span>` : ""}<br><small class="muted">${x.lessons} хичээл · ${fmtDate(x.last_at)}</small><br><span class="an-rank ${x.rank?.cheated ? "bad" : ""}" title="${x.rank?.points || 0} оноо">🎖 ${esc(x.rank?.name || "Шинэ цэрэг")} ${esc(x.rank?.insignia || "")}${x.rank?.cheated ? ` · ⛔${x.rank.cheated}` : ""}</span></td>
         <td>${dur(x.active_sec)}<br><small class="muted">нийт ${dur(x.total_sec)}</small></td><td>${bar(x.attention)}</td>
         <td>${bar(x.learn_score)}<br><small class="muted">${learnHint(x)}</small></td>
         <td>${x.violations ? `<b class="an-bad">${x.violations}</b><br><small class="muted">${["tab_switch", "copy", "auto_block"].filter((k) => x.counts[k]).map((k) => `${esc(labels[k] || k)}: ${x.counts[k]}`).join(", ")}</small>` : "0"}</td>
@@ -1513,17 +1516,23 @@ async function students() {
       <div class="an-tiles"><div class="an-tile"><small>Идэвхтэй</small><b>${dur(x.active_sec)}</b></div><div class="an-tile"><small>Идэвхтэй хувь</small><b>${x.active_pct}%</b></div>
         <div class="an-tile"><small>Анхаарал</small><b>${x.attention}%</b></div><div class="an-tile ${x.violations ? "warn" : ""}"><small>Зөрчил</small><b>${x.violations}</b></div>
         <div class="an-tile learn"><small>🧠 Суралцсан оноо</small><b>${x.learn_score}%</b></div>
-        <div class="an-tile"><small>🔥 Тогтмол байдал</small><b>${x.streak_days}</b><span class="muted small">дараалсан өдөр · ${x.active_days} нийт өдөр</span></div></div>
+        <div class="an-tile"><small>🔥 Тогтмол байдал</small><b>${x.streak_days}</b><span class="muted small">дараалсан өдөр · ${x.active_days} нийт өдөр</span></div>
+        <div class="an-tile ${x.rank?.cheated ? "warn" : "learn"}"><small>🎖 Цэргийн цол</small><b>${esc(x.rank?.name || "Шинэ цэрэг")} ${esc(x.rank?.insignia || "")}</b><span class="muted small">${x.rank?.points || 0} оноо${x.rank?.next ? ` · дараагийнх ${x.rank.next}` : ""}${x.rank?.cheated ? ` · ⛔ ${x.rank.cheated} хичээлд цолгүй` : ""}</span></div></div>
+      ${x.lesson_ranks?.length ? `<h4>Цол — хичээл бүрээр</h4><p class="muted small" style="margin:0 0 8px">Хичээл бүрийн оноо (0-100): дууссан, идэвхтэй хугацаа, асуулга, дүгнэлт, видео; таб солилт хасна; хуулах оролдлого → цолгүй.</p>
+        <table class="tbl"><thead><tr><th>Хичээл</th><th>Оноо</th><th>Цол</th><th>Үндэслэл</th></tr></thead><tbody>${x.lesson_ranks.map((r) => `<tr class="${r.disqualified ? "an-wrongq" : ""}"><td>${esc(r.title)}</td><td>${r.points}</td><td>${r.disqualified ? "⛔ Цолгүй" : "🎖 " + esc(r.rank)}</td><td class="muted small">${(r.reasons || []).map(esc).join(", ")}</td></tr>`).join("")}</tbody></table>` : ""}
       ${chart(d.daily)}
       <h4>Идэвхтэй суралцсаны нотолгоо</h4>
       <div class="an-tiles">
         <div class="an-tile"><small>✅ Асуултад зөв хариулсан</small><b>${x.quiz_total ? x.quiz_accuracy + "%" : "—"}</b><span class="muted small">${x.quiz_total} асуулт${x.quiz_total ? `, дундаж ${Math.round(x.quiz_avg_ms / 1000)} сек` : ""}</span></div>
         <div class="an-tile ${x.quiz_guesses > 2 ? "warn" : ""}"><small>⚡ Хэт хурдан хариулсан</small><b>${x.quiz_guesses}</b><span class="muted small">1.5 сек-ээс богино (таамаг)</span></div>
+        <div class="an-tile"><small>🎯 Асуулга дуусгасан</small><b>${x.quiz_lessons ? `${x.quiz_mastered}/${x.quiz_lessons}` : "—"}</b><span class="muted small">хичээл · анх удаад зөв ${x.quiz_questions ? x.quiz_first_try + "%" : "—"} · ${x.quiz_questions ? (x.quiz_attempts / 10).toFixed(1) + " оролдлого/асуулт" : ""}</span></div>
         <div class="an-tile"><small>▶ Видео үзэлт</small><b>${x.video_clips ? x.video_coverage + "%" : "—"}</b><span class="muted small">${x.video_clips} видео</span></div>
         <div class="an-tile"><small>✍️ Дүгнэлт бичсэн</small><b>${x.reflections}</b><span class="muted small">${x.reflections ? `дундаж ${x.reflection_words} үг` : "одоогоор алга"}</span></div></div>
       ${d.watches?.length ? `<h4>Видеоны үзэлтийн зураглал</h4><p class="muted small" style="margin:0 0 8px">Бараан хэсэг = давтаж үзсэн, цайвар саарал = алгассан хэсэг.</p><div class="vh">${d.watches.map(heatmap).join("")}</div>` : ""}
       ${d.reflections?.length ? `<h4>Бичсэн дүгнэлтүүд</h4><div class="refl-list">${d.reflections.map((r) => `<div class="refl-item"><b>${esc(r.lesson)}</b><small class="muted">${fmtDate(r.at)}</small><p>${esc(r.text)}</p></div>`).join("")}</div>` : ""}
-      ${d.quiz_logs?.length ? `<h4>Сүүлийн асуултын хариултууд</h4><table class="tbl"><thead><tr><th>Асуулт</th><th>Хариулт</th><th>Хугацаа</th></tr></thead><tbody>${d.quiz_logs.slice(0, 15).map((q) => `<tr class="${q.correct ? "" : "an-wrongq"}"><td>${esc(q.question)}</td><td>${q.correct ? "✓ Зөв" : "✗ Буруу"}</td><td>${q.ms ? (q.ms / 1000).toFixed(1) + " сек" + (q.ms < 1500 ? " ⚡" : "") : "—"}</td></tr>`).join("")}</tbody></table>` : ""}
+      ${d.quiz_lessons?.length ? `<h4>Асуулгын үнэлгээ — хичээл бүрээр</h4><p class="muted small" style="margin:0 0 8px">Хичээл доторх өөрийгөө сорих асуултууд. Бүгдэд нь зөв хариулсан хичээлийн дараагийнх нээгдэнэ.</p>
+        <table class="tbl"><thead><tr><th>Хичээл</th><th>Зөв / асуулт</th><th>Төлөв</th><th>Оролдлого</th><th>Анх удаад зөв</th><th>Дундаж</th></tr></thead><tbody>${d.quiz_lessons.map((q) => `<tr class="${q.done ? "" : "an-wrongq"}"><td>${esc(q.title)}</td><td>${q.correct}/${q.total}</td><td>${q.done ? `✓ Дууссан${q.done_at ? " · " + fmtDate(q.done_at) : ""}` : `${q.total - q.correct} үлдсэн`}</td><td>${q.attempts}${q.questions ? ` (${(q.attempts / q.questions).toFixed(1)}/асуулт)` : ""}</td><td>${q.questions ? q.first_try + "/" + q.questions : "—"}</td><td>${q.avg_ms ? (q.avg_ms / 1000).toFixed(1) + " сек" : "—"}${q.guesses ? ` · ⚡${q.guesses}` : ""}</td></tr>`).join("")}</tbody></table>` : ""}
+      ${d.quiz_logs?.length ? `<h4>Асуултын хариултын лог</h4><div class="bk-log"><table class="tbl"><thead><tr><th>Огноо</th><th>Хичээл</th><th>Асуулт</th><th>Хариулт</th><th>Хугацаа</th></tr></thead><tbody>${d.quiz_logs.map((q) => `<tr class="${q.correct ? "" : "an-wrongq"}"><td>${fmtDate(q.at)}</td><td>${esc(d.lesson_titles?.[q.lesson_id] || "")}</td><td>${esc(q.question)}</td><td>${q.correct ? "✓ Зөв" : "✗ Буруу"}</td><td>${q.ms ? (q.ms / 1000).toFixed(1) + " сек" + (q.ms < 1500 ? " ⚡" : "") : "—"}</td></tr>`).join("")}</tbody></table></div>` : ""}
       <h4>Хичээл тус бүрээр</h4><table class="tbl"><thead><tr><th>Хичээл</th><th>Идэвхтэй</th><th>Нийт</th><th>Удаа</th><th>Зөрчил</th></tr></thead><tbody>${d.lessons.map((l) => `<tr><td>${esc(l.title)}</td><td>${dur(l.active_sec)}</td><td>${dur(l.total_sec)}</td><td>${l.sessions}</td><td>${l.violations}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">Алга</td></tr>`}</tbody></table>
       <h4>Шалгалтууд</h4><table class="tbl"><thead><tr><th>Огноо</th><th>Оноо</th><th>Төлөв</th><th>Зөрчил</th></tr></thead><tbody>${d.exams.map((a) => `<tr><td>${fmtDate(a.started_at)}</td><td>${a.pct}%${a.passed ? " ✓" : ""}</td><td>${a.status === "terminated" ? `<b class="an-bad">Хаагдсан</b> · ${esc(a.reason || "")}` : a.status === "submitted" ? "Өгсөн" : a.status === "expired" ? "Хугацаа хэтэрсэн" : "Явагдаж байна"}</td><td>${a.violations}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">Алга</td></tr>`}</tbody></table>
       <h4>Лог</h4><div class="bk-log"><table class="tbl"><tbody>${d.events.map(evRow).join("") || `<tr><td class="muted">Алга</td></tr>`}</tbody></table></div>`;
