@@ -31,6 +31,22 @@ func (s *Server) convRole(ctx context.Context, c auth.Claims, conv *store.Conver
 	if !c.IsGuest() && c.UID == conv.TeacherID {
 		return store.SenderTeacher, true
 	}
+	switch conv.Kind {
+	case store.ConvDM: // нөгөө сурагч
+		if !c.IsGuest() && c.UID == conv.UserID {
+			return store.SenderVisitor, true
+		}
+		return "", false
+	case store.ConvTeam: // гишүүн
+		if c.IsGuest() {
+			return "", false
+		}
+		ok, err := s.store.IsTeamMember(ctx, conv.ID, c.UID)
+		if err != nil || !ok {
+			return "", false
+		}
+		return store.SenderVisitor, true
+	}
 	if conv.Kind == store.ConvGroup {
 		if c.IsGuest() {
 			return "", false
@@ -281,7 +297,11 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	if s.Publish != nil {
 		s.Publish(*m)
 	}
-	s.notifyMessage(r.Context(), conv, m)
+	if conv.Kind == store.ConvDM || conv.Kind == store.ConvTeam {
+		s.notifyPeers(r.Context(), conv, m)
+	} else {
+		s.notifyMessage(r.Context(), conv, m)
+	}
 	writeJSON(w, http.StatusCreated, m)
 }
 
@@ -419,8 +439,8 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	conn.SetReadLimit(1024)
 	// Бүртгэлтэй хэрэглэгчийн VisitorKey нь UserKey-тэй ижил тул мэдэгдэл ч энэ сувгаар ирнэ.
 	keys := []string{chat.VisitorKey(c.VisitorKey())}
-	if c.Role == string(store.RoleTeacher) {
-		keys = append(keys, chat.TeacherKey(c.UID))
+	if !c.IsGuest() {
+		keys = append(keys, chat.TeacherKey(c.UID)) // багш: бүх яриа; сурагч: өөрийн эхлүүлсэн хувийн яриа
 	}
 	// Бүлэг чатууд: холбогдох үеийн гишүүнчлэлээр бүртгэнэ (шинэ бүлэгт орвол клиент дахин холбогдоно).
 	if !c.IsGuest() {
@@ -439,6 +459,11 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		for _, g := range groups {
 			if g.Kind == store.ConvGroup {
 				keys = append(keys, chat.GroupKey(g.ID))
+			}
+		}
+		if teams, err := s.store.UserTeamConversations(gctx2(r), c.UID, 200); err == nil {
+			for _, t := range teams {
+				keys = append(keys, chat.GroupKey(t.ID))
 			}
 		}
 	}
@@ -472,4 +497,11 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+// gctx2 — WS бүртгэлийн богино хугацаатай context.
+func gctx2(r *http.Request) context.Context {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	_ = cancel // богино асуулга; холболт дуустал амьдарна
+	return ctx
 }

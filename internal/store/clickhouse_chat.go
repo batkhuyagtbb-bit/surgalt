@@ -221,3 +221,85 @@ func (c *ClickHouse) ConversationReads(ctx context.Context, conversationID strin
 	})
 	return out, err
 }
+
+// ---- сурагч хоорондын яриа ба бүлэг ----
+
+func (c *ClickHouse) CreateDM(ctx context.Context, a, b, bName string) (*Conversation, error) {
+	k1, k2 := a, b
+	if k2 < k1 {
+		k1, k2 = k2, k1
+	}
+	unlock, err := c.lock(ctx, "dm:"+k1+"|"+k2)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	cs, err := c.convsWhere(ctx, "kind = ? AND ((teacher_id = ? AND user_id = ?) OR (teacher_id = ? AND user_id = ?))", "LIMIT 1", ConvDM, a, b, b, a)
+	if err != nil {
+		return nil, err
+	}
+	if len(cs) > 0 {
+		return &cs[0], nil
+	}
+	now := time.Now()
+	cv := &Conversation{ID: NewID(), TeacherID: a, VisitorKey: "u:" + b, VisitorName: bName, UserID: b, Kind: ConvDM, CreatedAt: now, LastMessageAt: now}
+	return cv, c.writeConv(ctx, cv)
+}
+
+func (c *ClickHouse) CreateTeam(ctx context.Context, creator, title string, members []string) (*Conversation, error) {
+	now := time.Now()
+	id := NewID()
+	cv := &Conversation{ID: id, TeacherID: creator, VisitorKey: TeamVisitorKey(id), VisitorName: title, Kind: ConvTeam, CreatedAt: now, LastMessageAt: now}
+	if err := c.writeConv(ctx, cv); err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{creator: true}
+	all := append([]string{creator}, members...)
+	for _, m := range all {
+		if m == "" || (seen[m] && m != creator) {
+			continue
+		}
+		seen[m] = true
+		if err := c.insert(ctx, "conversation_members", []string{"conversation_id", "user_id", "ver"}, id, m, ver()); err != nil {
+			return nil, err
+		}
+	}
+	return cv, nil
+}
+
+func (c *ClickHouse) TeamMembers(ctx context.Context, convID string) ([]string, error) {
+	out := []string{}
+	err := c.query(ctx, "SELECT user_id FROM conversation_members FINAL WHERE conversation_id = ?", []any{convID}, func(r driver.Rows) error {
+		var u string
+		if err := r.Scan(&u); err != nil {
+			return err
+		}
+		out = append(out, u)
+		return nil
+	})
+	return out, err
+}
+
+func (c *ClickHouse) IsTeamMember(ctx context.Context, convID, userID string) (bool, error) {
+	n, err := c.count(ctx, "SELECT count() FROM conversation_members FINAL WHERE conversation_id = ? AND user_id = ?", convID, userID)
+	return n > 0, err
+}
+
+func (c *ClickHouse) UserDMConversations(ctx context.Context, userID string, limit int) ([]Conversation, error) {
+	return c.convsWhere(ctx, "kind = ? AND (teacher_id = ? OR user_id = ?)", "ORDER BY last_message_at DESC LIMIT ?", ConvDM, userID, userID, limit)
+}
+
+func (c *ClickHouse) UserTeamConversations(ctx context.Context, userID string, limit int) ([]Conversation, error) {
+	ids := []string{}
+	if err := c.query(ctx, "SELECT conversation_id FROM conversation_members FINAL WHERE user_id = ?", []any{userID}, func(r driver.Rows) error {
+		var id string
+		if err := r.Scan(&id); err != nil {
+			return err
+		}
+		ids = append(ids, id)
+		return nil
+	}); err != nil || len(ids) == 0 {
+		return []Conversation{}, err
+	}
+	return c.convsWhere(ctx, "kind = ? AND has(?, id)", "ORDER BY last_message_at DESC LIMIT ?", ConvTeam, ids, limit)
+}

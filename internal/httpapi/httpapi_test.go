@@ -2224,3 +2224,99 @@ func TestChatReactionsRepliesReads(t *testing.T) {
 		t.Fatal("гадны хүнд яриа олдохгүй")
 	}
 }
+
+// Ангийн найзууд: нэг багшид дагасан сурагчид хоорондоо харагдаж, хувийн яриа нээж, бүлэг үүсгэнэ;
+// өөр багшийн сурагч харагдахгүй, нэвтрэхгүй.
+func TestClassmatesDMAndTeam(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c1 := call(t, srv, "POST", "/api/courses", tt, `{"title":"Математик","price":0,"published":true}`)
+	_, c2 := call(t, srv, "POST", "/api/courses", tt, `{"title":"Физик","price":0,"published":true}`)
+	ot, _ := register(t, srv, "other", "teacher")
+	_, c3 := call(t, srv, "POST", "/api/courses", ot, `{"title":"Хими","price":0,"published":true}`)
+	a, aid := register(t, srv, "anu", "student")
+	b, bid := register(t, srv, "bat", "student")
+	d, did := register(t, srv, "dorj", "student")
+	call(t, srv, "POST", "/api/courses/"+c1["id"].(string)+"/enroll", a, "")
+	call(t, srv, "POST", "/api/courses/"+c2["id"].(string)+"/enroll", b, "") // өөр сургалт, ижил багш → найз
+	call(t, srv, "POST", "/api/courses/"+c3["id"].(string)+"/enroll", d, "") // өөр багш → найз биш
+	var list []any
+	_, raw := rawCall(t, srv, "GET", "/api/me/classmates", a, nil)
+	_ = json.Unmarshal(raw, &list)
+	if len(list) != 1 || list[0].(map[string]any)["user"].(map[string]any)["id"] != bid || list[0].(map[string]any)["via"] == "" {
+		t.Fatalf("ангийн найз зөвхөн Бат байх ёстой: %s", raw)
+	}
+	// Хувийн яриа: найзтай болно, бусадтай 403, өөртэйгөө 400.
+	if code, _ := call(t, srv, "POST", "/api/me/dm/"+did, a, ""); code != 403 {
+		t.Fatal("өөр багшийн сурагчтай чатлахгүй")
+	}
+	if code, _ := call(t, srv, "POST", "/api/me/dm/"+aid, a, ""); code != 400 {
+		t.Fatal("өөртэйгөө чатлахгүй")
+	}
+	code, dm := call(t, srv, "POST", "/api/me/dm/"+bid, a, "")
+	if code != 200 || dm["conversation"].(map[string]any)["kind"] != "dm" {
+		t.Fatalf("хувийн яриа: %d %v", code, dm)
+	}
+	conv := dm["conversation"].(map[string]any)["id"].(string)
+	// Нөгөө талаас нээхэд ижил яриа.
+	_, dm2 := call(t, srv, "POST", "/api/me/dm/"+aid, b, "")
+	if dm2["conversation"].(map[string]any)["id"] != conv {
+		t.Fatal("хоёр талаас нэг л яриа байх ёстой")
+	}
+	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/messages", a, `{"body":"Сайн уу Бат!"}`); code != 201 {
+		t.Fatal("Ану бичнэ")
+	}
+	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/messages", b, `{"body":"Сайн, Ану!"}`); code != 201 {
+		t.Fatal("Бат бичнэ")
+	}
+	if code, _ := call(t, srv, "GET", "/api/chat/"+conv+"/messages", d, ""); code != 404 {
+		t.Fatal("гадны хүн яриаг харахгүй")
+	}
+	_, lst := call(t, srv, "GET", "/api/chat/"+conv+"/messages", b, "")
+	if len(lst["messages"].([]any)) != 2 || lst["me"] != "visitor" {
+		t.Fatalf("Батын харагдац: %v", lst)
+	}
+	_, nb := call(t, srv, "GET", "/api/me/notifications", b, "")
+	if !strings.Contains(fmt.Sprint(nb), "танд бичлээ") {
+		t.Fatalf("Батад мэдэгдэл алга: %v", nb)
+	}
+	// Бүлэг: зөвхөн найзуудаар; гадны хүнийг нэмэхэд 403.
+	if code, _ := call(t, srv, "POST", "/api/me/teams", a, `{"title":"Баг","members":["`+did+`"]}`); code != 403 {
+		t.Fatal("гадны хүнийг бүлэгт нэмэхгүй")
+	}
+	if code, _ := call(t, srv, "POST", "/api/me/teams", a, `{"title":"Б","members":["`+bid+`"]}`); code != 400 {
+		t.Fatal("богино нэр татгалзагдана")
+	}
+	code, tm := call(t, srv, "POST", "/api/me/teams", a, `{"title":"Математикийн баг","members":["`+bid+`"]}`)
+	if code != 201 || tm["conversation"].(map[string]any)["kind"] != "team" {
+		t.Fatalf("бүлэг үүсгэх: %d %v", code, tm)
+	}
+	team := tm["conversation"].(map[string]any)["id"].(string)
+	if code, _ := call(t, srv, "POST", "/api/chat/"+team+"/messages", b, `{"body":"Баг маань!"}`); code != 201 {
+		t.Fatal("гишүүн бичнэ")
+	}
+	if code, _ := call(t, srv, "POST", "/api/chat/"+team+"/messages", d, `{"body":"x"}`); code != 404 {
+		t.Fatal("гишүүн биш бичихгүй")
+	}
+	_, na := call(t, srv, "GET", "/api/me/notifications", a, "")
+	if !strings.Contains(fmt.Sprint(na), "бүлэгт бичлээ") {
+		t.Fatalf("бүлгийн мэдэгдэл алга: %v", na)
+	}
+	// Нүүрний чат жагсаалтад хувийн яриа (нөгөө талын нэртэй) ба бүлэг гарна.
+	_, home := call(t, srv, "GET", "/api/me/home", b, "")
+	kinds := map[string]string{}
+	for _, x := range home["chats"].([]any) {
+		m := x.(map[string]any)
+		kinds[m["kind"].(string)] = m["title"].(string)
+	}
+	if kinds["dm"] == "" || kinds["team"] != "Математикийн баг" {
+		t.Fatalf("нүүрний чат жагсаалт: %v", kinds)
+	}
+	// Найзын жагсаалтад нээсэн ярианы ID орно.
+	_, raw2 := rawCall(t, srv, "GET", "/api/me/classmates", a, nil)
+	_ = json.Unmarshal(raw2, &list)
+	if list[0].(map[string]any)["conv_id"] != conv {
+		t.Fatalf("conv_id алга: %s", raw2)
+	}
+}

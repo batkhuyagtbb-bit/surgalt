@@ -36,9 +36,10 @@ type Memory struct {
 	discussOnce sync.Once
 	chatX       *chatExtraMem
 	chatXOnce   sync.Once
-	learn       learnMem  // шалгалт, сесс, лог (memory_learning.go)
-	engage      engageMem // идэвхийн нэмэлт (memory_engagement.go)
-	books       bookMem   // ном (memory_books.go)
+	teamMembers map[string]map[string]bool // team conv → гишүүд
+	learn       learnMem                   // шалгалт, сесс, лог (memory_learning.go)
+	engage      engageMem                  // идэвхийн нэмэлт (memory_engagement.go)
+	books       bookMem                    // ном (memory_books.go)
 }
 
 func NewMemory() *Memory {

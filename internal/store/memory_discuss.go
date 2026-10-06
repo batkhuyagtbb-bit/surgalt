@@ -196,3 +196,92 @@ func (m *Memory) ConversationReads(_ context.Context, conversationID string) (ma
 	}
 	return out, nil
 }
+
+// ---- сурагч хоорондын яриа ба бүлэг (санах ой) ----
+
+func (m *Memory) CreateDM(_ context.Context, a, b, bName string) (*Conversation, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, cv := range m.convs {
+		if cv.Kind == ConvDM && ((cv.TeacherID == a && cv.UserID == b) || (cv.TeacherID == b && cv.UserID == a)) {
+			cc := *cv
+			return &cc, nil
+		}
+	}
+	now := time.Now()
+	cv := &Conversation{ID: m.next(), TeacherID: a, VisitorKey: "u:" + b, VisitorName: bName, UserID: b, Kind: ConvDM, CreatedAt: now, LastMessageAt: now}
+	m.convs[cv.ID] = cv
+	cc := *cv
+	return &cc, nil
+}
+
+func (m *Memory) CreateTeam(_ context.Context, creator, title string, members []string) (*Conversation, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := time.Now()
+	id := m.next()
+	cv := &Conversation{ID: id, TeacherID: creator, VisitorKey: TeamVisitorKey(id), VisitorName: title, Kind: ConvTeam, CreatedAt: now, LastMessageAt: now}
+	m.convs[id] = cv
+	if m.teamMembers == nil {
+		m.teamMembers = map[string]map[string]bool{}
+	}
+	m.teamMembers[id] = map[string]bool{creator: true}
+	for _, u := range members {
+		if u != "" {
+			m.teamMembers[id][u] = true
+		}
+	}
+	cc := *cv
+	return &cc, nil
+}
+
+func (m *Memory) TeamMembers(_ context.Context, convID string) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := []string{}
+	for u := range m.teamMembers[convID] {
+		out = append(out, u)
+	}
+	slices.Sort(out)
+	return out, nil
+}
+
+func (m *Memory) IsTeamMember(_ context.Context, convID, userID string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.teamMembers[convID][userID], nil
+}
+
+func (m *Memory) UserDMConversations(_ context.Context, userID string, limit int) ([]Conversation, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := []Conversation{}
+	for _, cv := range m.convs {
+		if cv.Kind == ConvDM && (cv.TeacherID == userID || cv.UserID == userID) {
+			out = append(out, *cv)
+		}
+	}
+	slices.SortFunc(out, func(a, b Conversation) int { return b.LastMessageAt.Compare(a.LastMessageAt) })
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
+func (m *Memory) UserTeamConversations(_ context.Context, userID string, limit int) ([]Conversation, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := []Conversation{}
+	for id, members := range m.teamMembers {
+		if members[userID] {
+			if cv := m.convs[id]; cv != nil {
+				out = append(out, *cv)
+			}
+		}
+	}
+	slices.SortFunc(out, func(a, b Conversation) int { return b.LastMessageAt.Compare(a.LastMessageAt) })
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}

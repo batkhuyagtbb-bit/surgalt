@@ -215,9 +215,9 @@ function chatRail() {
   document.documentElement.classList.add("has-rail");
   document.body.insertAdjacentHTML("beforeend", `<aside class="rail" id="studioRail" aria-label="Чат">
     <div class="rail-view" id="railHome">
-      <header class="rail-head"><strong><i></i>Чат</strong><span class="chip" id="railCount">0</span><button class="icon-btn rail-close" data-rail-close aria-label="Чат хаах">${I.x}</button></header>
+      <header class="rail-head"><strong><i></i>Чат</strong><button class="btn btn-sm rail-group-btn" id="railNewGroup" title="${teacher ? "Сургалтын бүлэг чат нээх" : "Ангийн найзуудтайгаа бүлэг үүсгэх"}">＋ Бүлэг чат</button><button class="icon-btn rail-close" data-rail-close aria-label="Чат хумих" title="Хумих">»</button></header>
       <label class="rail-search">${I.search}<input type="search" id="railSearch" placeholder="Нэрээр хайх…" aria-label="Чат хайх"></label>
-      <div class="rail-list" id="railList"><div class="loader"></div></div></div>
+      <div class="rail-list" id="railList">${[1, 2, 3, 4].map(() => `<div class="rail-skel"><i></i><span><b></b><b></b></span></div>`).join("")}</div></div>
     <div class="rail-view" id="railThread" hidden>
       <header class="rail-head"><button class="icon-btn" id="railBack" aria-label="Жагсаалт руу буцах">${I.back}</button><div class="grow" id="railWho"></div><button class="icon-btn rail-close" data-rail-close aria-label="Чат хаах">${I.x}</button></header>
       <div class="chat-body" id="railBody"><ol class="chat-msgs" id="railMsgs"></ol></div>
@@ -250,18 +250,66 @@ function chatRail() {
       list.forEach((c) => out.set(c.id, { id: c.id, kind: c.kind || "", title: c.visitor_name, sub: c.kind === "group" ? "Бүлэг · сургалтын суралцагчид" : c.user_id ? "Суралцагч" : "Зочин", last: c.last_message, at: c.last_message_at }));
     }
     const h = await api("/api/me/home").catch(() => null);
-    (h?.chats || []).forEach((c) => { if (!out.has(c.id)) out.set(c.id, { id: c.id, kind: c.kind || "", title: c.kind === "group" ? c.title : c.teacher.display_name, sub: c.kind === "group" ? "Бүлэг · " + c.teacher.display_name : "Багш", user: c.teacher, last: c.last_message, at: c.last_message_at }); });
+    (h?.chats || []).forEach((c) => { if (!out.has(c.id)) out.set(c.id, { id: c.id, kind: c.kind || "", title: c.kind === "group" || c.kind === "team" ? c.title : c.teacher?.display_name || "", sub: c.kind === "group" ? "Бүлэг · " + (c.teacher?.display_name || "") : c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : "Багш", user: c.kind === "team" ? null : c.teacher, last: c.last_message, at: c.last_message_at }); });
     return [...out.values()].sort((a, b) => new Date(b.at) - new Date(a.at));
   };
+  // Хүмүүс: багшид — суралцагчид нь, суралцагчид — багш нар нь (яриа эхлээгүй байсан ч нэг дарж эхэлнэ).
+  let people = [];
+  const loadPeople = async () => {
+    try {
+      if (teacher) {
+        const rows = await api("/api/me/students");
+        people = rows.map((r) => ({ id: r.user.id, user: r.user, name: r.user.display_name, sub: "Суралцагч" + (r.courses?.[0]?.title ? " · " + r.courses[0].title : ""), convId: r.conv_id || "", start: () => api(`/api/me/students/${r.user.id}/chat`, { method: "POST" }) }));
+      } else {
+        const [h, mates] = await Promise.all([api("/api/me/home"), api("/api/me/classmates").catch(() => [])]);
+        people = (h.teachers || []).map((t) => ({ id: t.id, user: t, name: t.display_name, sub: "Багш" + (t.headline ? " · " + t.headline : ""), convId: "", start: () => api(`/api/teachers/${t.username}/chat`, { method: "POST" }) }))
+          .concat(mates.map((m) => ({ id: m.user.id, user: m.user, name: m.user.display_name, sub: "Ангийн найз · " + (m.via || m.courses?.[0] || ""), convId: m.conv_id || "", mate: true, start: () => api(`/api/me/dm/${m.user.id}`, { method: "POST" }) })));
+      }
+    } catch { people = []; }
+  };
   const draw = () => {
-    const q = $("#railSearch").value.trim().toLowerCase();
-    const shown = convs.filter((c) => !q || c.title.toLowerCase().includes(q));
-    $("#railCount").textContent = convs.length;
-    $("#railList").innerHTML = shown.map((c) => `<button class="rail-item ${unread.has(c.id) ? "unread" : ""}" data-id="${esc(c.id)}">${c.kind === "group" ? `<span class="avatar avatar-sm group">👥</span>` : c.user ? avatarHTML(c.user) : `<span class="avatar avatar-sm" style="--h:${hueOfName(c.title)}">${esc(c.title.slice(0, 1).toUpperCase())}</span>`}
-      <span class="grow"><strong>${esc(c.title)}</strong><small><b>${esc(c.sub)}</b>${c.last ? " · " + esc(c.last) : ""}</small></span></button>`).join("") ||
-      `<p class="muted small" style="padding:16px">${convs.length ? "Илэрц алга" : teacher ? "Одоогоор чат алга. Профайлаа түгээгээрэй!" : "Багшийн профайл дээрх «Чатлах» эсвэл сургалтын «Бүлэг чат»-аар яриа эхэлнэ."}</p>`;
+    const q = $("#railSearch").value.trim().toLowerCase(), hit = (s) => !q || s.toLowerCase().includes(q);
+    const shown = convs.filter((c) => hit(c.title));
+    const convUsers = new Set(convs.map((c) => c.user?.id).filter(Boolean));
+    const ppl = people.filter((p) => hit(p.name) && !(p.convId && convs.some((c) => c.id === p.convId)) && !convUsers.has(p.id));
+    let i = 0;
+    const item = (c) => `<button class="rail-item rail-in ${unread.has(c.id) ? "unread" : ""}" style="--i:${i++}" data-id="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group">${c.kind === "team" ? "🧑‍🤝‍🧑" : "👥"}</span>` : c.user ? avatarHTML(c.user) : `<span class="avatar avatar-sm" style="--h:${hueOfName(c.title)}">${esc(c.title.slice(0, 1).toUpperCase())}</span>`}
+      <span class="grow"><strong>${esc(c.title)}</strong><small><b>${esc(c.sub)}</b>${c.last ? " · " + esc(c.last) : ""}</small></span>${c.at ? `<time class="rail-time">${fmtTime(c.at)}</time>` : ""}</button>`;
+    const person = (p) => `<button class="rail-item rail-in rail-person" style="--i:${i++}" data-person="${esc(p.id)}">${avatarHTML(p.user)}<span class="grow"><strong>${esc(p.name)}</strong><small><b>${esc(p.sub)}</b></small></span><span class="rail-new" aria-hidden="true">${I.chat}</span></button>`;
+    const sec = (title, n) => `<div class="rail-sec"><span>${title}</span><em>${n}</em></div>`;
+    $("#railList").innerHTML = (shown.length ? sec("Сүүлийн яриа", shown.length) + shown.map(item).join("") : "") + (ppl.length ? sec("Хүмүүс", ppl.length) + ppl.map(person).join("") : "") ||
+      `<p class="muted small" style="padding:16px">${q ? "Илэрц алга" : teacher ? "Одоогоор чат алга. Профайлаа түгээгээрэй!" : "Багшийн профайл дээрх «Чатлах» эсвэл сургалтын «Бүлэг чат»-аар яриа эхэлнэ."}</p>`;
   };
   const load = async () => { convs = await norm(); draw(); };
+  const startWith = async (pid) => {
+    const p = people.find((x) => x.id === pid); if (!p) return;
+    if (p.convId) return open(p.convId);
+    try { const d = await p.start(); const id = d.conversation?.id || d.id; p.convId = id; await load(); open(id); } catch (e) { toast(e.message, true); }
+  };
+  $("#railNewGroup")?.addEventListener("click", async (e) => {
+    $(".rail-pop")?.remove();
+    const pop = document.createElement("div"); pop.className = "rail-pop";
+    e.currentTarget.insertAdjacentElement("afterend", pop);
+    if (teacher) {
+      let courses = []; try { courses = await api("/api/me/courses"); } catch {}
+      pop.innerHTML = `<b>Сургалтын бүлэг чат</b>${courses.map((c) => `<button type="button" data-course="${esc(c.id)}">👥 ${esc(c.title)}</button>`).join("") || `<p class="muted small">Сургалт алга</p>`}`;
+      pop.onclick = async (ev) => { const b = ev.target.closest("[data-course]"); if (!b) return; pop.remove(); try { const d = await api(`/api/courses/${b.dataset.course}/chat`, { method: "POST" }); Live.reconnect(); await load(); open(d.conversation.id); } catch (x) { toast(x.message, true); } };
+    } else {
+      const mates = people.filter((p) => p.mate);
+      pop.innerHTML = `<b>Ангийн найзуудтайгаа бүлэг үүсгэх</b><form class="team-form"><input name="title" maxlength="60" required placeholder="Бүлгийн нэр (ж: Математикийн баг)">
+        <div class="team-list">${mates.map((m) => `<label><input type="checkbox" name="m" value="${esc(m.id)}">${avatarHTML(m.user)}<span>${esc(m.name)}<small>${esc(m.sub)}</small></span></label>`).join("") || `<p class="muted small">Ангийн найз хараахан алга — нэг багшид дагасан сурагчид энд гарна.</p>`}</div>
+        <button class="btn btn-gold btn-sm btn-block">Бүлэг үүсгэх</button></form>`;
+      pop.querySelector("form").onsubmit = async (ev) => {
+        ev.preventDefault();
+        const f = ev.target, members = [...f.querySelectorAll("input[name=m]:checked")].map((x) => x.value);
+        if (!members.length) { toast("Дор хаяж нэг найзаа сонгоно уу", true); return; }
+        try { const d = await api("/api/me/teams", { method: "POST", body: { title: f.title.value.trim(), members } }); pop.remove(); Live.reconnect(); await load(); open(d.conversation.id); toast("👥 Бүлэг үүслээ"); }
+        catch (x) { toast(x.message, true); }
+      };
+      setTimeout(() => pop.querySelector("input[name=title]")?.focus(), 50);
+    }
+    setTimeout(() => document.addEventListener("click", (ev) => { if (!pop.contains(ev.target)) pop.remove(); }, { once: true }), 0);
+  });
   const th = new ChatThread({ ol: msgs, body, form, token: () => Auth.token, convId: () => cur, role: () => myRole, group: () => curGroup });
   const append = (m) => th.append(m);
   const open = async (id) => {
@@ -271,15 +319,15 @@ function chatRail() {
     try {
       const d = await api(`/api/chat/${id}/messages`);
       if (cur !== id) return;
-      const c = d.conversation; curGroup = c.kind === "group"; myRole = d.me;
+      const c = d.conversation; curGroup = c.kind === "group" || c.kind === "team"; myRole = d.me;
       const known = convs.find((x) => x.id === id);
-      $("#railWho").innerHTML = `<strong>${esc(known?.title || c.visitor_name)}</strong><small class="muted">${curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин")}</small>`;
+      $("#railWho").innerHTML = `<strong>${esc(known?.title || c.visitor_name)}</strong><small class="muted">${c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин")}</small>`;
       th.set(d); form.body.focus();
     } catch (e) { $("#railWho").innerHTML = `<span class="form-error" style="margin:0">${esc(e.message)}</span>`; }
   };
   $("#railBack").onclick = () => { cur = null; thread.hidden = true; home.hidden = false; draw(); };
   $("#railSearch").addEventListener("input", draw);
-  $("#railList").addEventListener("click", (e) => { const it = e.target.closest(".rail-item"); if (it) open(it.dataset.id); });
+  $("#railList").addEventListener("click", (e) => { const p = e.target.closest("[data-person]"); if (p) return startWith(p.dataset.person); const it = e.target.closest(".rail-item"); if (it) open(it.dataset.id); });
   form.addEventListener("click", async (e) => {
     if (!e.target.closest("#railMeet") || !cur) return;
     try { const d = await api(`/api/chat/${cur}/meet`, { method: "POST" }); append(d.message); toast("Meet холбоос илгээгдлээ"); }
@@ -294,7 +342,7 @@ function chatRail() {
     clearTimeout(timer); timer = setTimeout(load, 400);
   });
   Live.connect(Auth.token);
-  load();
+  loadPeople().then(load);
   window.openRailChat = (id) => (id ? open(id) : setRail(true));
   // Сургалтын хуудасны товчнууд: нэвтэрсэн хүнд яриа энэ самбарт нээгдэнэ.
   window.railStartDirect = async (username) => { const d = await api(`/api/teachers/${username}/chat`, { method: "POST" }); await load(); open(d.conversation.id); };
@@ -1451,7 +1499,7 @@ class ChatThread {
   set(d) { this.list = d.messages || []; this.reads = d.reads || {}; this.meKey = d.me_key || this.meKey; this.replyTo = null; this.render(); this.scroll(true); this.markRead(); }
   append(m) {
     if (this.list.some((x) => x.id === m.id)) return;
-    this.list.push(m); this.typing.delete(m.sender_id ? "u:" + m.sender_id : m.sender_name);
+    this.list.push(m); this.typing.delete(m.sender_id ? "u:" + m.sender_id : m.sender_name); this._animLast = true;
     const atBottom = this.body.scrollHeight - this.body.scrollTop - this.body.clientHeight < 120;
     this.render(); if (atBottom || this.mine(m)) this.scroll(true);
     if (!this.mine(m)) this.markRead();
@@ -1505,6 +1553,7 @@ class ChatThread {
     for (const [, v] of this.typing) out.push(`<li class="msg them typing"><span class="msg-av"></span><div class="msg-col"><div class="bubble"><span class="dots"><i></i><i></i><i></i></span></div><small class="muted">${esc(v.name)} бичиж байна…</small></div></li>`);
     if (!out.length) out.push(`<li class="muted small" style="text-align:center">Анхны мессежээ бичээрэй ✍️</li>`);
     this.ol.innerHTML = out.join("");
+    if (this._animLast) { this.ol.lastElementChild?.classList.add("msg-in"); this._animLast = false; }
     this.renderReply();
   }
   async click(e) {

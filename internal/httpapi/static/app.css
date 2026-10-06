@@ -1725,3 +1725,50 @@ html.reader-open{overflow:hidden}
   html.has-rail.rail-collapsed .rail-tab .bell-badge{position:absolute;top:-6px;left:-6px}
   html.has-rail.rail-collapsed .chat-fab{right:22px}
 }
+
+/* Чатын жагсаалт: хэсгүүд, хүмүүс, анимаци */
+.rail-head{padding:4px 0 10px;border-bottom:1px solid var(--line)}
+.rail-head strong{font-size:1.2rem}
+.rail-group-btn{border-radius:999px;background:var(--brand-soft);color:var(--brand);border:0;font-weight:800;padding:8px 14px;transition:transform .15s,background .15s}
+.rail-group-btn:hover{background:#dbe4ff;transform:translateY(-1px)}
+.rail .rail-close{font-size:1.2rem;color:var(--muted)}
+.rail-search{border-radius:14px;padding:2px 12px}
+.rail-sec{display:flex;align-items:center;gap:8px;margin:12px 6px 4px;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rail-sec em{font-style:normal;padding:1px 8px;border-radius:999px;background:var(--ink-2);font-size:.7rem}
+.rail-item{position:relative;border-radius:14px;transition:background .18s,transform .18s}
+.rail-item:hover{transform:translateX(3px)}
+.rail-item:active{transform:scale(.985)}
+.rail-item .avatar{width:40px;height:40px;font-size:.95rem;position:relative;transition:transform .2s}
+.rail-item:hover .avatar{transform:scale(1.06)}
+.rail-item .avatar::after{content:"";position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;background:#cbd5e1;border:2px solid var(--surface)}
+.rail-item.unread .avatar::after{background:var(--teal,#0f9d8a);animation:pulse 1.6s infinite}
+.rail-item.unread strong::after{display:none}
+.rail-item.unread strong{color:var(--brand)}
+.rail-time{font-size:.68rem;color:var(--muted);align-self:flex-start;margin-top:2px}
+.rail-person small b{color:var(--brand)}
+.rail-new{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;color:var(--muted);opacity:.45;transition:opacity .15s,background .15s,color .15s}
+.rail-person:hover .rail-new{opacity:1;background:var(--brand-soft);color:var(--brand)}
+.rail-in{animation:rail-in .32s var(--ease,ease) both;animation-delay:calc(var(--i,0)*22ms)}
+@keyframes rail-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.rail-skel{display:flex;gap:12px;align-items:center;padding:10px}
+.rail-skel i,.rail-skel b{display:block;border-radius:8px;background:linear-gradient(90deg,var(--ink-2) 25%,#e9edf6 50%,var(--ink-2) 75%);background-size:200% 100%;animation:skel 1.2s infinite}
+.rail-skel i{width:40px;height:40px;border-radius:50%;flex:0 0 40px}
+.rail-skel span{flex:1;display:grid;gap:6px}
+.rail-skel b:first-child{height:12px;width:60%}.rail-skel b:last-child{height:10px;width:85%}
+@keyframes skel{from{background-position:200% 0}to{background-position:-200% 0}}
+.rail-pop{position:absolute;z-index:10;top:52px;right:14px;left:14px;padding:10px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:0 14px 40px rgba(15,23,42,.18);display:grid;gap:4px;animation:salute-pop .22s cubic-bezier(.2,1.4,.4,1)}
+.rail-pop b{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:2px 6px}
+.rail-pop button{text-align:left;padding:9px 10px;border:0;border-radius:10px;background:none;font:inherit;font-weight:700;color:var(--text);cursor:pointer}
+.rail-pop button:hover{background:var(--brand-soft);color:var(--brand)}
+.msg-in{animation:msg-in .28s cubic-bezier(.2,1.2,.4,1) both}
+@keyframes msg-in{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.rail-in,.msg-in,.rail-skel i,.rail-skel b{animation:none}}
+
+/* Сурагчдын бүлэг үүсгэх */
+.team-form{display:grid;gap:8px}
+.team-form input[name=title]{padding:9px 12px}
+.team-list{max-height:260px;overflow:auto;display:grid;gap:2px}
+.team-list label{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:10px;cursor:pointer;font-weight:600}
+.team-list label:hover{background:var(--ink-2)}
+.team-list label small{display:block;font-weight:500;color:var(--muted);font-size:.74rem}
+.team-list .avatar{width:30px;height:30px;font-size:.75rem}

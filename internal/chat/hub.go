@@ -144,7 +144,7 @@ func (h *Hub) Fanout(teacherID, visitorKey, conversationID string, event any) {
 
 func (h *Hub) fanout(teacherID, visitorKey, conversationID string, payload []byte) {
 	h.publish(TeacherKey(teacherID), payload)
-	if strings.HasPrefix(visitorKey, "course:") {
+	if strings.HasPrefix(visitorKey, "course:") || strings.HasPrefix(visitorKey, "team:") {
 		h.publish(GroupKey(conversationID), payload) // бүлгийн бүх гишүүнд
 		return
 	}

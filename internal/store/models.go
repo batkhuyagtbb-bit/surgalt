@@ -393,10 +393,15 @@ const (
 	SenderVisitor = "visitor"
 
 	ConvGroup = "group"
+	ConvDM    = "dm"   // сурагч ↔ сурагч (нэг багшийн ангийн найзууд): TeacherID = эхлүүлэгч, UserID = нөгөө
+	ConvTeam  = "team" // сурагчдын өөрсдийн үүсгэсэн бүлэг: TeacherID = үүсгэгч, гишүүд conversation_members-д
 )
 
 // GroupVisitorKey нь сургалтын бүлэг чатын түлхүүр.
 func GroupVisitorKey(courseID string) string { return "course:" + courseID }
+
+// TeamVisitorKey — сурагчдын бүлгийн сувгийн түлхүүр.
+func TeamVisitorKey(convID string) string { return "team:" + convID }
 
 type Message struct {
 	ID             string `json:"id"`
@@ -426,8 +431,16 @@ type ReactUser struct {
 	Name string `json:"name"`
 }
 
-// ChatExtras — хариулах, реакц, уншсан тэмдэг.
+// ChatExtras — хариулах, реакц, уншсан тэмдэг; сурагч хоорондын хувийн яриа ба бүлэг.
 type ChatExtras interface {
+	// CreateDM: a ба b хоёрын хувийн ярианы өрөө (байвал тэрийг буцаана; дараалал хамаарахгүй).
+	CreateDM(ctx context.Context, a, b, bName string) (*Conversation, error)
+	// CreateTeam: creator-ийн үүсгэсэн сурагчдын бүлэг; members-д creator орно.
+	CreateTeam(ctx context.Context, creator, title string, members []string) (*Conversation, error)
+	TeamMembers(ctx context.Context, convID string) ([]string, error)
+	IsTeamMember(ctx context.Context, convID, userID string) (bool, error)
+	UserDMConversations(ctx context.Context, userID string, limit int) ([]Conversation, error)
+	UserTeamConversations(ctx context.Context, userID string, limit int) ([]Conversation, error)
 	MessageByID(ctx context.Context, conversationID, id string) (*Message, error)
 	// ReactMessage: emoji хоосон бол хасна; нэг хүн нэг мессежид нэг эможи.
 	ReactMessage(ctx context.Context, conversationID, messageID, userKey, name, emoji string) error

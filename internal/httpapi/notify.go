@@ -179,6 +179,39 @@ func (s *Server) notifyMessage(ctx context.Context, conv *store.Conversation, m 
 		Title: title, Body: short(m.Body), Link: "/me#chat=" + conv.ID})
 }
 
+// notifyPeers — сурагч хоорондын хувийн яриа ба бүлэгт: илгээгчээс бусад оролцогчид мэдэгдэнэ.
+func (s *Server) notifyPeers(ctx context.Context, conv *store.Conversation, m *store.Message) {
+	var to []string
+	switch conv.Kind {
+	case store.ConvDM:
+		if m.SenderID == conv.TeacherID {
+			to = []string{conv.UserID}
+		} else {
+			to = []string{conv.TeacherID}
+		}
+	case store.ConvTeam:
+		members, _ := s.store.TeamMembers(ctx, conv.ID)
+		for _, u := range members {
+			if u != m.SenderID {
+				to = append(to, u)
+			}
+		}
+	default:
+		return
+	}
+	who := m.SenderName
+	if who == "" {
+		who = "Найз"
+	}
+	title := "💬 " + who + " танд бичлээ"
+	if conv.Kind == store.ConvTeam {
+		title = "💬 " + who + " · " + conv.VisitorName + " бүлэгт бичлээ"
+	}
+	for _, u := range to {
+		s.notify(ctx, &store.Notification{UserID: u, Type: NotifMessage, Count: 1, Title: title, Body: short(m.Body), Link: "/me#chat=" + conv.ID})
+	}
+}
+
 // notifyPaid нь төлбөр баталгаажсаны дараа багш болон худалдан авагчид мэдэгдэнэ.
 func (s *Server) notifyPaid(ctx context.Context, o *store.Order) {
 	if o.Kind == store.OrderKindStorage {

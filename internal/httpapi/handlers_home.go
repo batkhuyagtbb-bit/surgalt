@@ -287,6 +287,9 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	convs = append(convs, groups...)
+	dms, _ := s.store.UserDMConversations(ctx, c.UID, homeMaxChats)
+	teams, _ := s.store.UserTeamConversations(ctx, c.UID, homeMaxChats)
+	convs = append(append(convs, dms...), teams...)
 	sort.SliceStable(convs, func(i, j int) bool { return convs[i].LastMessageAt.After(convs[j].LastMessageAt) })
 
 	out := Home{User: u, Courses: []HomeCourse{}, Lessons: []HomeLesson{}, Pending: []HomeOrder{},
@@ -343,6 +346,9 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, cv := range convs {
 		teacherIDs[cv.TeacherID] = true
+		if cv.Kind == store.ConvDM {
+			teacherIDs[cv.UserID] = true
+		}
 	}
 	delete(teacherIDs, c.UID)
 	ids := make([]string, 0, len(teacherIDs))
@@ -354,12 +360,14 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	briefs := make(map[string]*TeacherBrief, len(users))
+	peers := map[string]*TeacherBrief{} // dm-ийн нөгөө сурагч
 	for i := range users {
 		t := &users[i]
-		if t.Role != store.RoleTeacher {
-			continue
+		b := &TeacherBrief{ID: t.ID, Username: t.Username, DisplayName: t.DisplayName, Headline: t.Headline, AvatarURL: t.AvatarURL}
+		if t.Role == store.RoleTeacher {
+			briefs[t.ID] = b
 		}
-		briefs[t.ID] = &TeacherBrief{ID: t.ID, Username: t.Username, DisplayName: t.DisplayName, Headline: t.Headline, AvatarURL: t.AvatarURL}
+		peers[t.ID] = b
 	}
 
 	var courseIDs []string
@@ -420,12 +428,25 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, cv := range convs {
-		if t := briefs[cv.TeacherID]; t != nil {
-			hc := HomeChat{ID: cv.ID, Teacher: t, LastMessage: cv.LastMessage, LastMessageAt: cv.LastMessageAt}
-			if cv.Kind == store.ConvGroup {
-				hc.Kind, hc.CourseID, hc.Title = cv.Kind, cv.CourseID, cv.VisitorName
+		switch cv.Kind {
+		case store.ConvDM: // нөгөө сурагч "teacher" талбарт (нэр, зураг)
+			other := cv.UserID
+			if other == c.UID {
+				other = cv.TeacherID
 			}
-			out.Chats = append(out.Chats, hc)
+			if p := peers[other]; p != nil {
+				out.Chats = append(out.Chats, HomeChat{ID: cv.ID, Kind: cv.Kind, Teacher: p, Title: p.DisplayName, LastMessage: cv.LastMessage, LastMessageAt: cv.LastMessageAt})
+			}
+		case store.ConvTeam:
+			out.Chats = append(out.Chats, HomeChat{ID: cv.ID, Kind: cv.Kind, Teacher: peers[cv.TeacherID], Title: cv.VisitorName, LastMessage: cv.LastMessage, LastMessageAt: cv.LastMessageAt})
+		default:
+			if t := briefs[cv.TeacherID]; t != nil {
+				hc := HomeChat{ID: cv.ID, Teacher: t, LastMessage: cv.LastMessage, LastMessageAt: cv.LastMessageAt}
+				if cv.Kind == store.ConvGroup {
+					hc.Kind, hc.CourseID, hc.Title = cv.Kind, cv.CourseID, cv.VisitorName
+				}
+				out.Chats = append(out.Chats, hc)
+			}
 		}
 	}
 	for _, t := range briefs {
