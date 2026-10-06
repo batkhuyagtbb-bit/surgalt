@@ -211,11 +211,18 @@ function chatRail() {
     back: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>`,
     search: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`,
     live: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/></svg>`,
+    group: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.2 2.7-5 6-5s6 1.8 6 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.3c3-.3 5.5 1.5 5.5 4.2"/></svg>`,
+    people: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5M10.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/></svg>`,
+    plus: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+    collapse: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 6 6 6-6 6M13 6l6 6-6 6"/></svg>`,
   };
+  const sameDay = (t) => new Date(t).toDateString() === new Date().toDateString();
+  // Хумьсан хавтас "би энд байна": шинэ мессеж ирэхэд нэг удаа дохино.
+  const nudgeTab = () => { const tab = $("#railTab"); if (!tab) return; tab.classList.remove("nudge"); void tab.offsetWidth; tab.classList.add("nudge"); };
   document.documentElement.classList.add("has-rail");
   document.body.insertAdjacentHTML("beforeend", `<aside class="rail" id="studioRail" aria-label="Чат">
     <div class="rail-view" id="railHome">
-      <header class="rail-head"><strong><i></i>Чат</strong><button class="btn btn-sm rail-group-btn" id="railNewGroup" title="${teacher ? "Сургалтын бүлэг чат нээх" : "Ангийн найзуудтайгаа бүлэг үүсгэх"}">＋ Бүлэг чат</button><button class="icon-btn rail-close" data-rail-close aria-label="Чат хумих" title="Хумих">»</button></header>
+      <header class="rail-head"><strong><i></i>Чат</strong><button class="btn btn-sm rail-group-btn" id="railNewGroup" title="${teacher ? "Сургалтын бүлэг чат нээх" : "Ангийн найзуудтайгаа бүлэг үүсгэх"}">${I.plus}Бүлэг чат</button><button class="icon-btn rail-close" data-rail-close aria-label="Чат хумих" title="Хумих">${I.collapse}</button></header>
       <label class="rail-search">${I.search}<input type="search" id="railSearch" placeholder="Нэрээр хайх…" aria-label="Чат хайх"></label>
       <div class="rail-list" id="railList">${[1, 2, 3, 4].map(() => `<div class="rail-skel"><i></i><span><b></b><b></b></span></div>`).join("")}</div></div>
     <div class="rail-view" id="railThread" hidden>
@@ -225,17 +232,17 @@ function chatRail() {
   </aside><div class="rail-scrim" id="railScrim"></div>`);
   $(".nav-links").insertAdjacentHTML("afterbegin", `<button class="icon-btn rail-toggle" id="railToggle" aria-label="Чат" aria-controls="studioRail" aria-expanded="false">${I.chat}<span class="bell-badge" id="railBadge" hidden></span></button>`);
   const rail = $("#studioRail"), home = $("#railHome"), thread = $("#railThread"), msgs = $("#railMsgs"), body = $("#railBody"), form = $("#railForm");
-  let convs = [], unread = new Set(), timer = 0, cur = null, curGroup = false, myRole = "visitor";
+  let convs = [], unread = new Map(), timer = 0, cur = null, curGroup = false, myRole = "visitor";
   // Өргөн дэлгэцэд чат баруун талд наалддаг; хумих (⟩) товчоор нуугдаж, баруун ирмэгийн хавтсаар дахин нээгдэнэ.
   const wide = () => matchMedia("(min-width:1280px)").matches;
-  document.body.insertAdjacentHTML("beforeend", `<button class="rail-tab" id="railTab" aria-label="Чат нээх" title="Чат нээх">${I.chat}<span>Чат</span><span class="bell-badge" id="railTabBadge" hidden></span></button>`);
+  document.body.insertAdjacentHTML("beforeend", `<button class="rail-tab" id="railTab" aria-label="Чат нээх" title="Чат нээх"><span class="rail-tab-ico">${I.chat}<i class="rail-tab-dot"></i></span><span class="rail-tab-txt">Чат</span><span class="bell-badge" id="railTabBadge" hidden></span></button>`);
   const setCollapsed = (c) => { document.documentElement.classList.toggle("rail-collapsed", c); try { localStorage.setItem("sg_rail_collapsed", c ? "1" : "0"); } catch {} };
   try { if (localStorage.getItem("sg_rail_collapsed") === "1") setCollapsed(true); } catch {}
   const setRail = (open) => {
     if (wide()) { setCollapsed(!open); }
     document.body.classList.toggle("rail-open", open && !wide()); $("#railToggle").setAttribute("aria-expanded", String(open));
   };
-  const badge = () => { const n = unread.size; for (const id of ["railBadge", "railTabBadge"]) { const b = $("#" + id); if (b) { b.hidden = !n; b.textContent = n; } } };
+  const badge = () => { let n = 0; unread.forEach((v) => (n += v)); for (const id of ["railBadge", "railTabBadge"]) { const b = $("#" + id); if (b) { b.hidden = !n; b.textContent = n > 99 ? "99+" : n; } } document.documentElement.classList.toggle("rail-has-unread", n > 0); };
   $("#railToggle").onclick = () => setRail(wide() ? document.documentElement.classList.contains("rail-collapsed") : !document.body.classList.contains("rail-open"));
   $("#railTab").onclick = () => setRail(true);
   $("#railScrim").onclick = () => setRail(false);
@@ -275,8 +282,8 @@ function chatRail() {
     const convUsers = new Set(convs.map((c) => c.user?.id).filter(Boolean));
     const ppl = people.filter((p) => hit(p.name) && !(p.convId && convs.some((c) => c.id === p.convId)) && !convUsers.has(p.id));
     let i = 0;
-    const item = (c) => `<button class="rail-item ${anim} ${unread.has(c.id) ? "unread" : ""}" style="--i:${i++}" data-id="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group">${c.kind === "team" ? "🧑‍🤝‍🧑" : "👥"}</span>` : c.user ? avatarHTML(c.user) : `<span class="avatar avatar-sm" style="--h:${hueOfName(c.title)}">${esc(c.title.slice(0, 1).toUpperCase())}</span>`}
-      <span class="grow"><strong>${esc(c.title)}</strong><small><b>${esc(c.sub)}</b>${c.last ? " · " + esc(c.last) : ""}</small></span>${c.at ? `<time class="rail-time">${fmtTime(c.at)}</time>` : ""}</button>`;
+    const item = (c) => { const n = unread.get(c.id) || 0; return `<button class="rail-item ${anim} ${n ? "unread" : ""} ${c.id === cur ? "active" : ""}" style="--i:${i++}" data-id="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group ${c.kind}">${c.kind === "team" ? I.people : I.group}</span>` : c.user ? avatarHTML(c.user) : `<span class="avatar avatar-sm" style="--h:${hueOfName(c.title)}">${esc(c.title.slice(0, 1).toUpperCase())}</span>`}
+      <span class="grow"><span class="rail-row1"><strong>${esc(c.title)}</strong>${c.at ? `<time class="rail-time">${sameDay(c.at) ? fmtTime(c.at) : fmtDay(c.at)}</time>` : ""}</span><small>${c.last ? esc(c.last) : `<i>${esc(c.sub)}</i>`}</small></span>${n ? `<span class="rail-unread">${n > 9 ? "9+" : n}</span>` : ""}</button>`; };
     const person = (p) => `<button class="rail-item ${anim} rail-person" style="--i:${Math.min(i++, 12)}" data-person="${esc(p.id)}">${avatarHTML(p.user)}<span class="grow"><strong>${esc(p.name)}</strong><small><b>${esc(p.sub)}</b></small></span><span class="rail-new" aria-hidden="true">${I.chat}</span></button>`;
     const sec = (title, n) => `<div class="rail-sec"><span>${title}</span><em>${n}</em></div>`;
     $("#railList").innerHTML = (shown.length ? sec("Сүүлийн яриа", shown.length) + shown.map(item).join("") : "") + (ppl.length ? sec("Хүмүүс", ppl.length) + ppl.map(person).join("") : "") ||
@@ -315,7 +322,7 @@ function chatRail() {
   const th = new ChatThread({ ol: msgs, body, form, token: () => Auth.token, convId: () => cur, role: () => myRole, group: () => curGroup });
   const append = (m) => th.append(m);
   const open = async (id) => {
-    cur = id; unread.delete(id); badge(); setRail(true);
+    cur = id; unread.delete(id); badge(); setRail(true); draw();
     home.hidden = true; thread.hidden = false;
     $("#railWho").innerHTML = `<span class="muted small">Ачаалж байна…</span>`; msgs.innerHTML = "";
     try {
@@ -340,7 +347,7 @@ function chatRail() {
     if (d.type !== "message") return;
     const m = d.message;
     if (m.conversation_id === cur) append(m);
-    else if (m.sender_id !== u.id) { unread.add(m.conversation_id); badge(); }
+    else if (m.sender_id !== u.id) { unread.set(m.conversation_id, (unread.get(m.conversation_id) || 0) + 1); badge(); if (window.innerWidth >= 1280 && document.documentElement.classList.contains("rail-collapsed")) nudgeTab(); }
     clearTimeout(timer); timer = setTimeout(load, 400);
   });
   Live.connect(Auth.token);
