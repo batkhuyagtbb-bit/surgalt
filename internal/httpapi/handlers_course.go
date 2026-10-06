@@ -310,12 +310,14 @@ func (s *Server) lessonAccess(ctx context.Context, uid string, course *store.Cou
 
 // LessonState нь суралцагчид нэг хичээл одоо нээлттэй юу, үгүй бол яагаад, хэзээ нээгдэхийг хэлнэ.
 type LessonState struct {
-	Open      bool       `json:"open"`
-	Reason    string     `json:"reason,omitempty"` // "prev" — өмнөхөө үзээгүй, "quiz" — өмнөхийн асуултуудад бүрэн зөв хариулаагүй, "timer" — хугацаа болоогүй
-	PrevTitle string     `json:"prev_title,omitempty"`
-	UnlockAt  *time.Time `json:"unlock_at,omitempty"`
-	QuizLeft  int        `json:"quiz_left,omitempty"`  // quiz: хэдэн асуулт зөв хариулагдаагүй үлдсэн
-	QuizTotal int        `json:"quiz_total,omitempty"` // quiz: өмнөх хичээлийн нийт асуулт
+	Open       bool       `json:"open"`
+	Reason     string     `json:"reason,omitempty"` // "prev" — өмнөхөө үзээгүй, "quiz" — өмнөхийн асуултуудад бүрэн зөв хариулаагүй, "timer" — хугацаа болоогүй
+	PrevTitle  string     `json:"prev_title,omitempty"`
+	UnlockAt   *time.Time `json:"unlock_at,omitempty"`
+	QuizLeft   int        `json:"quiz_left,omitempty"`   // quiz: хэдэн асуулт зөв хариулагдаагүй үлдсэн
+	QuizTotal  int        `json:"quiz_total,omitempty"`  // quiz: өмнөх хичээлийн нийт асуулт
+	ActiveLeft int        `json:"active_left,omitempty"` // active: өмнөх хичээлд дутуу идэвхтэй минут
+	ActiveMin  int        `json:"active_min,omitempty"`
 }
 
 // quizBlockIDs — хичээл доторх өөрийгөө сорих асуултуудын ID (шалгалтын хичээлд хамаарахгүй: тэр тусдаа тэнцдэг).
@@ -353,9 +355,36 @@ func quizMastery(l *store.Lesson, p *store.LessonProgress) (correct, total int, 
 	return
 }
 
-// dripState: дараалал идэвхгүй, хичээл үргэлж нээлттэй, эхний хичээл, эсвэл fullAccess (багш /
-// багц төлсөн + UnlockAllPaid) бол нээлттэй. Үгүй бол өмнөх хичээлийг үзсэн цаг + хүлээх хугацаа.
-func dripState(course *store.Course, lessons []store.Lesson, l *store.Lesson, progress map[string]store.LessonProgress, fullAccess bool, now time.Time) LessonState {
+// dripExtra — дарааллын шалгалтад хэрэгтэй нэмэлт баримт: хичээл бүрийн идэвхтэй секунд, тэнцсэн шалгалт.
+type dripExtra struct {
+	active map[string]int
+	passed map[string]bool
+}
+
+func (s *Server) dripFacts(ctx context.Context, uid, courseID string) dripExtra {
+	x := dripExtra{active: map[string]int{}, passed: map[string]bool{}}
+	if ss, err := s.store.Sessions(ctx, store.ActivityFilter{UserID: uid, CourseID: courseID}, 5000); err == nil {
+		for _, v := range ss {
+			x.active[v.LessonID] += v.ActiveSec
+		}
+	}
+	if atts, err := s.store.ExamAttempts(ctx, store.ActivityFilter{UserID: uid, CourseID: courseID}); err == nil {
+		for _, a := range atts {
+			if a.Passed {
+				x.passed[a.LessonID] = true
+			}
+		}
+	}
+	return x
+}
+
+// dripState — дараагийн хичээл нээгдэх дүрэм:
+//  1. Өмнөх хичээлийг үзсэн байх.
+//  2. Өмнөх хичээлийн идэвхтэй суралцах хугацааг (ActiveMin) гүйцээсэн байх (эсвэл "дууслаа" гэсэн).
+//  3. Өмнөх нь шалгалт бол тэнцсэн, асуулттай бол бүгдэд нь зөв хариулсан байх — тэгвэл цаг, өдрөөс
+//     үл хамааран ШУУД нээгдэнэ (таймер хамаарахгүй).
+//  4. Асуулт, шалгалтгүй хичээл бол тохируулсан хүлээх хугацаа (UnlockAfterH) үйлчилнэ.
+func dripState(course *store.Course, lessons []store.Lesson, l *store.Lesson, progress map[string]store.LessonProgress, fullAccess bool, now time.Time, x dripExtra) LessonState {
 	if !course.Drip || l.AlwaysOpen || fullAccess {
 		return LessonState{Open: true}
 	}
@@ -372,13 +401,26 @@ func dripState(course *store.Course, lessons []store.Lesson, l *store.Lesson, pr
 	if !ok {
 		return LessonState{Reason: "prev", PrevTitle: prev.Title}
 	}
-	// Өмнөх хичээлд асуулт байвал бүгдэд нь зөв хариулж дуусгасан байх ёстой; таймер тэр мөчөөс эхэлнэ.
-	correct, total, done, base := quizMastery(prev, &p)
-	if !done {
+	if need := prev.ActiveMin * 60; need > 0 && p.CompletedAt == nil && x.active[prev.ID] < need {
+		left := (need - x.active[prev.ID] + 59) / 60
+		return LessonState{Reason: "active", PrevTitle: prev.Title, ActiveLeft: left, ActiveMin: prev.ActiveMin}
+	}
+	if prev.Exam != nil {
+		if x.passed[prev.ID] {
+			return LessonState{Open: true}
+		}
+		return LessonState{Reason: "exam", PrevTitle: prev.Title}
+	}
+	correct, total, done, _ := quizMastery(prev, &p)
+	if total > 0 {
+		if done {
+			return LessonState{Open: true} // асуултуудад бүгдэд нь зөв → цаг, өдөр хамаагүй шууд
+		}
 		return LessonState{Reason: "quiz", PrevTitle: prev.Title, QuizLeft: total - correct, QuizTotal: total}
 	}
-	if total == 0 {
-		base = p.ViewedAt
+	base := p.ViewedAt
+	if p.CompletedAt != nil {
+		base = *p.CompletedAt
 	}
 	at := base.Add(time.Duration(l.UnlockAfterH) * time.Hour)
 	if now.Before(at) {
@@ -583,10 +625,11 @@ func (s *Server) handleCourseAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	full := fullAccess(course, c.UID, enrolled)
+	facts := s.dripFacts(r.Context(), c.UID, course.ID)
 	states := make(map[string]LessonState, len(lessons))
 	done := 0
 	for i := range lessons {
-		states[lessons[i].ID] = dripState(course, lessons, &lessons[i], progress, full, time.Now())
+		states[lessons[i].ID] = dripState(course, lessons, &lessons[i], progress, full, time.Now(), facts)
 		if p, ok := progress[lessons[i].ID]; ok && p.CompletedAt != nil {
 			done++
 		}
@@ -673,10 +716,16 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		enrolled, _ := s.store.IsEnrolled(r.Context(), c.UID, course.ID)
-		if st := dripState(course, lessons, l, progress, fullAccess(course, c.UID, enrolled), time.Now()); !st.Open {
+		if st := dripState(course, lessons, l, progress, fullAccess(course, c.UID, enrolled), time.Now(), s.dripFacts(r.Context(), c.UID, course.ID)); !st.Open {
 			msg := "Эхлээд «" + st.PrevTitle + "» хичээлийг үзнэ үү"
 			if st.Reason == "quiz" {
 				msg = fmt.Sprintf("Эхлээд «%s» хичээлийн асуултуудад бүгдэд нь зөв хариулна уу (%d/%d үлдсэн)", st.PrevTitle, st.QuizLeft, st.QuizTotal)
+			}
+			if st.Reason == "active" {
+				msg = fmt.Sprintf("Эхлээд «%s» хичээлийн идэвхтэй суралцах хугацааг гүйцээнэ үү (%d мин дутуу)", st.PrevTitle, st.ActiveLeft)
+			}
+			if st.Reason == "exam" {
+				msg = "Эхлээд «" + st.PrevTitle + "» шалгалтад тэнцэнэ үү"
 			}
 			if st.Reason == "timer" {
 				msg = "Энэ хичээл " + st.UnlockAt.Local().Format("01/02 15:04") + "-д нээгдэнэ"

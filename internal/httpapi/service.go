@@ -72,7 +72,7 @@ func (s *Server) LessonFor(ctx context.Context, uid, cid, lid string) (*store.Co
 			return nil, nil, err
 		}
 		enrolled, _ := s.store.IsEnrolled(ctx, uid, course.ID)
-		if st := dripState(course, lessons, l, progress, fullAccess(course, uid, enrolled), time.Now()); !st.Open {
+		if st := dripState(course, lessons, l, progress, fullAccess(course, uid, enrolled), time.Now(), s.dripFacts(ctx, uid, course.ID)); !st.Open {
 			return nil, nil, apiError(http.StatusLocked, "энэ хичээл хараахан нээгдээгүй", map[string]any{"state": st})
 		}
 	}

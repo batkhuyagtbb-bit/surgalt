@@ -1577,18 +1577,33 @@ func TestQuizMasteryUnlock(t *testing.T) {
 	if p := acc["progress"].(map[string]any)[id(l1)].(map[string]any); p["quiz_done_at"] == nil {
 		t.Fatalf("quiz_done_at алга: %v", p)
 	}
-	// 3: өмнөх (2) асуулттай тул эхлээд асуулга, дараа нь 24 цагийн таймер (асуулга дууссан мөчөөс).
+	// 3: өмнөх (2) асуулттай тул эхлээд асуулга; бүгдэд зөв хариулмагц 24 цагийн таймер үл хамааран шууд нээгдэнэ.
 	if code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l3), s1, ""); code != http.StatusLocked || r["state"].(map[string]any)["reason"] != "quiz" {
 		t.Fatalf("3 нь 2-ын асуулгаас хамаарна: %d %v", code, r)
 	}
 	call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+id(l2)+"/quiz/q003", s1, `{"answer":[0],"ms":2500}`)
-	if code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l3), s1, ""); code != http.StatusLocked || r["state"].(map[string]any)["reason"] != "timer" {
-		t.Fatalf("асуулга дууссан → таймер: %d %v", code, r)
+	if code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l3), s1, ""); code != 200 {
+		t.Fatalf("асуулга амжилттай → цаг хамаагүй шууд нээгдэнэ: %d %v", code, r)
 	}
-	if mem, ok := st.(*store.Memory); ok {
-		mem.BackdateProgress(uid, id(l2), 25*time.Hour)
-		if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l3), s1, ""); code != 200 {
-			t.Fatal("24 цаг өнгөрсний дараа 3 нээгдэх ёстой")
+	_ = uid
+	_ = st
+	// Идэвхтэй хугацаа: өмнөх хичээл 10 мин шаарддаг бол асуулга зөв ч хугацаа гүйцээтэл түгжээтэй.
+	_, l4 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Дөрөв","active_min":10,"blocks":[{"id":"q004","type":"quiz","quiz":{"question":"?","options":["a","b"],"correct":[0]}}]}`)
+	_, l5 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Тав"}`)
+	call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l3), s1, "")
+	call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l4), s1, "")
+	call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+id(l4)+"/quiz/q004", s1, `{"answer":[0],"ms":3000}`)
+	if code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l5), s1, ""); code != http.StatusLocked || r["state"].(map[string]any)["reason"] != "active" || r["state"].(map[string]any)["active_left"].(float64) != 10 {
+		t.Fatalf("идэвхтэй хугацаа гүйцээгүй → active түгжээ: %d %v", code, r)
+	}
+	_, sess := call(t, srv, "POST", "/api/activity/start", s1, `{"course_id":"`+cid+`","lesson_id":"`+id(l4)+`","kind":"lesson"}`)
+	for i := 0; i < 3; i++ { // beat тус бүр дээд тал нь өнгөрсөн хугацаагаар хязгаарлагдана — complete-ээр баталгаажуулна
+		call(t, srv, "POST", "/api/activity/beat", s1, `{"session_id":"`+sess["session_id"].(string)+`","active":15}`)
+	}
+	if mem, ok := st.(*store.Memory); ok { // хугацааг дуурайна: "дууслаа" тэмдэглэгдсэн бол хугацаа гүйцсэнд тооцно
+		mem.MarkLessonCompleted(context.Background(), uid, cid, id(l4))
+		if code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l5), s1, ""); code != 200 {
+			t.Fatalf("хугацаа гүйцсэн (дууссан) → 5 шууд нээгдэнэ: %d %v", code, r)
 		}
 	}
 	// Багш өөрөө түгжээгүй.
@@ -1602,16 +1617,16 @@ func TestQuizMasteryUnlock(t *testing.T) {
 		t.Fatalf("1 суралцагч: %v", an)
 	}
 	x := sts[0].(map[string]any)
-	if x["quiz_lessons"].(float64) != 2 || x["quiz_mastered"].(float64) != 2 || x["quiz_first_try"].(float64) != 67 || x["quiz_questions"].(float64) != 3 {
+	if x["quiz_lessons"].(float64) != 3 || x["quiz_mastered"].(float64) != 3 || x["quiz_first_try"].(float64) != 75 || x["quiz_questions"].(float64) != 4 {
 		t.Fatalf("асуулгын эзэмшилт буруу: lessons=%v mastered=%v first=%v q=%v", x["quiz_lessons"], x["quiz_mastered"], x["quiz_first_try"], x["quiz_questions"])
 	}
 	tot := an["data"].(map[string]any)["totals"].(map[string]any)
-	if tot["quiz_mastered"].(float64) != 2 {
+	if tot["quiz_mastered"].(float64) != 3 {
 		t.Fatalf("нийт эзэмшилт буруу: %v", tot)
 	}
 	_, det := call(t, srv, "GET", "/api/me/analytics/students/"+uid+"?course="+cid, tt, "")
 	ql := det["quiz_lessons"].([]any)
-	if len(ql) != 2 {
+	if len(ql) != 3 {
 		t.Fatalf("хичээл бүрийн асуулгын мөр 2 байх ёстой: %v", ql)
 	}
 	var one map[string]any
@@ -1623,7 +1638,7 @@ func TestQuizMasteryUnlock(t *testing.T) {
 	if one == nil || one["done"] != true || one["attempts"].(float64) != 3 || one["first_try"].(float64) != 1 || one["correct"].(float64) != 2 {
 		t.Fatalf("1-р хичээлийн үнэлгээ буруу: %v", one)
 	}
-	if len(det["quiz_logs"].([]any)) != 4 || det["lesson_titles"].(map[string]any)[id(l1)] != "Нэг" {
+	if len(det["quiz_logs"].([]any)) != 5 || det["lesson_titles"].(map[string]any)[id(l1)] != "Нэг" {
 		t.Fatalf("лог/нэр буруу: %v", det["lesson_titles"])
 	}
 }

@@ -1990,3 +1990,6 @@ html.reader-open{overflow:hidden}
 .dp-card .dp-steps{margin-bottom:26px}
 .dp-acts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .lesson-nav .ln.is-lock{opacity:.75}
+/* Наалдсан табын цэс: багшийн удирдлага (.manage) дээр ч бүтэн өргөнөөр, агуулгатай ижил тэнхлэгт */
+.pf-stuck .pf-tabs,.pf-stuck.pf .pf-tabs,.pf.manage.pf-stuck .pf-tabs,.pf-stuck .pf.manage .pf-tabs{max-width:none;margin:0;width:auto}
+.pf.manage.pf-stuck .pf-tabs,.pf-stuck .pf.manage .pf-tabs{padding:0 max(16px,calc((100vw - var(--rail-w,0px) - 1360px)/2 + 16px))}
