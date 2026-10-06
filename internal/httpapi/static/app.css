@@ -1710,3 +1710,18 @@ html.reader-open{overflow:hidden}
 .composer-bar .cb-left .cb-ic:hover{background:#d3f0e7}
 .composer-bar .cb-left .cb-ic svg{width:20px;height:20px}
 .composer-bar .reply-bar{border-radius:12px;padding:8px 12px}
+
+/* Чат хумих / нээх */
+.rail-tab{display:none}
+@media (min-width:1280px){
+  html.has-rail body,html.has-rail .nav{transition:padding-right .3s var(--ease),right .3s var(--ease)}
+  html.has-rail .rail .rail-close{display:inline-grid}
+  html.has-rail .rail{transition:transform .3s var(--ease)}
+  html.has-rail.rail-collapsed{--rail-w:0px}
+  html.has-rail.rail-collapsed .rail{transform:translateX(104%)!important;box-shadow:none}
+  html.has-rail.rail-collapsed .nav .rail-toggle{display:inline-grid}
+  html.has-rail.rail-collapsed .rail-tab{position:fixed;right:0;top:50%;z-index:46;display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px 12px 10px;border:1px solid var(--line);border-right:0;border-radius:14px 0 0 14px;background:var(--surface);color:var(--brand);font-size:.72rem;font-weight:800;cursor:pointer;transform:translateY(-50%);box-shadow:-6px 0 20px -8px rgba(18,24,41,.25);transition:transform .15s}
+  html.has-rail.rail-collapsed .rail-tab:hover{transform:translateY(-50%) translateX(-3px)}
+  html.has-rail.rail-collapsed .rail-tab .bell-badge{position:absolute;top:-6px;left:-6px}
+  html.has-rail.rail-collapsed .chat-fab{right:22px}
+}

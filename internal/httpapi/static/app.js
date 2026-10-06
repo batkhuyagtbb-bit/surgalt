@@ -226,9 +226,18 @@ function chatRail() {
   $(".nav-links").insertAdjacentHTML("afterbegin", `<button class="icon-btn rail-toggle" id="railToggle" aria-label="Чат" aria-controls="studioRail" aria-expanded="false">${I.chat}<span class="bell-badge" id="railBadge" hidden></span></button>`);
   const rail = $("#studioRail"), home = $("#railHome"), thread = $("#railThread"), msgs = $("#railMsgs"), body = $("#railBody"), form = $("#railForm");
   let convs = [], unread = new Set(), timer = 0, cur = null, curGroup = false, myRole = "visitor";
-  const setRail = (open) => { document.body.classList.toggle("rail-open", open); $("#railToggle").setAttribute("aria-expanded", String(open)); };
-  const badge = () => { const b = $("#railBadge"); b.hidden = !unread.size; b.textContent = unread.size; };
-  $("#railToggle").onclick = () => setRail(!document.body.classList.contains("rail-open"));
+  // Өргөн дэлгэцэд чат баруун талд наалддаг; хумих (⟩) товчоор нуугдаж, баруун ирмэгийн хавтсаар дахин нээгдэнэ.
+  const wide = () => matchMedia("(min-width:1280px)").matches;
+  document.body.insertAdjacentHTML("beforeend", `<button class="rail-tab" id="railTab" aria-label="Чат нээх" title="Чат нээх">${I.chat}<span>Чат</span><span class="bell-badge" id="railTabBadge" hidden></span></button>`);
+  const setCollapsed = (c) => { document.documentElement.classList.toggle("rail-collapsed", c); try { localStorage.setItem("sg_rail_collapsed", c ? "1" : "0"); } catch {} };
+  try { if (localStorage.getItem("sg_rail_collapsed") === "1") setCollapsed(true); } catch {}
+  const setRail = (open) => {
+    if (wide()) { setCollapsed(!open); }
+    document.body.classList.toggle("rail-open", open && !wide()); $("#railToggle").setAttribute("aria-expanded", String(open));
+  };
+  const badge = () => { const n = unread.size; for (const id of ["railBadge", "railTabBadge"]) { const b = $("#" + id); if (b) { b.hidden = !n; b.textContent = n; } } };
+  $("#railToggle").onclick = () => setRail(wide() ? document.documentElement.classList.contains("rail-collapsed") : !document.body.classList.contains("rail-open"));
+  $("#railTab").onclick = () => setRail(true);
   $("#railScrim").onclick = () => setRail(false);
   rail.addEventListener("click", (e) => { if (e.target.closest("[data-rail-close]")) setRail(false); });
   addEventListener("keydown", (e) => { if (e.key === "Escape") setRail(false); });
