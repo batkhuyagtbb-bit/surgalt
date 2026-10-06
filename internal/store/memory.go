@@ -599,6 +599,19 @@ func (m *Memory) UpdateLesson(_ context.Context, l *Lesson) error {
 	return ErrNotFound
 }
 
+func (m *Memory) DeleteLesson(_ context.Context, courseID, lessonID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ls := m.lessons[courseID]
+	for i, cur := range ls {
+		if cur.ID == lessonID {
+			m.lessons[courseID] = append(ls[:i:i], ls[i+1:]...)
+			return nil
+		}
+	}
+	return ErrNotFound
+}
+
 func (m *Memory) CreateOrGetPendingLessonOrder(_ context.Context, userID string, c *Course, l *Lesson) (*Order, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

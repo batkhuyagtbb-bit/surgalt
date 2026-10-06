@@ -220,16 +220,23 @@ func (s *Server) handleDeleteBook(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if b.Sales > 0 {
+	// Зарагдсан номыг багш санамсаргүй устгахаас сэргийлнэ: ?force=1 гэж баталгаажуулсан үед л устгана
+	// (худалдаж авсан хүмүүс хандах эрхээ алдана гэдгийг UI анхааруулна).
+	if b.Sales > 0 && r.URL.Query().Get("force") != "1" {
 		writeErr(w, http.StatusConflict, "худалдаж авсан хүмүүс байгаа тул устгах боломжгүй — нийтлэлээс хасна уу")
 		return
 	}
 	if err := s.store.DeleteBook(r.Context(), b.ID, c.UID); s.storeErr(w, r, err) {
 		return
 	}
+	// Цаана нь байгаа файлууд: хуудасны зургууд (номын хавтас) ба өөр хаана ч ашиглаагүй нүүр зураг.
 	_ = s.files.DeleteBookPages(c.UID, b.ID)
+	removed := 0
+	if b.CoverURL != "" {
+		removed = s.deleteOrphanFiles(c.UID, []string{strings.SplitN(b.CoverURL, "?", 2)[0]}, s.teacherFilesInUse(r.Context(), c.UID, "", b.ID))
+	}
 	s.bookChanged(r, c.UID, c.Name)
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted_files": removed})
 }
 
 // handleUploadBookPage: POST /api/me/books/{id}/pages/{n} — түүхий зураг (багшийн хөтөч PDF-ээс зурж илгээнэ).

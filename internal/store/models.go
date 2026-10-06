@@ -366,6 +366,8 @@ type Store interface {
 	LessonByID(ctx context.Context, courseID, lessonID string) (*Lesson, error)
 	// UpdateLesson нь гарчиг, агуулга, медиа, үнэгүй/төлбөртэй, үнэ, дараалсан нээлтийн тохиргоог шинэчилнэ.
 	UpdateLesson(ctx context.Context, l *Lesson) error
+	// DeleteLesson нь хичээлийг устгана (явц, худалдан авалтын түүх хэвээр үлдэнэ).
+	DeleteLesson(ctx context.Context, courseID, lessonID string) error
 	// ReorderLessons нь хичээлүүдийн дараалал (1..n) ба бүлгийг нэг дор шинэчилнэ. items нь сургалтын бүх хичээлийг агуулна.
 	ReorderLessons(ctx context.Context, courseID string, items []LessonOrder) error
 	// SaveQuizResult нь суралцагчийн асуултын сүүлийн хариултыг (зөв/буруу) явцад хадгална.

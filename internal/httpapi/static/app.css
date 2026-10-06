@@ -1443,3 +1443,7 @@ html.reader-open{overflow:hidden}
 .refl-item small{float:right;color:var(--muted)}
 .refl-item p{margin:6px 0 0;white-space:pre-wrap}
 .an-wrongq td{background:var(--coral-soft)}
+/* Хичээл устгах товч: улаан өнгө, зөвхөн hover дээр тод */
+.post-foot>.post-del{flex:0 0 auto;color:var(--muted)}
+.post-foot>.post-del:hover{background:#fee2e2;color:#b91c1c}
+.ol-row .ol-del:hover{color:#b91c1c;background:#fee2e2}

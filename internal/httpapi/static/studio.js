@@ -651,7 +651,8 @@ async function courseEditor(id) {
         : `<button class="post-attach" data-open-media>${ico(/\.pdf$/i.test(stripSig(l.video_url)) ? "book" : "live", 22)}<span><strong>${esc(mediaLabel(l.video_url))}</strong><small class="muted">Дарж нээнэ</small></span>${ico("chevron", 18)}</button><div class="post-media" hidden></div>`) : ""}
       <footer class="post-foot"><button data-edit-post>${ico("edit", 16)}Засах</button><button data-toggle-free>${ico(l.is_free ? "lock" : "globe", 16)}${l.is_free ? "Төлбөртэй болгох" : "Үнэгүй болгох"}</button>
         ${c.drip ? `<button data-toggle-always title="Дарааллаас үл хамааран нээлттэй эсэх">${ico(l.always_open ? "lock" : "globe", 16)}${l.always_open ? "Дараалалд оруулах" : "Шууд нээлттэй болгох"}</button>` : ""}
-        ${c.published ? `<a href="/c/${esc(c.id)}#l=${esc(l.id)}" target="_blank" rel="noopener">${ico("eye", 16)}Суралцагчийн нүдээр</a>` : ""}</footer></article>`;
+        ${c.published ? `<a href="/c/${esc(c.id)}#l=${esc(l.id)}" target="_blank" rel="noopener">${ico("eye", 16)}Суралцагчийн нүдээр</a>` : ""}
+        <button data-del-post class="post-del" title="Хичээлийг файлуудтай нь хамт устгах">${ico("x", 16)}Устгах</button></footer></article>`;
 
   const free = () => lessons.filter((l) => l.is_free).length;
   // Бүлэгтэй бол хөтөлбөрийн дарааллаар бүлэг бүрийн доор; бүлэггүй бол нийтлэл шиг шинэ нь дээрээ.
@@ -671,7 +672,8 @@ async function courseEditor(id) {
       <button type="button" class="ol-handle" data-drag="row" aria-label="«${esc(l.title)}» хичээлийг зөөх (↑↓ товч)" title="Чирж зөөх">${ico("grip", 18)}</button>
       <span class="ol-num">${String(n).padStart(2, "0")}</span>
       <span class="ol-title"><strong>${esc(l.title)}</strong><small>${[l.format && kindName(l.format), l.mode && kindName(l.mode)].filter(Boolean).map((k) => `<span class="kind">${esc(k)}</span>`).join("")}${audience(l)}${c.drip && !l.always_open && n > 1 && l.unlock_after_h ? `<span class="aud">⏱ ${window.SG_humanHours(l.unlock_after_h)}</span>` : ""}${l.exam ? `<span class="kind kind-exam">📝 Шалгалт</span>` : ""}${l.active_min ? `<span class="aud">🕒 ${l.active_min} мин идэвхтэй</span>` : ""}</small></span>
-      <button type="button" class="icon-btn" data-edit-post aria-label="Засах" title="Засах">${ico("edit", 17)}</button></li>`;
+      <button type="button" class="icon-btn" data-edit-post aria-label="Засах" title="Засах">${ico("edit", 17)}</button>
+      <button type="button" class="icon-btn ol-del" data-del-post aria-label="Устгах" title="Устгах">${ico("x", 17)}</button></li>`;
   const outlineHTML = () => {
     const gs = groupsModel(); let n = 0;
     return `<div class="ol" id="olSecs">${gs.map((g, i) => `<section class="ol-sec" data-sec="${esc(g.name)}">
@@ -866,6 +868,13 @@ async function courseEditor(id) {
     const post = t.closest(".post, .ol-row"), l = post && lessons.find((x) => x.id === post.dataset.lid);
     if (t.closest("[data-cancel]")) return render();
     if (t.closest("[data-edit-post]") && l) { post.classList.add("editing"); putEditor(post, l); $("input[name=title]", post).focus(); return; }
+    if (t.closest("[data-del-post]") && l) {
+      const nFiles = new Set([l.video_url, ...(l.blocks || []).flatMap((b) => [b.url, b.quiz?.image])].map(stripQ).filter((u) => u.startsWith("/files/"))).size;
+      if (!confirm(`«${l.title}» хичээлийг устгах уу?${nFiles ? `\nЗөвхөн энэ хичээлд ашигласан файлууд (${nFiles}) хамт устна.` : ""}\nСуралцагчдын явцын түүх хадгалагдана.`)) return;
+      try { const r = await api(`/api/courses/${c.id}/lessons/${l.id}`, { method: "DELETE" }); toast(r.deleted_files ? `Хичээл ${r.deleted_files} файлын хамт устгагдлаа` : "Хичээл устгагдлаа"); await reload(); }
+      catch (err) { toast(err.message, true); }
+      return;
+    }
     if (t.closest("[data-open-media]") && l) { // агуулгыг суралцагчийн харах байдлаар урьдчилан үзнэ
       const box = $(".post-preview", post) || $(".post-media", post); box.hidden = !box.hidden;
       if (!box.hidden && !box.innerHTML) { box.innerHTML = SG.blocksHTML(lessonBlocks(l)); hydrateBooks(box); SG.mountQuizzes(box, `/api/courses/${c.id}/lessons/${l.id}`); }
@@ -952,7 +961,7 @@ async function books() {
       <fieldset><legend>Нүүр зураг (заавал биш)</legend><input type="file" name="cover" accept="image/*"><small class="muted">Оруулахгүй бол эхний хуудас нүүр болно.</small></fieldset>
       <label class="check"><input type="checkbox" name="published" ${b.published ? "checked" : ""}> Нийтлэх — профайл дээр харагдаж, зарагдана</label>
       <p class="form-error" role="alert"></p>
-      <div class="hero-cta" style="margin:0;justify-content:space-between">${b.id && !b.sales ? `<button type="button" class="btn btn-ghost" data-del>Устгах</button>` : "<span></span>"}
+      <div class="hero-cta" style="margin:0;justify-content:space-between">${b.id ? `<button type="button" class="btn btn-ghost" data-del>Устгах</button>` : "<span></span>"}
         <span style="display:flex;gap:8px"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></span></div></form>`;
   const openForm = (b) => {
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="bkModal"><div class="modal-card" style="width:min(640px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button><h3 class="h3">${b ? "Ном засах" : "Ном нэмэх"}</h3>${formHTML(b)}</div></div>`);
@@ -961,8 +970,9 @@ async function books() {
     const closeIt = () => { SG.closeModal(modal); setTimeout(() => modal.remove(), 300); };
     modal.addEventListener("click", (e) => { if (e.target === modal || e.target.closest("[data-close]")) { e.preventDefault(); closeIt(); } });
     $("[data-del]", f)?.addEventListener("click", async () => {
-      if (!confirm("Энэ номыг устгах уу?")) return;
-      try { await api(`/api/me/books/${b.id}`, { method: "DELETE" }); toast("Устгагдлаа"); closeIt(); reload(); } catch (e) { toast(e.message, true); }
+      const msg = b.sales ? `Энэ номыг ${b.sales} хүн худалдаж авсан байна. Устгавал тэд хандах эрхээ алдана!\nХуудасны зургууд, нүүр зураг хамт устна. Үнэхээр устгах уу?` : "Энэ номыг хуудасны зургуудтай нь хамт устгах уу?";
+      if (!confirm(msg)) return;
+      try { await api(`/api/me/books/${b.id}${b.sales ? "?force=1" : ""}`, { method: "DELETE" }); toast("Ном файлуудтайгаа хамт устгагдлаа"); closeIt(); reload(); } catch (e) { toast(e.message, true); }
     });
     f.onsubmit = async (e) => {
       e.preventDefault();

@@ -259,6 +259,19 @@ func (c *ClickHouse) UpdateLesson(ctx context.Context, l *Lesson) error {
 	return nil
 }
 
+func (c *ClickHouse) DeleteLesson(ctx context.Context, courseID, lessonID string) error {
+	unlock, err := c.lock(ctx, "lessons:"+courseID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	cur, err := c.LessonByID(ctx, courseID, lessonID)
+	if err != nil {
+		return err
+	}
+	return c.writeLesson(ctx, cur, true)
+}
+
 func (c *ClickHouse) ReorderLessons(ctx context.Context, courseID string, items []LessonOrder) error {
 	unlock, err := c.lock(ctx, "lessons:"+courseID)
 	if err != nil {

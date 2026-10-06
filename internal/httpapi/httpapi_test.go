@@ -1258,6 +1258,17 @@ func TestBooks(t *testing.T) {
 	if res, body := rawCall(t, srv, "GET", "/b/"+bid, "", nil); res.StatusCode != 200 || !strings.Contains(string(body), "Бодлогын ном") {
 		t.Fatalf("номын хуудас: %d", res.StatusCode)
 	}
+	// Багш баталгаажуулж (?force=1) устгавал ном, хуудасны зургууд хамт устна; уншигчид 404.
+	if code, out := call(t, srv, "DELETE", "/api/me/books/"+bid+"?force=1", tt, ""); code != 200 || out["ok"] != true {
+		t.Fatalf("force устгалт: %d %v", code, out)
+	}
+	if code, _ := call(t, srv, "GET", "/api/books/"+bid, s1, ""); code != 404 {
+		t.Fatalf("устгасан ном 404 байх ёстой: %d", code)
+	}
+	if r, _ := rawCall(t, srv, "GET", "/api/books/"+bid+"/pages/1", s1, nil); r.StatusCode != 404 {
+		t.Fatalf("устгасан номын хуудас 404 байх ёстой: %d", r.StatusCode)
+	}
+
 }
 
 func TestVideoWatchedAndFileUsage(t *testing.T) {
@@ -1437,4 +1448,81 @@ func TestRegisterDuplicateEmailConcurrent(t *testing.T) {
 	if code, _ := call(t, srv, "POST", "/api/auth/login", "", `{"email":"same@x.mn","password":"password1"}`); code != 200 {
 		t.Fatalf("нэвтрэх: %d", code)
 	}
+}
+
+// uploadFile нь багшийн сан руу жинхэнэ файл хуулж, /files/... замыг буцаана.
+func uploadFile(t *testing.T, srv *httptest.Server, token, name string, data []byte) string {
+	t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, _ := mw.CreateFormFile("file", name)
+	fw.Write(data)
+	mw.Close()
+	req, _ := http.NewRequest("POST", srv.URL+"/api/me/files?visibility=private", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var out map[string]any
+	_ = json.NewDecoder(res.Body).Decode(&out)
+	if res.StatusCode != 201 && res.StatusCode != 200 {
+		t.Fatalf("файл хуулагдсангүй: %d %v", res.StatusCode, out)
+	}
+	return out["path"].(string)
+}
+
+// Хичээл устгахад зөвхөн тэр хичээлд ашигласан файл устаж, өөр хичээлд ч байгаа файл үлдэнэ.
+func TestDeleteLessonRemovesOrphanFiles(t *testing.T) {
+	srv, st := newTestServer(t)
+	defer srv.Close()
+	tt, tid := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Устгах","price":0,"published":true}`)
+	cid := c["id"].(string)
+	shared := uploadFile(t, srv, tt, "shared.txt", []byte("хамтын файл"))
+	only := uploadFile(t, srv, tt, "only.txt", []byte("зөвхөн нэг хичээлд"))
+	fileExists := func(p string) bool {
+		_, files := call(t, srv, "GET", "/api/me/files", tt, "")
+		for _, f := range files["files"].([]any) {
+			if f.(map[string]any)["path"] == p {
+				return true
+			}
+		}
+		return false
+	}
+	if !fileExists(shared) || !fileExists(only) {
+		t.Fatal("хуулсан файлууд санд байх ёстой")
+	}
+	_, l1 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true,"blocks":[{"id":"fil1","type":"file","url":"`+shared+`"},{"id":"fil2","type":"file","url":"`+only+`?exp=1&sig=x"}]}`)
+	_, l2 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Хоёр","is_free":true,"blocks":[{"id":"fil1","type":"file","url":"`+shared+`"}]}`)
+	lid1, lid2 := l1["id"].(string), l2["id"].(string)
+	// Өөр багш устгаж чадахгүй.
+	ot, _ := register(t, srv, "other", "teacher")
+	if code, _ := call(t, srv, "DELETE", "/api/courses/"+cid+"/lessons/"+lid1, ot, ""); code != 404 && code != 403 {
+		t.Fatalf("бусдын хичээлийг устгах ёсгүй: %d", code)
+	}
+	code, out := call(t, srv, "DELETE", "/api/courses/"+cid+"/lessons/"+lid1, tt, "")
+	if code != 200 || out["deleted_files"].(float64) != 1 {
+		t.Fatalf("1 өнчин файл устах ёстой: %d %v", code, out)
+	}
+	if _, err := st.LessonByID(context.Background(), cid, lid1); err != store.ErrNotFound {
+		t.Fatalf("хичээл устаагүй: %v", err)
+	}
+	if fileExists(only) || !fileExists(shared) {
+		t.Fatal("зөвхөн нэг хичээлд байсан файл устаж, хамтын файл үлдэх ёстой")
+	}
+	if code, _ := call(t, srv, "DELETE", "/api/courses/"+cid+"/lessons/"+lid1, tt, ""); code != 404 {
+		t.Fatalf("дахин устгахад 404: %d", code)
+	}
+	ls, _ := st.LessonsByCourse(context.Background(), cid)
+	if len(ls) != 1 || ls[0].ID != lid2 {
+		t.Fatalf("нэг хичээл үлдэх ёстой: %+v", ls)
+	}
+	code, out = call(t, srv, "DELETE", "/api/courses/"+cid+"/lessons/"+lid2, tt, "")
+	if code != 200 || out["deleted_files"].(float64) != 1 || fileExists(shared) {
+		t.Fatalf("сүүлийн хичээлтэй хамт хамтын файл устах ёстой: %d %v", code, out)
+	}
+	_ = tid
 }
