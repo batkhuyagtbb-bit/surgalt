@@ -12,6 +12,8 @@ const WEEKDAYS = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пү�
 const WEEKDAYS_SHORT = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"];
 const pad2 = (n) => String(n).padStart(2, "0");
 const fmtTime = (t) => { const d = new Date(t); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); };
+// Секундийг хүний хэлээр: 45 сек, 12 мин, 1 ц 05 мин
+const dur = (s) => { s = Math.max(0, Math.round(+s || 0)); if (s < 60) return s + " сек"; const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? `${h} ц ${String(m).padStart(2, "0")} мин` : `${m} мин`; };
 const fmtDay = (t, year) => { const d = new Date(t); return (year ? d.getFullYear() + " оны " : "") + (d.getMonth() + 1) + "-р сарын " + d.getDate(); };
 const fmtDate = (t) => {
   const d = new Date(t), now = new Date();
@@ -1986,6 +1988,36 @@ async function homePage() {
         ${h.course_ranks.length ? `<div class="rank-box"><b>Сургалт бүрээр</b><ul class="rank-courses">${h.course_ranks.map((c) => `<li><a href="/c/${esc(c.course_id)}"><span class="rank-shine" data-level="${c.rank.level}">${esc(c.rank.insignia)}</span><span class="grow"><strong>${esc(c.title)}</strong><small>${esc(c.rank.name)} · ${c.rank.points} оноо · ${c.lessons.length} хичээл</small></span><span class="chip chip-teal">Үргэлжлүүлэх</span></a></li>`).join("")}</ul></div>` : ""}
       </div></div>`));
   }
+  // 📊 Миний суралцсан байдал: бүх хичээлээр (сургалт бүрийн цолын мэдээллээс)
+  const studied = (h.course_ranks || []).flatMap((c) => c.lessons || []);
+  if (studied.length) {
+    const sum = (f) => studied.reduce((a, l) => a + (f(l) || 0), 0);
+    const active = sum((l) => l.active_sec), done = studied.filter((l) => l.completed).length, qT = sum((l) => l.quiz_total), qC = sum((l) => l.quiz_correct);
+    const vids = studied.filter((l) => l.has_video), vPct = vids.length ? Math.round(sum((l) => l.has_video ? l.video_pct : 0) / vids.length) : 0;
+    const refl = studied.filter((l) => l.reflected).length, honest = studied.filter((l) => !l.disqualified).length;
+    const lessonsTotal = (h.courses || []).reduce((a, c) => a + (c.course.lesson_count || 0), 0);
+    const byTime = [...studied].sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
+    const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
+    const bar = (v, cls = "") => `<span class="st-bar ${cls}"><i style="width:${Math.max(0, Math.min(100, v))}%"></i></span>`;
+    const state = (l) => l.disqualified ? `<span class="st-chip bad">⛔ Цолгүй</span>` : l.completed ? `<span class="st-chip ok">✓ Дууссан</span>` : `<span class="st-chip">Үзэж байна</span>`;
+    parts.push(sec("my-study", "📊 Миний суралцсан байдал", `<div class="study">
+      <div class="st-tiles">
+        <div class="st-tile"><small>Идэвхтэй суралцсан</small><b>${dur(active)}</b><span>${studied.length} хичээлд · ${sum((l) => l.sessions)} удаа</span></div>
+        <div class="st-tile"><small>Дуусгасан хичээл</small><b>${done}<em>/${lessonsTotal || studied.length}</em></b>${bar(pct(done, lessonsTotal || studied.length))}</div>
+        <div class="st-tile"><small>Асуултад зөв</small><b>${qT ? pct(qC, qT) + "%" : "—"}</b><span>${qC}/${qT} асуулт</span></div>
+        <div class="st-tile"><small>Видео үзэлт</small><b>${vids.length ? vPct + "%" : "—"}</b><span>${vids.length} видео хичээл</span></div>
+        <div class="st-tile"><small>Дүгнэлт бичсэн</small><b>${refl}</b><span>хичээлд</span></div>
+        <div class="st-tile"><small>Шударга суралцсан</small><b>${honest}<em>/${studied.length}</em></b><span>хуулах оролдлогогүй</span></div>
+      </div>
+      <div class="st-table-wrap"><table class="st-table"><thead><tr><th>Хичээл</th><th>Төлөв</th><th>Идэвхтэй</th><th>Асуулга</th><th>Видео</th><th>Оноо · цол</th></tr></thead><tbody>
+        ${byTime.map((l) => `<tr><td><a href="/c/${esc(l.course_id)}#l=${esc(l.lesson_id)}"><strong>${esc(l.title)}</strong><small>${esc(l.course_title || "")}${l.last_at ? " · " + fmtDate(l.last_at) : ""}</small></a></td>
+          <td>${state(l)}</td>
+          <td><b>${dur(l.active_sec)}</b>${l.total_sec ? `<small>${pct(l.active_sec, l.total_sec)}% идэвхтэй${l.tab_switches ? ` · ${l.tab_switches} таб` : ""}</small>` : ""}</td>
+          <td>${l.quiz_total ? `<b>${l.quiz_correct}/${l.quiz_total}</b>${bar(pct(l.quiz_correct, l.quiz_total), l.quiz_correct === l.quiz_total ? "ok" : "")}` : `<span class="muted">—</span>`}</td>
+          <td>${l.has_video ? `<b>${l.video_pct}%</b>${bar(l.video_pct, l.video_pct >= 90 ? "ok" : "")}` : `<span class="muted">—</span>`}</td>
+          <td><span class="st-pts ${l.disqualified ? "bad" : l.points >= 75 ? "ok" : ""}"><b>${l.points}</b><small>${esc(l.rank)}</small></span></td></tr>`).join("")}
+      </tbody></table></div></div>`));
+  }
   if (h.tasks?.length) {
     const label = (t) => ({ open: ["Хийх", "chip-amber"], not_started: [`${fmtDate(t.due.start_at)}-д эхэлнэ`, ""], need_pay: [(t.due.need_late ? "Хоцорсон · " : "Төлбөртэй · ") + money(t.due.fee) + " төлж нээнэ", "chip-amber"], closed: ["Хаалттай", ""], submitted: ["Илгээсэн · дүгнэхийг хүлээж байна", "chip-teal"],
       graded: [`Дүн: ${t.score}/${t.max_score || 100}`, "chip-teal"], passed: [`Тэнцсэн · ${t.exam_best}%`, "chip-teal"], failed: [`Тэнцээгүй · шилдэг ${t.exam_best}%`, "chip-amber"] })[t.status] || ["", ""];
@@ -2207,9 +2239,24 @@ async function coursePage() {
       } catch (e) { err.textContent = e.message; } finally { b.disabled = false; }
     };
   };
+  // Хичээлийн дараалал (хуудасны мөрүүдийн дарааллаар): өмнөх / дараагийн.
+  const lessonRows = () => $$(".lesson[data-lesson]");
+  const rowTitle = (li) => $(".lesson-title", li)?.childNodes[0]?.textContent?.trim() || "";
+  const navHTML = (lid) => {
+    const rows = lessonRows(), i = rows.findIndex((r) => r.dataset.lesson === lid), prev = rows[i - 1], next = rows[i + 1];
+    const btn = (li, dir) => {
+      if (!li) return `<span></span>`;
+      const locked = li.classList.contains("is-locked") && !li.classList.contains("unlocked"), drip = li.classList.contains("is-drip");
+      const st = $(".lesson-state", li)?.textContent || "";
+      return `<button type="button" class="ln ${dir}" data-nav="${esc(li.dataset.lesson)}" ${drip ? "disabled" : ""}><small>${dir === "next" ? "Дараагийн хичээл" : "Өмнөх хичээл"}</small><b>${esc(rowTitle(li))}</b>${drip ? `<em>${esc(st)}</em>` : locked ? `<em>🔒 ${li.dataset.price > 0 ? "Худалдаж авах" : "Багцаар нээх"}</em>` : `<em>${dir === "next" ? "Үзэх →" : "← Үзэх"}</em>`}</button>`;
+    };
+    return `${btn(prev, "prev")}${btn(next, "next")}`;
+  };
   const play = async (lid) => {
     const l = await api(`/api/courses/${id}/lessons/${lid}`);
     $("#lessonTitle").textContent = l.title;
+    const nav = $("#lessonNav");
+    if (nav) { nav.innerHTML = navHTML(lid); nav.hidden = lessonRows().length < 2; nav.onclick = async (e) => { const b = e.target.closest("[data-nav]"); if (!b || b.disabled) return; const li = lessonRows().find((r) => r.dataset.lesson === b.dataset.nav); $("[data-play]", li)?.click(); $(".lesson-modal")?.scrollTo?.({ top: 0, behavior: "smooth" }); }; }
     const done = $("#lessonDone"), p = access?.progress?.[lid];
     if (done) {
       done.hidden = !Auth.token;
@@ -2270,6 +2317,24 @@ async function coursePage() {
   }
 
   document.addEventListener("click", async (e) => {
+    const row = e.target.closest(".lesson[data-lesson]");
+    if (row && !e.target.closest("button, a")) { // мөр дээр дарахад доош задарна: төлөв, оноо, "Үзэх", "Дараагийн хичээл"
+      const was = row.classList.contains("open");
+      $$(".lesson.open").forEach((r) => { r.classList.remove("open"); $(".lesson-more", r)?.remove(); });
+      if (was) return;
+      const rows = lessonRows(), i = rows.indexOf(row), next = rows[i + 1];
+      const p = access?.progress?.[row.dataset.lesson], rk = access?.ranks?.[row.dataset.lesson], st = access?.states?.[row.dataset.lesson];
+      const status = p?.completed_at ? `<span class="st-chip ok">✓ Дууссан · ${fmtDate(p.completed_at)}</span>` : p?.viewed_at ? `<span class="st-chip">Үзэж эхэлсэн · ${fmtDate(p.viewed_at)}</span>` : `<span class="st-chip">Хараахан үзээгүй</span>`;
+      const quiz = p?.quiz ? Object.entries(p.quiz).filter(([k]) => !k.startsWith("watch_") && !k.endsWith("_pass")) : [];
+      const facts = [status, rk ? `<span class="st-chip ${rk.disqualified ? "bad" : rk.points >= 75 ? "ok" : ""}">🎖 ${esc(rk.rank)} · ${rk.points} оноо</span>` : "", quiz.length ? `<span class="st-chip">Асуулга ${quiz.filter(([, v]) => v).length}/${quiz.length}</span>` : "", st && !st.open && !row.classList.contains("is-free") ? `<span class="st-chip bad">${esc($(".lesson-state", row)?.textContent || "Түгжээтэй")}</span>` : ""].filter(Boolean).join("");
+      row.classList.add("open");
+      row.insertAdjacentHTML("beforeend", `<div class="lesson-more"><div class="lm-facts">${facts}</div>
+        <div class="lm-acts"><button type="button" class="btn btn-gold btn-sm" data-more-play>${row.classList.contains("is-locked") && !row.classList.contains("unlocked") ? "🔒 Нээх" : "▶ Хичээл үзэх"}</button>${next ? `<button type="button" class="btn btn-ghost btn-sm" data-more-next="${esc(next.dataset.lesson)}">Дараагийн хичээл: ${esc(rowTitle(next)).slice(0, 40)} →</button>` : `<span class="muted small">Сүүлийн хичээл</span>`}</div></div>`);
+      return;
+    }
+    if (e.target.closest("[data-more-play]")) { const r = e.target.closest(".lesson"); $("[data-play]", r)?.click(); return; }
+    const mn = e.target.closest("[data-more-next]");
+    if (mn) { const r = lessonRows().find((x) => x.dataset.lesson === mn.dataset.moreNext); r?.scrollIntoView({ block: "center", behavior: "smooth" }); $("[data-play]", r)?.click(); return; }
     const b = e.target.closest("[data-play]");
     if (!b) return;
     const li = b.closest(".lesson"), lid = li.dataset.lesson, price = +li.dataset.price;

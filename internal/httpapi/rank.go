@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"sort"
+	"time"
 
 	"surgalt/internal/store"
 )
@@ -20,6 +21,20 @@ type LessonRank struct {
 	Rank         string   `json:"rank"`
 	Disqualified bool     `json:"disqualified,omitempty"` // хуулах оролдлоготой — цолгүй
 	Reasons      []string `json:"reasons,omitempty"`      // юунаас бүрдсэн / юу дутуу
+	// Суралцагчийн өөрийн самбарт: яаж судалсан бэ.
+	CourseID    string     `json:"course_id,omitempty"`
+	CourseTitle string     `json:"course_title,omitempty"`
+	ActiveSec   int        `json:"active_sec"`
+	TotalSec    int        `json:"total_sec"`
+	Sessions    int        `json:"sessions"`
+	Completed   bool       `json:"completed"`
+	QuizCorrect int        `json:"quiz_correct"`
+	QuizTotal   int        `json:"quiz_total"`
+	VideoPct    int        `json:"video_pct"`
+	HasVideo    bool       `json:"has_video"`
+	Reflected   bool       `json:"reflected"`
+	TabSwitches int        `json:"tab_switches"`
+	LastAt      *time.Time `json:"last_at,omitempty"`
 }
 
 // RankInfo — нэгдсэн цол.
@@ -127,7 +142,7 @@ func RankFor(points int) RankInfo {
 // Үзсэн 5, дууссан 10, идэвхтэй хугацаа 30, дүгнэлт 15 — үргэлж; асуулга 30, видео 10 — байвал.
 // Таб солилт бүр −5 (дээд тал нь −30). Хуулах оролдлого → 0, цолгүй.
 func lessonPoints(l *store.Lesson, p *store.LessonProgress, sessions []*store.StudySession, reflected bool, videoCoverage int, hasVideo bool) LessonRank {
-	lr := LessonRank{LessonID: l.ID, Title: l.Title}
+	lr := LessonRank{LessonID: l.ID, Title: l.Title, HasVideo: hasVideo, VideoPct: videoCoverage, Reflected: reflected}
 	if p == nil && len(sessions) == 0 {
 		lr.Rank = lessonRankName(0, false)
 		return lr
@@ -139,6 +154,19 @@ func lessonPoints(l *store.Lesson, p *store.LessonProgress, sessions []*store.St
 		tabs += s.Counts["tab_switch"]
 		for _, k := range cheatEvents {
 			cheats += s.Counts[k]
+		}
+		if lr.LastAt == nil || s.LastAt.After(*lr.LastAt) {
+			t := s.LastAt
+			lr.LastAt = &t
+		}
+	}
+	lr.ActiveSec, lr.TotalSec, lr.Sessions, lr.TabSwitches = active, total, len(sessions), tabs
+	if p != nil {
+		lr.Completed = p.CompletedAt != nil
+		lr.QuizCorrect, lr.QuizTotal, _, _ = quizMastery(l, p)
+		if lr.LastAt == nil {
+			t := p.ViewedAt
+			lr.LastAt = &t
 		}
 	}
 	if cheats > 0 {

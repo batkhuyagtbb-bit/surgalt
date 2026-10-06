@@ -53,6 +53,9 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 			continue
 		}
 		ranks, info := s.courseRanksCtx(ctx, uid, c.ID, lessons, progress)
+		for i := range ranks {
+			ranks[i].CourseID, ranks[i].CourseTitle = c.ID, c.Title
+		}
 		if len(ranks) > 0 {
 			_, aw := s.autoAward(ctx, uid, c.ID, "/c/"+c.ID, info.Points)
 			awarded = awarded || aw

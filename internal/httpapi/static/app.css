@@ -1887,3 +1887,78 @@ html.reader-open{overflow:hidden}
 .thread .msg.me .bubble:has(.msg-deleted){background:transparent;color:var(--muted)}
 .msg-col .msg-foot{margin-top:2px}
 @media (max-width:640px){.msg-col{max-width:86%}}
+/* Багана доторх мөр, бөмбөлөг, quote баганаасаа хальж болохгүй (нэг мөрт урт quote ellipsis болно) */
+.msg-col>*{max-width:100%}
+.msg-row{max-width:100%;min-width:0}
+.bubble{box-sizing:border-box}
+.msg-quote{max-width:100%;min-width:0;box-sizing:border-box;overflow:hidden}
+.msg-quote b,.msg-quote span{max-width:100%}
+.msg-img{max-width:min(240px,100%)}
+
+/* Миний суралцсан байдал */
+.study{display:grid;gap:14px}
+.st-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.st-tile{padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.st-tile small{display:block;color:var(--muted);font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.st-tile b{display:block;font-size:1.5rem;margin:4px 0 2px;color:var(--brand)}
+.st-tile b em{font-style:normal;font-size:.95rem;color:var(--muted);font-weight:600}
+.st-tile span{font-size:.78rem;color:var(--muted)}
+.st-bar{display:block;height:6px;border-radius:999px;background:var(--ink-2);overflow:hidden;margin-top:6px;min-width:60px}
+.st-bar i{display:block;height:100%;background:var(--accent);border-radius:999px}
+.st-bar.ok i{background:#0f9d8a}
+.st-table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.st-table{width:100%;border-collapse:collapse;font-size:.88rem}
+.st-table th{text-align:left;padding:10px 12px;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap}
+.st-table td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.st-table tr:last-child td{border-bottom:0}
+.st-table td a{color:inherit;text-decoration:none}
+.st-table td a strong{display:block}
+.st-table td small{display:block;color:var(--muted);font-size:.74rem}
+.st-chip{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--ink-2);color:var(--muted);font-size:.74rem;font-weight:700;white-space:nowrap}
+.st-chip.ok{background:#e6f6f1;color:#0f7a63}
+.st-chip.bad{background:#fee2e2;color:#b91c1c}
+.st-pts{display:inline-flex;flex-direction:column;align-items:center;min-width:56px;padding:4px 8px;border-radius:10px;background:var(--ink-2)}
+.st-pts b{font-size:1rem;color:var(--brand)}
+.st-pts small{font-size:.66rem;color:var(--muted)}
+.st-pts.ok{background:#e6f6f1}.st-pts.ok b{color:#0f7a63}
+.st-pts.bad{background:#fee2e2}.st-pts.bad b{color:#b91c1c}
+
+/* Чат — үндсэн дизайнтай уялдуулах: ижил булан, сүүдэр, өнгө, үсэг */
+.rail{background:var(--surface);border-left:1px solid var(--line)}
+.rail-head strong{font-family:inherit;font-weight:800;color:var(--text)}
+.rail-head strong i{background:var(--accent);box-shadow:0 0 0 4px rgba(234,160,46,.18)}
+.rail-group-btn{background:var(--brand);color:#fff;box-shadow:var(--shadow-sm)}
+.rail-group-btn:hover{background:#2f55c0;color:#fff}
+.chat-body{background:var(--surface-2)}
+.thread .msg.them .bubble{background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-sm,0 1px 2px rgba(15,23,42,.05))}
+.thread .msg.me .bubble{background:linear-gradient(135deg,#2f55c0,var(--brand));box-shadow:0 6px 16px -8px rgba(31,60,143,.6)}
+.bubble{border-radius:16px;font-size:.92rem}
+.msg-day span{background:var(--surface);border:1px solid var(--line);color:var(--muted)}
+.msg-reacts button{box-shadow:var(--shadow-sm,0 1px 2px rgba(15,23,42,.06))}
+.msg-reacts button.on{background:rgba(234,160,46,.15);border-color:var(--accent);color:#9a5b00}
+.msg-tools{border-radius:12px;box-shadow:var(--shadow,0 8px 24px rgba(15,23,42,.12))}
+.msg-seen{color:var(--teal,#0f9d8a)}
+.composer-bar{background:var(--surface)}
+.composer-bar .cb-input{border-radius:16px;background:var(--surface-2);border-color:transparent}
+.composer-bar .cb-input:focus-within{background:var(--surface);border-color:var(--brand)}
+.composer-bar .cb-send.has-arrow{border-radius:14px}
+.composer-bar .cb-left .cb-ic{border-radius:14px}
+.rail-item{border-radius:12px}
+.rail-unread{background:var(--accent);color:#1a1a1a}
+.rail-item .avatar.group{background:var(--brand-soft);color:var(--brand)}
+
+/* Хичээлийн мөр доош задрах + өмнөх/дараагийн хичээл */
+.lesson[data-lesson]{cursor:pointer;flex-wrap:wrap}
+.lesson.open{background:var(--brand-soft)}
+.lesson-more{flex-basis:100%;width:100%;margin-top:10px;padding:12px 14px;border-top:1px dashed var(--line);display:grid;gap:10px;animation:rail-in .25s ease both}
+.lm-facts{display:flex;gap:6px;flex-wrap:wrap}
+.lm-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.lesson-nav{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0 6px}
+.lesson-nav .ln{display:grid;gap:2px;text-align:left;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface);font:inherit;cursor:pointer;transition:border-color .15s,transform .15s,box-shadow .15s}
+.lesson-nav .ln.next{text-align:right;background:linear-gradient(135deg,#2f55c0,var(--brand));color:#fff;border-color:transparent}
+.lesson-nav .ln small{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;opacity:.75}
+.lesson-nav .ln b{font-size:.95rem;line-height:1.3}
+.lesson-nav .ln em{font-style:normal;font-size:.8rem;opacity:.85}
+.lesson-nav .ln:not([disabled]):hover{transform:translateY(-1px);box-shadow:0 10px 24px -12px rgba(31,60,143,.5);border-color:var(--brand)}
+.lesson-nav .ln[disabled]{opacity:.6;cursor:not-allowed}
+@media (max-width:640px){.lesson-nav{grid-template-columns:1fr}}
