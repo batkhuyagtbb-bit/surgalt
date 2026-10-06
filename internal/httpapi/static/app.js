@@ -2253,7 +2253,7 @@ async function coursePage() {
       if (!li) return `<span></span>`;
       const locked = li.classList.contains("is-locked") && !li.classList.contains("unlocked"), drip = li.classList.contains("is-drip");
       const st = $(".lesson-state", li)?.textContent || "";
-      return `<button type="button" class="ln ${dir}" data-nav="${esc(li.dataset.lesson)}" ${drip ? "disabled" : ""}><small>${dir === "next" ? "Дараагийн хичээл" : "Өмнөх хичээл"}</small><b>${esc(rowTitle(li))}</b>${drip ? `<em>${esc(st)}</em>` : locked ? `<em>🔒 ${li.dataset.price > 0 ? "Худалдаж авах" : "Багцаар нээх"}</em>` : `<em>${dir === "next" ? "Үзэх →" : "← Үзэх"}</em>`}</button>`;
+      return `<button type="button" class="ln ${dir} ${drip ? "is-lock" : ""}" data-nav="${esc(li.dataset.lesson)}"><small>${dir === "next" ? "Дараагийн хичээл" : "Өмнөх хичээл"}</small><b>${esc(rowTitle(li))}</b>${drip ? `<em>${esc(st)}</em>` : locked ? `<em>🔒 ${li.dataset.price > 0 ? "Худалдаж авах" : "Багцаар нээх"}</em>` : `<em>${dir === "next" ? "Үзэх →" : "← Үзэх"}</em>`}</button>`;
     };
     return `${btn(prev, "prev")}${btn(next, "next")}`;
   };
@@ -2267,7 +2267,30 @@ async function coursePage() {
     $$(".lesson.open").forEach((r) => { r.classList.remove("open"); $(".lesson-more", r)?.remove(); });
   };
   const canOpen = (row) => !(row.classList.contains("is-locked") && !row.classList.contains("unlocked")) && !row.classList.contains("is-drip");
+  // Дарааллаар түгжээтэй хичээл: жижиг цонх — "Эхлээд өмнөх хичээлээ судал", өмнөх хичээл рүү шууд очих товч.
+  const dripPrompt = (row) => {
+    $(".drip-pop")?.remove();
+    const lid = row.dataset.lesson, st = access?.states?.[lid] || {}, rows = lessonRows(), i = rows.indexOf(row);
+    let prev = rows.slice(0, i).reverse().find((r) => st.prev_title && rowTitle(r) === st.prev_title) || rows[i - 1];
+    const pTitle = st.prev_title || (prev ? rowTitle(prev) : "");
+    const reason = st.reason === "timer" ? `⏳ Энэ хичээл <b>${esc(fmtDate(st.unlock_at))}</b>-д нээгдэнэ. Өмнөх «${esc(pTitle)}» хичээлээ давтаж бэлдээрэй.`
+      : st.reason === "quiz" ? `🧩 «<b>${esc(pTitle)}</b>» хичээлийн асуултуудад бүгдэд нь зөв хариулсны дараа энэ хичээл нээгдэнэ. <span class="dp-left">${st.quiz_left}/${st.quiz_total} асуулт үлдсэн</span>`
+      : `📘 Эхлээд «<b>${esc(pTitle)}</b>» хичээлийг судалж дуусгаад дараа нь энэ хичээлийг үзнэ.`;
+    const pop = document.createElement("div"); pop.className = "drip-pop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Өмнөх хичээл");
+    pop.innerHTML = `<div class="dp-card"><button class="icon-btn dp-x" aria-label="Хаах">✕</button>
+      <div class="dp-steps"><span class="dp-step cur">1<small>${esc(pTitle || "Өмнөх")}</small></span><i></i><span class="dp-step lock">🔒<small>${esc(rowTitle(row))}</small></span></div>
+      <h3>Эхлээд өмнөх хичээлээ судлаарай</h3><p>${reason}</p>
+      <div class="dp-acts">${prev && canOpen(prev) ? `<button class="btn btn-gold" data-dp-go>▶ «${esc(pTitle).slice(0, 34)}» үзэх</button>` : ""}<button class="btn btn-ghost" data-dp-close>Ойлголоо</button></div></div>`;
+    document.body.append(pop);
+    const close = () => { pop.classList.add("out"); setTimeout(() => pop.remove(), 200); };
+    pop.addEventListener("click", async (e) => {
+      if (e.target === pop || e.target.closest(".dp-x, [data-dp-close]")) return close();
+      if (e.target.closest("[data-dp-go]")) { close(); prev.scrollIntoView({ block: "center", behavior: "smooth" }); await expandRow(prev); }
+    });
+    $("[data-dp-go], [data-dp-close]", pop)?.focus();
+  };
   const expandRow = async (row, scroll) => {
+    if (row.classList.contains("is-drip")) { dripPrompt(row); return; }
     const was = row.classList.contains("open");
     collapseAll();
     if (was) return;
@@ -2289,7 +2312,7 @@ async function coursePage() {
     const l = await api(`/api/courses/${id}/lessons/${lid}`);
     $("#lessonTitle").textContent = l.title;
     const nav = $("#lessonNav");
-    if (nav) { nav.innerHTML = navHTML(lid); nav.hidden = lessonRows().length < 2; nav.onclick = async (e) => { const b = e.target.closest("[data-nav]"); if (!b || b.disabled) return; const li = lessonRows().find((r) => r.dataset.lesson === b.dataset.nav); if (!li) return; if (lessonModalEl().classList.contains("inline") && canOpen(li)) { await expandRow(li, true); return; } $("[data-play]", li)?.click(); $(".lesson-modal")?.scrollTo?.({ top: 0, behavior: "smooth" }); }; }
+    if (nav) { nav.innerHTML = navHTML(lid); nav.hidden = lessonRows().length < 2; nav.onclick = async (e) => { const b = e.target.closest("[data-nav]"); if (!b || b.disabled) return; const li = lessonRows().find((r) => r.dataset.lesson === b.dataset.nav); if (!li) return; if (li.classList.contains("is-drip")) { dripPrompt(li); return; } if (lessonModalEl().classList.contains("inline") && canOpen(li)) { await expandRow(li, true); return; } $("[data-play]", li)?.click(); $(".lesson-modal")?.scrollTo?.({ top: 0, behavior: "smooth" }); }; }
     const done = $("#lessonDone"), p = access?.progress?.[lid];
     if (done) {
       done.hidden = !Auth.token;
@@ -2359,7 +2382,7 @@ async function coursePage() {
     if (b && !e.target.closest(".lesson-more") && canOpen(b.closest(".lesson"))) { await expandRow(b.closest(".lesson")); return; }
     if (!b) return;
     const li = b.closest(".lesson"), lid = li.dataset.lesson, price = +li.dataset.price;
-    if (li.classList.contains("is-drip")) { li.animate([{ transform: "translateX(0)" }, { transform: "translateX(-8px)" }, { transform: "translateX(8px)" }, { transform: "translateX(0)" }], { duration: 350 }); toast($(".lesson-state", li).textContent); return; }
+    if (li.classList.contains("is-drip")) { dripPrompt(li); return; }
     if (!li.classList.contains("is-locked")) { try { await play(lid); } catch (err) { toast(err.message, true); } return; }
     if (!price) { // зөвхөн багцаар
       li.animate([{ transform: "translateX(0)" }, { transform: "translateX(-8px)" }, { transform: "translateX(8px)" }, { transform: "translateX(0)" }], { duration: 350 });
