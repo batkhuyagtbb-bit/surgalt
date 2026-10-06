@@ -63,11 +63,25 @@ func NewClickHouse(ctx context.Context, o ClickHouseOptions) (*ClickHouse, error
 	_ = bc.Close()
 
 	opts.Auth.Database = db
+	// Жижиг, олон INSERT-ийг ClickHouse өөрөө багцалж нэг part болгоно (async insert): мянга мянган суралцагчийн
+	// beat/явц бичилтэд "too many parts"-гүй, дамжуулалт олон дахин өснө. wait_for_async_insert=1 тул
+	// хариу ирэхэд өгөгдөл уншигдах боломжтой (бичсэний дараах шалгалтууд хэвээр). DSN-д өгвөл тэр нь давамгайлна.
+	if opts.Settings == nil {
+		opts.Settings = clickhouse.Settings{}
+	}
+	for k, v := range map[string]any{"async_insert": 1, "wait_for_async_insert": 1, "async_insert_busy_timeout_ms": 50, "async_insert_max_data_size": 1_000_000} {
+		if _, ok := opts.Settings[k]; !ok {
+			opts.Settings[k] = v
+		}
+	}
 	if opts.MaxOpenConns == 0 {
-		opts.MaxOpenConns = 32
+		opts.MaxOpenConns = 64
 	}
 	if opts.MaxIdleConns == 0 {
-		opts.MaxIdleConns = 8
+		opts.MaxIdleConns = opts.MaxOpenConns // холболтыг нээж/хаахгүй дахин ашиглана (TIME_WAIT порт дуусахаас сэргийлнэ)
+	}
+	if opts.ConnMaxLifetime == 0 {
+		opts.ConnMaxLifetime = time.Hour
 	}
 	conn, err := clickhouse.Open(opts)
 	if err != nil {
