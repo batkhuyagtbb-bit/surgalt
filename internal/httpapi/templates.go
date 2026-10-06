@@ -73,9 +73,9 @@ func initials(name string) string {
 	return string(out)
 }
 
-// brandHues нь логоны өнгөнд зохицсон өнгөний тойргийн цэгүүд: хөхийн сүүдрүүд ба улбар шар.
+// brandHues нь логоны хар хөхөд зохицсон хөхийн сүүдрүүд (улбар шар нь зөвхөн онцлох өнгө).
 // Карт, дүрс бүр эндээс л өнгө авна — сайт бүхэлдээ нэг өнгөний системтэй харагдана.
-var brandHues = []int{222, 214, 206, 230, 36, 28, 218, 198}
+var brandHues = []int{222, 216, 228, 212, 232, 219, 225, 214}
 
 // hue нь гарчгаас тогтвортой өнгө гаргаж, картын зургийг үүсгэнэ.
 func hue(s string) int {
@@ -98,6 +98,8 @@ var iconPaths = map[string]string{
 	"qr":      `<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20v.01M17 20h4v-3"/>`,
 	"share":   `<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 15V3M8 7l4-4 4 4"/>`,
 	"edit":    `<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.500 6.500 4 4"/>`,
+	"user":    `<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.600-6 8-6s8 2 8 6"/>`,
+	"layers":  `<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>`,
 	"camera":  `<path d="M4 8h3l1.500-2.500h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.500"/>`,
 	"search":  `<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>`,
 	"eye":     `<path d="M2 12s3.600-7 10-7 10 7 10 7-3.600 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>`,

@@ -2,7 +2,6 @@
 {{template "head" (dict "Title" (printf "%s — %s" $c.Title $t.DisplayName) "Desc" $c.Description "Image" $t.AvatarURL "Page" "course")}}
 <main class="course-page" data-course="{{$c.ID}}" data-price="{{$c.Price}}" data-drip="{{if $c.Drip}}1{{else}}0{{end}}" data-mode="{{if $c.Price}}bundle{{else if gt $paid 0}}lessons{{else}}free{{end}}">
   <section class="hero hero-course" style="--h:{{hue $c.Title}}">
-    <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
     <div class="hero-inner">
       <div class="hero-left">
         <a class="teacher-chip reveal" href="/t/{{$t.Username}}">
@@ -14,7 +13,7 @@
         <div class="hero-cta reveal">
           <button class="btn btn-gold btn-lg magnetic" id="buyBtn">{{if $c.Price}}Бүх хичээл багцаар · {{money $c.Price}}{{else if gt $paid 0}}Хичээлүүдийг сонгох ↓{{else}}Үнэгүй элсэх{{end}}</button>
           <button class="btn btn-glass btn-lg magnetic" data-open-chat>{{icon "chat"}}Багшаас асуух</button>
-          <button class="btn btn-glass btn-lg" data-open-group title="Сургалтад элссэн суралцагчдын бүлэг">👥 Бүлэг чат</button>
+          <button class="btn btn-glass btn-lg" data-open-group title="Сургалтад элссэн суралцагчдын бүлэг">{{icon "users"}}Бүлэг чат</button>
         </div>
       </div>
       <div class="hero-card glass tilt reveal">
@@ -63,7 +62,7 @@
     <div class="lesson-content pre" id="lessonContent"></div>
     <section class="discuss" id="lessonDiscuss" hidden aria-label="Хэлэлцүүлэг"></section>
     <nav class="lesson-nav" id="lessonNav" hidden aria-label="Өмнөх, дараагийн хичээл"></nav>
-    <div class="lesson-done" id="lessonDone" hidden><span class="active-need" hidden></span><button class="btn btn-teal" data-complete>✓ Энэ хичээлийг дууслаа</button><span class="muted small">Дууссан гэж тэмдэглэхэд явц тань хадгалагдана.</span></div>
+    <div class="lesson-done" id="lessonDone" hidden><span class="active-need" hidden></span><button class="btn btn-gold" data-complete>✓ Энэ хичээлийг дууслаа</button><span class="muted small">Дууссан гэж тэмдэглэхэд явц тань хадгалагдана.</span></div>
   </div>
 </div>
 
@@ -86,7 +85,7 @@
       <li class="lesson reveal {{if $l.IsFree}}is-free{{else}}is-locked{{end}}" data-lesson="{{$l.ID}}" data-price="{{$l.Price}}" data-unlock="{{$l.UnlockAfterH}}" data-always="{{if $l.AlwaysOpen}}1{{else}}0{{end}}">
         <span class="lesson-num">{{printf "%02d" $l.Position}}</span>
         <span class="lesson-title">{{$l.Title}}{{if or $l.Format $l.Mode}}<span class="lesson-kind">{{with $l.Format}}<em>{{fmtName .}}</em>{{end}}{{with $l.Mode}}<em>{{modeName .}}</em>{{end}}</span>{{end}}<span class="lesson-state" hidden></span></span>
-        {{if $l.IsFree}}<span class="chip chip-teal">Үнэгүй</span><button class="btn btn-sm btn-teal" data-play="{{$l.ID}}">▶ Үзэх</button>
+        {{if $l.IsFree}}<span class="chip chip-amber">Үнэгүй</span><button class="btn btn-sm btn-glass" data-play="{{$l.ID}}">▶ Үзэх</button>
         {{else}}<span class="chip chip-gold lesson-price">{{if $l.Price}}{{money $l.Price}}{{else}}Багцад багтсан{{end}}</span>
         <button class="btn btn-sm {{if $l.Price}}btn-gold{{else}}btn-ghost{{end}} lock" data-play="{{$l.ID}}"><span class="lock-ico">🔒</span><span class="lock-txt">{{if $l.Price}}Худалдаж авах{{else}}Багцаар нээх{{end}}</span></button>{{end}}
       </li>{{end}}

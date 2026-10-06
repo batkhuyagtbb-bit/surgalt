@@ -7,6 +7,27 @@ const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const page = document.body.dataset.page;
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const money = (n) => (n ? Number(n).toLocaleString("en-US") + "₮" : "Үнэгүй");
+// Бүтцийн дүрс (самбар, гарчиг, жагсаалт): нэг хэв маягийн шугаман SVG — emoji шиг төхөөрөмжөөс хамаарч өөрчлөгдөхгүй.
+const UI_ICONS = {
+  courses: '<path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/>',
+  book: '<path d="M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h7"/>',
+  live: '<rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/>',
+  chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.7c2 .7 3.5 2.4 3.5 5.3"/>',
+  teacher: '<circle cx="12" cy="7" r="3.5"/><path d="M5 21c0-4 3.1-6.5 7-6.5s7 2.5 7 6.5"/><path d="M15 3.5h5v3"/>',
+  play: '<circle cx="12" cy="12" r="9"/><path d="m10 8.5 5.5 3.5-5.5 3.5z"/>',
+  clip: '<path d="m20 11-8.5 8.5a5 5 0 0 1-7-7L13 4a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4L14.5 7"/>',
+  exam: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3.5V5h6V3.5M9 10h6M9 14h6M9 18h3"/>',
+  medal: '<circle cx="12" cy="15" r="5"/><path d="M8.5 11 6 3h4l2 5 2-5h4l-2.5 8"/><path d="m12 13 .9 1.8 2 .3-1.4 1.4.3 2-1.8-1-1.8 1 .3-2-1.4-1.4 2-.3z"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  money: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 9v.01M17 15v.01"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+};
+const icon = (n, size = 18) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI_ICONS[n] || ""}</svg>`;
 // Огноог өөрсдөө хэлбэржүүлнэ: олон браузерт mn-MN локаль байхгүй тул англиар гардаг.
 const WEEKDAYS = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"];
 const WEEKDAYS_SHORT = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"];
@@ -374,7 +395,7 @@ function bell() {
   const links = $(".nav-links");
   if (!links || $("#bell")) return;
   links.insertAdjacentHTML("afterbegin", `
-    <div class="bell-wrap"><button class="icon-btn bell" id="bell" aria-label="Мэдэгдэл">🔔<span class="bell-badge" hidden></span></button>
+    <div class="bell-wrap"><button class="icon-btn bell" id="bell" aria-label="Мэдэгдэл"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg><span class="bell-badge" hidden></span></button>
     <div class="bell-panel glass" id="bellPanel" hidden><div class="bell-head"><strong>Мэдэгдэл</strong><button class="btn btn-ghost btn-sm" id="bellPerm" hidden>🔔 Браузерт мэдэгдэх</button></div><ol class="bell-list" id="bellList"><li class="muted small">Ачаалж байна…</li></ol></div></div>`);
   const badge = $(".bell-badge"), panel = $("#bellPanel"), list = $("#bellList");
   let unread = 0;
@@ -656,7 +677,7 @@ function fireworks(canvas, ms = 5000) {
   const ctx = canvas.getContext("2d"), dpr = Math.min(2, devicePixelRatio || 1);
   const fit = () => { canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr; };
   fit(); addEventListener("resize", fit);
-  const colors = ["#ffb347", "#ff5e7e", "#4fd1c5", "#7aa2ff", "#ffe066", "#c084fc", "#34d399", "#fb7185"];
+  const colors = ["#eaa02e", "#f6c56f", "#ffd79a", "#ffffff", "#9fb4ef", "#c9d6ff"];
   const parts = [];
   const burst = () => {
     const x = (0.15 + Math.random() * 0.7) * canvas.width, y = (0.15 + Math.random() * 0.45) * canvas.height, col = colors[Math.floor(Math.random() * colors.length)], n = 70 + Math.random() * 50;
@@ -988,13 +1009,13 @@ function guardVideos(box, { watched = {}, owner = false, onWatched, modal, progr
 async function examCard(box, { courseId, lessonId, title, onFinish }) {
   const base = `/api/courses/${courseId}/lessons/${lessonId}`;
   const card = document.createElement("section"); card.className = "exam-card"; box.append(card);
-  if (!Auth.token) { card.innerHTML = `<h3>📝 Шалгалт</h3><p>Шалгалт өгөхийн тулд нэвтэрнэ үү.</p><a class="btn btn-gold" href="/login?next=${encodeURIComponent(location.pathname)}">Нэвтрэх</a>`; return; }
+  if (!Auth.token) { card.innerHTML = `<h3>${icon("exam", 20)} Шалгалт</h3><p>Шалгалт өгөхийн тулд нэвтэрнэ үү.</p><a class="btn btn-gold" href="/login?next=${encodeURIComponent(location.pathname)}">Нэвтрэх</a>`; return; }
   const draw = async () => {
     let info;
     try { info = await api(`${base}/exam`); } catch (e) { card.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
     const ex = info.exam, best = info.attempts.filter((a) => a.status !== "active").reduce((m, a) => Math.max(m, a.pct), -1);
     const active = info.attempts.find((a) => a.status === "active"), due = info.due || { open: true };
-    card.innerHTML = `<h3>📝 Шалгалт</h3>
+    card.innerHTML = `<h3>${icon("exam", 20)} Шалгалт</h3>
       <ul class="exam-facts"><li>❓ <b>${info.questions}</b> асуулт</li><li>⏱ ${ex.time_min ? `<b>${ex.time_min}</b> минут` : "Хугацаа хязгааргүй"}</li>${due.start_at ? `<li>▶ Эхлэх: <b>${fmtDate(due.start_at)}</b></li>` : ""}${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : ""}${due.entry_fee ? `<li>💳 Оролцооны төлбөр: <b>${money(due.entry_fee)}</b>${due.paid ? " ✓" : ""}</li>` : ""}
         <li>🎯 Тэнцэх: <b>${ex.pass_pct}%</b></li><li>🔁 ${info.left < 0 ? "Оролдлого хязгааргүй" : `Үлдсэн оролдлого: <b>${info.left}</b>`}</li>${best >= 0 ? `<li>🏆 Таны шилдэг: <b>${best}%</b></li>` : ""}</ul>
       <div class="exam-rules"><b>⚠️ Дүрэм:</b> Шалгалтын үеэр өөр таб, цонх руу шилжих эсвэл текст хуулах үед шалгалт <b>шууд хаагдаж</b>, тэр хүртэлх хариултаар дүгнэгдэнэ. Энэ тухай багшид мэдэгдэнэ.</div>
@@ -1041,12 +1062,12 @@ function bindLatePay(card, base, label, after) {
 async function assignmentCard(box, { courseId, lessonId }) {
   const base = `/api/courses/${courseId}/lessons/${lessonId}`;
   const card = document.createElement("section"); card.className = "exam-card asg-card"; box.append(card);
-  if (!Auth.token) { card.innerHTML = `<h3>📎 Даалгавар</h3><p>Хариу илгээхийн тулд нэвтэрнэ үү.</p><a class="btn btn-gold" href="/login?next=${encodeURIComponent(location.pathname)}">Нэвтрэх</a>`; return; }
+  if (!Auth.token) { card.innerHTML = `<h3>${icon("clip", 20)} Даалгавар</h3><p>Хариу илгээхийн тулд нэвтэрнэ үү.</p><a class="btn btn-gold" href="/login?next=${encodeURIComponent(location.pathname)}">Нэвтрэх</a>`; return; }
   const draw = async () => {
     let info;
     try { info = await api(`${base}/assignment`); } catch (e) { card.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
     const a = info.assignment, due = info.due || { open: true }, sub = info.submission;
-    card.innerHTML = `<h3>📎 Даалгавар</h3>
+    card.innerHTML = `<h3>${icon("clip", 20)} Даалгавар</h3>
       <ul class="exam-facts">${due.start_at ? `<li>▶ Эхлэх: <b>${fmtDate(due.start_at)}</b></li>` : ""}${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : "<li>📅 Хугацаагүй</li>"}<li>🎯 Дээд оноо: <b>${a.max_score || 100}</b></li>${due.entry_fee ? `<li>💳 Төлбөр: <b>${money(due.entry_fee)}</b>${due.paid ? " ✓" : ""}</li>` : ""}<li>✍️ Хариу: текст ба холбоос</li></ul>
       ${dueNotice(due)}
       ${sub ? `<div class="sub-mine"><b>Таны хариу</b> <small class="muted">${fmtDate(sub.submitted_at)}${sub.late ? " · хоцорсон" : ""}</small>${sub.text ? `<p>${esc(sub.text)}</p>` : ""}${sub.links?.length ? `<p>${sub.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 60))}</a>`).join("<br>")}</p>` : ""}${sub.files?.length ? `<p>${sub.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`).join(" · ")}</p>` : ""}
@@ -1156,7 +1177,7 @@ function pdfLib() {
   return pdfjs;
 }
 // Логоны өнгөнд зохицсон өнгөнүүд (templates.go-гийн brandHues-тэй ижил).
-const BRAND_HUES = [222, 214, 206, 230, 36, 28, 218, 198];
+const BRAND_HUES = [222, 216, 228, 212, 232, 219, 225, 214];
 function hueOf(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return BRAND_HUES[h % BRAND_HUES.length]; }
 function book3dHTML(url, title) {
   return `<div class="book3d" data-pdf="${esc(url)}" data-title="${esc(title || "")}" style="--hue:${hueOf(title || url)}" title="${esc(title || "Ном")}">
@@ -2011,24 +2032,25 @@ async function homePage() {
   const accessLabel = { full: "Бүх хичээл нээлттэй", enrolled: "Элссэн", lessons: "" };
   const last = store.get("sg_last");
   const resume = last && h.courses.find((c) => c.course.id === last.course);
-  const sec = (id, title, body, extra = "") => `<section class="dash-sec" id="${id}"><header><h2>${title}</h2>${extra}</header>${body}</section>`;
+  const SEC_ICO = { "my-rank": "medal", "my-study": "chart", "my-tasks": "exam", "my-pending": "money", "my-studio": "gear", "my-live": "live", "my-courses": "courses", "my-lessons": "play", "my-teachers": "teacher", "my-chats": "chat" };
+  const sec = (id, title, body, extra = "") => `<section class="dash-sec" id="${id}"><header><h2>${SEC_ICO[id] ? `<span class="sec-ico">${icon(SEC_ICO[id], 17)}</span>` : ""}${title}</h2>${extra}</header>${body}</section>`;
   const courseCard = (c, i) => `<a class="course-card tilt" href="/c/${esc(c.course.id)}" style="--h:${hueOfName(c.course.title)}">
     <div class="course-art"><div class="course-flags"><span class="flag flag-own">✓ ${c.access === "lessons" ? c.owned_lessons + " хичээл" : accessLabel[c.access]}</span></div><span class="course-num">${String(i + 1).padStart(2, "0")}</span><span class="glare"></span></div>
     <div class="course-body"><h3>${esc(c.course.title)}</h3>${c.teacher ? `<div class="course-by">${avatarHTML(c.teacher)}${esc(c.teacher.display_name)}</div>` : ""}
     <div class="course-meta"><span>${c.course.lesson_count} хичээл</span><span class="price free">▶ Үргэлжлүүлэх</span></div></div></a>`;
 
   const tp = h.teacher;
-  const parts = [`<div class="dash-head">${avatarHTML(u, "avatar-md")}<div class="grow"><h1>${hello}, ${esc(u.display_name.split(" ")[0])} 👋</h1>
+  const parts = [`<div class="dash-head">${avatarHTML(u, "avatar-md")}<div class="grow"><h1>${hello}, ${esc(u.display_name.split(" ")[0])}</h1>
       <p>${h.courses.length ? `Танд ${h.courses.length} сургалт${h.meetings.length ? `, ${h.meetings.length} шууд хичээл` : ""} байна.` : tp ? "Багшийн самбар болон суралцах хэсэг тань энд байна." : "Багшийнхаа профайлаас анхны сургалтаа сонгоорой."}</p></div>
       ${tp ? `<a class="btn" href="/t/${esc(u.username)}#overview">Миний профайл →</a>` : `<button class="btn" data-student-settings>Тохиргоо</button>`}</div>`,
     `<div class="tiles">
-      <a class="tile" href="#my-courses"><em>🎓</em><b>${h.courses.length}</b><span>Миний сургалт</span></a>
-      <a class="tile" href="#my-lessons"><em>📘</em><b>${h.lessons.length}</b><span>Авсан хичээл</span></a>
-      <a class="tile" href="#my-live"><em>📹</em><b>${h.meetings.length}</b><span>Шууд хичээл</span></a>
-      <a class="tile" href="#my-chats"><em>💬</em><b>${h.chats.length}</b><span>Чат</span></a>
-      <a class="tile" href="#my-teachers"><em>👩‍🏫</em><b>${h.teachers.length}</b><span>Миний багш</span></a>
+      <a class="tile" href="#my-courses"><em>${icon("courses")}</em><b>${h.courses.length}</b><span>Миний сургалт</span></a>
+      <a class="tile" href="#my-lessons"><em>${icon("play")}</em><b>${h.lessons.length}</b><span>Авсан хичээл</span></a>
+      <a class="tile" href="#my-live"><em>${icon("live")}</em><b>${h.meetings.length}</b><span>Шууд хичээл</span></a>
+      <a class="tile" href="#my-chats"><em>${icon("chat")}</em><b>${h.chats.length}</b><span>Чат</span></a>
+      <a class="tile" href="#my-teachers"><em>${icon("teacher")}</em><b>${h.teachers.length}</b><span>Миний багш</span></a>
       ${h.rank ? `<a class="tile tile-rank" href="#my-rank"><em class="rank-shine" data-level="${h.rank.level}">${esc(h.rank.insignia)}</em><b>${esc(h.rank.name)}</b><span>Миний цол · ${h.rank.points} оноо</span></a>` : ""}
-      ${h.tasks?.length ? `<a class="tile" href="#my-tasks"><em>📎</em><b>${h.tasks.filter((t) => ["open", "need_pay"].includes(t.status)).length}</b><span>Хийх даалгавар, шалгалт</span></a>` : ""}
+      ${h.tasks?.length ? `<a class="tile" href="#my-tasks"><em>${icon("exam")}</em><b>${h.tasks.filter((t) => ["open", "need_pay"].includes(t.status)).length}</b><span>Хийх даалгавар, шалгалт</span></a>` : ""}
     </div>`];
   // Цол: систем шинэ цол олгосон бол баяр хүргэж салют буудуулна.
   if (h.rank) {
@@ -2038,7 +2060,7 @@ async function homePage() {
     try { localStorage.setItem(lvlKey, h.rank.level); } catch {}
   }
 
-  if (resume) parts.push(`<div class="resume"><span class="item-ico">▶</span><div class="grow"><span class="eyebrow">Үргэлжлүүлэх</span><strong>${esc(last.lessonTitle || resume.course.title)}</strong><span class="muted small">${esc(resume.course.title)}</span></div>
+  if (resume) parts.push(`<div class="resume"><span class="item-ico">${icon("play", 20)}</span><div class="grow"><span class="eyebrow">Үргэлжлүүлэх</span><strong>${esc(last.lessonTitle || resume.course.title)}</strong><span class="muted small">${esc(resume.course.title)}</span></div>
       <a class="btn btn-gold" href="/c/${esc(last.course)}${last.lesson ? "#l=" + esc(last.lesson) : ""}">Үзэх</a></div>`);
 
   if (h.rank) {
@@ -2048,7 +2070,7 @@ async function homePage() {
     const ring = `<div class="rank-ring" style="--p:${rk.progress}"><div class="rank-ring-in"><span class="rank-shine" data-level="${rk.level}">${esc(rk.insignia)}</span></div></div>`;
     const steps = ladder.map((st, i) => `<li class="${i < rk.level ? "done" : i === rk.level ? "cur" : i === rk.level + 1 ? "next" : ""}" title="${esc(st.name)} · ${st.points} оноо"><b class="${i <= rk.level ? "rank-shine" : ""}" data-level="${i}">${esc(st.insignia)}</b><span>${esc(st.name)}</span><small>${st.points}</small></li>`).join("");
     const tipLine = (t) => { const m = /\(\+(\d+)/.exec(t); return `<li><i>${m ? "+" + m[1] : "✓"}</i><span>${esc(t.replace(/\s*\(\+.*$/, ""))}</span></li>`; };
-    parts.push(sec("my-rank", "🎖 Миний цол", `<div class="rank-hero">
+    parts.push(sec("my-rank", "Миний цол", `<div class="rank-hero">
       <div class="rank-hero-top">${ring}
         <div class="grow"><span class="eyebrow">Цэргийн цол · систем автоматаар олгоно</span><strong class="rank-title">${esc(rk.name)}</strong>
           <p class="rank-cheer">${cheer}</p>
@@ -2072,7 +2094,7 @@ async function homePage() {
     const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
     const bar = (v, cls = "") => `<span class="st-bar ${cls}"><i style="width:${Math.max(0, Math.min(100, v))}%"></i></span>`;
     const state = (l) => l.disqualified ? `<span class="st-chip bad">⛔ Цолгүй</span>` : l.completed ? `<span class="st-chip ok">✓ Дууссан</span>` : `<span class="st-chip">Үзэж байна</span>`;
-    parts.push(sec("my-study", "📊 Миний суралцсан байдал", `<div class="study">
+    parts.push(sec("my-study", "Миний суралцсан байдал", `<div class="study">
       <div class="st-tiles">
         <div class="st-tile"><small>Идэвхтэй суралцсан</small><b>${dur(active)}</b><span>${studied.length} хичээлд · ${sum((l) => l.sessions)} удаа</span></div>
         <div class="st-tile"><small>Дуусгасан хичээл</small><b>${done}<em>/${lessonsTotal || studied.length}</em></b>${bar(pct(done, lessonsTotal || studied.length))}</div>
@@ -2093,11 +2115,11 @@ async function homePage() {
   if (h.tasks?.length) {
     const label = (t) => ({ open: ["Хийх", "chip-amber"], not_started: [`${fmtDate(t.due.start_at)}-д эхэлнэ`, ""], need_pay: [(t.due.need_late ? "Хоцорсон · " : "Төлбөртэй · ") + money(t.due.fee) + " төлж нээнэ", "chip-amber"], closed: ["Хаалттай", ""], submitted: ["Илгээсэн · дүгнэхийг хүлээж байна", "chip-teal"],
       graded: [`Дүн: ${t.score}/${t.max_score || 100}`, "chip-teal"], passed: [`Тэнцсэн · ${t.exam_best}%`, "chip-teal"], failed: [`Тэнцээгүй · шилдэг ${t.exam_best}%`, "chip-amber"] })[t.status] || ["", ""];
-    parts.push(sec("my-tasks", "📎 Даалгавар, шалгалт", `<ul class="items">${h.tasks.map((t) => { const [txt, cls] = label(t); return `
-      <li><a class="item ${["open", "need_pay"].includes(t.status) && t.due.at ? "warn" : ""}" href="/c/${esc(t.course_id)}#l=${esc(t.lesson_id)}"><span class="item-ico">${t.kind === "exam" ? "📝" : "📎"}</span><span class="grow"><strong>${esc(t.title)}</strong><small>${esc(t.course_title)}${t.due.at ? ` · ${t.due.late ? "хугацаа дууссан" : "хугацаа"}: ${fmtDate(t.due.at)}` : " · хугацаагүй"}${t.feedback ? ` · ${esc(t.feedback)}` : ""}</small></span><span class="chip ${cls}">${txt}</span></a></li>`; }).join("")}</ul>`));
+    parts.push(sec("my-tasks", "Даалгавар, шалгалт", `<ul class="items">${h.tasks.map((t) => { const [txt, cls] = label(t); return `
+      <li><a class="item ${["open", "need_pay"].includes(t.status) && t.due.at ? "warn" : ""}" href="/c/${esc(t.course_id)}#l=${esc(t.lesson_id)}"><span class="item-ico">${icon(t.kind === "exam" ? "exam" : "clip", 20)}</span><span class="grow"><strong>${esc(t.title)}</strong><small>${esc(t.course_title)}${t.due.at ? ` · ${t.due.late ? "хугацаа дууссан" : "хугацаа"}: ${fmtDate(t.due.at)}` : " · хугацаагүй"}${t.feedback ? ` · ${esc(t.feedback)}` : ""}</small></span><span class="chip ${cls}">${txt}</span></a></li>`; }).join("")}</ul>`));
   }
   if (h.pending.length) parts.push(sec("my-pending", "Төлбөр хүлээгдэж буй", `<ul class="items">${h.pending.map((o) => `
-      <li><a class="item warn" href="/c/${esc(o.course_id)}${o.lesson_id ? "#l=" + esc(o.lesson_id) : ""}"><span class="item-ico">₮</span><span class="grow"><strong>${esc(o.title)}</strong><small>${fmtDate(o.created_at)} · ${o.kind === "lesson" ? "нэг хичээл" : "бүтэн сургалт"}</small></span><strong>${money(o.amount)}</strong><span class="chip chip-amber">Төлөх →</span></a></li>`).join("")}</ul>`));
+      <li><a class="item warn" href="/c/${esc(o.course_id)}${o.lesson_id ? "#l=" + esc(o.lesson_id) : ""}"><span class="item-ico">${icon("money", 20)}</span><span class="grow"><strong>${esc(o.title)}</strong><small>${fmtDate(o.created_at)} · ${o.kind === "lesson" ? "нэг хичээл" : "бүтэн сургалт"}</small></span><strong>${money(o.amount)}</strong><span class="chip chip-amber">Төлөх →</span></a></li>`).join("")}</ul>`));
 
   if (tp) {
     const ins = tp.insights, todo = ins.tips.filter((t) => !t.done).slice(0, 3);
@@ -2108,8 +2130,8 @@ async function homePage() {
   }
 
   if (h.meetings.length) parts.push(sec("my-live", "Шууд хичээл", `<ul class="items">${h.meetings.map((m) => `
-      <li><div class="item live"><span class="item-ico">📹</span><span class="grow"><strong>${esc(m.title)}</strong><small>${fmtDate(m.starts_at)} · ${m.duration_min} мин · ${esc(m.course_title)}</small></span><span class="chip chip-teal">${until(m.starts_at)}</span>
-      ${m.meet_url ? `<a class="btn btn-teal btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">Нэгдэх</a>` : `<a class="btn btn-ghost btn-sm" href="/c/${esc(m.course_id)}">Сургалт</a>`}</div></li>`).join("")}</ul>`));
+      <li><div class="item live"><span class="item-ico">${icon("live", 20)}</span><span class="grow"><strong>${esc(m.title)}</strong><small>${fmtDate(m.starts_at)} · ${m.duration_min} мин · ${esc(m.course_title)}</small></span><span class="chip chip-teal">${until(m.starts_at)}</span>
+      ${m.meet_url ? `<a class="btn btn-accent btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">Нэгдэх</a>` : `<a class="btn btn-ghost btn-sm" href="/c/${esc(m.course_id)}">Сургалт</a>`}</div></li>`).join("")}</ul>`));
   else parts.push(`<span id="my-live"></span>`);
 
   parts.push(sec("my-courses", "Миний сургалтууд", h.courses.length ? `<div class="course-grid">${h.courses.map(courseCard).join("")}</div>`
@@ -2117,7 +2139,7 @@ async function homePage() {
        <form class="find" id="findTeacher"><input name="u" required pattern="[A-Za-z0-9_]{3,32}" placeholder="Багшийн нэр, жишээ: demo" aria-label="Багшийн хэрэглэгчийн нэр"><button class="btn btn-gold">Профайл нээх</button></form></div>`));
 
   if (h.lessons.length) parts.push(sec("my-lessons", "Дангаар авсан хичээлүүд", `<ul class="items">${h.lessons.map((l) => `
-      <li><a class="item" href="/c/${esc(l.course_id)}#l=${esc(l.lesson_id)}"><span class="item-ico">▶</span><span class="grow"><strong>${esc(l.title)}</strong><small>${l.paid_at ? fmtDate(l.paid_at) + "-д авсан" : ""}</small></span><span class="chip chip-teal">Үзэх</span></a></li>`).join("")}</ul>`));
+      <li><a class="item" href="/c/${esc(l.course_id)}#l=${esc(l.lesson_id)}"><span class="item-ico">${icon("play", 20)}</span><span class="grow"><strong>${esc(l.title)}</strong><small>${l.paid_at ? fmtDate(l.paid_at) + "-д авсан" : ""}</small></span><span class="chip chip-teal">Үзэх</span></a></li>`).join("")}</ul>`));
   else parts.push(`<span id="my-lessons"></span>`);
 
   const teachers = h.teachers.length ? sec("my-teachers", "Миний багш нар", `<div class="people">${h.teachers.map((t) => `
@@ -2239,8 +2261,8 @@ async function coursePage() {
     const li = $(`.lesson[data-lesson="${lid}"]`);
     if (!li || li.classList.contains("is-free")) return;
     li.classList.add("unlocked"); li.classList.remove("is-locked");
-    const chip = $(".lesson-price", li); if (chip) { chip.textContent = "✓ Нээлттэй"; chip.className = "chip chip-teal lesson-price"; }
-    const b = $("[data-play]", li); if (b) { b.className = "btn btn-sm btn-teal"; b.innerHTML = "▶ Үзэх"; }
+    const chip = $(".lesson-price", li); if (chip) { chip.textContent = "✓ Нээлттэй"; chip.className = "chip chip-gold lesson-price"; }
+    const b = $("[data-play]", li); if (b) { b.className = "btn btn-sm btn-glass"; b.innerHTML = "▶ Үзэх"; }
   };
   const unlockAll = () => {
     all = true;
@@ -2255,7 +2277,7 @@ async function coursePage() {
     const sec = $(".lessons").parentElement;
     sec.insertAdjacentHTML("afterbegin", `<div class="section-head reveal in"><span class="eyebrow">Шууд хичээл</span></div><div class="meet-list">${d.meetings.map((m) => `
       <div class="meet-item"><time>${fmtDate(m.starts_at)}</time><span class="grow" style="flex:1">${esc(m.title)} · ${m.duration_min} мин</span>
-      ${m.meet_url ? `<a class="btn btn-teal btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">📹 Нэгдэх</a>` : `<span class="chip">🔒 Худалдан авсан хүмүүст</span>`}</div>`).join("")}</div>`);
+      ${m.meet_url ? `<a class="btn btn-accent btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">Нэгдэх</a>` : `<span class="chip">🔒 Худалдан авсан хүмүүст</span>`}</div>`).join("")}</div>`);
   }).catch(() => {});
 
   const needLogin = () => { if (Auth.token) return false; location.href = "/login?next=" + encodeURIComponent(location.pathname); return true; };
@@ -2384,7 +2406,7 @@ async function coursePage() {
     if (blk) { // сануулгын хязгаар хэтэрсэн: орж болохгүй
       $(".drip-pop")?.remove();
       const pop = document.createElement("div"); pop.className = "drip-pop";
-      pop.innerHTML = `<div class="dp-card"><button class="icon-btn dp-x" aria-label="Хаах">✕</button><div class="dp-steps"><span class="dp-step lock" style="background:#fee2e2;color:#b91c1c">⛔</span></div>
+      pop.innerHTML = `<div class="dp-card"><button class="icon-btn dp-x" aria-label="Хаах">✕</button><div class="dp-steps"><span class="dp-step lock" style="background:var(--coral-soft);color:var(--coral)">⛔</span></div>
         <h3>${(blk.reason || "").startsWith("Шалгалт") ? "Шалгалт хаагдсан байна" : "Энэ хичээл хаагдсан байна"}</h3><p>${(blk.reason || "").startsWith("Шалгалт") ? "Шалгалтын үеэр зөрчил гарсан тул хаагдсан." : `Та хичээл үзэж байхдаа өөр цонх руу ${access?.max_warnings || 3}-аас олон удаа шилжсэн тул хичээл зогсож хаагдсан.`} ${blk.until ? `<b>${esc(fmtDate(blk.until))}</b> хүртэл хүлээнэ үү.` : "Багш тань дахин нээх хүртэл хүлээнэ үү — багшид мэдэгдэл очсон."}</p>
         <div class="dp-acts"><button class="btn btn-ghost" data-dp-close>Ойлголоо</button></div></div>`;
       document.body.append(pop);
@@ -2524,7 +2546,7 @@ async function coursePage() {
 
 function celebrate() {
   if (reduce) return;
-  const colors = ["#1f3c8f", "#eaa02e", "#2f55c0", "#f6c56f", "#14b8a6"];
+  const colors = ["#1f3c8f", "#eaa02e", "#3a5bb8", "#f6c56f", "#172c6b"];
   for (let i = 0; i < 90; i++) {
     const p = document.createElement("i");
     p.style.cssText = `position:fixed;z-index:200;left:50%;top:40%;width:8px;height:14px;border-radius:2px;pointer-events:none;background:${colors[i % 5]}`;
@@ -2679,7 +2701,7 @@ function loginPage() {
 }
 
 /* ---------- эхлүүлэх ---------- */
-window.SG = { embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
+window.SG = { icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх

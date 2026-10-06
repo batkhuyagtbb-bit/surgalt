@@ -93,7 +93,7 @@
         {{if .D.Meetings}}{{with index .D.Meetings 0}}
         <a class="card pf-next" href="/c/{{.CourseID}}"><span class="item-ico">{{icon "live" 20}}</span>
           <span class="grow"><span class="eyebrow">Удахгүй шууд хичээл</span><strong>{{.Title}}</strong><small class="muted"><time datetime="{{rfc .StartsAt}}" data-dt>{{.StartsAt.Format "01/02 15:04"}}</time> · {{.DurationMin}} мин · {{.CourseTitle}}</small></span>
-          <span class="chip chip-teal">Сургалт руу</span></a>
+          <span class="chip chip-gold">Сургалт руу</span></a>
         {{end}}{{end}}
 
         {{if .D.Courses}}
@@ -115,7 +115,7 @@
               <p class="clamp muted">{{$c.Description}}</p>
               <div class="course-meta">
                 <span>{{$c.LessonCount}} хичээл</span>
-                {{if $c.FreeLessonCount}}<span class="chip chip-teal">{{$c.FreeLessonCount}} үнэгүй</span>{{end}}
+                {{if $c.FreeLessonCount}}<span class="chip chip-amber">{{$c.FreeLessonCount}} үнэгүй</span>{{end}}
                 {{if $paid}}<span class="chip chip-gold">{{$paid}} төлбөртэй</span>{{end}}
                 <span class="price {{if and (eq $c.Price 0) (eq $paid 0)}}free{{end}}">{{if $c.Price}}{{money $c.Price}}{{else if $paid}}Хичээлээр{{else}}Үнэгүй{{end}}</span>
               </div>
@@ -160,7 +160,7 @@
           {{range .D.Meetings}}
           <a class="meet-item" href="/c/{{.CourseID}}"><time datetime="{{rfc .StartsAt}}" data-dt>{{.StartsAt.Format "01/02 15:04"}}</time>
             <span class="grow"><strong>{{.Title}}</strong> · {{.DurationMin}} мин<br><span class="muted small">{{.CourseTitle}}</span></span>
-            <span class="chip chip-teal">Сургалт руу</span></a>
+            <span class="chip chip-gold">Сургалт руу</span></a>
           {{end}}
         </div>
         <p class="muted small">Сургалтад элссэн суралцагчид Google Meet-ээр нэгдэнэ.</p>
