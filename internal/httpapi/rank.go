@@ -34,6 +34,8 @@ type RankInfo struct {
 	Cheated  int    `json:"cheated"`  // цол олгогдоогүй хичээл
 	Insignia string `json:"insignia"` // ★ тэмдэг (UI-д)
 	Progress int    `json:"progress"` // дараагийн цол хүртэлх хувь
+	// Систем өөрөө оношилж өгөх зөвлөмж: юу дутуу байгаа, дараагийн цолд юу хэрэгтэй.
+	Tips []string `json:"tips,omitempty"`
 }
 
 type rankStep struct {
@@ -254,7 +256,7 @@ func computeRanks(lessons []store.Lesson, progress map[string]store.LessonProgre
 	return out, sum
 }
 
-// summarize — хичээлийн цолуудаас нэгдсэн цол.
+// summarize — хичээлийн цолуудаас нэгдсэн цол ба автомат оношилгоо.
 func summarizeRank(ranks []LessonRank, sum int) RankInfo {
 	ri := RankFor(sum)
 	for _, r := range ranks {
@@ -265,7 +267,64 @@ func summarizeRank(ranks []LessonRank, sum int) RankInfo {
 			ri.Honest++
 		}
 	}
+	ri.Tips = diagnose(ranks, ri)
 	return ri
+}
+
+// diagnose — хичээлүүдийн дутуу зүйлсийг тоолж, хамгийн их оноо алдуулж буйгаас эхлэн зөвлөнө.
+func diagnose(ranks []LessonRank, ri RankInfo) []string {
+	if len(ranks) == 0 {
+		return nil
+	}
+	type tip struct{ key, text string }
+	tips := []tip{
+		{"хуулах оролдлого / хориг", "хуулах, зураг авах оролдлого бүү хий — тийм хичээлд цол олгохгүй"},
+		{"асуулга дутуу", "хичээл доторх асуултуудад бүгдэд нь зөв хариул (+30 оноо/хичээл)"},
+		{"идэвхтэй хугацаа дутуу", "хичээлээ идэвхтэй, дуустал үз (+30 оноо/хичээл)"},
+		{"идэвхгүй хугацаа их", "хичээл үзэхдээ өөр цонх руу бүү шилж, анхаарлаа төвлөрүүл (+30 хүртэл)"},
+		{"дүгнэлт бичээгүй", "хичээл бүрийн дараа «юу сурсан бэ?» дүгнэлтээ бич (+15 оноо/хичээл)"},
+		{"дуусгаагүй", "хичээлээ «дууслаа» гэж тэмдэглэ (+10 оноо/хичээл)"},
+		{"видео дутуу", "видеог дуустал үз (+10 оноо/хичээл)"},
+	}
+	count := map[string]int{}
+	for _, r := range ranks {
+		for _, reason := range r.Reasons {
+			count[reason]++
+		}
+	}
+	var out []string
+	for _, t := range tips {
+		if n := count[t.key]; n > 0 {
+			out = append(out, itoa(n)+" хичээлд: "+t.text)
+		}
+		if len(out) == 3 {
+			break
+		}
+	}
+	if ri.Next > 0 {
+		out = append(out, "дараагийн «"+ri.NextName+"» цолд "+itoa(ri.Next-ri.Points)+" оноо дутуу")
+	}
+	return out
+}
+
+// autoAward — систем өөрөө цол олгоно: сургалт бүрийн оноог хадгалж, нийлбэр түвшин дээшилбэл
+// суралцагчид мэдэгдэл илгээж, олгосон түвшинг хадгална. Нэгдсэн (бүх сургалтын) цолыг буцаана.
+// awarded=true бол яг энэ хүсэлтээр шинэ цол олгогдсон (хөтөч баяр хүргэж салют буудуулна).
+func (s *Server) autoAward(ctx context.Context, uid, courseID, link string, coursePts int) (info RankInfo, awarded bool) {
+	total, err := s.store.SaveRankPoints(ctx, uid, courseID, coursePts)
+	if err != nil {
+		return RankFor(coursePts), false
+	}
+	info = RankFor(total)
+	cur, err := s.store.UserRankLevel(ctx, uid)
+	if err == nil && info.Level > cur {
+		if err := s.store.SetUserRankLevel(ctx, uid, info.Level); err == nil {
+			awarded = true
+			s.notify(ctx, &store.Notification{UserID: uid, Type: "rank", Title: "🎖 Шинэ цол: " + info.Name,
+				Body: "Баяр хүргэе! Систем таны идэвхтэй, шударга суралцсан байдлыг үнэлж «" + info.Name + "» цол олголоо (" + itoa(total) + " оноо).", Link: link})
+		}
+	}
+	return info, awarded
 }
 
 // courseRanks — нэг суралцагчийн нэг сургалт дахь цолууд (сесс, дүгнэлт, видеог сангаас ачаална).

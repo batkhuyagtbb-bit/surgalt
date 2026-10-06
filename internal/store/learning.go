@@ -151,6 +151,16 @@ type LearningStore interface {
 	AddActivityEvents(ctx context.Context, evs []ActivityEvent) error
 	ActivityEvents(ctx context.Context, f ActivityFilter, limit int) ([]ActivityEvent, error)
 
+	// Цэргийн цол: сургалт бүрийн оноог хадгалж нийлбэрийг буцаана; олгосон түвшинг хэрэглэгчээр хадгална
+	// (систем автоматаар олгож, түвшин дээшлэхэд мэдэгдэнэ).
+	SaveRankPoints(ctx context.Context, userID, courseID string, points int) (total int, err error)
+	UserRankLevel(ctx context.Context, userID string) (int, error)
+	SetUserRankLevel(ctx context.Context, userID string, level int) error
+	// Даалгаврын хариу: нэг суралцагч нэг даалгаварт нэг (сүүлийн) хариу.
+	SaveSubmission(ctx context.Context, sub *Submission) error
+	SubmissionFor(ctx context.Context, userID, lessonID string) (*Submission, error)
+	Submissions(ctx context.Context, lessonID string) ([]Submission, error)
+	GradeSubmission(ctx context.Context, lessonID, userID string, score int, feedback string) error
 	AddQuizLog(ctx context.Context, l QuizLog) error
 	QuizLogs(ctx context.Context, f ActivityFilter, limit int) ([]QuizLog, error)
 	SaveReflection(ctx context.Context, r *Reflection) error

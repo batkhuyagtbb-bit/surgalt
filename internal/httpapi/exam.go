@@ -34,7 +34,7 @@ func validateExam(e *store.Exam) string {
 	case e.PassPct < 0 || e.PassPct > 100:
 		return "тэнцэх хувь 0-100"
 	}
-	return ""
+	return validateDue(&e.Due)
 }
 
 // examQuestions — шалгалтын асуултууд (оролдлогын дарааллаар).
@@ -92,7 +92,12 @@ func (s *Server) handleExamInfo(w http.ResponseWriter, r *http.Request) {
 	if l.Exam.Attempts > 0 {
 		left = max(0, l.Exam.Attempts-len(atts))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"exam": l.Exam, "questions": len(examQuestions(l, nil)), "attempts": atts, "left": left})
+	course, _ := s.store.CourseByID(r.Context(), r.PathValue("id"))
+	ds := DueState{Open: true}
+	if course != nil {
+		ds = s.dueFor(r, c.UID, course, l)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"exam": l.Exam, "questions": len(examQuestions(l, nil)), "attempts": atts, "left": left, "due": ds})
 }
 
 // handleExamStart: POST .../exam/start — шинэ оролдлого (эсвэл дуусаагүйг үргэлжлүүлнэ).
@@ -112,6 +117,9 @@ func (s *Server) handleExamStart(w http.ResponseWriter, r *http.Request) {
 	qs := examQuestions(l, nil)
 	if len(qs) == 0 {
 		writeErr(w, http.StatusConflict, "шалгалтад асуулт алга")
+		return
+	}
+	if dueBlocked(w, s.dueFor(r, c.UID, course, l)) { // хугацаа: хаалттай 423, хоцорсон төлбөр 402
 		return
 	}
 	atts, err := s.store.ExamAttempts(r.Context(), store.ActivityFilter{UserID: c.UID, LessonID: l.ID})

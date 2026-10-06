@@ -142,9 +142,11 @@ type Lesson struct {
 	// ActiveMin — суралцагч идэвхтэй үзэх ёстой хамгийн бага хугацаа (минут). 0 = шаардлагагүй.
 	ActiveMin int `json:"active_min"`
 	// Exam — хоосон биш бол энэ хичээл шалгалт (хугацаатай, хамгаалалт хатуу).
-	Exam      *Exam     `json:"exam,omitempty"`
-	Position  int       `json:"position"`
-	CreatedAt time.Time `json:"created_at"`
+	Exam *Exam `json:"exam,omitempty"`
+	// Assignment — хоосон биш бол энэ хичээл даалгавар (хугацаатай, хариу илгээж дүгнүүлнэ).
+	Assignment *Assignment `json:"assignment,omitempty"`
+	Position   int         `json:"position"`
+	CreatedAt  time.Time   `json:"created_at"`
 }
 
 // Block — хичээлийн агуулгын нэг хэсэг. Text нь text төрөлд хэлбэржүүлсэн текст (аюулгүй
@@ -205,6 +207,45 @@ type Exam struct {
 	PassPct     int  `json:"pass_pct"`     // тэнцэх хувь
 	Shuffle     bool `json:"shuffle"`      // асуултын дарааллыг холих
 	ShowAnswers bool `json:"show_answers"` // дууссаны дараа зөв хариултыг харуулах
+	Due         Due  `json:"due"`          // дуусах хугацаа ба хоцорсон тохиолдлын бодлого
+}
+
+// Due — шалгалт, даалгаврын дуусах хугацаа. At хоосон бол хугацаагүй. Хугацаа өнгөрсний дараа:
+// Late = "free" (төлбөргүй үргэлжлүүлнэ), "paid" (LateFee төлж нээнэ), "closed" (хаалттай).
+type Due struct {
+	At      *time.Time `json:"at,omitempty"`
+	Late    string     `json:"late,omitempty"`
+	LateFee int64      `json:"late_fee,omitempty"`
+}
+
+// LatePassKey — хоцорсон шалгалт/даалгаврын төлбөр төлсөн тэмдэг (LessonProgress.Quiz дотор).
+const LatePassKey = "late_pass"
+
+// LatePolicies — хоцорсон тохиолдлын бодлогын түлхүүр → монгол нэр.
+var LatePolicies = map[string]string{"": "төлбөргүй", "free": "төлбөргүй", "paid": "төлбөртэй", "closed": "хаалттай"}
+
+// Assignment — даалгавар: суралцагч текст, файлаар хариугаа илгээж, багш оноо, тайлбар өгнө.
+type Assignment struct {
+	Due        Due  `json:"due"`
+	MaxScore   int  `json:"max_score"`   // дээд оноо (анхдагч 100)
+	AllowFiles bool `json:"allow_files"` // файл хавсаргахыг зөвшөөрөх
+}
+
+// Submission — нэг суралцагчийн нэг даалгаварт илгээсэн хариу (дахин илгээвэл шинэчлэгдэнэ).
+type Submission struct {
+	ID          string     `json:"id"` // user:lesson
+	UserID      string     `json:"user_id"`
+	UserName    string     `json:"user_name"`
+	CourseID    string     `json:"course_id"`
+	LessonID    string     `json:"lesson_id"`
+	TeacherID   string     `json:"teacher_id"`
+	Text        string     `json:"text"`
+	Files       []string   `json:"files"` // багшийн сан дахь /files/... замууд
+	SubmittedAt time.Time  `json:"submitted_at"`
+	Late        bool       `json:"late"`
+	Score       *int       `json:"score,omitempty"`
+	Feedback    string     `json:"feedback,omitempty"`
+	GradedAt    *time.Time `json:"graded_at,omitempty"`
 }
 
 // BlockTypes — зөвшөөрөгдсөн блокийн төрлүүд.
@@ -242,6 +283,7 @@ const (
 	OrderKindCourse  = "course"  // сургалтын багц (бүх хичээл)
 	OrderKindLesson  = "lesson"  // нэг хичээл
 	OrderKindStorage = "storage" // файлын сангийн багтаамж
+	OrderKindLate    = "late"    // хугацаа хоцорсон шалгалт/даалгаврын төлбөр (lesson_progress-д late_pass)
 )
 
 // StorageMonth — багтаамжийн нэг сарын үргэлжлэх хугацаа.
@@ -400,6 +442,8 @@ type Store interface {
 	CreateOrGetPendingOrder(ctx context.Context, userID string, c *Course) (*Order, error)
 	// CreateOrGetPendingLessonOrder — нэг хичээл худалдан авах захиалга.
 	CreateOrGetPendingLessonOrder(ctx context.Context, userID string, c *Course, l *Lesson) (*Order, error)
+	// CreateOrGetPendingLateOrder — хоцорсон шалгалт/даалгаврыг нээх төлбөрийн захиалга (төлөгдвөл late_pass).
+	CreateOrGetPendingLateOrder(ctx context.Context, userID string, c *Course, l *Lesson, fee int64) (*Order, error)
 	// PurchasedLessons нь хэрэглэгчийн тухайн сургалтаас дангаар худалдаж авсан хичээлүүд.
 	PurchasedLessons(ctx context.Context, userID, courseID string) ([]string, error)
 	// CreateStorageOrder нь багтаамж худалдан авах захиалга.

@@ -331,6 +331,18 @@ func (m *Memory) MarkOrderPaid(_ context.Context, orderID string, amount int64) 
 	case OrderKindLesson:
 		delete(m.pendingL, [2]string{o.UserID, o.LessonID})
 		m.lessonAcc[[2]string{o.UserID, o.LessonID}] = o.CourseID
+	case OrderKindLate:
+		delete(m.pendingL, [2]string{o.UserID, "late:" + o.LessonID})
+		k := [2]string{o.UserID, o.LessonID}
+		p, ok := m.progress[k]
+		if !ok {
+			p = &LessonProgress{LessonID: o.LessonID, ViewedAt: time.Now()}
+			m.progress[k] = p
+		}
+		if p.Quiz == nil {
+			p.Quiz = map[string]bool{}
+		}
+		p.Quiz[LatePassKey] = true
 	case OrderKindBook:
 		m.books.grant(o.UserID, o.BookID, o.ID, o.Amount)
 	case OrderKindStorage:
@@ -591,7 +603,7 @@ func (m *Memory) UpdateLesson(_ context.Context, l *Lesson) error {
 		if cur.ID == l.ID {
 			cur.Title, cur.Content, cur.VideoURL, cur.IsFree, cur.Price = l.Title, l.Content, l.VideoURL, l.IsFree, l.Price
 			cur.UnlockAfterH, cur.AlwaysOpen, cur.Format, cur.Mode, cur.Section, cur.Blocks = l.UnlockAfterH, l.AlwaysOpen, l.Format, l.Mode, l.Section, l.Blocks
-			cur.ActiveMin, cur.Exam = l.ActiveMin, l.Exam
+			cur.ActiveMin, cur.Exam, cur.Assignment = l.ActiveMin, l.Exam, l.Assignment
 			*l = *cur
 			return nil
 		}
@@ -624,6 +636,23 @@ func (m *Memory) CreateOrGetPendingLessonOrder(_ context.Context, userID string,
 	}
 	o := &Order{ID: m.next(), Kind: OrderKindLesson, Title: c.Title + " — " + l.Title, UserID: userID, CourseID: c.ID,
 		LessonID: l.ID, TeacherID: c.TeacherID, Amount: l.Price, Status: OrderPending, CreatedAt: time.Now()}
+	m.orders[o.ID], m.pendingL[k] = o, o.ID
+	oc := *o
+	return &oc, nil
+}
+
+func (m *Memory) CreateOrGetPendingLateOrder(_ context.Context, userID string, c *Course, l *Lesson, fee int64) (*Order, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	k := [2]string{userID, "late:" + l.ID}
+	if id, ok := m.pendingL[k]; ok {
+		o := m.orders[id]
+		o.Amount = fee
+		oc := *o
+		return &oc, nil
+	}
+	o := &Order{ID: m.next(), Kind: OrderKindLate, Title: c.Title + " — " + l.Title + " (хоцорсон)", UserID: userID, CourseID: c.ID,
+		LessonID: l.ID, TeacherID: c.TeacherID, Amount: fee, Status: OrderPending, CreatedAt: time.Now()}
 	m.orders[o.ID], m.pendingL[k] = o, o.ID
 	oc := *o
 	return &oc, nil

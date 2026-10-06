@@ -132,6 +132,7 @@ const tsType = "DateTime64(3, 'UTC')"
 // chMigrations — өмнөх хувилбарын хүснэгтэд багана нэмэх ALTER-ууд (IF NOT EXISTS тул давтахад аюулгүй).
 var chMigrations = []string{
 	"ALTER TABLE lesson_progress ADD COLUMN IF NOT EXISTS quiz_done_at Nullable(" + tsType + ")",
+	"ALTER TABLE lessons ADD COLUMN IF NOT EXISTS assignment String DEFAULT ''",
 }
 
 var chTables = []chTable{
@@ -168,8 +169,12 @@ var chTables = []chTable{
 	{"lessons", `(id String, course_id String, title String, content String, video_url String,
 		is_free Bool, price Int64, unlock_after_h Int32, always_open Bool, format String, mode String,
 		section String, blocks String, active_min Int32, exam String, position Int32,
-		created_at ` + tsType + `, ver UInt64, deleted Bool DEFAULT false)
+		created_at ` + tsType + `, ver UInt64, deleted Bool DEFAULT false, assignment String DEFAULT '')
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (course_id, id)`},
+	{"submissions", `(id String, user_id String, user_name String, course_id String, lesson_id String, teacher_id String,
+		text String, files Array(String), submitted_at ` + tsType + `, late Bool, score Nullable(Int32), feedback String,
+		graded_at Nullable(` + tsType + `), ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (lesson_id, user_id)`},
 	{"lesson_progress", `(user_id String, course_id String, lesson_id String, viewed_at ` + tsType + `,
 		completed_at Nullable(` + tsType + `), quiz Map(String, Bool), quiz_done_at Nullable(` + tsType + `), ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, lesson_id)`},
@@ -193,6 +198,10 @@ var chTables = []chTable{
 	{"messages", `(id String, conversation_id String, teacher_id String, visitor_key String, sender String,
 		sender_id String, sender_name String, body String, created_at ` + tsType + `)
 	ENGINE = MergeTree ORDER BY (conversation_id, id)`},
+	{"rank_points", `(user_id String, course_id String, points Int32, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, course_id)`},
+	{"rank_levels", `(user_id String, level Int32, awarded_at ` + tsType + `, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY user_id`},
 	{"exam_attempts", `(id String, user_id String, user_name String, course_id String, lesson_id String,
 		teacher_id String, started_at ` + tsType + `, deadline_at Nullable(` + tsType + `),
 		finished_at Nullable(` + tsType + `), status String, reason String, score Float64, max Float64,

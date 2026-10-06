@@ -408,3 +408,113 @@ func (c *ClickHouse) VideoWatches(ctx context.Context, f ActivityFilter) ([]Vide
 	})
 	return out, err
 }
+
+// ---- цэргийн цол ----
+
+func (c *ClickHouse) SaveRankPoints(ctx context.Context, userID, courseID string, points int) (int, error) {
+	if err := c.insert(ctx, "rank_points", []string{"user_id", "course_id", "points", "ver"}, userID, courseID, int32(points), ver()); err != nil {
+		return 0, err
+	}
+	var total int64
+	err := c.query(ctx, "SELECT toInt64(sum(points)) FROM rank_points FINAL WHERE user_id = ?", []any{userID}, func(r driver.Rows) error { return r.Scan(&total) })
+	return int(total), err
+}
+
+func (c *ClickHouse) UserRankLevel(ctx context.Context, userID string) (int, error) {
+	var lvl int32
+	err := c.query(ctx, "SELECT level FROM rank_levels FINAL WHERE user_id = ? LIMIT 1", []any{userID}, func(r driver.Rows) error { return r.Scan(&lvl) })
+	return int(lvl), err
+}
+
+func (c *ClickHouse) SetUserRankLevel(ctx context.Context, userID string, level int) error {
+	return c.insert(ctx, "rank_levels", []string{"user_id", "level", "awarded_at", "ver"}, userID, int32(level), time.Now().UTC(), ver())
+}
+
+// ---- даалгаврын хариу ----
+
+const subCols = `id, user_id, user_name, course_id, lesson_id, teacher_id, text, files, submitted_at, late, score, feedback, graded_at`
+
+func scanSub(r driver.Rows) (Submission, error) {
+	var s Submission
+	var score *int32
+	err := r.Scan(&s.ID, &s.UserID, &s.UserName, &s.CourseID, &s.LessonID, &s.TeacherID, &s.Text, &s.Files, &s.SubmittedAt, &s.Late, &score, &s.Feedback, &s.GradedAt)
+	if score != nil {
+		v := int(*score)
+		s.Score = &v
+	}
+	if s.Files == nil {
+		s.Files = []string{}
+	}
+	return s, err
+}
+
+func (c *ClickHouse) writeSub(ctx context.Context, s *Submission) error {
+	var score *int32
+	if s.Score != nil {
+		v := int32(*s.Score)
+		score = &v
+	}
+	files := s.Files
+	if files == nil {
+		files = []string{}
+	}
+	return c.insert(ctx, "submissions", []string{"id", "user_id", "user_name", "course_id", "lesson_id", "teacher_id", "text", "files",
+		"submitted_at", "late", "score", "feedback", "graded_at", "ver"},
+		s.ID, s.UserID, s.UserName, s.CourseID, s.LessonID, s.TeacherID, s.Text, files, s.SubmittedAt.UTC(), s.Late, score, s.Feedback, nullTime(s.GradedAt), ver())
+}
+
+func (c *ClickHouse) subsWhere(ctx context.Context, where string, args ...any) ([]Submission, error) {
+	out := []Submission{}
+	err := c.query(ctx, "SELECT "+subCols+" FROM submissions FINAL WHERE "+where+" ORDER BY submitted_at DESC", args, func(r driver.Rows) error {
+		s, err := scanSub(r)
+		if err != nil {
+			return err
+		}
+		out = append(out, s)
+		return nil
+	})
+	return out, err
+}
+
+func (c *ClickHouse) SaveSubmission(ctx context.Context, sub *Submission) error {
+	unlock, err := c.lock(ctx, "sub:"+sub.UserID+":"+sub.LessonID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	sub.ID = sub.UserID + ":" + sub.LessonID
+	if cur, err := c.SubmissionFor(ctx, sub.UserID, sub.LessonID); err == nil { // дахин илгээхэд өмнөх дүн хүчингүй болно
+		_ = cur
+	}
+	return c.writeSub(ctx, sub)
+}
+
+func (c *ClickHouse) SubmissionFor(ctx context.Context, userID, lessonID string) (*Submission, error) {
+	ss, err := c.subsWhere(ctx, "user_id = ? AND lesson_id = ?", userID, lessonID)
+	if err != nil {
+		return nil, err
+	}
+	if len(ss) == 0 {
+		return nil, ErrNotFound
+	}
+	return &ss[0], nil
+}
+
+func (c *ClickHouse) Submissions(ctx context.Context, lessonID string) ([]Submission, error) {
+	return c.subsWhere(ctx, "lesson_id = ?", lessonID)
+}
+
+func (c *ClickHouse) GradeSubmission(ctx context.Context, lessonID, userID string, score int, feedback string) error {
+	unlock, err := c.lock(ctx, "sub:"+userID+":"+lessonID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	cur, err := c.SubmissionFor(ctx, userID, lessonID)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	cur.Score, cur.Feedback, cur.GradedAt = &score, feedback, &now
+	return c.writeSub(ctx, cur)
+}

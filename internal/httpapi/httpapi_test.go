@@ -1700,6 +1700,22 @@ func TestMilitaryRanks(t *testing.T) {
 	if rank["name"] != "Байлдагч" || rank["cheated"].(float64) != 1 || rank["honest"].(float64) != 1 {
 		t.Fatalf("нэгдсэн цол: %v", rank)
 	}
+	if tips, _ := rank["tips"].([]any); len(tips) == 0 || !strings.Contains(fmt.Sprint(tips), "хуулах") {
+		t.Fatalf("оношилгооны зөвлөмж алга: %v", rank["tips"])
+	}
+	// Систем өөрөө олгосон: нэгдсэн (бүх сургалтын) цол ба суралцагчид мэдэгдэл.
+	if tot := acc["rank_total"].(map[string]any); tot["name"] != "Байлдагч" || acc["rank_awarded"] != true {
+		t.Fatalf("нэгдсэн цол олгогдоогүй / олгосон дохио алга: %v %v", tot, acc["rank_awarded"])
+	}
+	_, ns := call(t, srv, "GET", "/api/me/notifications", s1, "")
+	if !strings.Contains(fmt.Sprint(ns), "Шинэ цол: Байлдагч") {
+		t.Fatalf("цол олгосон мэдэгдэл алга: %v", ns)
+	}
+	call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
+	_, ns2 := call(t, srv, "GET", "/api/me/notifications", s1, "")
+	if strings.Count(fmt.Sprint(ns2), "Шинэ цол") != 1 {
+		t.Fatalf("давхар мэдэгдэл: %v", ns2)
+	}
 	// Багшийн дашбоард: суралцагчийн цол, дэлгэрэнгүйд хичээл бүрийн цол.
 	_, an := call(t, srv, "GET", "/api/me/analytics?course="+cid, tt, "")
 	x := an["data"].(map[string]any)["students"].([]any)[0].(map[string]any)
@@ -1776,5 +1792,152 @@ func TestMediaTicket(t *testing.T) {
 	mu := mine["lessons"].([]any)[0].(map[string]any)["blocks"].([]any)[0].(map[string]any)["url"].(string)
 	if !strings.HasPrefix(mu, "/files/") {
 		t.Fatalf("багшид /files/ зам байх ёстой: %s", mu)
+	}
+}
+
+// Даалгавар ба хугацаа: хоцорвол төлбөртэй (402 → төлөөд илгээнэ), хаалттай (423), төлбөргүй;
+// суралцагч хариу илгээж, багш дүгнэж, хоёр тал мэдэгдэл авна.
+func TestAssignmentAndDueFlow(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Даалгавар","price":0,"published":true}`)
+	cid := c["id"].(string)
+	past, future := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339), time.Now().Add(48*time.Hour).UTC().Format(time.RFC3339)
+	// Буруу: хоцорвол төлбөртэй гэсэн ч төлбөргүй; шалгалт+даалгавар давхар.
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"x","is_free":true,"assignment":{"due":{"at":"`+past+`","late":"paid","late_fee":0}}}`); code != 400 {
+		t.Fatal("төлбөргүй 'paid' бодлого татгалзагдах ёстой")
+	}
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"x","is_free":true,"assignment":{"due":{}},"exam":{"pass_pct":50},"blocks":[{"id":"q001","type":"quiz","quiz":{"question":"?","options":["a","b"],"correct":[0]}}]}`); code != 400 {
+		t.Fatal("шалгалт ба даалгавар давхар байж болохгүй")
+	}
+	code, la := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Эссэ","is_free":true,"blocks":[{"id":"t001","type":"text","text":"500 үгтэй эссэ бич"}],"assignment":{"due":{"at":"`+past+`","late":"paid","late_fee":2000},"max_score":50,"allow_files":true}}`)
+	if code != 201 || la["assignment"].(map[string]any)["max_score"].(float64) != 50 {
+		t.Fatalf("даалгавар үүссэнгүй: %d %v", code, la)
+	}
+	lid := la["id"].(string)
+	s1, uid := register(t, srv, "stud", "student")
+	call(t, srv, "POST", "/api/courses/"+cid+"/enroll", s1, "")
+	// Хугацаа хоцорсон → 402, due.need_pay.
+	code, r := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lid+"/submit", s1, `{"text":"Миний эссэ"}`)
+	if code != http.StatusPaymentRequired || r["due"].(map[string]any)["need_pay"] != true {
+		t.Fatalf("хоцорсон бол 402 байх ёстой: %d %v", code, r)
+	}
+	_, info := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid+"/assignment", s1, "")
+	if d := info["due"].(map[string]any); d["late"] != true || d["fee"].(float64) != 2000 || info["submission"] != nil {
+		t.Fatalf("даалгаврын мэдээлэл: %v", info)
+	}
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lid+"/complete", s1, ""); code != 409 {
+		t.Fatal("хариу илгээгээгүй бол дуусгаж болохгүй")
+	}
+	// Хоцролтын төлбөр → захиалга → dev-pay → нээгдэнэ.
+	code, lp := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lid+"/late-pay", s1, "")
+	if code != 201 || lp["order"].(map[string]any)["amount"].(float64) != 2000 || lp["order"].(map[string]any)["kind"] != "late" {
+		t.Fatalf("хоцролтын захиалга: %d %v", code, lp)
+	}
+	call(t, srv, "POST", "/api/orders/"+lp["order"].(map[string]any)["id"].(string)+"/dev-pay", s1, "")
+	_, lp2 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lid+"/late-pay", s1, "")
+	if lp2["unlocked"] != true {
+		t.Fatalf("төлсний дараа нээлттэй байх ёстой: %v", lp2)
+	}
+	// Файлтай илгээх (multipart).
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("text", "Миний эссэ: хоцорсон ч илгээлээ.")
+	fw, _ := mw.CreateFormFile("file", "esse.txt")
+	fw.Write([]byte("эссэ…"))
+	mw.Close()
+	req, _ := http.NewRequest("POST", srv.URL+"/api/courses/"+cid+"/lessons/"+lid+"/submit", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+s1)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sr map[string]any
+	_ = json.NewDecoder(res.Body).Decode(&sr)
+	res.Body.Close()
+	sub, _ := sr["submission"].(map[string]any)
+	if res.StatusCode != 200 || sub["late"] != true || len(sub["files"].([]any)) != 1 || !strings.HasSuffix(sub["files"].([]any)[0].(map[string]any)["name"].(string), "esse.txt") {
+		t.Fatalf("илгээлт: %d %v", res.StatusCode, sr)
+	}
+	_, acc := call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
+	if acc["progress"].(map[string]any)[lid].(map[string]any)["completed_at"] == nil {
+		t.Fatal("илгээсэн даалгавар дууссан гэж тэмдэглэгдэх ёстой")
+	}
+	_, tn := call(t, srv, "GET", "/api/me/notifications", tt, "")
+	if !strings.Contains(fmt.Sprint(tn), "Даалгаврын хариу ирлээ") {
+		t.Fatalf("багшид мэдэгдэл алга: %v", tn)
+	}
+	// Багш хариунуудыг харж дүгнэнэ; хязгаараас их оноо татгалзана.
+	_, subs := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid+"/submissions", tt, "")
+	if len(subs["submissions"].([]any)) != 1 {
+		t.Fatalf("1 хариу: %v", subs)
+	}
+	if code, _ := call(t, srv, "PUT", "/api/courses/"+cid+"/lessons/"+lid+"/submissions/"+uid, tt, `{"score":80}`); code != 400 {
+		t.Fatal("дээд оноо 50-аас их байж болохгүй")
+	}
+	if code, _ := call(t, srv, "PUT", "/api/courses/"+cid+"/lessons/"+lid+"/submissions/"+uid, s1, `{"score":10}`); code != 403 {
+		t.Fatal("суралцагч дүгнэж болохгүй")
+	}
+	code, g := call(t, srv, "PUT", "/api/courses/"+cid+"/lessons/"+lid+"/submissions/"+uid, tt, `{"score":42,"feedback":"Сайн, гэхдээ дүгнэлт сул"}`)
+	if code != 200 || g["score"].(float64) != 42 {
+		t.Fatalf("дүгнэлт: %d %v", code, g)
+	}
+	_, info = call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid+"/assignment", s1, "")
+	if sm := info["submission"].(map[string]any); sm["score"].(float64) != 42 || sm["feedback"] != "Сайн, гэхдээ дүгнэлт сул" {
+		t.Fatalf("суралцагчид дүн харагдахгүй байна: %v", sm)
+	}
+	_, sn := call(t, srv, "GET", "/api/me/notifications", s1, "")
+	if !strings.Contains(fmt.Sprint(sn), "Даалгавар дүгнэгдлээ: 42/50") {
+		t.Fatalf("суралцагчид дүнгийн мэдэгдэл алга: %v", sn)
+	}
+
+	// Шалгалт: хугацаа дууссан + хаалттай → 423; төлбөргүй → эхэлнэ; ирээдүйн хугацаа → эхэлнэ.
+	q := `"blocks":[{"id":"q001","type":"quiz","quiz":{"question":"?","options":["a","b"],"correct":[0]}}]`
+	_, e1 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Хаалттай","is_free":true,`+q+`,"exam":{"pass_pct":50,"due":{"at":"`+past+`","late":"closed"}}}`)
+	if code, r := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+e1["id"].(string)+"/exam/start", s1, ""); code != http.StatusLocked || r["due"].(map[string]any)["closed"] != true {
+		t.Fatalf("хаалттай шалгалт 423: %d %v", code, r)
+	}
+	_, e2 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Төлбөргүй","is_free":true,`+q+`,"exam":{"pass_pct":50,"due":{"at":"`+past+`","late":"free"}}}`)
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+e2["id"].(string)+"/exam/start", s1, ""); code != 200 && code != 201 {
+		t.Fatalf("төлбөргүй хоцролт: шалгалт эхлэх ёстой: %d", code)
+	}
+	_, e3 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Төлбөртэй","is_free":true,`+q+`,"exam":{"pass_pct":50,"due":{"at":"`+past+`","late":"paid","late_fee":1000}}}`)
+	eid := e3["id"].(string)
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+eid+"/exam/start", s1, ""); code != http.StatusPaymentRequired {
+		t.Fatalf("хоцорсон төлбөртэй шалгалт 402: %d", code)
+	}
+	_, ei := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+eid+"/exam", s1, "")
+	if ei["due"].(map[string]any)["need_pay"] != true {
+		t.Fatalf("шалгалтын мэдээлэлд хоцролт харагдах ёстой: %v", ei["due"])
+	}
+	_, o := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+eid+"/late-pay", s1, "")
+	call(t, srv, "POST", "/api/orders/"+o["order"].(map[string]any)["id"].(string)+"/dev-pay", s1, "")
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+eid+"/exam/start", s1, ""); code != 200 && code != 201 {
+		t.Fatalf("төлсний дараа шалгалт эхлэх ёстой: %d", code)
+	}
+	// Багшид хугацаа хамаарахгүй; ирээдүйн хугацаатай даалгаварт хоцролт байхгүй.
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+e1["id"].(string)+"/exam/start", tt, ""); code != 200 && code != 201 {
+		t.Fatal("багшид хаалттай шалгалт ч нээлттэй")
+	}
+	_, lb := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Ирээдүй","is_free":true,"assignment":{"due":{"at":"`+future+`","late":"closed"}}}`)
+	if code, r := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lb["id"].(string)+"/submit", s1, `{"text":"цагтаа"}`); code != 200 || r["submission"].(map[string]any)["late"] != false {
+		t.Fatalf("цагтаа илгээсэн: %d %v", code, r)
+	}
+	// Файл хавсаргахыг зөвшөөрөөгүй даалгаварт файл → 400; хоосон хариу → 400.
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lb["id"].(string)+"/submit", s1, `{"text":"   "}`); code != 400 {
+		t.Fatal("хоосон хариу татгалзагдана")
+	}
+	// Хөтөлбөрт даалгаврын мэдээлэл олон нийтэд харагдана (хугацаа).
+	_, pc := call(t, srv, "GET", "/api/courses/"+cid, s1, "")
+	found := false
+	for _, pl := range pc["lessons"].([]any) {
+		if m := pl.(map[string]any); m["id"] == lid && m["assignment"] != nil {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("нийтийн хөтөлбөрт даалгавар алга: %v", pc["lessons"])
 	}
 }

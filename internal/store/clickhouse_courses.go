@@ -149,15 +149,15 @@ func (c *ClickHouse) CoursesByIDs(ctx context.Context, ids []string) ([]Course, 
 // ---- хичээл ----
 
 const lessonCols = `id, course_id, title, content, video_url, is_free, price, unlock_after_h, always_open, format, mode,
-	section, blocks, active_min, exam, position, created_at, deleted`
+	section, blocks, active_min, exam, position, created_at, deleted, assignment`
 
 func scanLesson(r driver.Rows) (Lesson, bool, error) {
 	var l Lesson
 	var deleted bool
 	var unlock, active, pos int32
-	var blocks, exam string
+	var blocks, exam, asg string
 	err := r.Scan(&l.ID, &l.CourseID, &l.Title, &l.Content, &l.VideoURL, &l.IsFree, &l.Price, &unlock, &l.AlwaysOpen,
-		&l.Format, &l.Mode, &l.Section, &blocks, &active, &exam, &pos, &l.CreatedAt, &deleted)
+		&l.Format, &l.Mode, &l.Section, &blocks, &active, &exam, &pos, &l.CreatedAt, &deleted, &asg)
 	if err != nil {
 		return l, false, err
 	}
@@ -171,6 +171,12 @@ func scanLesson(r driver.Rows) (Lesson, bool, error) {
 			l.Exam = &e
 		}
 	}
+	if asg != "" {
+		var a Assignment
+		if json.Unmarshal([]byte(asg), &a) == nil {
+			l.Assignment = &a
+		}
+	}
 	return l, deleted, nil
 }
 
@@ -180,15 +186,19 @@ func (c *ClickHouse) writeLesson(ctx context.Context, l *Lesson, deleted bool) e
 		b, _ := json.Marshal(l.Blocks)
 		blocks = string(b)
 	}
-	exam := ""
+	exam, asg := "", ""
 	if l.Exam != nil {
 		b, _ := json.Marshal(l.Exam)
 		exam = string(b)
 	}
+	if l.Assignment != nil {
+		b, _ := json.Marshal(l.Assignment)
+		asg = string(b)
+	}
 	return c.insert(ctx, "lessons", []string{"id", "course_id", "title", "content", "video_url", "is_free", "price",
-		"unlock_after_h", "always_open", "format", "mode", "section", "blocks", "active_min", "exam", "position", "created_at", "ver", "deleted"},
+		"unlock_after_h", "always_open", "format", "mode", "section", "blocks", "active_min", "exam", "position", "created_at", "ver", "deleted", "assignment"},
 		l.ID, l.CourseID, l.Title, l.Content, l.VideoURL, l.IsFree, l.Price, int32(l.UnlockAfterH), l.AlwaysOpen,
-		l.Format, l.Mode, l.Section, blocks, int32(l.ActiveMin), exam, int32(l.Position), l.CreatedAt.UTC(), ver(), deleted)
+		l.Format, l.Mode, l.Section, blocks, int32(l.ActiveMin), exam, int32(l.Position), l.CreatedAt.UTC(), ver(), deleted, asg)
 }
 
 func (c *ClickHouse) lessonsWhere(ctx context.Context, where string, args ...any) ([]Lesson, error) {
@@ -251,7 +261,7 @@ func (c *ClickHouse) UpdateLesson(ctx context.Context, l *Lesson) error {
 	}
 	cur.Title, cur.Content, cur.VideoURL, cur.IsFree, cur.Price = l.Title, l.Content, l.VideoURL, l.IsFree, l.Price
 	cur.UnlockAfterH, cur.AlwaysOpen, cur.Format, cur.Mode, cur.Section, cur.Blocks = l.UnlockAfterH, l.AlwaysOpen, l.Format, l.Mode, l.Section, l.Blocks
-	cur.ActiveMin, cur.Exam = l.ActiveMin, l.Exam
+	cur.ActiveMin, cur.Exam, cur.Assignment = l.ActiveMin, l.Exam, l.Assignment
 	if err := c.writeLesson(ctx, cur, false); err != nil {
 		return err
 	}
@@ -674,6 +684,11 @@ func (c *ClickHouse) CreateOrGetPendingLessonOrder(ctx context.Context, userID s
 		&Order{Kind: OrderKindLesson, Title: co.Title + " — " + l.Title, UserID: userID, CourseID: co.ID, LessonID: l.ID, TeacherID: co.TeacherID, Amount: l.Price})
 }
 
+func (c *ClickHouse) CreateOrGetPendingLateOrder(ctx context.Context, userID string, co *Course, l *Lesson, fee int64) (*Order, error) {
+	return c.pendingOrder(ctx, userID+":late:"+l.ID, "user_id = ? AND lesson_id = ? AND kind = ?", []any{userID, l.ID, OrderKindLate},
+		&Order{Kind: OrderKindLate, Title: co.Title + " — " + l.Title + " (хоцорсон)", UserID: userID, CourseID: co.ID, LessonID: l.ID, TeacherID: co.TeacherID, Amount: fee})
+}
+
 func (c *ClickHouse) CreateStorageOrder(ctx context.Context, userID string, mb int64, months int, amount int64) (*Order, error) {
 	o := &Order{ID: NewID(), Kind: OrderKindStorage, StorageMB: mb, Months: months, UserID: userID, Amount: amount, Status: OrderPending, CreatedAt: time.Now()}
 	return o, c.writeOrder(ctx, o, false)
@@ -709,6 +724,10 @@ func (c *ClickHouse) MarkOrderPaid(ctx context.Context, orderID string, amount i
 	case OrderKindLesson:
 		if err := c.insert(ctx, "lesson_access", []string{"user_id", "lesson_id", "course_id", "teacher_id", "created_at", "ver"},
 			o.UserID, o.LessonID, o.CourseID, o.TeacherID, time.Now().UTC(), ver()); err != nil {
+			return nil, err
+		}
+	case OrderKindLate: // хоцорсон шалгалт/даалгаврын эрх: явцад late_pass тэмдэг
+		if err := c.SaveQuizResult(ctx, o.UserID, o.CourseID, o.LessonID, LatePassKey, true); err != nil {
 			return nil, err
 		}
 	case OrderKindStorage:

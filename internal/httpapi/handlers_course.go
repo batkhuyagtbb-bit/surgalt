@@ -117,19 +117,20 @@ func (s *Server) ownCourse(w http.ResponseWriter, r *http.Request, uid string) (
 }
 
 type lessonInput struct {
-	Title        string        `json:"title"`
-	Content      string        `json:"content"`
-	VideoURL     string        `json:"video_url"`
-	IsFree       bool          `json:"is_free"`
-	Price        int64         `json:"price"`          // төлбөртэй хичээлийн дангаар худалдах үнэ (₮)
-	UnlockAfterH int           `json:"unlock_after_h"` // өмнөх хичээлийг үзснээс хойш хэдэн цагийн дараа (0 = шууд)
-	AlwaysOpen   bool          `json:"always_open"`    // дарааллаас үл хамааран нээлттэй
-	Format       string        `json:"format"`         // lecture | seminar | practice | lab | ""
-	Mode         string        `json:"mode"`           // classroom | online | blended | ""
-	Section      string        `json:"section"`        // хичээлийн бүлэг (модуль), хоосон = бүлэггүй
-	Blocks       []store.Block `json:"blocks"`         // дэлгэрэнгүй агуулга (текст, зураг, дуу, видео, файл, асуулт)
-	ActiveMin    int           `json:"active_min"`     // идэвхтэй суралцах ёстой минут
-	Exam         *store.Exam   `json:"exam"`           // хоосон биш бол шалгалт
+	Title        string            `json:"title"`
+	Content      string            `json:"content"`
+	VideoURL     string            `json:"video_url"`
+	IsFree       bool              `json:"is_free"`
+	Price        int64             `json:"price"`          // төлбөртэй хичээлийн дангаар худалдах үнэ (₮)
+	UnlockAfterH int               `json:"unlock_after_h"` // өмнөх хичээлийг үзснээс хойш хэдэн цагийн дараа (0 = шууд)
+	AlwaysOpen   bool              `json:"always_open"`    // дарааллаас үл хамааран нээлттэй
+	Format       string            `json:"format"`         // lecture | seminar | practice | lab | ""
+	Mode         string            `json:"mode"`           // classroom | online | blended | ""
+	Section      string            `json:"section"`        // хичээлийн бүлэг (модуль), хоосон = бүлэггүй
+	Blocks       []store.Block     `json:"blocks"`         // дэлгэрэнгүй агуулга (текст, зураг, дуу, видео, файл, асуулт)
+	ActiveMin    int               `json:"active_min"`     // идэвхтэй суралцах ёстой минут
+	Exam         *store.Exam       `json:"exam"`           // хоосон биш бол шалгалт
+	Assignment   *store.Assignment `json:"assignment"`     // хоосон биш бол даалгавар
 }
 
 const maxUnlockHours = 24 * 365
@@ -165,7 +166,13 @@ func (in *lessonInput) validate(teacherID string, course *store.Course) string {
 	if in.ActiveMin < 0 || in.ActiveMin > 600 {
 		return "идэвхтэй суралцах хугацаа 0-600 минут"
 	}
+	if in.Exam != nil && in.Assignment != nil {
+		return "нэг хичээл шалгалт эсвэл даалгаврын аль нэг нь байна"
+	}
 	if msg := validateExam(in.Exam); msg != "" {
+		return msg
+	}
+	if msg := validateAssignment(in.Assignment); msg != "" {
 		return msg
 	}
 	return validateBlocks(in.Blocks, teacherID)
@@ -173,7 +180,7 @@ func (in *lessonInput) validate(teacherID string, course *store.Course) string {
 
 func lessonFromInput(in lessonInput, courseID string) *store.Lesson {
 	return &store.Lesson{CourseID: courseID, Title: in.Title, Content: in.Content, VideoURL: in.VideoURL, IsFree: in.IsFree, Price: in.Price,
-		UnlockAfterH: in.UnlockAfterH, AlwaysOpen: in.AlwaysOpen, Format: in.Format, Mode: in.Mode, Section: in.Section, Blocks: in.Blocks, ActiveMin: in.ActiveMin, Exam: in.Exam}
+		UnlockAfterH: in.UnlockAfterH, AlwaysOpen: in.AlwaysOpen, Format: in.Format, Mode: in.Mode, Section: in.Section, Blocks: in.Blocks, ActiveMin: in.ActiveMin, Exam: in.Exam, Assignment: in.Assignment}
 }
 
 func (s *Server) handleCreateLesson(w http.ResponseWriter, r *http.Request) {
@@ -410,6 +417,12 @@ func (s *Server) handleCompleteLesson(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, "шалгалтыг өгч тэнцсэнээр дуусна")
 		return
 	}
+	if l.Assignment != nil && course.TeacherID != c.UID {
+		if _, err := s.store.SubmissionFor(r.Context(), c.UID, l.ID); err != nil {
+			writeErr(w, http.StatusConflict, "даалгаврын хариугаа илгээснээр дуусна")
+			return
+		}
+	}
 	if l.ActiveMin > 0 && course.TeacherID != c.UID {
 		done, err := s.lessonActiveSec(r.Context(), c.UID, l.ID)
 		if s.storeErr(w, r, err) {
@@ -578,12 +591,17 @@ func (s *Server) handleCourseAccess(w http.ResponseWriter, r *http.Request) {
 	for _, lr := range ranks {
 		rankBy[lr.LessonID] = lr
 	}
+	var total RankInfo
+	awarded := false
+	if !owner && len(ranks) > 0 {
+		total, awarded = s.autoAward(r.Context(), c.UID, course.ID, "/c/"+course.ID, rank.Points) // систем өөрөө олгоно
+	}
 	w.Header().Set("Cache-Control", "private, no-store")
 	// all: бүх хичээл төлбөрийн хувьд нээлттэй (багш эсвэл үнэтэй багц худалдаж авсан).
 	writeJSON(w, http.StatusOK, map[string]any{"enrolled": enrolled, "owner": owner,
 		"all": owner || (enrolled && course.Price > 0), "lessons": bought,
 		"states": states, "progress": progress, "done": done, "total": len(lessons),
-		"ranks": rankBy, "rank": rank})
+		"ranks": rankBy, "rank": rank, "rank_total": total, "rank_awarded": awarded})
 }
 
 // handleGetLesson: үнэгүй хичээлийг хэн ч, бусдыг зөвхөн элссэн хүн эсвэл багш үзнэ.

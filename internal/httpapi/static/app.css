@@ -1469,3 +1469,52 @@ html.reader-open{overflow:hidden}
 .vg-bar .vg-prog{flex:1;height:5px;border-radius:3px;background:rgba(255,255,255,.25);overflow:hidden;cursor:not-allowed}
 .vg-bar .vg-prog i{display:block;height:100%;width:0;background:var(--accent)}
 .vg-locked:fullscreen video{width:100%;height:100%;aspect-ratio:auto;object-fit:contain}
+.course-rank .cr-tips{flex-basis:100%;margin:4px 0 0;padding-left:18px;color:var(--muted);font-size:.82rem}
+.course-rank .cr-tips li{margin:2px 0}
+
+/* Хичээл нэмэх: төрлийн цэс; шалгалт/даалгаврын хугацаа; даалгаврын хариу */
+.kind-menu{position:absolute;z-index:30;margin-top:6px;display:grid;gap:4px;padding:6px;min-width:280px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.14)}
+.kind-menu button{display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;text-align:left;padding:8px 10px;border:0;border-radius:8px;background:none;font:inherit;cursor:pointer;color:var(--ink)}
+.kind-menu button:hover{background:var(--ink-2)}
+.kind-menu button small{grid-column:2;color:var(--muted);font-size:.74rem}
+.sec-head,.composer-box{position:relative}
+.pe-kind{margin-bottom:8px}
+.pe-section{padding:10px 12px;margin:0 0 10px;border:1px dashed var(--line);border-radius:10px;background:var(--ink-2)}
+.kind-asg{background:#ecfeff;color:#0e7490}
+.sub-list{display:grid;gap:12px;max-height:70vh;overflow:auto}
+.sub-item{padding:12px;border:1px solid var(--line);border-radius:12px}
+.sub-item header{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.sub-text{white-space:pre-wrap;margin:8px 0}
+.sub-grade{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:8px}
+.sub-grade label{margin:0;font-size:.8rem}
+.sub-grade input[name=score]{width:90px}
+.sub-grade .grow{flex:1;min-width:200px}
+.asg-card .sub-mine{padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin:10px 0;background:var(--card)}
+.asg-card .sub-mine p{white-space:pre-wrap;margin:6px 0}
+.asg-card .sub-score{margin-top:8px;padding:8px 10px;border-radius:10px;background:#e6f6f1;color:#0f7a63}
+.asg-card .sub-form textarea{width:100%}
+
+/* Цолны тэмдэг: мэргэжлийн гялалзалт (зөөлөн гэрлийн шугам + импульс), хөдөлгөөн багасгасан бол зогсоно */
+.rank-shine{position:relative;background-image:linear-gradient(110deg,currentColor 0 42%,#fff 50%,currentColor 58% 100%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--accent);animation:rank-sweep 2.8s ease-in-out infinite,rank-pulse 2.8s ease-in-out infinite}
+.rank-shine[data-level="0"],.rank-shine[data-level="1"]{color:#8a94a6}
+.rank-shine[data-level="7"],.rank-shine[data-level="8"],.rank-shine[data-level="9"],.rank-shine[data-level="10"]{color:#1f3c8f}
+.rank-shine[data-level="11"],.rank-shine[data-level="12"],.rank-shine[data-level="13"]{color:#7c3aed}
+.rank-shine[data-level="14"],.rank-shine[data-level="15"],.rank-shine[data-level="16"],.rank-shine[data-level="17"]{color:#b45309}
+.lesson-rank.rank-shine{-webkit-text-fill-color:initial;background-image:none;animation:rank-glow 2.4s ease-in-out infinite}
+.an-rank.rank-shine{-webkit-text-fill-color:initial;background-image:none;animation:rank-glow 2.4s ease-in-out infinite}
+.course-rank .cr-sign.rank-shine{font-size:1.5rem;filter:drop-shadow(0 0 6px rgba(234,160,46,.55))}
+@keyframes rank-sweep{0%{background-position:120% 0}60%,100%{background-position:-120% 0}}
+@keyframes rank-pulse{0%,100%{filter:drop-shadow(0 0 2px rgba(234,160,46,.3))}50%{filter:drop-shadow(0 0 9px rgba(234,160,46,.85))}}
+@keyframes rank-glow{0%,100%{box-shadow:0 0 0 0 rgba(15,157,138,0)}50%{box-shadow:0 0 0 4px rgba(15,157,138,.18),0 0 14px rgba(15,157,138,.35)}}
+@media (prefers-reduced-motion:reduce){.rank-shine,.lesson-rank.rank-shine,.an-rank.rank-shine{animation:none}}
+/* Салют + баяр хүргэх карт */
+.salute{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 30%,rgba(10,16,40,.78),rgba(5,8,20,.92));animation:fade-in .3s ease}
+.salute.out{opacity:0;transition:opacity .4s}
+.salute-sky{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.salute-card{position:relative;max-width:460px;width:calc(100% - 32px);padding:28px 24px 24px;text-align:center;background:#fff;color:#0f172a;border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.45);animation:salute-pop .6s cubic-bezier(.2,1.4,.4,1)}
+.salute-card h2{margin:6px 0 8px;font-size:1.5rem}
+.salute-card h2 em{font-style:normal;color:var(--accent)}
+.salute-card p{color:var(--muted);margin:0 0 16px}
+.salute-sign{font-size:3rem;line-height:1;margin:6px 0 4px}
+@keyframes salute-pop{0%{transform:scale(.6) translateY(30px);opacity:0}100%{transform:none;opacity:1}}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}

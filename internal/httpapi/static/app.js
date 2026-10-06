@@ -508,6 +508,52 @@ function mountQuizzes(box, base, results = {}) {
   };
 }
 
+/* ---------- Цол олгох ёслол: өнгөлөг салют + баяр хүргэх карт (систем өөрөө) ---------- */
+function fireworks(canvas, ms = 5000) {
+  const ctx = canvas.getContext("2d"), dpr = Math.min(2, devicePixelRatio || 1);
+  const fit = () => { canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr; };
+  fit(); addEventListener("resize", fit);
+  const colors = ["#ffb347", "#ff5e7e", "#4fd1c5", "#7aa2ff", "#ffe066", "#c084fc", "#34d399", "#fb7185"];
+  const parts = [];
+  const burst = () => {
+    const x = (0.15 + Math.random() * 0.7) * canvas.width, y = (0.15 + Math.random() * 0.45) * canvas.height, col = colors[Math.floor(Math.random() * colors.length)], n = 70 + Math.random() * 50;
+    for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, v = (2 + Math.random() * 6) * dpr; parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, decay: 0.008 + Math.random() * 0.012, col, r: (1.2 + Math.random() * 1.8) * dpr }); }
+  };
+  const start = performance.now(); let last = 0, raf;
+  const tick = (t) => {
+    if (t - last > 420 && t - start < ms - 1200) { last = t; burst(); if (Math.random() < 0.5) burst(); }
+    ctx.globalCompositeOperation = "destination-out"; ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.05 * dpr; p.vx *= 0.985; p.vy *= 0.985; p.life -= p.decay;
+      if (p.life <= 0) { parts.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.6 + p.life * 0.6), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    if (t - start < ms || parts.length) raf = requestAnimationFrame(tick); else removeEventListener("resize", fit);
+  };
+  raf = requestAnimationFrame(tick);
+  return () => { cancelAnimationFrame(raf); removeEventListener("resize", fit); };
+}
+function rankSalute(rank) {
+  if (!rank?.name || $(".salute")) return;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const el = document.createElement("div"); el.className = "salute"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Шинэ цол");
+  el.innerHTML = `<canvas class="salute-sky" aria-hidden="true"></canvas>
+    <div class="salute-card"><span class="eyebrow">Систем баяр хүргэж байна</span>
+      <div class="salute-sign rank-shine" data-level="${rank.level}">${esc(rank.insignia || "★")}</div>
+      <h2>🎖 Шинэ цол: <em class="rank-name">${esc(rank.name)}</em></h2>
+      <p>Идэвхтэй, шударга суралцсан тань үнэлэгдэж <b>${rank.points}</b> оноонд хүрлээ.${rank.next ? ` Дараагийн «${esc(rank.next_name)}» цол ${rank.next} оноонд.` : " Энэ бол дээд цол!"}</p>
+      <button class="btn btn-gold btn-lg">Баярлалаа 🎉</button></div>`;
+  document.body.append(el);
+  const stop = reduce ? () => {} : fireworks($(".salute-sky", el), 6000);
+  celebrate?.();
+  const close = () => { stop(); el.classList.add("out"); setTimeout(() => el.remove(), 400); };
+  $("button", el).onclick = close; $("button", el).focus();
+  el.addEventListener("click", (e) => { if (e.target === el) close(); });
+  setTimeout(close, 12000);
+}
+
 // lockedControls: анх үзэж байхад хөтчийн ердийн удирдлагыг нууж, өөрийн удирдлага тавина —
 // явцын мөр дарагдахгүй (гүйлгэх, үсрэх боломжгүй), зөвхөн тоглуулах/зогсоох, дуу, бүтэн дэлгэц.
 // Бүрэн үзсэний дараа release() → ердийн удирдлага (гүйлгэж болно).
@@ -759,19 +805,72 @@ async function examCard(box, { courseId, lessonId, title, onFinish }) {
     let info;
     try { info = await api(`${base}/exam`); } catch (e) { card.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
     const ex = info.exam, best = info.attempts.filter((a) => a.status !== "active").reduce((m, a) => Math.max(m, a.pct), -1);
-    const active = info.attempts.find((a) => a.status === "active");
+    const active = info.attempts.find((a) => a.status === "active"), due = info.due || { open: true };
     card.innerHTML = `<h3>📝 Шалгалт</h3>
-      <ul class="exam-facts"><li>❓ <b>${info.questions}</b> асуулт</li><li>⏱ ${ex.time_min ? `<b>${ex.time_min}</b> минут` : "Хугацаа хязгааргүй"}</li>
+      <ul class="exam-facts"><li>❓ <b>${info.questions}</b> асуулт</li><li>⏱ ${ex.time_min ? `<b>${ex.time_min}</b> минут` : "Хугацаа хязгааргүй"}</li>${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : ""}
         <li>🎯 Тэнцэх: <b>${ex.pass_pct}%</b></li><li>🔁 ${info.left < 0 ? "Оролдлого хязгааргүй" : `Үлдсэн оролдлого: <b>${info.left}</b>`}</li>${best >= 0 ? `<li>🏆 Таны шилдэг: <b>${best}%</b></li>` : ""}</ul>
       <div class="exam-rules"><b>⚠️ Дүрэм:</b> Шалгалтын үеэр өөр таб, цонх руу шилжих эсвэл текст хуулах үед шалгалт <b>шууд хаагдаж</b>, тэр хүртэлх хариултаар дүгнэгдэнэ. Энэ тухай багшид мэдэгдэнэ.</div>
       ${info.attempts.length ? `<table class="tbl"><thead><tr><th>Огноо</th><th>Оноо</th><th>Төлөв</th></tr></thead><tbody>${info.attempts.map((a) => `<tr><td>${fmtDate(a.started_at)}</td><td>${a.status === "active" ? "—" : a.pct + "%" + (a.passed ? " ✓" : "")}</td><td>${a.status === "terminated" ? `⛔ Хаагдсан · ${esc(a.reason || "")}` : a.status === "submitted" ? (a.passed ? "Тэнцсэн" : "Тэнцээгүй") : a.status === "expired" ? "Хугацаа хэтэрсэн" : "Үргэлжилж байна"}</td></tr>`).join("")}</tbody></table>` : ""}
-      ${active || info.left !== 0 ? `<button class="btn btn-gold btn-lg" data-exam-start>${active ? "▶ Шалгалтаа үргэлжлүүлэх" : "▶ Шалгалт эхлүүлэх"}</button>` : `<p class="muted">Оролдлогын тоо дууссан.</p>`}`;
+      ${dueNotice(due)}
+      ${due.closed ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж шалгалтаа нээх</button>` : active || info.left !== 0 ? `<button class="btn btn-gold btn-lg" data-exam-start>${active ? "▶ Шалгалтаа үргэлжлүүлэх" : "▶ Шалгалт эхлүүлэх"}</button>` : `<p class="muted">Оролдлогын тоо дууссан.</p>`}`;
+    bindLatePay(card, base, "Хоцорсон шалгалтын төлбөр", draw);
     const b = $("[data-exam-start]", card);
     if (b) b.onclick = async () => {
       if (!active && !confirm("Шалгалт эхлүүлэх үү? Эхэлсний дараа өөр цонх руу шилжвэл шалгалт хаагдана.")) return;
       b.disabled = true;
       try { const d = await api(`${base}/exam/start`, { method: "POST" }); runExam({ base, courseId, lessonId, title, data: d, onClose: () => { draw(); onFinish?.(); } }); }
       catch (e) { toast(e.message, true); } finally { b.disabled = false; }
+    };
+  };
+  await draw();
+}
+
+// Хугацааны мэдэгдэл (шалгалт, даалгаварт ижил): хоцорсон → төлбөргүй / төлбөртэй / хаалттай.
+function dueNotice(due) {
+  if (!due?.late) return "";
+  if (due.closed) return `<div class="exam-rules"><b>⛔ Хугацаа дууссан.</b> Энэ ${"хэсэг"} хаалттай — багштайгаа холбогдоно уу.</div>`;
+  if (due.need_pay) return `<div class="exam-rules"><b>⏰ Хугацаа хоцорсон.</b> Үргэлжлүүлэхийн тулд <b>${money(due.fee)}</b> хоцролтын төлбөр төлнө.</div>`;
+  if (due.paid) return `<div class="exam-rules">✓ Хоцролтын төлбөр төлсөн — үргэлжлүүлж болно.</div>`;
+  return `<div class="exam-rules">⏰ Хугацаа өнгөрсөн ч төлбөргүй үргэлжлүүлж болно (хоцорсон гэж тэмдэглэгдэнэ).</div>`;
+}
+function bindLatePay(card, base, label, after) {
+  const b = $("[data-late-pay]", card); if (!b) return;
+  b.onclick = async () => {
+    b.disabled = true;
+    try { const d = await api(`${base}/late-pay`, { method: "POST" }); if (d.unlocked) return after(); window.SG_pay?.(d.order, d.payment, label, () => { toast("✓ Нээгдлээ"); after(); }); }
+    catch (e) { toast(e.message, true); } finally { b.disabled = false; }
+  };
+}
+
+// Даалгавар: нөхцөл (блокууд дээр), хугацаа, хариу илгээх (текст + файл), багшийн дүн.
+async function assignmentCard(box, { courseId, lessonId }) {
+  const base = `/api/courses/${courseId}/lessons/${lessonId}`;
+  const card = document.createElement("section"); card.className = "exam-card asg-card"; box.append(card);
+  if (!Auth.token) { card.innerHTML = `<h3>📎 Даалгавар</h3><p>Хариу илгээхийн тулд нэвтэрнэ үү.</p><a class="btn btn-gold" href="/login?next=${encodeURIComponent(location.pathname)}">Нэвтрэх</a>`; return; }
+  const draw = async () => {
+    let info;
+    try { info = await api(`${base}/assignment`); } catch (e) { card.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
+    const a = info.assignment, due = info.due || { open: true }, sub = info.submission;
+    card.innerHTML = `<h3>📎 Даалгавар</h3>
+      <ul class="exam-facts">${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : "<li>📅 Хугацаагүй</li>"}<li>🎯 Дээд оноо: <b>${a.max_score || 100}</b></li>${a.allow_files ? "<li>📄 Файл хавсаргаж болно (3 хүртэл)</li>" : ""}</ul>
+      ${dueNotice(due)}
+      ${sub ? `<div class="sub-mine"><b>Таны хариу</b> <small class="muted">${fmtDate(sub.submitted_at)}${sub.late ? " · хоцорсон" : ""}</small>${sub.text ? `<p>${esc(sub.text)}</p>` : ""}${sub.files?.length ? `<p>${sub.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`).join(" · ")}</p>` : ""}
+        ${sub.score !== undefined ? `<div class="sub-score">✅ Дүн: <b>${sub.score}/${a.max_score || 100}</b>${sub.feedback ? `<p>${esc(sub.feedback)}</p>` : ""}</div>` : `<p class="muted small">Багш хараахан дүгнээгүй байна.</p>`}</div>` : ""}
+      ${due.closed ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж даалгавраа илгээх</button>`
+        : `<form class="sub-form"><label>${sub ? "Хариугаа шинэчлэх" : "Хариу"}<textarea name="text" rows="5" maxlength="20000" placeholder="Хариугаа энд бичнэ үү…">${esc(sub?.text || "")}</textarea></label>
+          ${a.allow_files ? `<label>Файл (3 хүртэл)<input type="file" name="files" multiple></label>` : ""}
+          <p class="form-error" role="alert"></p><button class="btn btn-gold">${sub ? "Дахин илгээх" : "Илгээх"}</button></form>`}`;
+    bindLatePay(card, base, "Хоцорсон даалгаврын төлбөр", draw);
+    const f = $(".sub-form", card);
+    if (f) f.onsubmit = async (e) => {
+      e.preventDefault();
+      const err = $(".form-error", f), b = $("button", f); err.textContent = ""; b.disabled = true;
+      try {
+        const fd = new FormData(); fd.append("text", f.text.value);
+        if (f.files) [...f.files.files].slice(0, 3).forEach((x) => fd.append("file", x));
+        await api(`${base}/submit`, { method: "POST", body: fd });
+        toast("✓ Даалгавар илгээгдлээ"); celebrate?.(); await draw(); document.dispatchEvent(new CustomEvent("sg:quiz-mastered"));
+      } catch (x) { err.textContent = x.message; } finally { b.disabled = false; }
     };
   };
   await draw();
@@ -1704,7 +1803,7 @@ async function coursePage() {
       const r = ranks[li.dataset.lesson]; let b = $(".lesson-rank", li);
       if (!r) { b?.remove(); return; }
       if (!b) { b = document.createElement("span"); b.className = "lesson-rank"; $(".lesson-title", li)?.append(b); }
-      b.className = "lesson-rank " + (r.disqualified ? "disq" : r.points >= 75 ? "high" : "");
+      b.className = "lesson-rank " + (r.disqualified ? "disq" : r.points >= 75 ? "high rank-shine" : "");
       b.title = (r.reasons || []).join(", ");
       b.textContent = r.disqualified ? "⛔ Цолгүй" : `🎖 ${r.rank} · ${r.points}`;
     });
@@ -1713,8 +1812,16 @@ async function coursePage() {
       if (!rl) { rl = document.createElement("div"); rl.id = "courseRank"; rl.className = "course-rank"; bar.after(rl); }
       const rk = a.rank;
       rl.hidden = !rk.lessons;
-      rl.innerHTML = `<span class="cr-sign">${esc(rk.insignia)}</span><b>${esc(rk.name)}</b><span class="muted small">${rk.points} оноо${rk.next ? ` · дараагийн цол «${esc(rk.next_name)}» ${rk.next} оноонд` : " · дээд цол"}${rk.cheated ? ` · <span class="cr-bad">${rk.cheated} хичээлд хуулах оролдлогоос цол олгоогүй</span>` : ""}</span>
-        <span class="meter cr-meter"><i style="width:${rk.progress}%"></i></span>`;
+      const tot = a.rank_total && a.rank_total.points > rk.points ? a.rank_total : null;
+      const shown = tot || rk;
+      // Шинэ цол: сервер дохио өгсөн эсвэл сүүлд харснаас түвшин дээшилсэн бол баяр хүргэж салют буудуулна.
+      const lvlKey = "sg_rank_lvl_" + (Auth.user?.id || "u");
+      let seen = -1; try { seen = localStorage.getItem(lvlKey) === null ? -1 : +localStorage.getItem(lvlKey); } catch {}
+      if (a.rank_awarded || (seen >= 0 && shown.level > seen)) rankSalute(shown);
+      try { localStorage.setItem(lvlKey, shown.level); } catch {}
+      rl.innerHTML = `<span class="cr-sign rank-shine" data-level="${rk.level}">${esc(rk.insignia)}</span><b class="rank-name">${esc(rk.name)}</b><span class="muted small">${rk.points} оноо${rk.next ? ` · дараагийн цол «${esc(rk.next_name)}» ${rk.next} оноонд` : " · дээд цол"}${tot ? ` · бүх сургалтаар: <b>${esc(tot.name)}</b> ${tot.points}` : ""}${rk.cheated ? ` · <span class="cr-bad">${rk.cheated} хичээлд хуулах оролдлогоос цол олгоогүй</span>` : ""}</span>
+        <span class="meter cr-meter"><i style="width:${rk.progress}%"></i></span>
+        ${rk.tips?.length ? `<ul class="cr-tips">${rk.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}`;
     }
   };
   const refreshAccess = () => api(`/api/courses/${id}/access`).then((a) => { applyStates(a); return a; }).catch(() => null);
@@ -1761,7 +1868,8 @@ async function coursePage() {
       const o = await api(`/api/orders/${order.id}`).catch(() => null);
       if (o?.status === "paid") { clearInterval(poll); closeModal($("#payModal")); onPaid(); }
     }, 4000);
-  };
+  };  window.SG_pay = pay; // шалгалт, даалгаврын хоцролтын төлбөрт ч ижил цонх
+
 
   buy.addEventListener("click", async () => {
     if (all || mode === "lessons") { $("#lessons").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
@@ -1832,6 +1940,10 @@ async function coursePage() {
     if (l.exam) { // шалгалт: асуултууд зөвхөн "эхлүүлэх"-ээр ирнэ
       if (done) done.hidden = true;
       examCard(body, { courseId: id, lessonId: lid, title: l.title, onFinish: refreshAccess });
+    }
+    if (l.assignment) { // даалгавар: хариу илгээснээр дуусна
+      if (done) done.hidden = true;
+      assignmentCard(body, { courseId: id, lessonId: lid });
     }
     // Видео: бүрэн үзэхээс өмнө урагш гүйлгэхгүй; хэдэн удаа аль хэсгийг үзсэнийг бичинэ.
     const watched = {};

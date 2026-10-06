@@ -14,6 +14,106 @@ type learnMem struct {
 	attempts map[string]*ExamAttempt
 	sessions map[string]*StudySession
 	events   []ActivityEvent
+	rankPts  map[[2]string]int // (user, course) → оноо
+	rankLvl  map[string]int    // user → олгосон түвшин
+	subs     map[string]*Submission
+}
+
+func cloneSub(s *Submission) Submission {
+	c := *s
+	c.Files = append([]string{}, s.Files...)
+	if s.Score != nil {
+		v := *s.Score
+		c.Score = &v
+	}
+	return c
+}
+
+func (m *Memory) SaveSubmission(_ context.Context, sub *Submission) error {
+	l := &m.learn
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.subs == nil {
+		l.subs = map[string]*Submission{}
+	}
+	sub.ID = sub.UserID + ":" + sub.LessonID
+	c := cloneSub(sub)
+	l.subs[sub.ID] = &c
+	return nil
+}
+
+func (m *Memory) SubmissionFor(_ context.Context, userID, lessonID string) (*Submission, error) {
+	l := &m.learn
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	s, ok := l.subs[userID+":"+lessonID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	c := cloneSub(s)
+	return &c, nil
+}
+
+func (m *Memory) Submissions(_ context.Context, lessonID string) ([]Submission, error) {
+	l := &m.learn
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	out := []Submission{}
+	for _, s := range l.subs {
+		if s.LessonID == lessonID {
+			out = append(out, cloneSub(s))
+		}
+	}
+	slices.SortFunc(out, func(a, b Submission) int { return b.SubmittedAt.Compare(a.SubmittedAt) })
+	return out, nil
+}
+
+func (m *Memory) GradeSubmission(_ context.Context, lessonID, userID string, score int, feedback string) error {
+	l := &m.learn
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	s, ok := l.subs[userID+":"+lessonID]
+	if !ok {
+		return ErrNotFound
+	}
+	now := time.Now()
+	s.Score, s.Feedback, s.GradedAt = &score, feedback, &now
+	return nil
+}
+
+func (m *Memory) SaveRankPoints(_ context.Context, userID, courseID string, points int) (int, error) {
+	l := &m.learn
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.rankPts == nil {
+		l.rankPts = map[[2]string]int{}
+	}
+	l.rankPts[[2]string{userID, courseID}] = points
+	total := 0
+	for k, v := range l.rankPts {
+		if k[0] == userID {
+			total += v
+		}
+	}
+	return total, nil
+}
+
+func (m *Memory) UserRankLevel(_ context.Context, userID string) (int, error) {
+	l := &m.learn
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.rankLvl[userID], nil
+}
+
+func (m *Memory) SetUserRankLevel(_ context.Context, userID string, level int) error {
+	l := &m.learn
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.rankLvl == nil {
+		l.rankLvl = map[string]int{}
+	}
+	l.rankLvl[userID] = level
+	return nil
 }
 
 func (f ActivityFilter) match(teacher, course, user, lesson, kind string, at time.Time) bool {
