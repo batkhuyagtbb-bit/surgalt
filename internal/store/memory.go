@@ -32,9 +32,11 @@ type Memory struct {
 	pendingL    map[[2]string]string          // (user, lesson) -> order
 	notifs      map[string][]*Notification    // user -> шинээс хуучин биш, нэмэгдэх дарааллаар
 	progress    map[[2]string]*LessonProgress // (user, lesson)
-	learn       learnMem                      // шалгалт, сесс, лог (memory_learning.go)
-	engage      engageMem                     // идэвхийн нэмэлт (memory_engagement.go)
-	books       bookMem                       // ном (memory_books.go)
+	discuss     *discussMem
+	discussOnce sync.Once
+	learn       learnMem  // шалгалт, сесс, лог (memory_learning.go)
+	engage      engageMem // идэвхийн нэмэлт (memory_engagement.go)
+	books       bookMem   // ном (memory_books.go)
 }
 
 func NewMemory() *Memory {
@@ -606,7 +608,7 @@ func (m *Memory) UpdateLesson(_ context.Context, l *Lesson) error {
 		if cur.ID == l.ID {
 			cur.Title, cur.Content, cur.VideoURL, cur.IsFree, cur.Price = l.Title, l.Content, l.VideoURL, l.IsFree, l.Price
 			cur.UnlockAfterH, cur.AlwaysOpen, cur.Format, cur.Mode, cur.Section, cur.Blocks = l.UnlockAfterH, l.AlwaysOpen, l.Format, l.Mode, l.Section, l.Blocks
-			cur.ActiveMin, cur.Exam, cur.Assignment = l.ActiveMin, l.Exam, l.Assignment
+			cur.ActiveMin, cur.Exam, cur.Assignment, cur.Discussion = l.ActiveMin, l.Exam, l.Assignment, l.Discussion
 			*l = *cur
 			return nil
 		}

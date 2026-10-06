@@ -576,13 +576,13 @@ function mountBlockEditor(f, blocks) {
 const blocksSummary = (bs) => bs.filter((b) => b.type === "text" || b.type === "heading").map((b) => b.text.replace(/\*\*|__|==|^[>-]\s|\[([^\]]*)\]\([^)]*\)/gm, "$1")).join("\n").slice(0, 1500);
 
 async function courseEditor(id) {
-  let [{ course: c, lessons }, lib, roster] = await Promise.all([api(`/api/me/courses/${id}`), loadLibrary(), api(`/api/me/courses/${id}/students`).catch(() => [])]);
+  let [{ course: c, lessons, comments: commentCounts = {} }, lib, roster] = await Promise.all([api(`/api/me/courses/${id}`), loadLibrary(), api(`/api/me/courses/${id}/students`).catch(() => [])]);
   const stripSig = (u) => (u && u.startsWith("/files/") ? u.split("?")[0] : u || ""); // гарын үсэгтэй URL-аас query-г хасна
   const fileName = (u) => { const f = lib.files.find((x) => x.path === stripSig(u)); return f ? f.original_name : decodeURIComponent(stripSig(u).split("/").pop() || ""); };
   const mediaLabel = (u) => (!u ? "" : /youtu\.?be|vimeo/.test(u) ? "Видео холбоос" : u.startsWith("/files/") ? fileName(u) : u);
   const isImage = (u) => /\.(webp|jpe?g|png|gif)$/i.test(stripSig(u));
   const dueBadge = (due) => !due ? "" : `${due.start_at ? `<span class="aud">▶ ${fmtDate(due.start_at)}-с</span>` : ""}${due.at ? `<span class="aud">📅 ${fmtDate(due.at)} хүртэл${due.late === "paid" ? ` · хоцорвол ${money(due.late_fee)}` : due.late === "closed" ? " · дараа нь хаалттай" : ""}</span>` : ""}${due.fee ? `<span class="aud aud-paid">💳 ${money(due.fee)}</span>` : ""}`;
-  const kindBadge = (l) => l.exam ? `<span class="kind kind-exam">📝 Шалгалт</span>${dueBadge(l.exam.due)}` : l.assignment ? `<span class="kind kind-asg">📎 Даалгавар</span>${dueBadge(l.assignment.due)}` : "";
+  const kindBadge = (l) => (l.exam ? `<span class="kind kind-exam">📝 Шалгалт</span>${dueBadge(l.exam.due)}` : l.assignment ? `<span class="kind kind-asg">📎 Даалгавар</span>${dueBadge(l.assignment.due)}` : "") + (l.discussion && !l.exam ? `<span class="aud" title="Хэлэлцүүлэгтэй">💬${commentCounts[l.id] ? " " + commentCounts[l.id] : ""}</span>` : "");
   const audience = (l) => l.is_free ? `<span class="aud aud-free">${ico("globe", 14)}Үнэгүй · бүгдэд нээлттэй</span>`
     : `<span class="aud aud-paid">${ico("lock", 14)}${l.price ? money(l.price) : "Зөвхөн багцаар"}</span>`;
   const libOptions = () => lib.files.filter((f) => f.status !== "failed").map((f) => `<option value="${esc(f.path)}">${esc(f.original_name)} · ${fmtSize(f.size)}${f.status === "processing" ? " (боловсруулж байна)" : ""}</option>`).join("");
@@ -649,6 +649,7 @@ async function courseEditor(id) {
             <label>Сургалтын хэлбэр<select name="format">${FORMATS.map(([v, t]) => `<option value="${v}" ${(l?.format || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
             <label>Заах аргын төрөл<select name="mode_kind">${MODES.map(([v, t]) => `<option value="${v}" ${(l?.mode || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
             <label>Идэвхтэй суралцах хугацаа (мин)<input name="active_min" type="number" min="0" max="600" value="${l?.active_min || 0}"><small>0 бол шаардахгүй. Тавьсан бол энэ хугацаанд идэвхтэй үзэж байж «дууслаа» дарна.</small></label></div>
+          <label class="check" style="margin-top:10px"><input type="checkbox" name="discussion" ${l ? (l.discussion ? "checked" : "") : "checked"}> 💬 Хэлэлцүүлэгтэй — хичээлийн доор суралцагчид лайк дарж, сэтгэгдэл, асуулт бичиж, хоорондоо ярилцана (та ч хариулна)</label>
           ${c.drip ? `<div class="pe-grid pe-grid-2" style="margin-top:10px"><label>Өмнөх хичээлийг үзснээс хойш нээгдэх<select name="unlock_after_h">${UNLOCKS.map(([h, t]) => `<option value="${h}" ${(l?.unlock_after_h || 0) === h ? "selected" : ""}>${t}</option>`).join("")}${l && !UNLOCKS.some(([h]) => h === (l.unlock_after_h || 0)) ? `<option value="${l.unlock_after_h}" selected>${l.unlock_after_h} цаг</option>` : ""}</select></label>
             <label class="check" style="align-self:end"><input type="checkbox" name="always_open" ${l?.always_open ? "checked" : ""}> Дарааллаас үл хамааран нээлттэй</label></div>` : ""}
         </div></details>
@@ -680,7 +681,7 @@ async function courseEditor(id) {
         : `<button class="post-attach" data-open-media>${ico(/\.pdf$/i.test(stripSig(l.video_url)) ? "book" : "live", 22)}<span><strong>${esc(mediaLabel(l.video_url))}</strong><small class="muted">Дарж нээнэ</small></span>${ico("chevron", 18)}</button><div class="post-media" hidden></div>`) : ""}
       <footer class="post-foot"><button data-edit-post>${ico("edit", 16)}Засах</button>${l.assignment ? `<button data-grade>${ico("users", 16)}Хариунуудыг дүгнэх</button>` : ""}<button data-toggle-free>${ico(l.is_free ? "lock" : "globe", 16)}${l.is_free ? "Төлбөртэй болгох" : "Үнэгүй болгох"}</button>
         ${c.drip ? `<button data-toggle-always title="Дарааллаас үл хамааран нээлттэй эсэх">${ico(l.always_open ? "lock" : "globe", 16)}${l.always_open ? "Дараалалд оруулах" : "Шууд нээлттэй болгох"}</button>` : ""}
-        ${c.published ? `<a href="/c/${esc(c.id)}#l=${esc(l.id)}" target="_blank" rel="noopener">${ico("eye", 16)}Суралцагчийн нүдээр</a>` : ""}
+        ${c.published ? `<a href="/c/${esc(c.id)}#l=${esc(l.id)}" target="_blank" rel="noopener">${ico("eye", 16)}Суралцагчийн нүдээр</a>` : ""}${l.discussion && !l.exam && c.published ? `<a href="/c/${esc(c.id)}#l=${esc(l.id)}" target="_blank" rel="noopener">${ico("chat", 16)}Хэлэлцүүлэг${commentCounts[l.id] ? ` (${commentCounts[l.id]})` : ""}</a>` : ""}
         <button data-del-post class="post-del" title="Хичээлийг файлуудтай нь хамт устгах">${ico("x", 16)}Устгах</button></footer></article>`;
 
   const free = () => lessons.filter((l) => l.is_free).length;
@@ -790,11 +791,11 @@ async function courseEditor(id) {
     }
     return { title: f.title.value, content: blocksSummary(blocks), video_url: "", blocks, active_min: +f.active_min.value || 0, exam, assignment, is_free: isFree, price: isFree ? 0 : +f.price.value || 0,
       unlock_after_h: f.unlock_after_h ? +f.unlock_after_h.value || 0 : l?.unlock_after_h || 0, always_open: f.always_open ? f.always_open.checked : !!l?.always_open,
-      format: f.format.value, mode: f.mode_kind.value, section: sectionOf(f) };
+      format: f.format.value, mode: f.mode_kind.value, section: sectionOf(f), discussion: f.discussion.checked };
   };
   const sectionOf = (f) => (f.section_pick.value === "__new" ? f.section_new.value : f.section_pick.value).trim();
-  const lessonPut = (l, patch) => api(`/api/courses/${c.id}/lessons/${l.id}`, { method: "PUT", body: { title: l.title, content: l.content, video_url: stripSig(l.video_url), is_free: l.is_free, price: l.price || 0, unlock_after_h: l.unlock_after_h || 0, always_open: !!l.always_open, format: l.format || "", mode: l.mode || "", section: l.section || "", blocks: (l.blocks || []).map((b) => (b.url ? { ...b, url: stripQ(b.url) } : b.quiz?.image ? { ...b, quiz: { ...b.quiz, image: stripQ(b.quiz.image) } } : b)), active_min: l.active_min || 0, exam: l.exam || null, ...patch } });
-  const reload = async () => { ({ course: c, lessons } = await api(`/api/me/courses/${id}`)); roster = await api(`/api/me/courses/${id}/students`).catch(() => roster); render(); };
+  const lessonPut = (l, patch) => api(`/api/courses/${c.id}/lessons/${l.id}`, { method: "PUT", body: { title: l.title, content: l.content, video_url: stripSig(l.video_url), is_free: l.is_free, price: l.price || 0, unlock_after_h: l.unlock_after_h || 0, always_open: !!l.always_open, format: l.format || "", mode: l.mode || "", section: l.section || "", blocks: (l.blocks || []).map((b) => (b.url ? { ...b, url: stripQ(b.url) } : b.quiz?.image ? { ...b, quiz: { ...b.quiz, image: stripQ(b.quiz.image) } } : b)), active_min: l.active_min || 0, exam: l.exam || null, assignment: l.assignment || null, discussion: !!l.discussion, ...patch } });
+  const reload = async () => { const d = await api(`/api/me/courses/${id}`); c = d.course; lessons = d.lessons; commentCounts = d.comments || {}; roster = await api(`/api/me/courses/${id}/students`).catch(() => roster); render(); };
 
   // Засварлах маягт + блок засварлагч.
   const putEditor = (box, l, preset, kind) => { box.innerHTML = editorHTML(l, preset, kind); mountBlockEditor($(".post-editor", box), lessonBlocks(l)); };

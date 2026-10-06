@@ -145,8 +145,10 @@ type Lesson struct {
 	Exam *Exam `json:"exam,omitempty"`
 	// Assignment — хоосон биш бол энэ хичээл даалгавар (хугацаатай, хариу илгээж дүгнүүлнэ).
 	Assignment *Assignment `json:"assignment,omitempty"`
-	Position   int         `json:"position"`
-	CreatedAt  time.Time   `json:"created_at"`
+	// Discussion — хэлэлцүүлэгтэй: доор нь лайк, сэтгэгдэл, асуулт, хариу бичиж хоорондоо ярилцана.
+	Discussion bool      `json:"discussion"`
+	Position   int       `json:"position"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // Block — хичээлийн агуулгын нэг хэсэг. Text нь text төрөлд хэлбэржүүлсэн текст (аюулгүй
@@ -234,6 +236,40 @@ type Assignment struct {
 	Due        Due  `json:"due"`
 	MaxScore   int  `json:"max_score"`   // дээд оноо (анхдагч 100)
 	AllowFiles bool `json:"allow_files"` // файл хавсаргахыг зөвшөөрөх
+}
+
+// Comment — хичээлийн доорх хэлэлцүүлгийн нэг сэтгэгдэл (ParentID байвал хариу).
+type Comment struct {
+	ID        string    `json:"id"`
+	CourseID  string    `json:"course_id"`
+	LessonID  string    `json:"lesson_id"`
+	TeacherID string    `json:"teacher_id"`
+	UserID    string    `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	ParentID  string    `json:"parent_id,omitempty"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
+	Deleted   bool      `json:"-"`
+}
+
+// Лайк: Target = "lesson" | "comment".
+const (
+	LikeLesson  = "lesson"
+	LikeComment = "comment"
+)
+
+// DiscussionStore — хичээлийн хэлэлцүүлэг: сэтгэгдэл ба лайк.
+type DiscussionStore interface {
+	AddComment(ctx context.Context, c *Comment) error
+	Comments(ctx context.Context, lessonID string, limit int) ([]Comment, error)
+	CommentByID(ctx context.Context, id string) (*Comment, error)
+	DeleteComment(ctx context.Context, id string) error
+	// CommentCounts нь хичээл бүрийн сэтгэгдлийн тоо (багшийн жагсаалтад).
+	CommentCounts(ctx context.Context, lessonIDs []string) (map[string]int, error)
+	// ToggleLike: байвал хасна, байхгүй бол нэмнэ; одоогийн төлөв ба нийт тоог буцаана.
+	ToggleLike(ctx context.Context, userID, target, targetID string) (liked bool, total int, err error)
+	// Likes нь өгөгдсөн зорилтуудын нийт тоо ба userID лайк дарсан эсэх.
+	Likes(ctx context.Context, userID, target string, targetIDs []string) (counts map[string]int, mine map[string]bool, err error)
 }
 
 // Submission — нэг суралцагчийн нэг даалгаварт илгээсэн хариу (дахин илгээвэл шинэчлэгдэнэ).
@@ -377,6 +413,7 @@ type Message struct {
 
 type Store interface {
 	LearningStore
+	DiscussionStore
 	BookStore
 	CreateUser(ctx context.Context, u *User) error
 	UserByID(ctx context.Context, id string) (*User, error)

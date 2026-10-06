@@ -131,6 +131,7 @@ type lessonInput struct {
 	ActiveMin    int               `json:"active_min"`     // идэвхтэй суралцах ёстой минут
 	Exam         *store.Exam       `json:"exam"`           // хоосон биш бол шалгалт
 	Assignment   *store.Assignment `json:"assignment"`     // хоосон биш бол даалгавар
+	Discussion   bool              `json:"discussion"`     // хэлэлцүүлэгтэй (лайк, сэтгэгдэл)
 }
 
 const maxUnlockHours = 24 * 365
@@ -180,7 +181,7 @@ func (in *lessonInput) validate(teacherID string, course *store.Course) string {
 
 func lessonFromInput(in lessonInput, courseID string) *store.Lesson {
 	return &store.Lesson{CourseID: courseID, Title: in.Title, Content: in.Content, VideoURL: in.VideoURL, IsFree: in.IsFree, Price: in.Price,
-		UnlockAfterH: in.UnlockAfterH, AlwaysOpen: in.AlwaysOpen, Format: in.Format, Mode: in.Mode, Section: in.Section, Blocks: in.Blocks, ActiveMin: in.ActiveMin, Exam: in.Exam, Assignment: in.Assignment}
+		UnlockAfterH: in.UnlockAfterH, AlwaysOpen: in.AlwaysOpen, Format: in.Format, Mode: in.Mode, Section: in.Section, Blocks: in.Blocks, ActiveMin: in.ActiveMin, Exam: in.Exam, Assignment: in.Assignment, Discussion: in.Discussion}
 }
 
 func (s *Server) handleCreateLesson(w http.ResponseWriter, r *http.Request) {
@@ -517,7 +518,12 @@ func (s *Server) handleMyCourse(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"course": course, "lessons": lessons})
+	ids := make([]string, len(lessons))
+	for i := range lessons {
+		ids[i] = lessons[i].ID
+	}
+	counts, _ := s.store.CommentCounts(r.Context(), ids) // хэлэлцүүлгийн сэтгэгдлийн тоо (жагсаалтад)
+	writeJSON(w, http.StatusOK, map[string]any{"course": course, "lessons": lessons, "comments": counts})
 }
 
 func (s *Server) handleMyEnrollments(w http.ResponseWriter, r *http.Request) {

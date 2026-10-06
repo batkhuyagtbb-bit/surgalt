@@ -508,6 +508,62 @@ function mountQuizzes(box, base, results = {}) {
   };
 }
 
+/* ---------- Хэлэлцүүлэг: лайк, сэтгэгдэл, асуулт, хариу (Facebook маягийн) ---------- */
+function timeAgo(t) {
+  const m = Math.round((Date.now() - new Date(t)) / 60000);
+  if (m < 1) return "саяхан";
+  if (m < 60) return m + " мин";
+  if (m < 1440) return Math.floor(m / 60) + " ц";
+  if (m < 10080) return Math.floor(m / 1440) + " өдөр";
+  return fmtDate(t);
+}
+async function discussionPanel(box, { courseId, lessonId }) {
+  const base = `/api/courses/${courseId}/lessons/${lessonId}`;
+  box.hidden = false;
+  if (!Auth.token) { box.innerHTML = `<div class="dc-head"><b>💬 Хэлэлцүүлэг</b></div><p class="muted small">Сэтгэгдэл бичих, лайк дарахын тулд <a href="/login?next=${encodeURIComponent(location.pathname)}">нэвтэрнэ үү</a>.</p>`; return; }
+  const me = Auth.user || {};
+  let d, openReply = null;
+  const cm = (c, reply = false) => `<article class="dc-item ${reply ? "dc-reply" : ""}" data-cid="${esc(c.id)}">
+      ${avatarHTML({ display_name: c.user_name, avatar_url: c.avatar_url, username: c.user_name }, "avatar-sm")}
+      <div class="dc-main"><div class="dc-bubble"><b>${esc(c.user_name)}${c.teacher ? ` <span class="dc-badge">Багш</span>` : ""}</b><p>${linkify(c.body)}</p></div>
+        <div class="dc-acts"><button type="button" class="dc-like ${c.liked ? "on" : ""}" data-like-c="${esc(c.id)}">${c.liked ? "👍 Таалагдсан" : "Таалагдлаа"}${c.likes ? ` · ${c.likes}` : ""}</button>
+          ${reply ? "" : `<button type="button" data-reply="${esc(c.id)}">Хариулах</button>`}<span class="muted">${timeAgo(c.created_at)}</span>
+          ${c.can_delete ? `<button type="button" class="dc-del" data-del-c="${esc(c.id)}">Устгах</button>` : ""}</div>
+        ${(c.replies || []).map((r) => cm(r, true)).join("")}
+        ${openReply === c.id ? composer(c.id) : ""}</div></article>`;
+  const composer = (parent) => `<form class="dc-form ${parent ? "dc-form-reply" : ""}" data-parent="${esc(parent || "")}">${avatarHTML(me, "avatar-sm")}
+      <div class="dc-input"><textarea name="body" rows="1" maxlength="2000" placeholder="${parent ? "Хариу бичих…" : "Асуулт, сэтгэгдлээ бичнэ үү…"}" required></textarea><button class="btn btn-gold btn-sm" aria-label="Илгээх">➤</button></div></form>`;
+  const render = () => {
+    const n = d.count;
+    box.innerHTML = `<div class="dc-head"><button type="button" class="dc-like dc-like-lesson ${d.liked ? "on" : ""}" data-like-lesson>👍 ${d.liked ? "Таалагдсан" : "Таалагдлаа"}${d.likes ? ` · ${d.likes}` : ""}</button>
+        <span class="muted small">💬 ${n ? n + " сэтгэгдэл" : "Сэтгэгдэл алга — эхнийхийг нь та бичээрэй"}</span></div>
+      ${composer("")}
+      <div class="dc-list">${d.comments.map((c) => cm(c)).join("")}</div>`;
+    $$(".dc-form textarea", box).forEach((t) => t.addEventListener("input", () => { t.style.height = "auto"; t.style.height = Math.min(160, t.scrollHeight) + "px"; }));
+    $(".dc-form-reply textarea", box)?.focus();
+  };
+  const load = async () => { try { d = await api(`${base}/discussion`); render(); } catch (e) { box.innerHTML = e.status === 409 ? "" : `<p class="form-error">${esc(e.message)}</p>`; if (e.status === 409) box.hidden = true; } };
+  box.onclick = async (e) => {
+    const t = e.target;
+    if (t.closest("[data-like-lesson]")) { try { const r = await api(`${base}/like`, { method: "POST", body: { target: "lesson" } }); d.liked = r.liked; d.likes = r.likes; render(); } catch (x) { toast(x.message, true); } return; }
+    const lc = t.closest("[data-like-c]");
+    if (lc) { try { const r = await api(`${base}/like`, { method: "POST", body: { target: "comment", id: lc.dataset.likeC } }); const upd = (c) => { if (c.id === lc.dataset.likeC) { c.liked = r.liked; c.likes = r.likes; } (c.replies || []).forEach(upd); }; d.comments.forEach(upd); render(); } catch (x) { toast(x.message, true); } return; }
+    const rp = t.closest("[data-reply]");
+    if (rp) { openReply = openReply === rp.dataset.reply ? null : rp.dataset.reply; render(); return; }
+    const del = t.closest("[data-del-c]");
+    if (del && confirm("Сэтгэгдлийг устгах уу?")) { try { await api(`${base}/discussion/${del.dataset.delC}`, { method: "DELETE" }); await load(); } catch (x) { toast(x.message, true); } }
+  };
+  box.onsubmit = async (e) => {
+    const f = e.target.closest(".dc-form"); if (!f) return; e.preventDefault();
+    const body = f.body.value.trim(); if (!body) return;
+    const b = $("button", f); b.disabled = true;
+    try { await api(`${base}/discussion`, { method: "POST", body: { body, parent_id: f.dataset.parent || "" } }); openReply = null; await load(); }
+    catch (x) { toast(x.message, true); } finally { b.disabled = false; }
+  };
+  box.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && e.target.matches(".dc-form textarea")) { e.preventDefault(); e.target.closest("form").requestSubmit(); } });
+  await load();
+}
+
 /* ---------- Цол олгох ёслол: өнгөлөг салют + баяр хүргэх карт (систем өөрөө) ---------- */
 function fireworks(canvas, ms = 5000) {
   const ctx = canvas.getContext("2d"), dpr = Math.min(2, devicePixelRatio || 1);
@@ -1975,6 +2031,8 @@ async function coursePage() {
       if (done) done.hidden = true;
       assignmentCard(body, { courseId: id, lessonId: lid });
     }
+    const dbox = $("#lessonDiscuss");
+    if (dbox) { dbox.hidden = true; dbox.innerHTML = ""; if (l.discussion && !l.exam) discussionPanel(dbox, { courseId: id, lessonId: lid }); }
     // Видео: бүрэн үзэхээс өмнө урагш гүйлгэхгүй; хэдэн удаа аль хэсгийг үзсэнийг бичинэ.
     const watched = {};
     for (const [k, v] of Object.entries(access?.progress?.[lid]?.quiz || {})) if (k.startsWith("watch_") && v) watched[k.slice(6)] = true;

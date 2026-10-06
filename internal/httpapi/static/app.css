@@ -1567,3 +1567,31 @@ html.reader-open{overflow:hidden}
 .pe-v2 .pe-foot{position:sticky;bottom:0;z-index:2;margin-top:2px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 -6px 20px rgba(15,23,42,.06)}
 .pe-access{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 @media (max-width:640px){.pe-step{grid-template-columns:1fr}.pe-num{display:none}.pe-more-body{padding-left:16px}}
+
+/* Хэлэлцүүлэг (Facebook маягийн) */
+.discuss{margin:18px 0 6px;padding:14px 0 0;border-top:1px solid var(--line)}
+.dc-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.dc-like{border:0;background:none;font:inherit;font-weight:700;color:var(--muted);cursor:pointer;padding:4px 8px;border-radius:8px}
+.dc-like:hover{background:var(--ink-2)}
+.dc-like.on{color:var(--brand)}
+.dc-like-lesson{font-size:.95rem;padding:8px 12px;border:1px solid var(--line);border-radius:999px}
+.dc-like-lesson.on{border-color:var(--brand);background:var(--brand-soft)}
+.dc-form{display:flex;gap:10px;align-items:flex-start;margin:8px 0}
+.dc-form-reply{margin:6px 0 0}
+.dc-input{flex:1;display:flex;gap:6px;align-items:flex-end;padding:6px 6px 6px 12px;border-radius:18px;background:var(--ink-2)}
+.dc-input textarea{flex:1;min-height:0;height:auto;border:0;background:none;resize:none;padding:6px 0;font:inherit;line-height:1.4;outline:none;max-height:160px;box-shadow:none}
+.dc-input textarea:focus{border:0;box-shadow:none;outline:none}
+.dc-input .btn{border-radius:50%;width:34px;height:34px;padding:0;display:grid;place-items:center}
+.dc-list{display:grid;gap:10px;margin-top:8px}
+.dc-item{display:flex;gap:10px;align-items:flex-start}
+.dc-main{flex:1;min-width:0}
+.dc-bubble{display:inline-block;max-width:100%;padding:8px 12px;border-radius:16px;background:var(--ink-2)}
+.dc-bubble b{display:block;font-size:.85rem}
+.dc-bubble p{margin:2px 0 0;white-space:pre-wrap;word-break:break-word;line-height:1.5}
+.dc-badge{display:inline-block;margin-left:4px;padding:0 6px;border-radius:999px;background:var(--brand);color:#fff;font-size:.68rem;vertical-align:middle}
+.dc-acts{display:flex;gap:10px;align-items:center;padding:2px 8px;font-size:.78rem}
+.dc-acts button{border:0;background:none;font:inherit;font-size:.78rem;font-weight:700;color:var(--muted);cursor:pointer;padding:2px 4px}
+.dc-acts button:hover{text-decoration:underline}
+.dc-acts .dc-del{color:#b91c1c}
+.dc-reply{margin-top:6px}
+.dc-reply .avatar{width:26px;height:26px;font-size:.7rem}

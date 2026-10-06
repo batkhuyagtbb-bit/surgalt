@@ -87,6 +87,7 @@ type PublicLesson struct {
 	ActiveMin    int               `json:"active_min,omitempty"`
 	Exam         *store.Exam       `json:"exam,omitempty"`
 	Assignment   *store.Assignment `json:"assignment,omitempty"`
+	Discussion   bool              `json:"discussion"`
 	VideoURL     string            `json:"video_url,omitempty"`
 }
 
@@ -253,7 +254,7 @@ func (s *Server) publicCourse(ctx context.Context, id string) (*Rendered[PublicC
 		}
 		pls := make([]PublicLesson, len(lessons))
 		for i, l := range lessons {
-			pls[i] = PublicLesson{ID: l.ID, Title: l.Title, IsFree: l.IsFree, Price: l.Price, Position: l.Position, UnlockAfterH: l.UnlockAfterH, AlwaysOpen: l.AlwaysOpen, Format: l.Format, Mode: l.Mode, Section: l.Section, ActiveMin: l.ActiveMin, Exam: l.Exam, Assignment: l.Assignment}
+			pls[i] = PublicLesson{ID: l.ID, Title: l.Title, IsFree: l.IsFree, Price: l.Price, Position: l.Position, UnlockAfterH: l.UnlockAfterH, AlwaysOpen: l.AlwaysOpen, Format: l.Format, Mode: l.Mode, Section: l.Section, ActiveMin: l.ActiveMin, Exam: l.Exam, Assignment: l.Assignment, Discussion: l.Discussion}
 			if l.IsFree {
 				// Кэш 30 секунд тул 6 цагийн гарын үсэг үргэлж хүчинтэй байна.
 				pls[i].Content, pls[i].VideoURL, pls[i].Blocks = l.Content, s.viewerMedia(l.VideoURL, ""), s.viewerBlocks(examIntro(&l))

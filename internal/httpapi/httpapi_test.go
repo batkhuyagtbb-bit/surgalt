@@ -2006,3 +2006,109 @@ func TestAssignmentAndDueFlow(t *testing.T) {
 		t.Fatalf("нийтийн хөтөлбөрт даалгавар алга: %v", pc["lessons"])
 	}
 }
+
+// Хэлэлцүүлэг: лайк, сэтгэгдэл, хариу, устгах; хаалттай хичээлд 409; мэдэгдэл; багшийн жагсаалтад тоо.
+func TestDiscussion(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Хэлэлцүүлэг","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true,"discussion":true,"blocks":[{"id":"t001","type":"text","text":"x"}]}`)
+	_, l2 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Хаалттай","is_free":true,"discussion":false}`)
+	lid, lid2 := l["id"].(string), l2["id"].(string)
+	if l["discussion"] != true || l2["discussion"] != false {
+		t.Fatalf("хэлэлцүүлгийн тохиргоо хадгалагдаагүй: %v %v", l["discussion"], l2["discussion"])
+	}
+	s1, _ := register(t, srv, "stud", "student")
+	s2, _ := register(t, srv, "stud2", "student")
+	for _, tok := range []string{s1, s2} {
+		call(t, srv, "POST", "/api/courses/"+cid+"/enroll", tok, "")
+	}
+	base := "/api/courses/" + cid + "/lessons/" + lid
+	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid2+"/discussion", s1, ""); code != 409 {
+		t.Fatalf("хаалттай хичээлд хэлэлцүүлэг 409: %d", code)
+	}
+	if code, _ := call(t, srv, "POST", base+"/discussion", s1, `{"body":""}`); code != 400 {
+		t.Fatal("хоосон сэтгэгдэл татгалзагдана")
+	}
+	code, c1 := call(t, srv, "POST", base+"/discussion", s1, `{"body":"Энэ томьёог яаж гаргах вэ?"}`)
+	if code != 201 {
+		t.Fatalf("сэтгэгдэл: %d %v", code, c1)
+	}
+	if code, _ := call(t, srv, "POST", base+"/discussion", s1, `{"body":"давхар"}`); code != 429 {
+		t.Fatalf("5 секундэд нэг сэтгэгдэл: %d", code)
+	}
+	// Багш хариулна (багшид хурдны хязгаар тус бүрт тул ок), өөр суралцагч хариуны хариу → эх сэтгэгдэлд очно.
+	code, r1 := call(t, srv, "POST", base+"/discussion", tt, `{"body":"Ингэж гаргана…","parent_id":"`+c1["id"].(string)+`"}`)
+	if code != 201 || r1["parent_id"] != c1["id"] {
+		t.Fatalf("багшийн хариу: %d %v", code, r1)
+	}
+	code, r2 := call(t, srv, "POST", base+"/discussion", s2, `{"body":"Би ч ойлголоо","parent_id":"`+r1["id"].(string)+`"}`)
+	if code != 201 || r2["parent_id"] != c1["id"] {
+		t.Fatalf("хариуны хариу эх сэтгэгдэлд очих ёстой: %d %v", code, r2)
+	}
+	// Лайк: хичээл ба сэтгэгдэл, давтахад буцна.
+	_, lk := call(t, srv, "POST", base+"/like", s1, `{"target":"lesson"}`)
+	if lk["liked"] != true || lk["likes"].(float64) != 1 {
+		t.Fatalf("хичээлийн лайк: %v", lk)
+	}
+	call(t, srv, "POST", base+"/like", s2, `{"target":"lesson"}`)
+	_, lk2 := call(t, srv, "POST", base+"/like", s1, `{"target":"lesson"}`)
+	if lk2["liked"] != false || lk2["likes"].(float64) != 1 {
+		t.Fatalf("лайк буцаах: %v", lk2)
+	}
+	call(t, srv, "POST", base+"/like", s2, `{"target":"comment","id":"`+c1["id"].(string)+`"}`)
+	if code, _ := call(t, srv, "POST", base+"/like", s2, `{"target":"comment","id":"nope"}`); code != 404 {
+		t.Fatal("байхгүй сэтгэгдэлд лайк 404")
+	}
+	_, d := call(t, srv, "GET", base+"/discussion", s2, "")
+	top := d["comments"].([]any)
+	if d["count"].(float64) != 3 || d["likes"].(float64) != 1 || d["liked"] != true || len(top) != 1 {
+		t.Fatalf("хэлэлцүүлгийн нэгтгэл: %v", d)
+	}
+	first := top[0].(map[string]any)
+	reps := first["replies"].([]any)
+	if first["likes"].(float64) != 1 || first["liked"] != true || len(reps) != 2 || reps[0].(map[string]any)["teacher"] != true || first["can_delete"] != false {
+		t.Fatalf("сэтгэгдлийн харагдац: %v", first)
+	}
+	// Устгах: бусдынхыг болохгүй, өөрийнхөө болно, багш хэнийхийг ч.
+	if code, _ := call(t, srv, "DELETE", base+"/discussion/"+c1["id"].(string), s2, ""); code != 403 {
+		t.Fatal("бусдын сэтгэгдлийг устгаж болохгүй")
+	}
+	if code, _ := call(t, srv, "DELETE", base+"/discussion/"+r2["id"].(string), s2, ""); code != 204 {
+		t.Fatal("өөрийн сэтгэгдлээ устгана")
+	}
+	if code, _ := call(t, srv, "DELETE", base+"/discussion/"+c1["id"].(string), tt, ""); code != 204 {
+		t.Fatal("багш устгана")
+	}
+	_, d = call(t, srv, "GET", base+"/discussion", s1, "")
+	if d["count"].(float64) != 1 { // багшийн хариу (эцэггүй болсон) л үлдэнэ
+		t.Fatalf("устгасны дараа: %v", d["count"])
+	}
+	// Мэдэгдэл: багшид сэтгэгдэл, суралцагчид хариу.
+	_, tn := call(t, srv, "GET", "/api/me/notifications", tt, "")
+	if !strings.Contains(fmt.Sprint(tn), "томьёог") {
+		t.Fatalf("багшид сэтгэгдлийн мэдэгдэл алга: %v", tn)
+	}
+	_, sn := call(t, srv, "GET", "/api/me/notifications", s1, "")
+	if !strings.Contains(fmt.Sprint(sn), "танд хариуллаа") {
+		t.Fatalf("суралцагчид хариуны мэдэгдэл алга: %v", sn)
+	}
+	// Багшийн жагсаалтад сэтгэгдлийн тоо; нийтийн хөтөлбөрт discussion тэмдэг.
+	_, mine := call(t, srv, "GET", "/api/me/courses/"+cid, tt, "")
+	if mine["comments"].(map[string]any)[lid].(float64) != 1 {
+		t.Fatalf("сэтгэгдлийн тоо: %v", mine["comments"])
+	}
+	_, pc := call(t, srv, "GET", "/api/courses/"+cid, s1, "")
+	if pc["lessons"].([]any)[0].(map[string]any)["discussion"] != true {
+		t.Fatalf("нийтийн хөтөлбөрт discussion алга: %v", pc["lessons"].([]any)[0])
+	}
+	// Элсээгүй хүн төлбөртэй хичээлийн хэлэлцүүлэгт орохгүй.
+	_, pc2 := call(t, srv, "POST", "/api/courses", tt, `{"title":"Төлбөртэй","price":5000,"published":true}`)
+	_, pl := call(t, srv, "POST", "/api/courses/"+pc2["id"].(string)+"/lessons", tt, `{"title":"Нууц","discussion":true}`)
+	s3, _ := register(t, srv, "outsider", "student")
+	if code, _ := call(t, srv, "GET", "/api/courses/"+pc2["id"].(string)+"/lessons/"+pl["id"].(string)+"/discussion", s3, ""); code != 402 && code != 403 {
+		t.Fatalf("эрхгүй хүнд хэлэлцүүлэг хаалттай: %d", code)
+	}
+}
