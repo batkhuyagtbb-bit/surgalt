@@ -1735,11 +1735,9 @@ html.reader-open{overflow:hidden}
 .rail-search{border-radius:14px;padding:2px 12px}
 .rail-sec{display:flex;align-items:center;gap:8px;margin:12px 6px 4px;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .rail-sec em{font-style:normal;padding:1px 8px;border-radius:999px;background:var(--ink-2);font-size:.7rem}
-.rail-item{position:relative;border-radius:14px;transition:background .18s,transform .18s}
-.rail-item:hover{transform:translateX(3px)}
-.rail-item:active{transform:scale(.985)}
-.rail-item .avatar{width:40px;height:40px;font-size:.95rem;position:relative;transition:transform .2s}
-.rail-item:hover .avatar{transform:scale(1.06)}
+.rail-item{position:relative;border-radius:14px;transition:background .18s}
+.rail-item:active{background:var(--brand-soft)}
+.rail-item .avatar{width:40px;height:40px;font-size:.95rem;position:relative}
 .rail-item .avatar::after{content:"";position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;background:#cbd5e1;border:2px solid var(--surface)}
 .rail-item.unread .avatar::after{background:var(--teal,#0f9d8a);animation:pulse 1.6s infinite}
 .rail-item.unread strong::after{display:none}
@@ -1748,7 +1746,7 @@ html.reader-open{overflow:hidden}
 .rail-person small b{color:var(--brand)}
 .rail-new{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;color:var(--muted);opacity:.45;transition:opacity .15s,background .15s,color .15s}
 .rail-person:hover .rail-new{opacity:1;background:var(--brand-soft);color:var(--brand)}
-.rail-in{animation:rail-in .32s var(--ease,ease) both;animation-delay:calc(var(--i,0)*22ms)}
+.rail-in{animation:rail-in .28s ease both;animation-delay:calc(min(var(--i,0),12)*20ms)}
 @keyframes rail-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .rail-skel{display:flex;gap:12px;align-items:center;padding:10px}
 .rail-skel i,.rail-skel b{display:block;border-radius:8px;background:linear-gradient(90deg,var(--ink-2) 25%,#e9edf6 50%,var(--ink-2) 75%);background-size:200% 100%;animation:skel 1.2s infinite}

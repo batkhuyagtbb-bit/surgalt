@@ -267,15 +267,17 @@ function chatRail() {
       }
     } catch { people = []; }
   };
+  let firstDraw = true;
   const draw = () => {
+    const anim = firstDraw ? "rail-in" : ""; firstDraw = false;
     const q = $("#railSearch").value.trim().toLowerCase(), hit = (s) => !q || s.toLowerCase().includes(q);
     const shown = convs.filter((c) => hit(c.title));
     const convUsers = new Set(convs.map((c) => c.user?.id).filter(Boolean));
     const ppl = people.filter((p) => hit(p.name) && !(p.convId && convs.some((c) => c.id === p.convId)) && !convUsers.has(p.id));
     let i = 0;
-    const item = (c) => `<button class="rail-item rail-in ${unread.has(c.id) ? "unread" : ""}" style="--i:${i++}" data-id="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group">${c.kind === "team" ? "🧑‍🤝‍🧑" : "👥"}</span>` : c.user ? avatarHTML(c.user) : `<span class="avatar avatar-sm" style="--h:${hueOfName(c.title)}">${esc(c.title.slice(0, 1).toUpperCase())}</span>`}
+    const item = (c) => `<button class="rail-item ${anim} ${unread.has(c.id) ? "unread" : ""}" style="--i:${i++}" data-id="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group">${c.kind === "team" ? "🧑‍🤝‍🧑" : "👥"}</span>` : c.user ? avatarHTML(c.user) : `<span class="avatar avatar-sm" style="--h:${hueOfName(c.title)}">${esc(c.title.slice(0, 1).toUpperCase())}</span>`}
       <span class="grow"><strong>${esc(c.title)}</strong><small><b>${esc(c.sub)}</b>${c.last ? " · " + esc(c.last) : ""}</small></span>${c.at ? `<time class="rail-time">${fmtTime(c.at)}</time>` : ""}</button>`;
-    const person = (p) => `<button class="rail-item rail-in rail-person" style="--i:${i++}" data-person="${esc(p.id)}">${avatarHTML(p.user)}<span class="grow"><strong>${esc(p.name)}</strong><small><b>${esc(p.sub)}</b></small></span><span class="rail-new" aria-hidden="true">${I.chat}</span></button>`;
+    const person = (p) => `<button class="rail-item ${anim} rail-person" style="--i:${Math.min(i++, 12)}" data-person="${esc(p.id)}">${avatarHTML(p.user)}<span class="grow"><strong>${esc(p.name)}</strong><small><b>${esc(p.sub)}</b></small></span><span class="rail-new" aria-hidden="true">${I.chat}</span></button>`;
     const sec = (title, n) => `<div class="rail-sec"><span>${title}</span><em>${n}</em></div>`;
     $("#railList").innerHTML = (shown.length ? sec("Сүүлийн яриа", shown.length) + shown.map(item).join("") : "") + (ppl.length ? sec("Хүмүүс", ppl.length) + ppl.map(person).join("") : "") ||
       `<p class="muted small" style="padding:16px">${q ? "Илэрц алга" : teacher ? "Одоогоор чат алга. Профайлаа түгээгээрэй!" : "Багшийн профайл дээрх «Чатлах» эсвэл сургалтын «Бүлэг чат»-аар яриа эхэлнэ."}</p>`;
