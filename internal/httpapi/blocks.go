@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"surgalt/internal/store"
@@ -99,9 +100,13 @@ func (s *Server) lessonBlocked(ctx context.Context, uid string, course *store.Co
 }
 
 func blockedErr(b *LessonBlock) error {
-	msg := "Та сануулгын хязгаарыг хэтрүүлсэн тул энэ хичээл түр хаагдсан — багш тань нээх хүртэл хүлээнэ үү"
+	what := "Та сануулгын хязгаарыг хэтрүүлсэн тул энэ хичээл"
+	if strings.HasPrefix(b.Reason, "Шалгалт") {
+		what = "Шалгалт зөрчлөөр хаагдсан тул энэ шалгалт"
+	}
+	msg := what + " түр хаагдсан — багш тань нээх хүртэл хүлээнэ үү"
 	if b.Until != nil {
-		msg = "Та сануулгын хязгаарыг хэтрүүлсэн тул энэ хичээл " + b.Until.Local().Format("01/02 15:04") + " хүртэл хаагдсан"
+		msg = what + " " + b.Until.Local().Format("01/02 15:04") + " хүртэл хаагдсан"
 	}
 	return apiError(http.StatusLocked, msg, map[string]any{"blocked": b})
 }

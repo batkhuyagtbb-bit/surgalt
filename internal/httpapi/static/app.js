@@ -2331,7 +2331,7 @@ async function coursePage() {
       $(".drip-pop")?.remove();
       const pop = document.createElement("div"); pop.className = "drip-pop";
       pop.innerHTML = `<div class="dp-card"><button class="icon-btn dp-x" aria-label="Хаах">✕</button><div class="dp-steps"><span class="dp-step lock" style="background:#fee2e2;color:#b91c1c">⛔</span></div>
-        <h3>Энэ хичээл хаагдсан байна</h3><p>Та хичээл үзэж байхдаа өөр цонх руу ${access?.max_warnings || 3}-аас олон удаа шилжсэн тул хичээл зогсож хаагдсан. ${blk.until ? `<b>${esc(fmtDate(blk.until))}</b> хүртэл хүлээнэ үү.` : "Багш тань дахин нээх хүртэл хүлээнэ үү — багшид мэдэгдэл очсон."}</p>
+        <h3>${(blk.reason || "").startsWith("Шалгалт") ? "Шалгалт хаагдсан байна" : "Энэ хичээл хаагдсан байна"}</h3><p>${(blk.reason || "").startsWith("Шалгалт") ? "Шалгалтын үеэр зөрчил гарсан тул хаагдсан." : `Та хичээл үзэж байхдаа өөр цонх руу ${access?.max_warnings || 3}-аас олон удаа шилжсэн тул хичээл зогсож хаагдсан.`} ${blk.until ? `<b>${esc(fmtDate(blk.until))}</b> хүртэл хүлээнэ үү.` : "Багш тань дахин нээх хүртэл хүлээнэ үү — багшид мэдэгдэл очсон."}</p>
         <div class="dp-acts"><button class="btn btn-ghost" data-dp-close>Ойлголоо</button></div></div>`;
       document.body.append(pop);
       pop.onclick = (e) => { if (e.target === pop || e.target.closest(".dp-x, [data-dp-close]")) pop.remove(); };

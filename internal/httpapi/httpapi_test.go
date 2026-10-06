@@ -944,14 +944,14 @@ func TestExamFlow(t *testing.T) {
 	if a3 := res3["attempt"].(map[string]any); a3["status"] != "terminated" || a3["passed"] != false || a3["pct"].(float64) != 67 {
 		t.Fatalf("зөрчлөөр хаагдах ёстой: %v", a3)
 	}
-	if code, _ := call(t, srv, "POST", base+"/exam/start", s1, ""); code != http.StatusConflict {
-		t.Fatal("оролдлогын тоо хэтэрсэн")
+	if code, _ := call(t, srv, "POST", base+"/exam/start", s1, ""); code != http.StatusConflict && code != http.StatusLocked {
+		t.Fatal("оролдлогын тоо хэтэрсэн / зөрчлөөр хаагдсан")
 	}
 	// Багшид мэдэгдэл ба самбарт тусна.
 	_, notifs := callList(t, srv, "GET", "/api/me/notifications", tt)
 	found := false
 	for _, n := range notifs {
-		if strings.Contains(n.(map[string]any)["title"].(string), "зөрчлөөр хаагдлаа") {
+		if m := n.(map[string]any); m["type"] == "blocked" && strings.Contains(m["title"].(string), "шалгалт хаагдсан") {
 			found = true
 		}
 	}
@@ -2553,5 +2553,41 @@ func TestWarningLimitBlock(t *testing.T) {
 	until, _ := time.Parse(time.RFC3339Nano, b2["until"].(string))
 	if d := until.Sub(at); d != 20*time.Minute {
 		t.Fatalf("давтан хоригт хугацаа 2 дахин (20 мин) байх ёстой: %v", d)
+	}
+}
+
+// Хаагдсан шалгалт: шинэ оролдлого өгөхгүй (423); багш улаан товчоор нээвэл нэмэлт оролдлоготой дахин өгнө;
+// эсвэл тохируулсан минут өнгөрөхөд автоматаар.
+func TestExamTerminatedBlock(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Шалгалт","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Эцсийн шалгалт","is_free":true,"exam":{"pass_pct":50,"attempts":1},"blocks":[{"id":"q001","type":"quiz","quiz":{"question":"?","options":["a","b"],"correct":[0]}}]}`)
+	lid := l["id"].(string)
+	s1, uid := register(t, srv, "stud", "student")
+	base := "/api/courses/" + cid + "/lessons/" + lid + "/exam"
+	_, a := call(t, srv, "POST", base+"/start", s1, "")
+	aid := a["attempt"].(map[string]any)["id"].(string)
+	if code, r := call(t, srv, "POST", base+"/submit", s1, `{"attempt_id":"`+aid+`","answers":{},"terminate":"tab_switch"}`); code != 200 {
+		t.Fatalf("зөрчлөөр хаах: %d %v", code, r)
+	}
+	if code, r := call(t, srv, "POST", base+"/start", s1, ""); code != http.StatusLocked {
+		t.Fatalf("хаагдсан шалгалт шууд дахин эхлэхгүй (423): %d %v", code, r)
+	}
+	_, ns := call(t, srv, "GET", "/api/me/notifications", tt, "")
+	if !strings.Contains(fmt.Sprint(ns), "шалгалт хаагдсан") || !strings.Contains(fmt.Sprint(ns), "unblock:"+uid+":"+lid) {
+		t.Fatalf("багшид улаан товчтой мэдэгдэл алга: %v", ns)
+	}
+	if code, r := call(t, srv, "POST", "/api/me/students/"+uid+"/unblock", tt, `{"lesson_id":"`+lid+`"}`); code != 200 || r["unblocked"].(float64) != 1 {
+		t.Fatalf("багш нээх: %d %v", code, r)
+	}
+	_, info := call(t, srv, "GET", base, s1, "")
+	if info["left"].(float64) != 1 {
+		t.Fatalf("нэмэлт 1 оролдлого олгогдох ёстой: %v", info["left"])
+	}
+	if code, r := call(t, srv, "POST", base+"/start", s1, ""); code != 200 && code != 201 {
+		t.Fatalf("нээсний дараа дахин эхэлнэ: %d %v", code, r)
 	}
 }

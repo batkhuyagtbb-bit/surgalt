@@ -80,9 +80,12 @@ func (s *Server) logEvents(ctx context.Context, evs []store.ActivityEvent) {
 	}
 	n.mu.Unlock()
 	for _, e := range blocked {
-		title := e.LessonID
+		title, what := e.LessonID, "хичээл"
 		if l, err := s.store.LessonByID(ctx, e.CourseID, e.LessonID); err == nil {
 			title = l.Title
+			if l.Exam != nil {
+				what = "шалгалт"
+			}
 		}
 		body := short(e.Detail)
 		if prev, err := s.store.ActivityEvents(ctx, store.ActivityFilter{UserID: e.UserID, CourseID: e.CourseID}, 500); err == nil {
@@ -96,7 +99,7 @@ func (s *Server) logEvents(ctx context.Context, evs []store.ActivityEvent) {
 				body = fmt.Sprintf("Энэ сургалтад %d дахь удаагаа хаагдлаа · %s", n, body)
 			}
 		}
-		ns = append(ns, &store.Notification{UserID: e.TeacherID, Type: "blocked", Title: "⛔ " + e.UserName + ": «" + title + "» хичээл хаагдсан",
+		ns = append(ns, &store.Notification{UserID: e.TeacherID, Type: "blocked", Title: "⛔ " + e.UserName + ": «" + title + "» " + what + " хаагдсан",
 			Body: body, Link: "unblock:" + e.UserID + ":" + e.LessonID})
 	}
 	s.notify(ctx, ns...)

@@ -90,7 +90,7 @@ func (s *Server) handleExamInfo(w http.ResponseWriter, r *http.Request) {
 	}
 	left := -1
 	if l.Exam.Attempts > 0 {
-		left = max(0, l.Exam.Attempts-len(atts))
+		left = max(0, l.Exam.Attempts+s.reopenCount(r, c.UID, l.ID)-len(atts))
 	}
 	course, _ := s.store.CourseByID(r.Context(), r.PathValue("id"))
 	ds := DueState{Open: true}
@@ -137,8 +137,8 @@ func (s *Server) handleExamStart(w http.ResponseWriter, r *http.Request) {
 		}
 		s.finishAttempt(r, a, l, course, nil, store.AttemptExpired, "хугацаа дууссан")
 	}
-	if l.Exam.Attempts > 0 && len(atts) >= l.Exam.Attempts && course.TeacherID != c.UID {
-		writeErr(w, http.StatusConflict, fmt.Sprintf("оролдлогын тоо дууссан (%d)", l.Exam.Attempts))
+	if allowed := l.Exam.Attempts + s.reopenCount(r, c.UID, l.ID); l.Exam.Attempts > 0 && len(atts) >= allowed && course.TeacherID != c.UID {
+		writeErr(w, http.StatusConflict, fmt.Sprintf("оролдлогын тоо дууссан (%d)", allowed))
 		return
 	}
 	a := &store.ExamAttempt{UserID: c.UID, UserName: s.displayName(r.Context(), c.UID, c.Name), CourseID: course.ID, LessonID: l.ID, TeacherID: course.TeacherID,
@@ -244,11 +244,18 @@ func (s *Server) finishAttempt(r *http.Request, a *store.ExamAttempt, l *store.L
 	}
 	typ, title := "exam_submit", fmt.Sprintf("📝 %s шалгалт өглөө: %d%%", a.UserName, a.Pct)
 	if status == store.AttemptTerminated {
-		typ, title = "exam_terminated", fmt.Sprintf("⛔ %s-ийн шалгалт зөрчлөөр хаагдлаа", a.UserName)
+		typ = "exam_terminated"
 	}
-	s.logEvents(r.Context(), []store.ActivityEvent{{UserID: a.UserID, UserName: a.UserName, CourseID: a.CourseID, LessonID: a.LessonID, TeacherID: a.TeacherID,
-		Type: typ, Detail: fmt.Sprintf("%s · %d%% · %s", l.Title, a.Pct, reason)}})
-	if a.UserID != course.TeacherID {
+	evs := []store.ActivityEvent{{UserID: a.UserID, UserName: a.UserName, CourseID: a.CourseID, LessonID: a.LessonID, TeacherID: a.TeacherID,
+		Type: typ, Detail: fmt.Sprintf("%s · %d%% · %s", l.Title, a.Pct, reason)}}
+	if status == store.AttemptTerminated && a.UserID != course.TeacherID {
+		// Хаагдсан шалгалт = хичээлийн хоригтой ижил: тохируулсан минутын дараа эсвэл багш "Дахин нээх" дармагц
+		// шинэ оролдлого өгнө. auto_block нь багшид улаан товчтой мэдэгдэл үүсгэнэ.
+		evs = append(evs, store.ActivityEvent{UserID: a.UserID, UserName: a.UserName, CourseID: a.CourseID, LessonID: a.LessonID, TeacherID: a.TeacherID,
+			Type: "auto_block", Detail: "Шалгалт зөрчлөөр хаагдсан · " + reason, At: now})
+	}
+	s.logEvents(r.Context(), evs)
+	if a.UserID != course.TeacherID && status != store.AttemptTerminated {
 		s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: "exam", Title: title, Body: short(l.Title + " · " + reason), Link: "/me#students"})
 	}
 	if a.Passed {
@@ -262,4 +269,19 @@ func (s *Server) displayName(ctx context.Context, uid, fallback string) string {
 		return u.DisplayName
 	}
 	return fallback
+}
+
+// reopenCount — багш энэ шалгалтыг суралцагчид хэдэн удаа дахин нээж өгсөн (нэмэлт оролдлого болно).
+func (s *Server) reopenCount(r *http.Request, uid, lessonID string) int {
+	evs, err := s.store.ActivityEvents(r.Context(), store.ActivityFilter{UserID: uid, LessonID: lessonID}, 500)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, e := range evs {
+		if e.Type == "teacher_unblock" {
+			n++
+		}
+	}
+	return n
 }
