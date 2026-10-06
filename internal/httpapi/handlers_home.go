@@ -245,6 +245,11 @@ type Home struct {
 	Teachers []TeacherBrief    `json:"teachers"`
 	Chats    []HomeChat        `json:"chats"`
 	Teacher  *HomeTeacherPanel `json:"teacher,omitempty"`
+	// Суралцагчийн өөрийн хэсэг: систем олгосон цол, сургалт бүрийн цол, даалгавар/шалгалтын төлөв.
+	Rank        *RankInfo        `json:"rank,omitempty"`
+	CourseRanks []HomeCourseRank `json:"course_ranks"`
+	Tasks       []HomeTask       `json:"tasks"`
+	RankAwarded bool             `json:"rank_awarded,omitempty"`
 }
 
 const (
@@ -446,6 +451,16 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		out.Teacher = p
 	}
 
+	if u.Role != store.RoleTeacher && len(out.Courses) > 0 {
+		rank, byCourse, tasks, awarded := s.myProgress(ctx, c.UID, out.Courses)
+		out.Rank, out.CourseRanks, out.Tasks, out.RankAwarded = &rank, byCourse, tasks, awarded
+	}
+	if out.CourseRanks == nil {
+		out.CourseRanks = []HomeCourseRank{}
+	}
+	if out.Tasks == nil {
+		out.Tasks = []HomeTask{}
+	}
 	w.Header().Set("Cache-Control", "private, no-store")
 	writeJSON(w, http.StatusOK, out)
 }

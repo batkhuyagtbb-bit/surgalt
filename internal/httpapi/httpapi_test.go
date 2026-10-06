@@ -1929,6 +1929,21 @@ func TestAssignmentAndDueFlow(t *testing.T) {
 	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lb["id"].(string)+"/submit", s1, `{"text":"   "}`); code != 400 {
 		t.Fatal("хоосон хариу татгалзагдана")
 	}
+	// Суралцагчийн өөрийн хуудас: даалгавар дүнтэйгээ, цол харагдана.
+	_, home := call(t, srv, "GET", "/api/me/home", s1, "")
+	tasks := home["tasks"].([]any)
+	var mine map[string]any
+	for _, x := range tasks {
+		if m := x.(map[string]any); m["lesson_id"] == lid {
+			mine = m
+		}
+	}
+	if mine == nil || mine["status"] != "graded" || mine["score"].(float64) != 42 || mine["kind"] != "assignment" || mine["due"].(map[string]any)["late"] != true {
+		t.Fatalf("өөрийн хуудсанд даалгаврын дүн алга: %v", mine)
+	}
+	if home["rank"] == nil || home["rank"].(map[string]any)["name"] == "" {
+		t.Fatalf("өөрийн хуудсанд цол алга: %v", home["rank"])
+	}
 	// Хөтөлбөрт даалгаврын мэдээлэл олон нийтэд харагдана (хугацаа).
 	_, pc := call(t, srv, "GET", "/api/courses/"+cid, s1, "")
 	found := false

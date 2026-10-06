@@ -885,9 +885,13 @@ async function courseEditor(id) {
       m.innerHTML = `<button type="button" role="menuitem" data-new-kind="lesson">📄 <b>Хичээл</b><small>текст, видео, файл, асуулт</small></button>
         <button type="button" role="menuitem" data-new-kind="exam">📝 <b>Шалгалт</b><small>хугацаа, оролдлого, хоцорвол төлбөртэй/төлбөргүй</small></button>
         <button type="button" role="menuitem" data-new-kind="assignment">📎 <b>Даалгавар</b><small>хариу илгээж дүгнүүлнэ, хоцорвол төлбөртэй/төлбөргүй</small></button>`;
-      anchor.insertAdjacentElement("afterend", m);
-      m.onclick = (ev) => { const k = ev.target.closest("[data-new-kind]")?.dataset.newKind; m.remove(); if (k) openComposer(preset ?? "", k); };
-      setTimeout(() => document.addEventListener("click", (ev) => { if (!m.contains(ev.target)) m.remove(); }, { once: true }), 0);
+      document.body.append(m);
+      const place = () => { const r = anchor.getBoundingClientRect(), w = 300; m.style.top = Math.min(r.bottom + 6, innerHeight - 190) + "px"; m.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px"; };
+      place();
+      const kill = () => { m.remove(); removeEventListener("scroll", place, true); removeEventListener("resize", place); };
+      m.onclick = (ev) => { const k = ev.target.closest("[data-new-kind]")?.dataset.newKind; kill(); if (k) openComposer(preset ?? "", k); };
+      addEventListener("scroll", place, true); addEventListener("resize", place); // гүйлгэхэд товчоо дагана
+      setTimeout(() => document.addEventListener("click", (ev) => { if (!m.contains(ev.target)) kill(); }, { once: true }), 0);
     };
     if (t.closest("#composerOpen")) return kindMenu(t.closest("#composerOpen"));
     const sec = t.closest(".sec, .ol-sec");

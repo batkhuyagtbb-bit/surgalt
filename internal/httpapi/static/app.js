@@ -1697,11 +1697,36 @@ async function homePage() {
       <a class="tile" href="#my-live"><em>📹</em><b>${h.meetings.length}</b><span>Шууд хичээл</span></a>
       <a class="tile" href="#my-chats"><em>💬</em><b>${h.chats.length}</b><span>Чат</span></a>
       <a class="tile" href="#my-teachers"><em>👩‍🏫</em><b>${h.teachers.length}</b><span>Миний багш</span></a>
+      ${h.rank ? `<a class="tile tile-rank" href="#my-rank"><em class="rank-shine" data-level="${h.rank.level}">${esc(h.rank.insignia)}</em><b>${esc(h.rank.name)}</b><span>Миний цол · ${h.rank.points} оноо</span></a>` : ""}
+      ${h.tasks?.length ? `<a class="tile" href="#my-tasks"><em>📎</em><b>${h.tasks.filter((t) => ["open", "need_pay"].includes(t.status)).length}</b><span>Хийх даалгавар, шалгалт</span></a>` : ""}
     </div>`];
+  // Цол: систем шинэ цол олгосон бол баяр хүргэж салют буудуулна.
+  if (h.rank) {
+    const lvlKey = "sg_rank_lvl_" + (u.id || "u");
+    let seen = -1; try { seen = localStorage.getItem(lvlKey) === null ? -1 : +localStorage.getItem(lvlKey); } catch {}
+    if (h.rank_awarded || (seen >= 0 && h.rank.level > seen)) setTimeout(() => rankSalute(h.rank), 400);
+    try { localStorage.setItem(lvlKey, h.rank.level); } catch {}
+  }
 
   if (resume) parts.push(`<div class="resume"><span class="item-ico">▶</span><div class="grow"><span class="eyebrow">Үргэлжлүүлэх</span><strong>${esc(last.lessonTitle || resume.course.title)}</strong><span class="muted small">${esc(resume.course.title)}</span></div>
       <a class="btn btn-gold" href="/c/${esc(last.course)}${last.lesson ? "#l=" + esc(last.lesson) : ""}">Үзэх</a></div>`);
 
+  if (h.rank) {
+    const rk = h.rank;
+    parts.push(sec("my-rank", "🎖 Миний цол", `<div class="rank-card">
+      <div class="rank-main"><span class="rank-big rank-shine" data-level="${rk.level}">${esc(rk.insignia)}</span><div class="grow"><strong class="rank-title">${esc(rk.name)}</strong>
+        <span class="muted small">${rk.points} оноо · ${rk.honest} шударга хичээл${rk.cheated ? ` · <span class="cr-bad">${rk.cheated} хичээлд хуулах оролдлогоос цол олгоогүй</span>` : ""}</span>
+        <div class="meter cr-meter" style="margin-top:8px"><i style="width:${rk.progress}%"></i></div>
+        <span class="muted small">${rk.next ? `Дараагийн «${esc(rk.next_name)}» цол ${rk.next} оноонд — ${rk.next - rk.points} дутуу` : "Дээд цол — баяр хүргэе!"}</span></div></div>
+      ${rk.tips?.length ? `<div class="rank-tips"><b>Систем зөвлөж байна</b><ul>${rk.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div>` : ""}
+      ${h.course_ranks.length ? `<ul class="rank-courses">${h.course_ranks.map((c) => `<li><a href="/c/${esc(c.course_id)}"><span class="rank-shine" data-level="${c.rank.level}">${esc(c.rank.insignia)}</span><span class="grow"><strong>${esc(c.title)}</strong><small>${esc(c.rank.name)} · ${c.rank.points} оноо · ${c.lessons.length} хичээл үнэлэгдсэн</small></span><span class="chip chip-teal">Үзэх</span></a></li>`).join("")}</ul>` : ""}</div>`));
+  }
+  if (h.tasks?.length) {
+    const label = (t) => ({ open: ["Хийх", "chip-amber"], need_pay: ["Хоцорсон · " + money(t.due.fee) + " төлж нээнэ", "chip-amber"], closed: ["Хаалттай", ""], submitted: ["Илгээсэн · дүгнэхийг хүлээж байна", "chip-teal"],
+      graded: [`Дүн: ${t.score}/${t.max_score || 100}`, "chip-teal"], passed: [`Тэнцсэн · ${t.exam_best}%`, "chip-teal"], failed: [`Тэнцээгүй · шилдэг ${t.exam_best}%`, "chip-amber"] })[t.status] || ["", ""];
+    parts.push(sec("my-tasks", "📎 Даалгавар, шалгалт", `<ul class="items">${h.tasks.map((t) => { const [txt, cls] = label(t); return `
+      <li><a class="item ${["open", "need_pay"].includes(t.status) && t.due.at ? "warn" : ""}" href="/c/${esc(t.course_id)}#l=${esc(t.lesson_id)}"><span class="item-ico">${t.kind === "exam" ? "📝" : "📎"}</span><span class="grow"><strong>${esc(t.title)}</strong><small>${esc(t.course_title)}${t.due.at ? ` · ${t.due.late ? "хугацаа дууссан" : "хугацаа"}: ${fmtDate(t.due.at)}` : " · хугацаагүй"}${t.feedback ? ` · ${esc(t.feedback)}` : ""}</small></span><span class="chip ${cls}">${txt}</span></a></li>`; }).join("")}</ul>`));
+  }
   if (h.pending.length) parts.push(sec("my-pending", "Төлбөр хүлээгдэж буй", `<ul class="items">${h.pending.map((o) => `
       <li><a class="item warn" href="/c/${esc(o.course_id)}${o.lesson_id ? "#l=" + esc(o.lesson_id) : ""}"><span class="item-ico">₮</span><span class="grow"><strong>${esc(o.title)}</strong><small>${fmtDate(o.created_at)} · ${o.kind === "lesson" ? "нэг хичээл" : "бүтэн сургалт"}</small></span><strong>${money(o.amount)}</strong><span class="chip chip-amber">Төлөх →</span></a></li>`).join("")}</ul>`));
 
