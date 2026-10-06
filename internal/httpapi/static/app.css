@@ -1600,13 +1600,13 @@ html.reader-open{overflow:hidden}
 .thread{gap:2px}
 .msg-day{align-self:center;margin:10px 0 6px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .msg-day span{padding:3px 10px;border-radius:999px;background:var(--surface)}
-.thread .msg{max-width:100%;padding:0;background:none;border:0;display:flex;gap:8px;align-items:flex-end;color:inherit;box-shadow:none}
+.thread .msg{max-width:90%;padding:0;background:none;border:0;display:flex;gap:8px;align-items:flex-end;color:inherit;box-shadow:none}
 .thread .msg.me{flex-direction:row-reverse}
 .thread .msg.first{margin-top:8px}
 .msg-av{width:28px;flex:0 0 28px}
 .msg-av .avatar{width:28px;height:28px;font-size:.7rem}
 .thread .msg.me .msg-av{display:none}
-.msg-col{display:flex;flex-direction:column;width:max-content;max-width:82%;min-width:0}
+.msg-col{display:flex;flex-direction:column;max-width:100%;min-width:0}
 .thread .msg.me .msg-col{align-items:flex-end}
 .msg-who{font-size:.74rem;color:var(--muted);margin:0 0 2px 12px}
 .msg-row{display:flex;align-items:center;gap:4px}
