@@ -12,7 +12,7 @@ import (
 
 func (s *Server) filesErr(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, files.ErrType), errors.Is(err, files.ErrBadName), errors.Is(err, files.ErrBadVisibility):
+	case errors.Is(err, files.ErrType), errors.Is(err, files.ErrBadName), errors.Is(err, files.ErrBadVisibility), errors.Is(err, files.ErrBadImage):
 		writeErr(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, files.ErrQuota), errors.Is(err, files.ErrTooLarge):
 		writeErr(w, http.StatusRequestEntityTooLarge, err.Error())

@@ -35,6 +35,7 @@ var (
 	ErrQuota         = errors.New("файлын сангийн багтаамж хүрэлцэхгүй")
 	ErrTooLarge      = errors.New("файл хэт том")
 	ErrBadVisibility = errors.New("visibility нь public эсвэл private")
+	ErrBadImage      = errors.New("зураг уншигдсангүй (эвдэрсэн эсвэл дэмжигдэхгүй формат)")
 )
 
 const (
@@ -192,7 +193,7 @@ func (s *Store) Save(teacherID, visibility, originalName string, r io.Reader, qu
 	}
 	if isImageExt(ext) {
 		if _, _, err = processImage(tmp.Name()); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %v", ErrBadImage, err)
 		}
 		ext = ".webp"
 	}

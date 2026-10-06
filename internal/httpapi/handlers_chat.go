@@ -246,7 +246,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Body = strings.TrimSpace(in.Body)
-	if in.Attachment != "" && !(files.OwnedBy(in.Attachment, conv.TeacherID) && strings.Contains(in.Attachment, "/"+files.Private+"/chat_")) {
+	if in.Attachment != "" && !(files.OwnedBy(in.Attachment, conv.TeacherID) && strings.Contains(in.Attachment, "/"+files.Private+"/") && strings.Contains(in.Attachment, "__chat_")) {
 		writeErr(w, http.StatusBadRequest, "хавсралт буруу")
 		return
 	}

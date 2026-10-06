@@ -11,6 +11,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/jpeg"
+	"image/png"
 	"io"
 	"log/slog"
 	"mime/multipart"
@@ -2195,15 +2196,17 @@ func TestChatReactionsRepliesReads(t *testing.T) {
 	if code, _ := up("virus.exe", []byte("x")); code != 400 {
 		t.Fatal("зураг биш файл татгалзагдана")
 	}
-	code, u := up("photo.png", []byte("\x89PNG\r\n\x1a\n fake"))
-	if code != 201 || !strings.Contains(u["path"].(string), "/private/chat_") {
+	var pngBuf bytes.Buffer
+	_ = png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 2, 2)))
+	code, u := up("photo.png", pngBuf.Bytes())
+	if code != 201 || !strings.Contains(u["path"].(string), "__chat_") {
 		t.Fatalf("зураг хуулах: %d %v", code, u)
 	}
 	code, im := call(t, srv, "POST", "/api/chat/"+conv+"/messages", s1, `{"body":"","attachment":"`+u["path"].(string)+`"}`)
 	if code != 201 || im["body"] != "📷 Зураг" || !strings.Contains(im["attachment_url"].(string), "sig=") {
 		t.Fatalf("зурагтай мессеж: %d %v", code, im)
 	}
-	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/messages", s1, `{"body":"x","attachment":"/files/other/private/chat_x.png"}`); code != 400 {
+	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/messages", s1, `{"body":"x","attachment":"/files/other/private/ab__chat_x.png"}`); code != 400 {
 		t.Fatal("өөр багшийн зам татгалзагдана")
 	}
 	_, lst2 := call(t, srv, "GET", "/api/chat/"+conv+"/messages", tt, "")
