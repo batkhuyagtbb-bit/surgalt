@@ -1556,7 +1556,7 @@ html.reader-open{overflow:hidden}
 .pe-entry{max-width:360px}
 .pe-checks{display:flex;gap:16px;flex-wrap:wrap}
 .pe-checks .check{margin:0;font-size:.85rem}
-.pe-more{padding:0;overflow:hidden}
+.pe-step.pe-more{display:block;padding:0;overflow:hidden}
 .pe-more summary{display:grid;grid-template-columns:30px 1fr;gap:12px;padding:12px 16px;cursor:pointer;list-style:none}
 .pe-more summary::-webkit-details-marker{display:none}
 .pe-more summary .pe-num{background:var(--ink-2);color:var(--muted)}
