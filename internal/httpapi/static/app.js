@@ -436,7 +436,7 @@ const unob = (s) => { try { return atob(s.replace(/-/g, "+").replace(/_/g, "/"))
 const ytShieldHTML = (id) => `<div class="yt-wrap" oncontextmenu="return false"><iframe data-yt="${esc(id)}" src="https://www.youtube-nocookie.com/embed/${esc(id)}?rel=0&controls=0&disablekb=1&modestbranding=1&iv_load_policy=3&fs=0&playsinline=1&cc_load_policy=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media" referrerpolicy="strict-origin" tabindex="-1"></iframe>
   <div class="yt-cover" style="background-image:url('https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg')"></div>
   <div class="yt-shield" data-yt-toggle title="Тоглуулах / зогсоох"><span class="yt-big">▶</span></div>
-  <div class="vg-bar yt-bar"><button type="button" class="vg-play" data-yt-toggle aria-label="Тоглуулах">▶</button><span class="vg-time">0:00 / 0:00</span><span class="vg-prog"><i></i></span><button type="button" class="vg-mute" aria-label="Дуу">🔊</button><button type="button" class="vg-full" aria-label="Бүтэн дэлгэц">⛶</button></div></div>`;
+  <div class="vg-bar yt-bar"><button type="button" class="vg-play" data-yt-toggle aria-label="Тоглуулах">▶</button><span class="vg-time">0:00 / 0:00</span><span class="vg-prog"><b class="vg-seen"></b><i></i></span><button type="button" class="vg-mute" aria-label="Дуу">🔊</button><button type="button" class="vg-full" aria-label="Бүтэн дэлгэц">⛶</button></div></div>`;
 function mediaHTML(url, title) {
   if (!url) return "";
   if (url.startsWith("yt:")) return ytShieldHTML(unob(url.slice(3)));
@@ -700,7 +700,8 @@ function rankSalute(rank) {
 // lockedControls: анх үзэж байхад хөтчийн ердийн удирдлагыг нууж, өөрийн удирдлага тавина —
 // явцын мөр дарагдахгүй (гүйлгэх, үсрэх боломжгүй), зөвхөн тоглуулах/зогсоох, дуу, бүтэн дэлгэц.
 // Бүрэн үзсэний дараа release() → ердийн удирдлага (гүйлгэж болно).
-function lockedControls(v, isFree, note) {
+// maxFn() — энэ видеон дээр үзсэн хамгийн хол цэг (сек): түүнээс өмнө чөлөөтэй гүйлгэнэ, цааш нь үгүй.
+function lockedControls(v, isFree, note, maxFn = () => 0) {
   if (isFree()) return () => {};
   const wrap = v.parentElement; if (!wrap) return () => {};
   v.controls = false; v.removeAttribute("controls");
@@ -708,22 +709,28 @@ function lockedControls(v, isFree, note) {
   const bar = document.createElement("div");
   bar.className = "vg-bar";
   bar.innerHTML = `<button type="button" class="vg-play" aria-label="Тоглуулах">▶</button><span class="vg-time">0:00 / 0:00</span>
-    <span class="vg-prog" title="Эхний удаад гүйлгэх боломжгүй — дуустал үзнэ үү"><i></i></span><span class="vg-lock" aria-hidden="true">🔒</span>
+    <span class="vg-prog" title="Үзсэн хэсэг рүүгээ буцаж гүйлгэнэ — үзээгүй хэсэг рүү үгүй"><b class="vg-seen"></b><i></i></span><span class="vg-lock" aria-hidden="true">🔒</span>
     <button type="button" class="vg-mute" aria-label="Дуу">🔊</button><button type="button" class="vg-full" aria-label="Бүтэн дэлгэц">⛶</button>`;
   wrap.append(bar);
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
   const play = $(".vg-play", bar), time = $(".vg-time", bar), prog = $(".vg-prog i", bar), mute = $(".vg-mute", bar), full = $(".vg-full", bar);
-  const sync = () => { play.textContent = v.paused ? "▶" : "❚❚"; time.textContent = `${fmt(v.currentTime)} / ${fmt(v.duration || 0)}`; prog.style.width = v.duration ? v.currentTime / v.duration * 100 + "%" : "0"; mute.textContent = v.muted ? "🔇" : "🔊"; };
+  const seen = $(".vg-seen", bar);
+  const sync = () => { play.textContent = v.paused ? "▶" : "❚❚"; time.textContent = `${fmt(v.currentTime)} / ${fmt(v.duration || 0)}`; prog.style.width = v.duration ? v.currentTime / v.duration * 100 + "%" : "0"; seen.style.width = v.duration ? Math.min(1, Math.max(maxFn(), v.currentTime) / v.duration) * 100 + "%" : "0"; mute.textContent = v.muted ? "🔇" : "🔊"; };
+  // Үзсэн хүртэлх хэсэгт л үсэрнэ; цааш дарвал үзсэн хамгийн хол цэг дээр зогсооно.
+  const seekTo = (t) => { const lim = Math.max(maxFn(), 0); if (t > lim + 0.5) { v.currentTime = lim; note?.(); } else v.currentTime = Math.max(0, t); sync(); };
   const toggle = () => { if (v.paused) v.play().catch(() => {}); else v.pause(); };
   play.onclick = toggle;
   v.addEventListener("click", toggle);
   mute.onclick = () => { v.muted = !v.muted; sync(); };
   full.onclick = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else wrap.requestFullscreen?.(); };
-  $(".vg-prog", bar).onclick = () => note?.();
+  $(".vg-prog", bar).onclick = (e) => { if (!v.duration) return; const r = e.currentTarget.getBoundingClientRect(); seekTo(v.duration * (e.clientX - r.left) / r.width); };
   ["timeupdate", "play", "pause", "loadedmetadata", "volumechange", "durationchange"].forEach((n) => v.addEventListener(n, sync));
   const onKey = (e) => { // сум, PageUp/Down, тоонуудаар үсрэхийг хаана
     if (!wrap.contains(document.activeElement) && document.fullscreenElement !== wrap) return;
-    if (["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(e.key) || /^[0-9]$/.test(e.key)) { e.preventDefault(); note?.(); }
+    if (e.key === "ArrowLeft" || e.key === "j") { e.preventDefault(); seekTo(v.currentTime - 5); return; }
+    if (e.key === "ArrowRight" || e.key === "l") { e.preventDefault(); seekTo(v.currentTime + 5); return; }
+    if (e.key === "Home") { e.preventDefault(); seekTo(0); return; }
+    if (["End", "PageUp", "PageDown"].includes(e.key) || /^[0-9]$/.test(e.key)) { e.preventDefault(); note?.(); }
     if (e.key === " " || e.key === "k") { e.preventDefault(); toggle(); }
   };
   document.addEventListener("keydown", onKey);
@@ -889,7 +896,7 @@ function loadYT() {
 // progressBase: "/api/courses/{id}/lessons/{lid}" — өгөгдсөн бол үзэлтийн зураглалыг 10 секундийн
 // хэсгүүдээр бичиж, багшид аль хэсгийг давтаж, аль хэсгийг алгассаныг харуулна.
 function guardVideos(box, { watched = {}, owner = false, onWatched, modal, progressBase }) {
-  const note = () => toast("Видеог эхлээд нэг удаа бүрэн үзнэ үү — дараа нь гүйлгэж болно");
+  const note = () => toast("Үзээгүй хэсэг рүү гүйлгэх боломжгүй — үзсэн хэсэгтээ буцаж болно. Бүрэн үзсэний дараа чөлөөтэй.");
   const BUCKET = 10;
   const stoppers = [];
   const blocks = [...$$("[data-bid] video, [data-bid] iframe[data-yt]", box), ...$$("#player video, #player iframe[data-yt]", modal)];
@@ -922,7 +929,7 @@ function guardVideos(box, { watched = {}, owner = false, onWatched, modal, progr
       });
       v.addEventListener("seeking", () => { if (!free && idx >= unlockedPart && v.currentTime > maxPart + 1) { v.currentTime = maxPart; note(); } });
       v.addEventListener("ratechange", () => { if (!free && v.playbackRate > 2) v.playbackRate = 2; });
-      const release = lockedControls(v, () => free, note);
+      const release = lockedControls(v, () => free, note, () => (idx < unlockedPart ? Infinity : maxPart));
       v.addEventListener("ended", () => {
         if (parts.length > 1 && idx < parts.length - 1) { unlockedPart = Math.max(unlockedPart, idx + 1); loadPart(idx + 1, true); return; } // дараагийн хэсэг
         if (!free) { free = true; onWatched?.(bid); release(); paintParts(); } flush();
@@ -948,9 +955,10 @@ function guardVideos(box, { watched = {}, owner = false, onWatched, modal, progr
         $$("[data-yt-toggle]", wrap).forEach((b) => (b.onclick = toggle));
         $(".vg-mute", wrap).onclick = () => { try { p.isMuted() ? p.unMute() : p.mute(); } catch {} };
         $(".vg-full", wrap).onclick = () => (document.fullscreenElement ? document.exitFullscreen?.() : wrap.requestFullscreen?.());
-        $(".vg-prog", wrap).onclick = (e) => { // бүрэн үзсэний дараа л гүйлгэнэ
-          if (!free) return note();
-          const r = e.currentTarget.getBoundingClientRect(), d = p.getDuration?.() || 0; p.seekTo(d * (e.clientX - r.left) / r.width, true);
+        $(".vg-prog", wrap).onclick = (e) => { // үзсэн хэсэгтээ буцаж гүйлгэнэ; бүрэн үзсэний дараа чөлөөтэй
+          const r = e.currentTarget.getBoundingClientRect(), d = p.getDuration?.() || 0, t = d * (e.clientX - r.left) / r.width;
+          if (!free && t > max + 0.5) { p.seekTo(max, true); return note(); }
+          p.seekTo(Math.max(0, t), true);
         };
         wrap.addEventListener("keydown", (e) => { if (e.key === " ") { e.preventDefault(); toggle(); } });
         setInterval(() => {
@@ -958,7 +966,7 @@ function guardVideos(box, { watched = {}, owner = false, onWatched, modal, progr
           const t = p.getCurrentTime() || 0, d = p.getDuration?.() || 0, st = p.getPlayerState?.();
           $(".vg-time", wrap).textContent = `${fmt(t)} / ${fmt(d)}`; $(".vg-prog i", wrap).style.width = d ? (t / d) * 100 + "%" : "0";
           const playing = st === YT.PlayerState.PLAYING; $(".vg-play", wrap).textContent = playing ? "❚❚" : "▶"; wrap.classList.toggle("playing", playing);
-          $(".vg-mute", wrap).textContent = p.isMuted?.() ? "🔇" : "🔊"; $(".vg-prog", wrap).classList.toggle("seekable", free);
+          $(".vg-mute", wrap).textContent = p.isMuted?.() ? "🔇" : "🔊"; $(".vg-prog", wrap).classList.toggle("seekable", true); $(".vg-seen", wrap).style.width = d ? Math.min(1, (free ? d : Math.max(max, t)) / d) * 100 + "%" : "0";
         }, 400);
       }
       poll = setInterval(() => {
@@ -2437,8 +2445,9 @@ async function coursePage() {
     const watched = {};
     for (const [k, v] of Object.entries(access?.progress?.[lid]?.quiz || {})) if (k.startsWith("watch_") && v) watched[k.slice(6)] = true;
     stopVideos?.();
-    stopVideos = guardVideos(body, { watched, owner: isOwner || !Auth.token, modal, progressBase: Auth.token && !isOwner ? `/api/courses/${id}/lessons/${lid}` : null,
+    stopVideos = guardVideos(body, { watched, owner: isOwner, modal, progressBase: Auth.token && !isOwner ? `/api/courses/${id}/lessons/${lid}` : null,
       onWatched: (bid) => {
+        if (!Auth.token) return;
         api(`/api/courses/${id}/lessons/${lid}/watched/${bid}`, { method: "POST" }).then(() => toast("✓ Видеог бүрэн үзлээ — одоо гүйлгэж болно")).catch(() => {});
       } });
     // Идэвхтэй суралцах хугацаа

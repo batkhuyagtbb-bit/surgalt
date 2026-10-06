@@ -2052,3 +2052,13 @@ html.reader-open{overflow:hidden}
 .yt-wrap.playing .yt-shield{background:linear-gradient(rgba(0,0,0,0) 0,rgba(0,0,0,0) 100%)}
 .yt-wrap::before{content:"";position:absolute;left:0;right:0;top:0;height:64px;z-index:1;background:linear-gradient(rgba(0,0,0,.55),transparent);pointer-events:none;opacity:0;transition:opacity .2s}
 .yt-wrap.playing::before{opacity:1}
+
+/* Үйл явдлын лог: доош гүйлгэхэд 20-оор ачаална */
+.ev-feed{max-height:520px;overscroll-behavior:contain}
+.ev-more{text-align:center;padding:12px 8px 6px;cursor:pointer;min-height:20px}
+.ev-more:empty{padding:0;min-height:1px}
+
+/* Видео: үзсэн хэсэг (буцаж гүйлгэж болох) цайвар, одоогийн байрлал улбар шар */
+.vg-bar .vg-prog{position:relative;cursor:pointer}
+.vg-bar .vg-prog .vg-seen{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.45);border-radius:inherit}
+.vg-bar .vg-prog i{position:relative}

@@ -290,6 +290,9 @@ func (m *Memory) ActivityEvents(_ context.Context, f ActivityFilter, limit int) 
 	out := []ActivityEvent{}
 	for i := len(l.events) - 1; i >= 0 && (limit <= 0 || len(out) < limit); i-- {
 		e := l.events[i]
+		if !f.BeforeAt.IsZero() && !(e.At.Before(f.BeforeAt) || (e.At.Equal(f.BeforeAt) && e.ID < f.BeforeID)) {
+			continue
+		}
 		if f.match(e.TeacherID, e.CourseID, e.UserID, e.LessonID, "", e.At) {
 			out = append(out, e)
 		}

@@ -2666,3 +2666,56 @@ func TestExternalVideoHidden(t *testing.T) {
 		t.Fatal("багшид жинхэнэ холбоос харагдах ёстой")
 	}
 }
+
+// "Сүүлийн үйл явдал" 20-оор хуудаслагдаж, курсороор давхардалгүй, бүгдийг дамжина.
+func TestAnalyticsEventsPaging(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Лог","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true}`)
+	lid := l["id"].(string)
+	s1, _ := register(t, srv, "stud", "student")
+	_, ss := call(t, srv, "POST", "/api/activity/start", s1, `{"course_id":"`+cid+`","lesson_id":"`+lid+`","kind":"lesson"}`)
+	sid := ss["session_id"].(string)
+	for i := 0; i < 9; i++ { // цохилт бүрт 5 → нийт 45 үйл явдал
+		evs := strings.Repeat(`{"type":"copy","detail":"x"},`, 5)
+		call(t, srv, "POST", "/api/activity/beat", s1, `{"session_id":"`+sid+`","active":1,"events":[`+strings.TrimSuffix(evs, ",")+`]}`)
+	}
+	if code, _ := call(t, srv, "GET", "/api/me/analytics/events", s1, ""); code != http.StatusForbidden && code != http.StatusUnauthorized {
+		t.Fatalf("сурагч багшийн лог харахгүй: %d", code)
+	}
+	seen, pages, cur := map[string]bool{}, 0, ""
+	for {
+		code, r := call(t, srv, "GET", "/api/me/analytics/events?course="+cid+cur, tt, "")
+		if code != 200 {
+			t.Fatalf("events: %d %v", code, r)
+		}
+		pages++
+		evs := r["events"].([]any)
+		if len(evs) > 20 {
+			t.Fatalf("хуудас 20-оос их: %d", len(evs))
+		}
+		for _, e := range evs {
+			id := e.(map[string]any)["id"].(string)
+			if seen[id] {
+				t.Fatalf("давхардсан: %s", id)
+			}
+			seen[id] = true
+		}
+		if r["more"] != true {
+			break
+		}
+		cur = "&before_at=" + url.QueryEscape(r["next_at"].(string)) + "&before_id=" + r["next_id"].(string)
+		if pages > 10 {
+			t.Fatal("төгсгөлгүй")
+		}
+	}
+	if len(seen) != 45 || pages != 3 {
+		t.Fatalf("нийт %d үйл явдал, %d хуудас (45, 3 байх ёстой)", len(seen), pages)
+	}
+	if code, _ := call(t, srv, "GET", "/api/me/analytics/events?before_at=bad", tt, ""); code != 400 {
+		t.Fatal("буруу курсор 400")
+	}
+}

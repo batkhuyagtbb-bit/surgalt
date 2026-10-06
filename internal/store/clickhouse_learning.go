@@ -261,6 +261,12 @@ func (c *ClickHouse) AddActivityEvents(ctx context.Context, evs []ActivityEvent)
 
 func (c *ClickHouse) ActivityEvents(ctx context.Context, f ActivityFilter, limit int) ([]ActivityEvent, error) {
 	w, args := f.where("at", false)
+	if !f.BeforeAt.IsZero() {
+		// Параметр болгон дамжуулахад секунд хүртэл тайрагддаг тул миллисекундээр харьцуулна.
+		ms := f.BeforeAt.UnixMilli()
+		w += " AND (toUnixTimestamp64Milli(at) < ? OR (toUnixTimestamp64Milli(at) = ? AND id < ?))"
+		args = append(args, ms, ms, f.BeforeID)
+	}
 	out := []ActivityEvent{}
 	err := c.query(ctx, `SELECT id, user_id, user_name, course_id, lesson_id, teacher_id, session_id, type, detail, at
 		FROM activity_events WHERE `+w+" ORDER BY at DESC, id DESC"+limitClause(limit), args, func(r driver.Rows) error {

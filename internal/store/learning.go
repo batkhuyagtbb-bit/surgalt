@@ -87,6 +87,9 @@ type ActivityEvent struct {
 type ActivityFilter struct {
 	TeacherID, CourseID, UserID, LessonID, Kind string
 	Since                                       time.Time
+	// BeforeAt/BeforeID — хуудаслалтын курсор: (at, id)-ээс өмнөх мөрүүд (зөвхөн ActivityEvents).
+	BeforeAt time.Time
+	BeforeID string
 }
 
 // QuizLog — хичээл доторх асуултад өгсөн нэг хариулт ба хариулах хурд (таамаглалыг илрүүлэхэд).

@@ -534,6 +534,45 @@ func (s *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"data": data, "labels": eventLabels()})
 }
 
+// handleAnalyticsEvents: GET /api/me/analytics/events?course=&student=&days=&limit=20&before_at=&before_id=
+// "Сүүлийн үйл явдал"-ыг хуудсаар (scroll хийхэд дараагийн 20) өгнө. (at, id) курсороор тогтвортой.
+func (s *Server) handleAnalyticsEvents(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireTeacher(w, r)
+	if !ok {
+		return
+	}
+	q := r.URL.Query()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	f := store.ActivityFilter{TeacherID: c.UID, CourseID: q.Get("course"), UserID: q.Get("student"),
+		Since: time.Now().AddDate(0, 0, -analyticsDays(r))}
+	if v := q.Get("before_at"); v != "" {
+		t, err := time.Parse(time.RFC3339Nano, v)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "буруу курсор"})
+			return
+		}
+		f.BeforeAt, f.BeforeID = t, q.Get("before_id")
+	}
+	evs, err := s.store.ActivityEvents(r.Context(), f, limit)
+	if s.storeErr(w, r, err) {
+		return
+	}
+	out := []store.ActivityEvent{}
+	for _, e := range evs {
+		if e.UserID != c.UID || e.Type == "teacher_remind" {
+			out = append(out, e)
+		}
+	}
+	resp := map[string]any{"events": out, "labels": eventLabels(), "more": len(evs) == limit}
+	if n := len(evs); n == limit {
+		resp["next_at"], resp["next_id"] = evs[n-1].At.UTC().Format(time.RFC3339Nano), evs[n-1].ID
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
 // handleStudentAnalytics: GET /api/me/analytics/students/{uid}?course=&days=
 func (s *Server) handleStudentAnalytics(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireTeacher(w, r)

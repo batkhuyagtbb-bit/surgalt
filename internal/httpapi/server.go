@@ -160,6 +160,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/analytics", s.handleAnalytics)
 	mux.HandleFunc("GET /api/me/analytics/students/{uid}", s.handleStudentAnalytics)
 	mux.HandleFunc("GET /api/me/analytics/export", s.handleAnalyticsExport)
+	mux.HandleFunc("GET /api/me/analytics/events", s.handleAnalyticsEvents)
 	mux.HandleFunc("GET /api/quiz-template.xlsx", s.handleQuizTemplate)
 	mux.HandleFunc("GET /api/search", s.handleSearch)
 	mux.HandleFunc("GET /api/me/books", s.handleMyBooks)

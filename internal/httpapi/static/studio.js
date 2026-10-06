@@ -1026,12 +1026,27 @@ async function courseEditor(id) {
   render();
 }
 
+/* Лог хүснэгт: эхлээд 20 мөр, доош гүйлгэхэд дараагийн 20-ыг нэмнэ (ачаалсан жагсаалтаас). */
+function scrollRows(box, items, rowFn, step = 20) {
+  const tb = box.querySelector("tbody"); if (!tb) return;
+  let i = 0;
+  const more = document.createElement("div"); more.className = "ev-more muted small"; box.appendChild(more);
+  const next = () => {
+    tb.insertAdjacentHTML("beforeend", items.slice(i, i + step).map(rowFn).join("")); i += step;
+    more.textContent = i < items.length ? `${Math.min(i, items.length)} / ${items.length} · доош гүйлгэвэл цааш` : items.length > step ? `Бүгд · ${items.length}` : "";
+    if (i < items.length && box.isConnected && box.scrollHeight <= box.clientHeight + 60) requestAnimationFrame(next);
+  };
+  new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting) && i < items.length) next(); }, { root: box, rootMargin: "160px" }).observe(more);
+  more.addEventListener("click", () => i < items.length && next());
+  next();
+}
+
 /* ---------- Ном, өгүүлэл: зарах, хамгаалах, лог ----------
    Файлыг багшийн хөтөч дээр хуудас бүрээр зураг болгож илгээнэ — эх PDF уншигчид огт очихгүй. */
 const BOOK_EVENTS = { view: ["👀", "Хуудсыг үзсэн"], preview: ["📖", "Үнэгүй хэсгийг уншсан"], read: ["📚", "Бүтнээр уншсан"], interest: ["♥", "Сонирхсон"],
   paywall: ["🔒", "Төлбөрийн хананд хүрсэн"], purchase: ["💰", "Худалдаж авсан"], limit: ["⚠️", "Хэт хурдан татах гэсэн"] };
 async function books() {
-  let [list, evs] = await Promise.all([api("/api/me/books"), api("/api/me/book-events?limit=200")]);
+  let [list, evs] = await Promise.all([api("/api/me/books"), api("/api/me/book-events?limit=1000")]);
   const sum = (k) => list.reduce((a, b) => a + (b[k] || 0), 0);
   const cover = (b) => (b.cover_url || (b.pages ? `/api/books/${b.id}/cover?v=${encodeURIComponent(b.updated_at)}` : ""));
   const render = () => {
@@ -1046,12 +1061,15 @@ async function books() {
             <small class="muted">👀 ${b.views} · 📖 ${b.previews} · 📚 ${b.reads} · ♥ ${b.interest} · 💰 ${b.sales} (${money(b.revenue)})</small></div>
           <div class="bk-acts"><button class="btn btn-glass btn-sm" data-edit>${ico("edit", 15)}Засах</button>${b.published ? `<a class="btn btn-glass btn-sm" href="/b/${esc(b.id)}" target="_blank" rel="noopener">${ico("eye", 15)}Харах</a>` : ""}<button class="btn btn-ghost btn-sm" data-log>Лог</button></div></article>`).join("") || `<div class="empty">Ном хараахан алга.<br>PDF, Word (DOC, DOCX) файлаа оруулж зарж эхлээрэй.</div>`}</div>
       <section class="card"><div class="card-head"><h2>Үйлдлийн лог</h2><select id="bkLogFilter" aria-label="Номоор шүүх"><option value="">Бүх ном</option>${list.map((b) => `<option value="${esc(b.id)}">${esc(b.title)}</option>`).join("")}</select></div>
-        <div class="bk-log" id="bkLog">${logHTML(evs)}</div></section>`;
+        <div class="bk-log" id="bkLog"></div></section>`;
+    mountLog();
   };
   const title = (id) => list.find((b) => b.id === id)?.title || "";
-  const logHTML = (evs) => evs.length ? `<table class="tbl"><thead><tr><th>Цаг</th><th>Хэн</th><th>Үйлдэл</th><th>Ном</th></tr></thead><tbody>${evs.map((e) => `<tr class="ev-${esc(e.type)}">
-      <td>${fmtDate(e.at)}</td><td>${esc(e.user_name || "Зочин")}</td><td>${(BOOK_EVENTS[e.type] || ["•", e.type]).join(" ")}${e.detail ? ` <small class="muted">${esc(e.detail)}</small>` : ""}</td><td>${esc(title(e.book_id))}</td></tr>`).join("")}</tbody></table>` : `<p class="muted small" style="margin:0">Одоогоор лог алга.</p>`;
-  const reload = async () => { list = await api("/api/me/books"); evs = await api("/api/me/book-events?limit=200" + ($("#bkLogFilter")?.value ? "&book=" + $("#bkLogFilter").value : "")); render(); };
+  const logRow = (e) => `<tr class="ev-${esc(e.type)}">
+      <td>${fmtDate(e.at)}</td><td>${esc(e.user_name || "Зочин")}</td><td>${(BOOK_EVENTS[e.type] || ["•", e.type]).join(" ")}${e.detail ? ` <small class="muted">${esc(e.detail)}</small>` : ""}</td><td>${esc(title(e.book_id))}</td></tr>`;
+  const logHTML = (evs) => evs.length ? `<table class="tbl"><thead><tr><th>Цаг</th><th>Хэн</th><th>Үйлдэл</th><th>Ном</th></tr></thead><tbody></tbody></table>` : `<p class="muted small" style="margin:0">Одоогоор лог алга.</p>`;
+  const mountLog = () => { const box = $("#bkLog"); if (box) { box.innerHTML = logHTML(evs); scrollRows(box, evs, logRow); } };
+  const reload = async () => { list = await api("/api/me/books"); evs = await api("/api/me/book-events?limit=1000" + ($("#bkLogFilter")?.value ? "&book=" + $("#bkLogFilter").value : "")); render(); };
 
   const formHTML = (b = {}) => `<form class="form" id="bkForm">
       <div class="seg" role="radiogroup" aria-label="Төрөл"><label><input type="radio" name="kind" value="book" ${b.kind !== "article" ? "checked" : ""}><span>📕 Ном</span></label><label><input type="radio" name="kind" value="article" ${b.kind === "article" ? "checked" : ""}><span>📄 Өгүүлэл</span></label></div>
@@ -1070,7 +1088,7 @@ async function books() {
       <div class="hero-cta" style="margin:0;justify-content:space-between">${b.id ? `<button type="button" class="btn btn-ghost" data-del>Устгах</button>` : "<span></span>"}
         <span style="display:flex;gap:8px"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></span></div></form>`;
   const openForm = (b) => {
-    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="bkModal"><div class="modal-card" style="width:min(640px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button><h3 class="h3">${b ? "Ном засах" : "Ном нэмэх"}</h3>${formHTML(b)}</div></div>`);
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="bkModal"><div class="modal-card" style="width:min(640px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button><h3 class="h3">${b ? "Ном засах" : "Ном нэмэх"}</h3>${formHTML(b || {})}</div></div>`);
     const modal = $("#bkModal"), f = $("#bkForm", modal);
     SG.openModal(modal);
     const closeIt = () => { SG.closeModal(modal); setTimeout(() => modal.remove(), 300); };
@@ -1142,7 +1160,7 @@ async function books() {
     if (e.target.closest("[data-edit]") && b) return openForm(b);
     if (e.target.closest("[data-log]") && b) { $("#bkLogFilter").value = b.id; $("#bkLogFilter").dispatchEvent(new Event("change", { bubbles: true })); $("#bkLog").scrollIntoView({ behavior: "smooth" }); }
   };
-  const onChange = async (e) => { if (e.target.id === "bkLogFilter") { evs = await api("/api/me/book-events?limit=200" + (e.target.value ? "&book=" + e.target.value : "")); $("#bkLog").innerHTML = logHTML(evs); } };
+  const onChange = async (e) => { if (e.target.id === "bkLogFilter") { evs = await api("/api/me/book-events?limit=1000" + (e.target.value ? "&book=" + e.target.value : "")); mountLog(); } };
   main.addEventListener("click", onClick); main.addEventListener("change", onChange);
   cleanup = () => { main.removeEventListener("click", onClick); main.removeEventListener("change", onChange); };
   render();
@@ -1534,7 +1552,41 @@ async function students() {
       return `<rect x="${i * w + w * 0.15}" y="${40 - ha}" width="${w * 0.7}" height="${ha}" fill="#1f3c8f"><title>${d.day}: идэвхтэй ${dur(d.active_sec)}</title></rect><rect x="${i * w + w * 0.15}" y="${40 - ha - hi}" width="${w * 0.7}" height="${hi}" fill="#eaa02e" opacity=".75"><title>${d.day}: идэвхгүй ${dur(d.inactive_sec)}</title></rect>`;
     }).join("")}</svg><div class="an-legend"><span><i style="background:#1f3c8f"></i>Идэвхтэй</span><span><i style="background:#eaa02e"></i>Идэвхгүй, өөр цонхонд</span><span class="muted">${daily[0]?.day || ""} — ${daily[daily.length - 1]?.day || ""}</span></div>`;
   };
-  const evRow = (e) => `<tr><td>${fmtDate(e.at)}</td><td>${esc(e.user_name || "")}</td><td>${esc(labels[e.type] || e.type)}</td><td class="muted">${esc(e.detail || "")}</td></tr>`;
+  const evRow = (e, who = true) => `<tr><td>${fmtDate(e.at)}</td>${who ? `<td>${esc(e.user_name || "")}</td>` : ""}<td>${esc(labels[e.type] || e.type)}</td><td class="muted">${esc(e.detail || "")}</td></tr>`;
+  // Үйл явдлын лог: 20-оор ачаалж, доош гүйлгэхэд дараагийн 20-ыг (at, id курсороор) нэмнэ.
+  // 30 сек тутмын шинэчлэлд DOM-оо хадгалж, зөвхөн шинэ үйл явдлыг дээр нь нэмнэ.
+  const PAGE = 20;
+  const makeFeed = (extra, who = true) => {
+    const box = document.createElement("div"); box.className = "bk-log ev-feed";
+    box.innerHTML = `<table class="tbl"><thead><tr><th>Цаг</th>${who ? "<th>Хэн</th>" : ""}<th>Үйл явдал</th><th>Дэлгэрэнгүй</th></tr></thead><tbody></tbody></table><div class="ev-more muted small" role="status"></div>`;
+    const tb = $("tbody", box), more = $(".ev-more", box), seen = new Set(), url = (c = "") => `/api/me/analytics/events?${qs()}${extra}&limit=${PAGE}${c}`;
+    const row = (e) => evRow(e, who);
+    let cur = "", busy = false, done = false;
+    const status = () => { more.textContent = done ? (seen.size > PAGE ? "Бүгдийг харууллаа" : "") : "Доош гүйлгэвэл цааш ачаална…"; if (done && !seen.size) tb.innerHTML = `<tr><td colspan="4" class="muted">Одоогоор алга.</td></tr>`; };
+    const add = (evs, where) => { const fresh = evs.filter((e) => !seen.has(e.id)); fresh.forEach((e) => seen.add(e.id)); if (fresh.length && tb.querySelector("td[colspan]")) tb.innerHTML = ""; tb.insertAdjacentHTML(where, fresh.map(row).join("")); };
+    const next = async () => {
+      if (busy || done) return; busy = true; more.textContent = "Ачаалж байна…";
+      try {
+        const d = await api(url(cur)); Object.assign(labels, d.labels || {});
+        add(d.events, "beforeend"); done = !d.more;
+        cur = d.more ? `&before_at=${encodeURIComponent(d.next_at)}&before_id=${encodeURIComponent(d.next_id)}` : "";
+      } catch { busy = false; more.textContent = "Ачаалж чадсангүй — дарж дахин оролдоно уу"; return; }
+      busy = false; status();
+      if (!done && box.isConnected && box.scrollHeight <= box.clientHeight + 60) next(); // гүйлгэх зай үүсэх хүртэл
+    };
+    const refresh = async () => { // шинэ үйл явдлыг дээр нь нэмнэ
+      try { const d = await api(url()); add(d.events, "afterbegin"); status(); } catch {}
+    };
+    new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) next(); }, { root: box, rootMargin: "160px" }).observe(more);
+    more.addEventListener("click", next);
+    next();
+    return { box, refresh, key: qs() + extra };
+  };
+  let feed = null;
+  const mountFeed = () => {
+    if (!feed || feed.key !== qs()) feed = makeFeed(""); else feed.refresh();
+    const y = feed.box.scrollTop; $("#anFeed")?.replaceWith(feed.box); feed.box.scrollTop = y;
+  };
   // Хүснэгтэд: суралцсан оноог юунаас бүрдсэнийг нэг мөрөөр.
   const learnHint = (x) => {
     const p = [];
@@ -1586,11 +1638,12 @@ async function students() {
         <td class="an-acts"><button class="icon-btn" data-detail title="Дэлгэрэнгүй" aria-label="Дэлгэрэнгүй">${ico("eye", 17)}</button><button class="icon-btn" data-remind title="Сануулга илгээх" aria-label="Сануулга илгээх">${ico("chat", 17)}</button></td></tr>`).join("") || `<tr><td colspan="8" class="muted">Энэ хугацаанд хичээл үзсэн суралцагч алга.</td></tr>`}
       </tbody></table></div>`, 1) +
       panel(`<div class="panel-head"><h2>Сүүлийн үйл явдал</h2><span class="muted small">зөрчил, сануулга, шалгалт</span></div>
-        <div class="bk-log"><table class="tbl"><thead><tr><th>Цаг</th><th>Хэн</th><th>Үйл явдал</th><th>Дэлгэрэнгүй</th></tr></thead><tbody>${data.events.map(evRow).join("") || `<tr><td colspan="4" class="muted">Одоогоор алга.</td></tr>`}</tbody></table></div>`, 2) +
+        <div id="anFeed"></div>`, 2) +
       panel(`<div class="panel-head"><h2>Бүх суралцагчид</h2><span class="chip">${rows.length}</span></div>
         <p class="muted small" style="margin:-6px 0 14px">Таны сургалтад элссэн эсвэл хичээл худалдаж авсан хүмүүс. "Чат" дарахад баруун талд яриа нээгдэнэ.</p>
         <div class="items" id="stuList">${rows.map(studentRow).join("") || `<div class="empty">Одоогоор суралцагч алга. Профайлаа түгээж, үнэгүй хичээл нийтлээрэй.</div>`}</div>`, 3);
     $("#anCsv").href = "#";
+    mountFeed();
   };
   const load = async () => { const d = await api(`/api/me/analytics?${qs()}`); data = d.data; labels = d.labels; render(); };
   // Тайлан: CSV-г токентой татна; PDF-г хэвлэх цонхоор.
@@ -1635,18 +1688,21 @@ async function students() {
       ${d.reflections?.length ? `<h4>Бичсэн дүгнэлтүүд</h4><div class="refl-list">${d.reflections.map((r) => `<div class="refl-item"><b>${esc(r.lesson)}</b><small class="muted">${fmtDate(r.at)}</small><p>${esc(r.text)}</p></div>`).join("")}</div>` : ""}
       ${d.quiz_lessons?.length ? `<h4>Асуулгын үнэлгээ — хичээл бүрээр</h4><p class="muted small" style="margin:0 0 8px">Хичээл доторх өөрийгөө сорих асуултууд. Бүгдэд нь зөв хариулсан хичээлийн дараагийнх нээгдэнэ.</p>
         <table class="tbl"><thead><tr><th>Хичээл</th><th>Зөв / асуулт</th><th>Төлөв</th><th>Оролдлого</th><th>Анх удаад зөв</th><th>Дундаж</th></tr></thead><tbody>${d.quiz_lessons.map((q) => `<tr class="${q.done ? "" : "an-wrongq"}"><td>${esc(q.title)}</td><td>${q.correct}/${q.total}</td><td>${q.done ? `✓ Дууссан${q.done_at ? " · " + fmtDate(q.done_at) : ""}` : `${q.total - q.correct} үлдсэн`}</td><td>${q.attempts}${q.questions ? ` (${(q.attempts / q.questions).toFixed(1)}/асуулт)` : ""}</td><td>${q.questions ? q.first_try + "/" + q.questions : "—"}</td><td>${q.avg_ms ? (q.avg_ms / 1000).toFixed(1) + " сек" : "—"}${q.guesses ? ` · ⚡${q.guesses}` : ""}</td></tr>`).join("")}</tbody></table>` : ""}
-      ${d.quiz_logs?.length ? `<h4>Асуултын хариултын лог</h4><div class="bk-log"><table class="tbl"><thead><tr><th>Огноо</th><th>Хичээл</th><th>Асуулт</th><th>Хариулт</th><th>Хугацаа</th></tr></thead><tbody>${d.quiz_logs.map((q) => `<tr class="${q.correct ? "" : "an-wrongq"}"><td>${fmtDate(q.at)}</td><td>${esc(d.lesson_titles?.[q.lesson_id] || "")}</td><td>${esc(q.question)}</td><td>${q.correct ? "✓ Зөв" : "✗ Буруу"}</td><td>${q.ms ? (q.ms / 1000).toFixed(1) + " сек" + (q.ms < 1500 ? " ⚡" : "") : "—"}</td></tr>`).join("")}</tbody></table></div>` : ""}
+      ${d.quiz_logs?.length ? `<h4>Асуултын хариултын лог</h4><div class="bk-log" id="anQuizLog"><table class="tbl"><thead><tr><th>Огноо</th><th>Хичээл</th><th>Асуулт</th><th>Хариулт</th><th>Хугацаа</th></tr></thead><tbody></tbody></table></div>` : ""}
       <h4>Хичээл тус бүрээр</h4><table class="tbl"><thead><tr><th>Хичээл</th><th>Идэвхтэй</th><th>Нийт</th><th>Удаа</th><th>Зөрчил</th></tr></thead><tbody>${d.lessons.map((l) => `<tr><td>${esc(l.title)}</td><td>${dur(l.active_sec)}</td><td>${dur(l.total_sec)}</td><td>${l.sessions}</td><td>${l.violations}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">Алга</td></tr>`}</tbody></table>
       <h4>Шалгалтууд</h4><table class="tbl"><thead><tr><th>Огноо</th><th>Оноо</th><th>Төлөв</th><th>Зөрчил</th></tr></thead><tbody>${d.exams.map((a) => `<tr><td>${fmtDate(a.started_at)}</td><td>${a.pct}%${a.passed ? " ✓" : ""}</td><td>${a.status === "terminated" ? `<b class="an-bad">Хаагдсан</b> · ${esc(a.reason || "")}` : a.status === "submitted" ? "Өгсөн" : a.status === "expired" ? "Хугацаа хэтэрсэн" : "Явагдаж байна"}</td><td>${a.violations}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">Алга</td></tr>`}</tbody></table>
-      <h4>Лог</h4><div class="bk-log"><table class="tbl"><tbody>${d.events.map(evRow).join("") || `<tr><td class="muted">Алга</td></tr>`}</tbody></table></div>`;
+      <h4>Лог</h4><div id="anStuFeed"></div>`;
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="anModal"><div class="modal-card" style="width:min(900px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}
       <div class="hero-cta" style="margin:16px 0 0;justify-content:flex-end"><button class="btn btn-glass" data-x="csv">${ico("files", 16)}Excel</button><button class="btn btn-glass" data-x="pdf">${ico("book", 16)}PDF</button><button class="btn btn-gold" data-x="remind">${ico("chat", 16)}Сануулга илгээх</button></div></div></div>`);
-    const m = $("#anModal"); SG.openModal(m);
+    const m = $("#anModal"), sf = makeFeed(`&student=${encodeURIComponent(uid)}`, false); $("#anStuFeed", m).replaceWith(sf.box);
+    const qRow = (q) => `<tr class="${q.correct ? "" : "an-wrongq"}"><td>${fmtDate(q.at)}</td><td>${esc(d.lesson_titles?.[q.lesson_id] || "")}</td><td>${esc(q.question)}</td><td>${q.correct ? "✓ Зөв" : "✗ Буруу"}</td><td>${q.ms ? (q.ms / 1000).toFixed(1) + " сек" + (q.ms < 1500 ? " ⚡" : "") : "—"}</td></tr>`;
+    if ($("#anQuizLog", m)) scrollRows($("#anQuizLog", m), d.quiz_logs, qRow);
+    SG.openModal(m);
     m.addEventListener("click", (e) => {
       if (e.target === m || e.target.closest("[data-close]")) { SG.closeModal(m); setTimeout(() => m.remove(), 300); return; }
       const b = e.target.closest("[data-x]"); if (!b) return;
       if (b.dataset.x === "csv") download(`/api/me/analytics/export?${qs()}&student=${uid}`, `suragch-${x.name}.csv`);
-      if (b.dataset.x === "pdf") printReport("Суралцагчийн тайлан", `<h1>${esc(x.name)}</h1>${html.replace(/<svg[\s\S]*?<\/svg>/, "")}`);
+      if (b.dataset.x === "pdf") printReport("Суралцагчийн тайлан", `<h1>${esc(x.name)}</h1>${html.replace(/<svg[\s\S]*?<\/svg>/, "").replace('<div id="anStuFeed"></div>', sf.box.querySelector("table").outerHTML).replace(/(id="anQuizLog"[\s\S]*?<tbody>)(<\/tbody>)/, (_, a, b) => a + (d.quiz_logs || []).map(qRow).join("") + b)}`);
       if (b.dataset.x === "remind") remind(uid, x.name);
     });
   };
