@@ -71,8 +71,10 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 			} else {
 				d, t.MaxScore = l.Assignment.Due, l.Assignment.MaxScore
 			}
-			t.Due = dueStateOf(d, progress[l.ID].Quiz[store.LatePassKey], now)
+			t.Due = dueStateOf(d, progress[l.ID].Quiz[store.LatePassKey], progress[l.ID].Quiz[store.FeePassKey], now)
 			switch {
+			case t.Due.NotStarted:
+				t.Status = "not_started"
 			case t.Due.Closed:
 				t.Status = "closed"
 			case t.Due.NeedPay:

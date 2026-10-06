@@ -16,32 +16,57 @@ import (
 // Шалгалт, даалгаврын дуусах хугацаа ба хоцорсон тохиолдлын бодлого (төлбөргүй / төлбөртэй / хаалттай),
 // даалгаврын хариу илгээх, багш дүгнэх.
 
-// DueState — суралцагчид одоо юу харагдах вэ.
+// DueState — суралцагчид одоо юу харагдах вэ: эхлээгүй / нээлттэй / хоцорсон (төлбөргүй, төлбөртэй, хаалттай),
+// оролцооны төлбөр (шууд төлбөртэй шалгалт). Fee = одоо төлөх нийт дүн (оролцоо + хоцролт).
 type DueState struct {
-	At      *time.Time `json:"at,omitempty"`
-	Policy  string     `json:"policy,omitempty"` // free | paid | closed
-	Late    bool       `json:"late"`             // хугацаа өнгөрсөн
-	Open    bool       `json:"open"`             // одоо илгээж/өгч болно
-	NeedPay bool       `json:"need_pay"`         // хоцорсон төлбөр төлж нээнэ
-	Closed  bool       `json:"closed"`           // хаалттай
-	Fee     int64      `json:"fee,omitempty"`
-	Paid    bool       `json:"paid,omitempty"` // хоцорсон төлбөрийг төлсөн
+	StartAt    *time.Time `json:"start_at,omitempty"`
+	At         *time.Time `json:"at,omitempty"`
+	Policy     string     `json:"policy,omitempty"` // free | paid | closed
+	NotStarted bool       `json:"not_started"`      // эхлэх цаг болоогүй
+	Late       bool       `json:"late"`             // дуусах хугацаа өнгөрсөн
+	Open       bool       `json:"open"`             // одоо илгээж/өгч болно
+	NeedPay    bool       `json:"need_pay"`         // төлбөр төлж нээнэ (оролцоо ба/эсвэл хоцролт)
+	Closed     bool       `json:"closed"`           // хаалттай
+	Fee        int64      `json:"fee,omitempty"`    // одоо төлөх нийт дүн
+	EntryFee   int64      `json:"entry_fee,omitempty"`
+	LateFee    int64      `json:"late_fee,omitempty"`
+	Paid       bool       `json:"paid,omitempty"`      // шаардлагатай төлбөрүүд төлөгдсөн
+	NeedLate   bool       `json:"need_late,omitempty"` // хоцролтын төлбөр дутуу
+	NeedEntry  bool       `json:"need_entry,omitempty"`
 }
 
-func dueStateOf(d store.Due, hasPass bool, now time.Time) DueState {
-	ds := DueState{At: d.At, Policy: d.Late, Open: true}
-	if d.At == nil || !now.After(*d.At) {
+func dueStateOf(d store.Due, latePass, feePass bool, now time.Time) DueState {
+	ds := DueState{StartAt: d.StartAt, At: d.At, Policy: d.Late, Open: true, EntryFee: d.Fee}
+	if d.StartAt != nil && now.Before(*d.StartAt) {
+		ds.NotStarted, ds.Open = true, false
 		return ds
 	}
-	ds.Late = true
-	switch d.Late {
-	case "closed":
-		ds.Open, ds.Closed = false, true
-	case "paid":
-		ds.Fee, ds.Paid = d.LateFee, hasPass
-		if !hasPass {
-			ds.Open, ds.NeedPay = false, true
+	if d.At != nil && now.After(*d.At) {
+		ds.Late = true
+		switch d.Late {
+		case "closed":
+			ds.Open, ds.Closed = false, true
+			return ds
+		case "paid":
+			ds.LateFee = d.LateFee
+			if !latePass {
+				ds.NeedLate = true
+			}
 		}
+	}
+	if d.Fee > 0 && !feePass {
+		ds.NeedEntry = true
+	}
+	if ds.NeedLate || ds.NeedEntry {
+		ds.Open, ds.NeedPay = false, true
+		if ds.NeedEntry {
+			ds.Fee += d.Fee
+		}
+		if ds.NeedLate {
+			ds.Fee += d.LateFee
+		}
+	} else if d.Fee > 0 || (ds.Late && d.Late == "paid") {
+		ds.Paid = true
 	}
 	return ds
 }
@@ -55,8 +80,17 @@ func validateDue(d *store.Due) string {
 	case d.Late != "paid" && d.LateFee != 0:
 		d.LateFee = 0
 	}
+	if d.Fee < 0 || d.Fee > maxPrice {
+		return "оролцооны төлбөр 0-100,000,000₮"
+	}
+	if d.StartAt != nil && d.StartAt.IsZero() {
+		d.StartAt = nil
+	}
 	if d.At != nil && d.At.IsZero() {
 		d.At = nil
+	}
+	if d.StartAt != nil && d.At != nil && !d.At.After(*d.StartAt) {
+		return "дуусах цаг эхлэх цагаас хойш байна"
 	}
 	return ""
 }
@@ -71,16 +105,18 @@ func validateAssignment(a *store.Assignment) string {
 	if a.MaxScore > 1000 {
 		return "даалгаврын дээд оноо 1-1000"
 	}
+	a.AllowFiles = false // хариу зөвхөн текст ба холбоосоор — файл илгээхгүй
 	return validateDue(&a.Due)
 }
 
-// latePass — хоцорсон төлбөрийг төлсөн эсэх (явцын late_pass тэмдэг).
-func (s *Server) latePass(r *http.Request, uid, courseID, lessonID string) bool {
+// passes — хоцролтын ба оролцооны төлбөрийг төлсөн эсэх (явцын тэмдгүүд).
+func (s *Server) passes(r *http.Request, uid, courseID, lessonID string) (late, fee bool) {
 	prog, err := s.store.LessonProgress(r.Context(), uid, courseID)
 	if err != nil {
-		return false
+		return false, false
 	}
-	return prog[lessonID].Quiz[store.LatePassKey]
+	q := prog[lessonID].Quiz
+	return q[store.LatePassKey], q[store.FeePassKey]
 }
 
 // dueFor — тухайн хичээлийн (шалгалт эсвэл даалгавар) хугацааны төлөв; багшид үргэлж нээлттэй.
@@ -93,19 +129,27 @@ func (s *Server) dueFor(r *http.Request, uid string, course *store.Course, l *st
 		d = l.Assignment.Due
 	}
 	if course.TeacherID == uid {
-		return DueState{At: d.At, Policy: d.Late, Open: true}
+		return DueState{StartAt: d.StartAt, At: d.At, Policy: d.Late, Open: true, EntryFee: d.Fee}
 	}
-	return dueStateOf(d, s.latePass(r, uid, course.ID, l.ID), time.Now())
+	lp, fp := s.passes(r, uid, course.ID, l.ID)
+	return dueStateOf(d, lp, fp, time.Now())
 }
 
-// dueBlocked — хаалттай (423) эсвэл төлбөр шаардлагатай (402) бол хариулаад true.
+// dueBlocked — эхлээгүй/хаалттай (423) эсвэл төлбөр шаардлагатай (402) бол хариулаад true.
 func dueBlocked(w http.ResponseWriter, ds DueState) bool {
 	switch {
+	case ds.NotStarted:
+		writeJSON(w, http.StatusLocked, map[string]any{"error": "эхлэх цаг болоогүй: " + ds.StartAt.Local().Format("01/02 15:04"), "due": ds})
+		return true
 	case ds.Closed:
 		writeJSON(w, http.StatusLocked, map[string]any{"error": "хугацаа дууссан — хаалттай", "due": ds})
 		return true
 	case ds.NeedPay:
-		writeJSON(w, http.StatusPaymentRequired, map[string]any{"error": fmt.Sprintf("хугацаа хоцорсон — %d₮ төлж нээнэ", ds.Fee), "due": ds})
+		msg := fmt.Sprintf("оролцооны төлбөр %d₮ төлж нээнэ", ds.Fee)
+		if ds.NeedLate {
+			msg = fmt.Sprintf("хугацаа хоцорсон — %d₮ төлж нээнэ", ds.Fee)
+		}
+		writeJSON(w, http.StatusPaymentRequired, map[string]any{"error": msg, "due": ds})
 		return true
 	}
 	return false
@@ -126,7 +170,11 @@ func (s *Server) handleLatePay(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"unlocked": true, "due": ds})
 		return
 	}
-	o, err := s.store.CreateOrGetPendingLateOrder(r.Context(), c.UID, course, l, ds.Fee)
+	kind := store.OrderKindFee
+	if ds.NeedLate {
+		kind = store.OrderKindLate // хоцролт + (дутуу бол) оролцоо нэг төлбөрөөр
+	}
+	o, err := s.store.CreateOrGetPendingPassOrder(r.Context(), c.UID, course, l, kind, ds.Fee)
 	if s.storeErr(w, r, err) {
 		return
 	}
@@ -143,7 +191,11 @@ func (s *Server) subView(sub *store.Submission) map[string]any {
 		}
 		urls = append(urls, map[string]string{"name": name, "url": s.media(p)})
 	}
-	out := map[string]any{"user_id": sub.UserID, "user_name": sub.UserName, "text": sub.Text, "files": urls,
+	links := sub.Links
+	if links == nil {
+		links = []string{}
+	}
+	out := map[string]any{"user_id": sub.UserID, "user_name": sub.UserName, "text": sub.Text, "files": urls, "links": links,
 		"submitted_at": sub.SubmittedAt, "late": sub.Late, "feedback": sub.Feedback, "graded_at": sub.GradedAt}
 	if sub.Score != nil {
 		out["score"] = *sub.Score
@@ -197,7 +249,8 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sub := &store.Submission{UserID: c.UID, UserName: s.displayName(r.Context(), c.UID, c.Name), CourseID: course.ID, LessonID: l.ID,
-		TeacherID: course.TeacherID, SubmittedAt: time.Now(), Late: ds.Late, Files: []string{}}
+		TeacherID: course.TeacherID, SubmittedAt: time.Now(), Late: ds.Late, Files: []string{}, Links: []string{}}
+	var rawLinks []string
 	ct, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if ct == "multipart/form-data" {
 		mr, err := r.MultipartReader()
@@ -220,11 +273,16 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 				sub.Text = string(b)
 				continue
 			}
+			if part.FormName() == "links" { // мөр эсвэл таслалаар тусгаарласан холбоосууд
+				b, _ := io.ReadAll(io.LimitReader(part, 10_000))
+				rawLinks = append(rawLinks, strings.FieldsFunc(string(b), func(r rune) bool { return r == '\n' || r == ',' || r == ' ' })...)
+				continue
+			}
 			if part.FileName() == "" {
 				continue
 			}
-			if !l.Assignment.AllowFiles {
-				writeErr(w, http.StatusBadRequest, "энэ даалгаварт файл хавсаргахгүй")
+			if !l.Assignment.AllowFiles { // одоогоор үргэлж: хариуг текст, холбоосоор илгээнэ
+				writeErr(w, http.StatusBadRequest, "даалгаврын хариуд файл илгээхгүй — текст болон холбоос (Google Docs, видео г.м) оруулна уу")
 				return
 			}
 			if len(sub.Files) >= maxSubmissionFiles {
@@ -247,16 +305,32 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		var in struct {
-			Text string `json:"text"`
+			Text  string   `json:"text"`
+			Links []string `json:"links"`
 		}
 		if !decode(w, r, &in) {
 			return
 		}
-		sub.Text = in.Text
+		sub.Text, rawLinks = in.Text, in.Links
+	}
+	for _, u := range rawLinks {
+		u = strings.TrimSpace(u)
+		if u == "" {
+			continue
+		}
+		if !validURL(u) || len(u) > 500 {
+			writeErr(w, http.StatusBadRequest, "холбоос http(s)://-ээр эхэлсэн байна: "+short(u))
+			return
+		}
+		if len(sub.Links) >= 5 {
+			writeErr(w, http.StatusBadRequest, "дээд тал нь 5 холбоос")
+			return
+		}
+		sub.Links = append(sub.Links, u)
 	}
 	sub.Text = strings.TrimSpace(sub.Text)
-	if sub.Text == "" && len(sub.Files) == 0 {
-		writeErr(w, http.StatusBadRequest, "хариугаа бичих эсвэл файл хавсаргана уу")
+	if sub.Text == "" && len(sub.Files) == 0 && len(sub.Links) == 0 {
+		writeErr(w, http.StatusBadRequest, "хариугаа бичих, холбоос эсвэл файл хавсаргана уу")
 		return
 	}
 	if utf8.RuneCountInString(sub.Text) > 20_000 {

@@ -133,6 +133,7 @@ const tsType = "DateTime64(3, 'UTC')"
 var chMigrations = []string{
 	"ALTER TABLE lesson_progress ADD COLUMN IF NOT EXISTS quiz_done_at Nullable(" + tsType + ")",
 	"ALTER TABLE lessons ADD COLUMN IF NOT EXISTS assignment String DEFAULT ''",
+	"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS links Array(String)",
 }
 
 var chTables = []chTable{
@@ -173,7 +174,7 @@ var chTables = []chTable{
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (course_id, id)`},
 	{"submissions", `(id String, user_id String, user_name String, course_id String, lesson_id String, teacher_id String,
 		text String, files Array(String), submitted_at ` + tsType + `, late Bool, score Nullable(Int32), feedback String,
-		graded_at Nullable(` + tsType + `), ver UInt64)
+		graded_at Nullable(` + tsType + `), ver UInt64, links Array(String))
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (lesson_id, user_id)`},
 	{"lesson_progress", `(user_id String, course_id String, lesson_id String, viewed_at ` + tsType + `,
 		completed_at Nullable(` + tsType + `), quiz Map(String, Bool), quiz_done_at Nullable(` + tsType + `), ver UInt64)

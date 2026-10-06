@@ -432,18 +432,21 @@ func (c *ClickHouse) SetUserRankLevel(ctx context.Context, userID string, level 
 
 // ---- даалгаврын хариу ----
 
-const subCols = `id, user_id, user_name, course_id, lesson_id, teacher_id, text, files, submitted_at, late, score, feedback, graded_at`
+const subCols = `id, user_id, user_name, course_id, lesson_id, teacher_id, text, files, submitted_at, late, score, feedback, graded_at, links`
 
 func scanSub(r driver.Rows) (Submission, error) {
 	var s Submission
 	var score *int32
-	err := r.Scan(&s.ID, &s.UserID, &s.UserName, &s.CourseID, &s.LessonID, &s.TeacherID, &s.Text, &s.Files, &s.SubmittedAt, &s.Late, &score, &s.Feedback, &s.GradedAt)
+	err := r.Scan(&s.ID, &s.UserID, &s.UserName, &s.CourseID, &s.LessonID, &s.TeacherID, &s.Text, &s.Files, &s.SubmittedAt, &s.Late, &score, &s.Feedback, &s.GradedAt, &s.Links)
 	if score != nil {
 		v := int(*score)
 		s.Score = &v
 	}
 	if s.Files == nil {
 		s.Files = []string{}
+	}
+	if s.Links == nil {
+		s.Links = []string{}
 	}
 	return s, err
 }
@@ -454,13 +457,16 @@ func (c *ClickHouse) writeSub(ctx context.Context, s *Submission) error {
 		v := int32(*s.Score)
 		score = &v
 	}
-	files := s.Files
+	files, links := s.Files, s.Links
 	if files == nil {
 		files = []string{}
 	}
+	if links == nil {
+		links = []string{}
+	}
 	return c.insert(ctx, "submissions", []string{"id", "user_id", "user_name", "course_id", "lesson_id", "teacher_id", "text", "files",
-		"submitted_at", "late", "score", "feedback", "graded_at", "ver"},
-		s.ID, s.UserID, s.UserName, s.CourseID, s.LessonID, s.TeacherID, s.Text, files, s.SubmittedAt.UTC(), s.Late, score, s.Feedback, nullTime(s.GradedAt), ver())
+		"submitted_at", "late", "score", "feedback", "graded_at", "ver", "links"},
+		s.ID, s.UserID, s.UserName, s.CourseID, s.LessonID, s.TeacherID, s.Text, files, s.SubmittedAt.UTC(), s.Late, score, s.Feedback, nullTime(s.GradedAt), ver(), links)
 }
 
 func (c *ClickHouse) subsWhere(ctx context.Context, where string, args ...any) ([]Submission, error) {

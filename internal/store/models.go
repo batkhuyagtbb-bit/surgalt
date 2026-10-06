@@ -213,13 +213,18 @@ type Exam struct {
 // Due — шалгалт, даалгаврын дуусах хугацаа. At хоосон бол хугацаагүй. Хугацаа өнгөрсний дараа:
 // Late = "free" (төлбөргүй үргэлжлүүлнэ), "paid" (LateFee төлж нээнэ), "closed" (хаалттай).
 type Due struct {
-	At      *time.Time `json:"at,omitempty"`
+	StartAt *time.Time `json:"start_at,omitempty"` // эхлэх цаг: үүнээс өмнө хаалттай (хоосон = шууд)
+	At      *time.Time `json:"at,omitempty"`       // дуусах цаг
 	Late    string     `json:"late,omitempty"`
 	LateFee int64      `json:"late_fee,omitempty"`
+	Fee     int64      `json:"fee,omitempty"` // оролцооны төлбөр (шууд төлбөртэй шалгалт/даалгавар), 0 = үнэгүй
 }
 
 // LatePassKey — хоцорсон шалгалт/даалгаврын төлбөр төлсөн тэмдэг (LessonProgress.Quiz дотор).
 const LatePassKey = "late_pass"
+
+// FeePassKey — оролцооны төлбөр төлсөн тэмдэг (шууд төлбөртэй шалгалт/даалгавар).
+const FeePassKey = "fee_pass"
 
 // LatePolicies — хоцорсон тохиолдлын бодлогын түлхүүр → монгол нэр.
 var LatePolicies = map[string]string{"": "төлбөргүй", "free": "төлбөргүй", "paid": "төлбөртэй", "closed": "хаалттай"}
@@ -241,6 +246,7 @@ type Submission struct {
 	TeacherID   string     `json:"teacher_id"`
 	Text        string     `json:"text"`
 	Files       []string   `json:"files"` // багшийн сан дахь /files/... замууд
+	Links       []string   `json:"links"` // суралцагчийн илгээсэн холбоосууд (Google Docs, GitHub, видео г.м)
 	SubmittedAt time.Time  `json:"submitted_at"`
 	Late        bool       `json:"late"`
 	Score       *int       `json:"score,omitempty"`
@@ -283,7 +289,8 @@ const (
 	OrderKindCourse  = "course"  // сургалтын багц (бүх хичээл)
 	OrderKindLesson  = "lesson"  // нэг хичээл
 	OrderKindStorage = "storage" // файлын сангийн багтаамж
-	OrderKindLate    = "late"    // хугацаа хоцорсон шалгалт/даалгаврын төлбөр (lesson_progress-д late_pass)
+	OrderKindLate    = "late"    // хугацаа хоцорсон шалгалт/даалгаврын төлбөр (late_pass + fee_pass)
+	OrderKindFee     = "fee"     // шалгалт/даалгаврын оролцооны төлбөр (fee_pass)
 )
 
 // StorageMonth — багтаамжийн нэг сарын үргэлжлэх хугацаа.
@@ -442,8 +449,8 @@ type Store interface {
 	CreateOrGetPendingOrder(ctx context.Context, userID string, c *Course) (*Order, error)
 	// CreateOrGetPendingLessonOrder — нэг хичээл худалдан авах захиалга.
 	CreateOrGetPendingLessonOrder(ctx context.Context, userID string, c *Course, l *Lesson) (*Order, error)
-	// CreateOrGetPendingLateOrder — хоцорсон шалгалт/даалгаврыг нээх төлбөрийн захиалга (төлөгдвөл late_pass).
-	CreateOrGetPendingLateOrder(ctx context.Context, userID string, c *Course, l *Lesson, fee int64) (*Order, error)
+	// CreateOrGetPendingPassOrder — шалгалт/даалгаврын төлбөрийн захиалга: kind = late (хоцролт, оролцоог хамт) эсвэл fee (оролцоо).
+	CreateOrGetPendingPassOrder(ctx context.Context, userID string, c *Course, l *Lesson, kind string, amount int64) (*Order, error)
 	// PurchasedLessons нь хэрэглэгчийн тухайн сургалтаас дангаар худалдаж авсан хичээлүүд.
 	PurchasedLessons(ctx context.Context, userID, courseID string) ([]string, error)
 	// CreateStorageOrder нь багтаамж худалдан авах захиалга.

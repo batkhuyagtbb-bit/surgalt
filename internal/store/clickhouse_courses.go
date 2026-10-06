@@ -684,9 +684,10 @@ func (c *ClickHouse) CreateOrGetPendingLessonOrder(ctx context.Context, userID s
 		&Order{Kind: OrderKindLesson, Title: co.Title + " — " + l.Title, UserID: userID, CourseID: co.ID, LessonID: l.ID, TeacherID: co.TeacherID, Amount: l.Price})
 }
 
-func (c *ClickHouse) CreateOrGetPendingLateOrder(ctx context.Context, userID string, co *Course, l *Lesson, fee int64) (*Order, error) {
-	return c.pendingOrder(ctx, userID+":late:"+l.ID, "user_id = ? AND lesson_id = ? AND kind = ?", []any{userID, l.ID, OrderKindLate},
-		&Order{Kind: OrderKindLate, Title: co.Title + " — " + l.Title + " (хоцорсон)", UserID: userID, CourseID: co.ID, LessonID: l.ID, TeacherID: co.TeacherID, Amount: fee})
+func (c *ClickHouse) CreateOrGetPendingPassOrder(ctx context.Context, userID string, co *Course, l *Lesson, kind string, amount int64) (*Order, error) {
+	suffix := map[string]string{OrderKindLate: " (хоцорсон)", OrderKindFee: " (оролцооны төлбөр)"}[kind]
+	return c.pendingOrder(ctx, userID+":"+kind+":"+l.ID, "user_id = ? AND lesson_id = ? AND kind = ?", []any{userID, l.ID, kind},
+		&Order{Kind: kind, Title: co.Title + " — " + l.Title + suffix, UserID: userID, CourseID: co.ID, LessonID: l.ID, TeacherID: co.TeacherID, Amount: amount})
 }
 
 func (c *ClickHouse) CreateStorageOrder(ctx context.Context, userID string, mb int64, months int, amount int64) (*Order, error) {
@@ -726,8 +727,15 @@ func (c *ClickHouse) MarkOrderPaid(ctx context.Context, orderID string, amount i
 			o.UserID, o.LessonID, o.CourseID, o.TeacherID, time.Now().UTC(), ver()); err != nil {
 			return nil, err
 		}
-	case OrderKindLate: // хоцорсон шалгалт/даалгаврын эрх: явцад late_pass тэмдэг
+	case OrderKindLate: // хоцорсон шалгалт/даалгаврын эрх (оролцооны төлбөрийг хамт багтаасан)
 		if err := c.SaveQuizResult(ctx, o.UserID, o.CourseID, o.LessonID, LatePassKey, true); err != nil {
+			return nil, err
+		}
+		if err := c.SaveQuizResult(ctx, o.UserID, o.CourseID, o.LessonID, FeePassKey, true); err != nil {
+			return nil, err
+		}
+	case OrderKindFee: // оролцооны төлбөр
+		if err := c.SaveQuizResult(ctx, o.UserID, o.CourseID, o.LessonID, FeePassKey, true); err != nil {
 			return nil, err
 		}
 	case OrderKindStorage:

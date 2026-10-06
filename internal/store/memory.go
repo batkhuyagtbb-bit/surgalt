@@ -331,8 +331,8 @@ func (m *Memory) MarkOrderPaid(_ context.Context, orderID string, amount int64) 
 	case OrderKindLesson:
 		delete(m.pendingL, [2]string{o.UserID, o.LessonID})
 		m.lessonAcc[[2]string{o.UserID, o.LessonID}] = o.CourseID
-	case OrderKindLate:
-		delete(m.pendingL, [2]string{o.UserID, "late:" + o.LessonID})
+	case OrderKindLate, OrderKindFee:
+		delete(m.pendingL, [2]string{o.UserID, o.Kind + ":" + o.LessonID})
 		k := [2]string{o.UserID, o.LessonID}
 		p, ok := m.progress[k]
 		if !ok {
@@ -342,7 +342,10 @@ func (m *Memory) MarkOrderPaid(_ context.Context, orderID string, amount int64) 
 		if p.Quiz == nil {
 			p.Quiz = map[string]bool{}
 		}
-		p.Quiz[LatePassKey] = true
+		p.Quiz[FeePassKey] = true
+		if o.Kind == OrderKindLate {
+			p.Quiz[LatePassKey] = true
+		}
 	case OrderKindBook:
 		m.books.grant(o.UserID, o.BookID, o.ID, o.Amount)
 	case OrderKindStorage:
@@ -641,18 +644,19 @@ func (m *Memory) CreateOrGetPendingLessonOrder(_ context.Context, userID string,
 	return &oc, nil
 }
 
-func (m *Memory) CreateOrGetPendingLateOrder(_ context.Context, userID string, c *Course, l *Lesson, fee int64) (*Order, error) {
+func (m *Memory) CreateOrGetPendingPassOrder(_ context.Context, userID string, c *Course, l *Lesson, kind string, amount int64) (*Order, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	k := [2]string{userID, "late:" + l.ID}
+	k := [2]string{userID, kind + ":" + l.ID}
 	if id, ok := m.pendingL[k]; ok {
 		o := m.orders[id]
-		o.Amount = fee
+		o.Amount = amount
 		oc := *o
 		return &oc, nil
 	}
-	o := &Order{ID: m.next(), Kind: OrderKindLate, Title: c.Title + " — " + l.Title + " (хоцорсон)", UserID: userID, CourseID: c.ID,
-		LessonID: l.ID, TeacherID: c.TeacherID, Amount: fee, Status: OrderPending, CreatedAt: time.Now()}
+	suffix := map[string]string{OrderKindLate: " (хоцорсон)", OrderKindFee: " (оролцооны төлбөр)"}[kind]
+	o := &Order{ID: m.next(), Kind: kind, Title: c.Title + " — " + l.Title + suffix, UserID: userID, CourseID: c.ID,
+		LessonID: l.ID, TeacherID: c.TeacherID, Amount: amount, Status: OrderPending, CreatedAt: time.Now()}
 	m.orders[o.ID], m.pendingL[k] = o, o.ID
 	oc := *o
 	return &oc, nil

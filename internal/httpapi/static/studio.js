@@ -581,7 +581,7 @@ async function courseEditor(id) {
   const fileName = (u) => { const f = lib.files.find((x) => x.path === stripSig(u)); return f ? f.original_name : decodeURIComponent(stripSig(u).split("/").pop() || ""); };
   const mediaLabel = (u) => (!u ? "" : /youtu\.?be|vimeo/.test(u) ? "Видео холбоос" : u.startsWith("/files/") ? fileName(u) : u);
   const isImage = (u) => /\.(webp|jpe?g|png|gif)$/i.test(stripSig(u));
-  const dueBadge = (due) => !due?.at ? "" : `<span class="aud">📅 ${fmtDate(due.at)} хүртэл${due.late === "paid" ? ` · хоцорвол ${money(due.late_fee)}` : due.late === "closed" ? " · дараа нь хаалттай" : ""}</span>`;
+  const dueBadge = (due) => !due ? "" : `${due.start_at ? `<span class="aud">▶ ${fmtDate(due.start_at)}-с</span>` : ""}${due.at ? `<span class="aud">📅 ${fmtDate(due.at)} хүртэл${due.late === "paid" ? ` · хоцорвол ${money(due.late_fee)}` : due.late === "closed" ? " · дараа нь хаалттай" : ""}</span>` : ""}${due.fee ? `<span class="aud aud-paid">💳 ${money(due.fee)}</span>` : ""}`;
   const kindBadge = (l) => l.exam ? `<span class="kind kind-exam">📝 Шалгалт</span>${dueBadge(l.exam.due)}` : l.assignment ? `<span class="kind kind-asg">📎 Даалгавар</span>${dueBadge(l.assignment.due)}` : "";
   const audience = (l) => l.is_free ? `<span class="aud aud-free">${ico("globe", 14)}Үнэгүй · бүгдэд нээлттэй</span>`
     : `<span class="aud aud-paid">${ico("lock", 14)}${l.price ? money(l.price) : "Зөвхөн багцаар"}</span>`;
@@ -607,9 +607,11 @@ async function courseEditor(id) {
   // Нийтлэл бичих/засах маягт (шинэ хичээл ба засварт ижил). preset — бүлгийн толгойноос "+ Хичээл нэмэх" дарахад.
   const toLocal = (iso) => { if (!iso) return ""; const d = new Date(iso); if (isNaN(d)) return ""; const p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
   // Хугацаа ба хоцорсон тохиолдлын бодлого (шалгалт, даалгаварт ижил).
-  const dueHTML = (pfx, due) => `<label>Дуусах хугацаа<input name="${pfx}_due" type="datetime-local" value="${toLocal(due?.at)}"><small class="muted">Хоосон = хугацаагүй</small></label>
-        <label>Хугацаа хоцорсон бол<select name="${pfx}_late"><option value="free" ${!due?.late || due.late === "free" ? "selected" : ""}>Төлбөргүй үргэлжлүүлнэ</option><option value="paid" ${due?.late === "paid" ? "selected" : ""}>Төлбөр төлж нээнэ</option><option value="closed" ${due?.late === "closed" ? "selected" : ""}>Хаалттай</option></select></label>
-        <label class="pe-fee" ${due?.late === "paid" ? "" : "hidden"}>Хоцорсон төлбөр (₮)<input name="${pfx}_fee" type="number" min="0" step="500" value="${due?.late_fee || 5000}"></label>`;
+  const dueHTML = (pfx, due, what) => `<label>Эхлэх цаг<input name="${pfx}_start" type="datetime-local" value="${toLocal(due?.start_at)}"><small class="muted">Хоосон = шууд</small></label>
+        <label>Дуусах цаг<input name="${pfx}_due" type="datetime-local" value="${toLocal(due?.at)}"><small class="muted">Хоосон = хугацаагүй</small></label>
+        <label>Дуусах цаг өнгөрсөн бол<select name="${pfx}_late"><option value="free" ${!due?.late || due.late === "free" ? "selected" : ""}>Төлбөргүй үргэлжлүүлнэ</option><option value="paid" ${due?.late === "paid" ? "selected" : ""}>Хоцролтын төлбөр төлж нээнэ</option><option value="closed" ${due?.late === "closed" ? "selected" : ""}>Хаалттай</option></select></label>
+        <label class="pe-fee" ${due?.late === "paid" ? "" : "hidden"}>Хоцролтын төлбөр (₮)<input name="${pfx}_fee" type="number" min="0" step="500" value="${due?.late_fee || 5000}"></label>
+        <label>${what} төлбөр (₮)<input name="${pfx}_entry" type="number" min="0" step="500" value="${due?.fee || 0}"><small class="muted">0 = үнэгүй. Тавьсан бол суралцагч төлж байж ${what === "Шалгалтын" ? "шалгалт өгнө" : "хариу илгээнэ"} (сургалтад элссэн ч).</small></label>`;
   const kindOf = (l) => l?.exam ? "exam" : l?.assignment ? "assignment" : "lesson";
   const editorHTML = (l, preset, kind) => { kind = kind || kindOf(l); return `<form class="form post-editor" ${l ? `data-edit="${esc(l.id)}"` : `id="composerForm"`} data-kind="${kind}">
       <div class="seg pe-kind" role="radiogroup" aria-label="Төрөл">
@@ -627,14 +629,14 @@ async function courseEditor(id) {
           <label>Хугацаа (мин, 0 = хязгааргүй)<input name="ex_time" type="number" min="0" max="600" value="${l?.exam?.time_min ?? 30}"></label>
           <label>Оролдлого (0 = хязгааргүй)<input name="ex_attempts" type="number" min="0" max="100" value="${l?.exam?.attempts ?? 1}"></label>
           <label>Тэнцэх хувь<input name="ex_pass" type="number" min="0" max="100" value="${l?.exam?.pass_pct ?? 60}"></label>
-          ${dueHTML("ex", l?.exam?.due)}
+          ${dueHTML("ex", l?.exam?.due, "Шалгалтын")}
           <label class="check"><input type="checkbox" name="ex_shuffle" ${l?.exam?.shuffle ? "checked" : ""}> Асуултыг холих</label>
           <label class="check"><input type="checkbox" name="ex_show" ${l?.exam ? (l.exam.show_answers ? "checked" : "") : "checked"}> Дууссаны дараа зөв хариултыг харуулах</label></div></div>
-      <div class="pe-asg pe-section" ${kind === "assignment" ? "" : "hidden"}><p class="muted small" style="margin:0 0 6px">📎 Даалгавар: нөхцөлөө доорх агуулгад бичнэ. Суралцагч текст, файлаар хариугаа илгээж, та оноо, тайлбар өгнө.</p>
+      <div class="pe-asg pe-section" ${kind === "assignment" ? "" : "hidden"}><p class="muted small" style="margin:0 0 6px">📎 Даалгавар: нөхцөлөө доорх агуулгад бичнэ. Суралцагч текст, холбоосоор хариугаа илгээж, та оноо, тайлбар өгнө.</p>
         <div class="kind-row">
-          ${dueHTML("asg", l?.assignment?.due)}
-          <label>Дээд оноо<input name="asg_max" type="number" min="1" max="1000" value="${l?.assignment?.max_score || 100}"></label>
-          <label class="check"><input type="checkbox" name="asg_files" ${l ? (l.assignment?.allow_files ? "checked" : "") : "checked"}> Файл хавсаргахыг зөвшөөрөх (3 хүртэл)</label></div></div>
+          ${dueHTML("asg", l?.assignment?.due, "Даалгаврын")}
+          <label>Дээд оноо<input name="asg_max" type="number" min="1" max="1000" value="${l?.assignment?.max_score || 100}"></label></div>
+        <p class="muted small" style="margin:6px 0 0">Суралцагч хариугаа текст мэдээлэл ба холбоосоор (Google Docs, видео, GitHub г.м) илгээнэ — файл илгээхгүй.</p></div>
       <details class="pe-more" ${l?.active_min ? "open" : ""}><summary>${ico("gear", 15)}Идэвхтэй хугацаа</summary>
         <label>Идэвхтэй суралцах хугацаа (минут)<input name="active_min" type="number" min="0" max="600" value="${l?.active_min || 0}"><small class="muted">0 = шаардахгүй. Тавьсан бол суралцагч энэ хугацаанд идэвхтэй үзэж байж «дууслаа» дарна.</small></label></details>
       <div class="be" data-be></div>
@@ -749,10 +751,10 @@ async function courseEditor(id) {
     const d = await api(`/api/courses/${c.id}/lessons/${lid}/submissions`);
     const max = d.assignment?.max_score || 100;
     const row = (s) => `<article class="sub-item" data-uid="${esc(s.user_id)}"><header><b>${esc(s.user_name)}</b><small class="muted">${fmtDate(s.submitted_at)}${s.late ? ` · <span class="an-bad">хоцорсон</span>` : ""}</small></header>
-      ${s.text ? `<p class="sub-text">${SG.linkify(s.text)}</p>` : ""}${s.files?.length ? `<p class="sub-files">${s.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`).join(" ")}</p>` : ""}
+      ${s.text ? `<p class="sub-text">${SG.linkify(s.text)}</p>` : ""}${s.links?.length ? `<p class="sub-files">${s.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 70))}</a>`).join("<br>")}</p>` : ""}${s.files?.length ? `<p class="sub-files">${s.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`).join(" ")}</p>` : ""}
       <form class="sub-grade"><label>Оноо (0-${max})<input name="score" type="number" min="0" max="${max}" value="${s.score ?? ""}" required></label><label class="grow">Тайлбар<input name="feedback" maxlength="5000" value="${esc(s.feedback || "")}" placeholder="Юу сайн, юуг сайжруулах вэ?"></label><button class="btn btn-gold btn-sm">${s.graded_at ? "Шинэчлэх" : "Дүгнэх"}</button>${s.graded_at ? `<small class="muted">✓ ${fmtDate(s.graded_at)}</small>` : ""}</form></article>`;
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="gradeModal"><div class="modal-card" style="width:min(820px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
-      <h3 class="h3">📎 ${esc(d.lesson)} — хариунууд (${d.submissions.length})</h3>${d.assignment?.due?.at ? `<p class="muted small">Хугацаа: ${fmtDate(d.assignment.due.at)} · хоцорвол ${d.assignment.due.late === "paid" ? money(d.assignment.due.late_fee) : d.assignment.due.late === "closed" ? "хаалттай" : "төлбөргүй"}</p>` : ""}
+      <h3 class="h3">📎 ${esc(d.lesson)} — хариунууд (${d.submissions.length})</h3>${d.assignment?.due?.at || d.assignment?.due?.start_at ? `<p class="muted small">${d.assignment.due.start_at ? `Эхлэх: ${fmtDate(d.assignment.due.start_at)} · ` : ""}${d.assignment.due.at ? `Дуусах: ${fmtDate(d.assignment.due.at)} · хоцорвол ${d.assignment.due.late === "paid" ? money(d.assignment.due.late_fee) : d.assignment.due.late === "closed" ? "хаалттай" : "төлбөргүй"}` : ""}${d.assignment.due.fee ? ` · оролцооны төлбөр ${money(d.assignment.due.fee)}` : ""}</p>` : ""}
       <div class="sub-list">${d.submissions.map(row).join("") || `<p class="muted">Хариу ирээгүй байна.</p>`}</div></div></div>`);
     const m = $("#gradeModal"); SG.openModal(m);
     m.addEventListener("click", (e) => { if (e.target === m || e.target.closest("[data-close]")) { SG.closeModal(m); setTimeout(() => m.remove(), 300); } });
@@ -768,11 +770,14 @@ async function courseEditor(id) {
     const isFree = f.mode.value === "free";
     const blocks = f._be.collect();
     const kind = f.kind.value;
-    const due = (pfx) => { const at = f[pfx + "_due"].value ? new Date(f[pfx + "_due"].value).toISOString() : null, late = f[pfx + "_late"].value; return { at, late, late_fee: late === "paid" ? +f[pfx + "_fee"].value || 0 : 0 }; };
+    const due = (pfx) => { const iso = (v) => (v ? new Date(v).toISOString() : null), late = f[pfx + "_late"].value; return { start_at: iso(f[pfx + "_start"].value), at: iso(f[pfx + "_due"].value), late, late_fee: late === "paid" ? +f[pfx + "_fee"].value || 0 : 0, fee: +f[pfx + "_entry"].value || 0 }; };
     const exam = kind === "exam" ? { time_min: +f.ex_time.value || 0, attempts: +f.ex_attempts.value || 0, pass_pct: +f.ex_pass.value || 0, shuffle: f.ex_shuffle.checked, show_answers: f.ex_show.checked, due: due("ex") } : null;
-    const assignment = kind === "assignment" ? { due: due("asg"), max_score: +f.asg_max.value || 100, allow_files: f.asg_files.checked } : null;
+    const assignment = kind === "assignment" ? { due: due("asg"), max_score: +f.asg_max.value || 100, allow_files: false } : null;
     if (exam && !blocks.some((b) => b.type === "quiz")) throw new Error("Шалгалтад дор хаяж нэг асуулт нэмнэ үү");
-    for (const d of [exam?.due, assignment?.due]) if (d?.late === "paid" && !d.late_fee) throw new Error("Хоцорсон тохиолдлын төлбөрийг оруулна уу");
+    for (const d of [exam?.due, assignment?.due]) {
+      if (d?.late === "paid" && !d.late_fee) throw new Error("Хоцролтын төлбөрийг оруулна уу");
+      if (d?.start_at && d?.at && d.at <= d.start_at) throw new Error("Дуусах цаг эхлэх цагаас хойш байна");
+    }
     return { title: f.title.value, content: blocksSummary(blocks), video_url: "", blocks, active_min: +f.active_min.value || 0, exam, assignment, is_free: isFree, price: isFree ? 0 : +f.price.value || 0,
       unlock_after_h: f.unlock_after_h ? +f.unlock_after_h.value || 0 : l?.unlock_after_h || 0, always_open: f.always_open ? f.always_open.checked : !!l?.always_open,
       format: f.format.value, mode: f.mode_kind.value, section: sectionOf(f) };

@@ -22,6 +22,7 @@ type learnMem struct {
 func cloneSub(s *Submission) Submission {
 	c := *s
 	c.Files = append([]string{}, s.Files...)
+	c.Links = append([]string{}, s.Links...)
 	if s.Score != nil {
 		v := *s.Score
 		c.Score = &v

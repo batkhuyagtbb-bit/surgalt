@@ -1812,7 +1812,7 @@ func TestAssignmentAndDueFlow(t *testing.T) {
 		t.Fatal("шалгалт ба даалгавар давхар байж болохгүй")
 	}
 	code, la := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Эссэ","is_free":true,"blocks":[{"id":"t001","type":"text","text":"500 үгтэй эссэ бич"}],"assignment":{"due":{"at":"`+past+`","late":"paid","late_fee":2000},"max_score":50,"allow_files":true}}`)
-	if code != 201 || la["assignment"].(map[string]any)["max_score"].(float64) != 50 {
+	if code != 201 || la["assignment"].(map[string]any)["max_score"].(float64) != 50 || la["assignment"].(map[string]any)["allow_files"] != false {
 		t.Fatalf("даалгавар үүссэнгүй: %d %v", code, la)
 	}
 	lid := la["id"].(string)
@@ -1840,26 +1840,36 @@ func TestAssignmentAndDueFlow(t *testing.T) {
 	if lp2["unlocked"] != true {
 		t.Fatalf("төлсний дараа нээлттэй байх ёстой: %v", lp2)
 	}
-	// Файлтай илгээх (multipart).
-	var buf bytes.Buffer
-	mw := multipart.NewWriter(&buf)
-	_ = mw.WriteField("text", "Миний эссэ: хоцорсон ч илгээлээ.")
-	fw, _ := mw.CreateFormFile("file", "esse.txt")
-	fw.Write([]byte("эссэ…"))
-	mw.Close()
-	req, _ := http.NewRequest("POST", srv.URL+"/api/courses/"+cid+"/lessons/"+lid+"/submit", &buf)
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-	req.Header.Set("Authorization", "Bearer "+s1)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
+	// Файл илгээхгүй: multipart-аар файл явуулбал 400; текст + холбоос multipart → 200 (хоцорсон).
+	send := func(withFile bool) (int, map[string]any) {
+		var buf bytes.Buffer
+		mw := multipart.NewWriter(&buf)
+		_ = mw.WriteField("text", "Миний эссэ: хоцорсон ч илгээлээ.")
+		_ = mw.WriteField("links", "https://docs.google.com/esse\nhttps://youtu.be/abc")
+		if withFile {
+			fw, _ := mw.CreateFormFile("file", "esse.txt")
+			fw.Write([]byte("эссэ…"))
+		}
+		mw.Close()
+		req, _ := http.NewRequest("POST", srv.URL+"/api/courses/"+cid+"/lessons/"+lid+"/submit", &buf)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+s1)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var sr map[string]any
+		_ = json.NewDecoder(res.Body).Decode(&sr)
+		return res.StatusCode, sr
 	}
-	var sr map[string]any
-	_ = json.NewDecoder(res.Body).Decode(&sr)
-	res.Body.Close()
+	if code, sr := send(true); code != 400 {
+		t.Fatalf("файл илгээхгүй байх ёстой: %d %v", code, sr)
+	}
+	code, sr := send(false)
 	sub, _ := sr["submission"].(map[string]any)
-	if res.StatusCode != 200 || sub["late"] != true || len(sub["files"].([]any)) != 1 || !strings.HasSuffix(sub["files"].([]any)[0].(map[string]any)["name"].(string), "esse.txt") {
-		t.Fatalf("илгээлт: %d %v", res.StatusCode, sr)
+	if code != 200 || sub["late"] != true || len(sub["links"].([]any)) != 2 || len(sub["files"].([]any)) != 0 {
+		t.Fatalf("текст+холбоостой илгээлт: %d %v", code, sr)
 	}
 	_, acc := call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
 	if acc["progress"].(map[string]any)[lid].(map[string]any)["completed_at"] == nil {
@@ -1925,9 +1935,49 @@ func TestAssignmentAndDueFlow(t *testing.T) {
 	if code, r := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lb["id"].(string)+"/submit", s1, `{"text":"цагтаа"}`); code != 200 || r["submission"].(map[string]any)["late"] != false {
 		t.Fatalf("цагтаа илгээсэн: %d %v", code, r)
 	}
-	// Файл хавсаргахыг зөвшөөрөөгүй даалгаварт файл → 400; хоосон хариу → 400.
+	// Хоосон хариу → 400; буруу холбоос → 400; зөв холбоос хадгалагдана.
 	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lb["id"].(string)+"/submit", s1, `{"text":"   "}`); code != 400 {
 		t.Fatal("хоосон хариу татгалзагдана")
+	}
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lb["id"].(string)+"/submit", s1, `{"links":["javascript:alert(1)"]}`); code != 400 {
+		t.Fatal("буруу холбоос татгалзагдана")
+	}
+	code, lr := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lb["id"].(string)+"/submit", s1, `{"text":"Миний ажил","links":["https://docs.google.com/x","https://github.com/me/repo"]}`)
+	if ls, _ := lr["submission"].(map[string]any)["links"].([]any); code != 200 || len(ls) != 2 {
+		t.Fatalf("холбоостой хариу: %d %v", code, lr)
+	}
+	// Эхлэх цаг болоогүй шалгалт → 423 (not_started); багшид нээлттэй.
+	_, e4 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Маргааш","is_free":true,`+q+`,"exam":{"pass_pct":50,"due":{"start_at":"`+future+`"}}}`)
+	if code, r := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+e4["id"].(string)+"/exam/start", s1, ""); code != http.StatusLocked || r["due"].(map[string]any)["not_started"] != true {
+		t.Fatalf("эхлээгүй шалгалт 423: %d %v", code, r)
+	}
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"x","is_free":true,`+q+`,"exam":{"pass_pct":50,"due":{"start_at":"`+future+`","at":"`+past+`"}}}`); code != 400 {
+		t.Fatal("дуусах цаг эхлэхээс өмнө байж болохгүй")
+	}
+	// Шууд төлбөртэй шалгалт (оролцооны төлбөр 1500): 402 → fee захиалга → төлөөд эхэлнэ.
+	_, e5 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Төлбөртэй шалгалт","is_free":true,`+q+`,"exam":{"pass_pct":50,"due":{"fee":1500}}}`)
+	pid := e5["id"].(string)
+	code, r = call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+pid+"/exam/start", s1, "")
+	if code != http.StatusPaymentRequired || r["due"].(map[string]any)["need_entry"] != true || r["due"].(map[string]any)["fee"].(float64) != 1500 {
+		t.Fatalf("оролцооны төлбөр 402: %d %v", code, r)
+	}
+	_, fo := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+pid+"/late-pay", s1, "")
+	if fo["order"].(map[string]any)["kind"] != "fee" || fo["order"].(map[string]any)["amount"].(float64) != 1500 {
+		t.Fatalf("fee захиалга: %v", fo)
+	}
+	call(t, srv, "POST", "/api/orders/"+fo["order"].(map[string]any)["id"].(string)+"/dev-pay", s1, "")
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+pid+"/exam/start", s1, ""); code != 200 && code != 201 {
+		t.Fatalf("төлсний дараа шалгалт эхлэх ёстой: %d", code)
+	}
+	// Оролцоо + хоцролт хоёулаа дутуу → нэг захиалгаар нийлбэр (late), төлөхөд хоёулаа нээгдэнэ.
+	_, e6 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Хоёр төлбөр","is_free":true,`+q+`,"exam":{"pass_pct":50,"due":{"at":"`+past+`","late":"paid","late_fee":1000,"fee":2000}}}`)
+	_, bo := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+e6["id"].(string)+"/late-pay", s1, "")
+	if bo["order"].(map[string]any)["kind"] != "late" || bo["order"].(map[string]any)["amount"].(float64) != 3000 {
+		t.Fatalf("нийлбэр захиалга 3000 байх ёстой: %v", bo)
+	}
+	call(t, srv, "POST", "/api/orders/"+bo["order"].(map[string]any)["id"].(string)+"/dev-pay", s1, "")
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+e6["id"].(string)+"/exam/start", s1, ""); code != 200 && code != 201 {
+		t.Fatalf("хоёр төлбөрөө төлсний дараа эхлэх ёстой: %d", code)
 	}
 	// Суралцагчийн өөрийн хуудас: даалгавар дүнтэйгээ, цол харагдана.
 	_, home := call(t, srv, "GET", "/api/me/home", s1, "")

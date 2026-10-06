@@ -807,13 +807,13 @@ async function examCard(box, { courseId, lessonId, title, onFinish }) {
     const ex = info.exam, best = info.attempts.filter((a) => a.status !== "active").reduce((m, a) => Math.max(m, a.pct), -1);
     const active = info.attempts.find((a) => a.status === "active"), due = info.due || { open: true };
     card.innerHTML = `<h3>📝 Шалгалт</h3>
-      <ul class="exam-facts"><li>❓ <b>${info.questions}</b> асуулт</li><li>⏱ ${ex.time_min ? `<b>${ex.time_min}</b> минут` : "Хугацаа хязгааргүй"}</li>${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : ""}
+      <ul class="exam-facts"><li>❓ <b>${info.questions}</b> асуулт</li><li>⏱ ${ex.time_min ? `<b>${ex.time_min}</b> минут` : "Хугацаа хязгааргүй"}</li>${due.start_at ? `<li>▶ Эхлэх: <b>${fmtDate(due.start_at)}</b></li>` : ""}${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : ""}${due.entry_fee ? `<li>💳 Оролцооны төлбөр: <b>${money(due.entry_fee)}</b>${due.paid ? " ✓" : ""}</li>` : ""}
         <li>🎯 Тэнцэх: <b>${ex.pass_pct}%</b></li><li>🔁 ${info.left < 0 ? "Оролдлого хязгааргүй" : `Үлдсэн оролдлого: <b>${info.left}</b>`}</li>${best >= 0 ? `<li>🏆 Таны шилдэг: <b>${best}%</b></li>` : ""}</ul>
       <div class="exam-rules"><b>⚠️ Дүрэм:</b> Шалгалтын үеэр өөр таб, цонх руу шилжих эсвэл текст хуулах үед шалгалт <b>шууд хаагдаж</b>, тэр хүртэлх хариултаар дүгнэгдэнэ. Энэ тухай багшид мэдэгдэнэ.</div>
       ${info.attempts.length ? `<table class="tbl"><thead><tr><th>Огноо</th><th>Оноо</th><th>Төлөв</th></tr></thead><tbody>${info.attempts.map((a) => `<tr><td>${fmtDate(a.started_at)}</td><td>${a.status === "active" ? "—" : a.pct + "%" + (a.passed ? " ✓" : "")}</td><td>${a.status === "terminated" ? `⛔ Хаагдсан · ${esc(a.reason || "")}` : a.status === "submitted" ? (a.passed ? "Тэнцсэн" : "Тэнцээгүй") : a.status === "expired" ? "Хугацаа хэтэрсэн" : "Үргэлжилж байна"}</td></tr>`).join("")}</tbody></table>` : ""}
       ${dueNotice(due)}
-      ${due.closed ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж шалгалтаа нээх</button>` : active || info.left !== 0 ? `<button class="btn btn-gold btn-lg" data-exam-start>${active ? "▶ Шалгалтаа үргэлжлүүлэх" : "▶ Шалгалт эхлүүлэх"}</button>` : `<p class="muted">Оролдлогын тоо дууссан.</p>`}`;
-    bindLatePay(card, base, "Хоцорсон шалгалтын төлбөр", draw);
+      ${due.closed || due.not_started ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж шалгалтаа нээх</button>` : active || info.left !== 0 ? `<button class="btn btn-gold btn-lg" data-exam-start>${active ? "▶ Шалгалтаа үргэлжлүүлэх" : "▶ Шалгалт эхлүүлэх"}</button>` : `<p class="muted">Оролдлогын тоо дууссан.</p>`}`;
+    bindLatePay(card, base, "Шалгалтын төлбөр", draw);
     const b = $("[data-exam-start]", card);
     if (b) b.onclick = async () => {
       if (!active && !confirm("Шалгалт эхлүүлэх үү? Эхэлсний дараа өөр цонх руу шилжвэл шалгалт хаагдана.")) return;
@@ -827,11 +827,18 @@ async function examCard(box, { courseId, lessonId, title, onFinish }) {
 
 // Хугацааны мэдэгдэл (шалгалт, даалгаварт ижил): хоцорсон → төлбөргүй / төлбөртэй / хаалттай.
 function dueNotice(due) {
-  if (!due?.late) return "";
-  if (due.closed) return `<div class="exam-rules"><b>⛔ Хугацаа дууссан.</b> Энэ ${"хэсэг"} хаалттай — багштайгаа холбогдоно уу.</div>`;
-  if (due.need_pay) return `<div class="exam-rules"><b>⏰ Хугацаа хоцорсон.</b> Үргэлжлүүлэхийн тулд <b>${money(due.fee)}</b> хоцролтын төлбөр төлнө.</div>`;
-  if (due.paid) return `<div class="exam-rules">✓ Хоцролтын төлбөр төлсөн — үргэлжлүүлж болно.</div>`;
-  return `<div class="exam-rules">⏰ Хугацаа өнгөрсөн ч төлбөргүй үргэлжлүүлж болно (хоцорсон гэж тэмдэглэгдэнэ).</div>`;
+  if (!due) return "";
+  if (due.not_started) return `<div class="exam-rules"><b>🕒 Эхлээгүй.</b> ${fmtDate(due.start_at)}-д нээгдэнэ.</div>`;
+  if (due.closed) return `<div class="exam-rules"><b>⛔ Хугацаа дууссан.</b> Хаалттай — багштайгаа холбогдоно уу.</div>`;
+  if (due.need_pay) {
+    const parts = [];
+    if (due.need_entry) parts.push(`оролцооны төлбөр ${money(due.entry_fee)}`);
+    if (due.need_late) parts.push(`хоцролтын төлбөр ${money(due.late_fee)}`);
+    return `<div class="exam-rules"><b>${due.need_late ? "⏰ Хугацаа хоцорсон." : "💳 Төлбөртэй."}</b> Үргэлжлүүлэхийн тулд ${parts.join(" + ")} = <b>${money(due.fee)}</b> төлнө.</div>`;
+  }
+  if (due.paid) return `<div class="exam-rules">✓ Төлбөр төлсөн — үргэлжлүүлж болно.</div>`;
+  if (due.late) return `<div class="exam-rules">⏰ Хугацаа өнгөрсөн ч төлбөргүй үргэлжлүүлж болно (хоцорсон гэж тэмдэглэгдэнэ).</div>`;
+  return "";
 }
 function bindLatePay(card, base, label, after) {
   const b = $("[data-late-pay]", card); if (!b) return;
@@ -852,23 +859,21 @@ async function assignmentCard(box, { courseId, lessonId }) {
     try { info = await api(`${base}/assignment`); } catch (e) { card.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
     const a = info.assignment, due = info.due || { open: true }, sub = info.submission;
     card.innerHTML = `<h3>📎 Даалгавар</h3>
-      <ul class="exam-facts">${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : "<li>📅 Хугацаагүй</li>"}<li>🎯 Дээд оноо: <b>${a.max_score || 100}</b></li>${a.allow_files ? "<li>📄 Файл хавсаргаж болно (3 хүртэл)</li>" : ""}</ul>
+      <ul class="exam-facts">${due.start_at ? `<li>▶ Эхлэх: <b>${fmtDate(due.start_at)}</b></li>` : ""}${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : "<li>📅 Хугацаагүй</li>"}<li>🎯 Дээд оноо: <b>${a.max_score || 100}</b></li>${due.entry_fee ? `<li>💳 Төлбөр: <b>${money(due.entry_fee)}</b>${due.paid ? " ✓" : ""}</li>` : ""}<li>✍️ Хариу: текст ба холбоос</li></ul>
       ${dueNotice(due)}
-      ${sub ? `<div class="sub-mine"><b>Таны хариу</b> <small class="muted">${fmtDate(sub.submitted_at)}${sub.late ? " · хоцорсон" : ""}</small>${sub.text ? `<p>${esc(sub.text)}</p>` : ""}${sub.files?.length ? `<p>${sub.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`).join(" · ")}</p>` : ""}
+      ${sub ? `<div class="sub-mine"><b>Таны хариу</b> <small class="muted">${fmtDate(sub.submitted_at)}${sub.late ? " · хоцорсон" : ""}</small>${sub.text ? `<p>${esc(sub.text)}</p>` : ""}${sub.links?.length ? `<p>${sub.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 60))}</a>`).join("<br>")}</p>` : ""}${sub.files?.length ? `<p>${sub.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`).join(" · ")}</p>` : ""}
         ${sub.score !== undefined ? `<div class="sub-score">✅ Дүн: <b>${sub.score}/${a.max_score || 100}</b>${sub.feedback ? `<p>${esc(sub.feedback)}</p>` : ""}</div>` : `<p class="muted small">Багш хараахан дүгнээгүй байна.</p>`}</div>` : ""}
-      ${due.closed ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж даалгавраа илгээх</button>`
+      ${due.closed || due.not_started ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж даалгавраа илгээх</button>`
         : `<form class="sub-form"><label>${sub ? "Хариугаа шинэчлэх" : "Хариу"}<textarea name="text" rows="5" maxlength="20000" placeholder="Хариугаа энд бичнэ үү…">${esc(sub?.text || "")}</textarea></label>
-          ${a.allow_files ? `<label>Файл (3 хүртэл)<input type="file" name="files" multiple></label>` : ""}
+          <label>Холбоос (Google Docs, GitHub, видео… мөр тус бүрд нэг, 5 хүртэл)<textarea name="links" rows="2" placeholder="https://…">${esc((sub?.links || []).join("\n"))}</textarea></label>
           <p class="form-error" role="alert"></p><button class="btn btn-gold">${sub ? "Дахин илгээх" : "Илгээх"}</button></form>`}`;
-    bindLatePay(card, base, "Хоцорсон даалгаврын төлбөр", draw);
+    bindLatePay(card, base, "Даалгаврын төлбөр", draw);
     const f = $(".sub-form", card);
     if (f) f.onsubmit = async (e) => {
       e.preventDefault();
       const err = $(".form-error", f), b = $("button", f); err.textContent = ""; b.disabled = true;
       try {
-        const fd = new FormData(); fd.append("text", f.text.value);
-        if (f.files) [...f.files.files].slice(0, 3).forEach((x) => fd.append("file", x));
-        await api(`${base}/submit`, { method: "POST", body: fd });
+        await api(`${base}/submit`, { method: "POST", body: { text: f.text.value, links: f.links.value.split(/[\n,\s]+/).filter(Boolean) } });
         toast("✓ Даалгавар илгээгдлээ"); celebrate?.(); await draw(); document.dispatchEvent(new CustomEvent("sg:quiz-mastered"));
       } catch (x) { err.textContent = x.message; } finally { b.disabled = false; }
     };
@@ -1722,7 +1727,7 @@ async function homePage() {
       ${h.course_ranks.length ? `<ul class="rank-courses">${h.course_ranks.map((c) => `<li><a href="/c/${esc(c.course_id)}"><span class="rank-shine" data-level="${c.rank.level}">${esc(c.rank.insignia)}</span><span class="grow"><strong>${esc(c.title)}</strong><small>${esc(c.rank.name)} · ${c.rank.points} оноо · ${c.lessons.length} хичээл үнэлэгдсэн</small></span><span class="chip chip-teal">Үзэх</span></a></li>`).join("")}</ul>` : ""}</div>`));
   }
   if (h.tasks?.length) {
-    const label = (t) => ({ open: ["Хийх", "chip-amber"], need_pay: ["Хоцорсон · " + money(t.due.fee) + " төлж нээнэ", "chip-amber"], closed: ["Хаалттай", ""], submitted: ["Илгээсэн · дүгнэхийг хүлээж байна", "chip-teal"],
+    const label = (t) => ({ open: ["Хийх", "chip-amber"], not_started: [`${fmtDate(t.due.start_at)}-д эхэлнэ`, ""], need_pay: [(t.due.need_late ? "Хоцорсон · " : "Төлбөртэй · ") + money(t.due.fee) + " төлж нээнэ", "chip-amber"], closed: ["Хаалттай", ""], submitted: ["Илгээсэн · дүгнэхийг хүлээж байна", "chip-teal"],
       graded: [`Дүн: ${t.score}/${t.max_score || 100}`, "chip-teal"], passed: [`Тэнцсэн · ${t.exam_best}%`, "chip-teal"], failed: [`Тэнцээгүй · шилдэг ${t.exam_best}%`, "chip-amber"] })[t.status] || ["", ""];
     parts.push(sec("my-tasks", "📎 Даалгавар, шалгалт", `<ul class="items">${h.tasks.map((t) => { const [txt, cls] = label(t); return `
       <li><a class="item ${["open", "need_pay"].includes(t.status) && t.due.at ? "warn" : ""}" href="/c/${esc(t.course_id)}#l=${esc(t.lesson_id)}"><span class="item-ico">${t.kind === "exam" ? "📝" : "📎"}</span><span class="grow"><strong>${esc(t.title)}</strong><small>${esc(t.course_title)}${t.due.at ? ` · ${t.due.late ? "хугацаа дууссан" : "хугацаа"}: ${fmtDate(t.due.at)}` : " · хугацаагүй"}${t.feedback ? ` · ${esc(t.feedback)}` : ""}</small></span><span class="chip ${cls}">${txt}</span></a></li>`; }).join("")}</ul>`));
