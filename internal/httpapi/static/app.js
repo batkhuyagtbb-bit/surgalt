@@ -1568,7 +1568,7 @@ class ChatThread {
       const content = m.deleted ? `<span class="msg-text msg-deleted">Мессеж устгагдсан</span>` : editing ? `<form class="msg-edit"><textarea rows="2" maxlength="2000">${esc(m.body)}</textarea><div><button type="submit" class="btn btn-gold btn-sm">Хадгалах</button><button type="button" class="btn btn-ghost btn-sm" data-edit-cancel>Болих</button></div></form>` : sticker ? `<span class="msg-sticker">${esc(sticker[1])}</span>` : imgUrl ? `<a class="msg-img" href="${esc(imgUrl)}" target="_blank" rel="noopener"><img src="${esc(imgUrl)}" alt="" loading="lazy"></a>${m.attachment_url && m.body && m.body !== "📷 Зураг" ? `<span class="msg-text">${linkify(m.body)}</span>` : ""}` : `<span class="msg-text">${linkify(m.body)}</span>`;
       out.push(`<li class="msg ${mine ? "me" : "them"} ${first ? "first" : ""} ${last ? "last" : ""} ${sticker ? "is-sticker" : ""} ${imgUrl ? "has-img" : ""}" data-id="${esc(m.id)}">${av}<div class="msg-col">${name}
         <div class="msg-row"><div class="bubble" title="${fmtDate(m.created_at)}">${quote}${content}</div>
-          <div class="msg-tools">${m.deleted ? "" : `<button type="button" data-react="${esc(m.id)}" title="Реакц">☺</button>`}${mine || m.deleted ? "" : `<button type="button" data-reply="${esc(m.id)}" title="Хариулах">↩</button>`}${mine && !m.deleted ? `<button type="button" data-edit="${esc(m.id)}" title="Засах">✎</button>` : ""}${(mine || this.role() === "teacher") && !m.deleted ? `<button type="button" data-del="${esc(m.id)}" title="Устгах">🗑</button>` : ""}</div></div>
+          <div class="msg-tools">${m.deleted ? "" : `<button type="button" data-react="${esc(m.id)}" title="Реакц">☺</button>`}${m.deleted ? "" : `<button type="button" data-reply="${esc(m.id)}" title="Хариулах">↩</button>`}${mine && !m.deleted ? `<button type="button" data-edit="${esc(m.id)}" title="Засах">✎</button>` : ""}${(mine || this.role() === "teacher") && !m.deleted ? `<button type="button" data-del="${esc(m.id)}" title="Устгах">🗑</button>` : ""}</div></div>
         ${reacts}${foot}</div></li>`);
     });
     for (const [, v] of this.typing) out.push(`<li class="msg them typing"><span class="msg-av"></span><div class="msg-col"><div class="bubble"><span class="dots"><i></i><i></i><i></i></span></div><small class="muted">${esc(v.name)} бичиж байна…</small></div></li>`);
@@ -1605,7 +1605,8 @@ class ChatThread {
     let bar = this.form.querySelector(".reply-bar");
     if (!this.replyTo) { bar?.remove(); return; }
     if (!bar) { bar = document.createElement("div"); bar.className = "reply-bar"; this.form.prepend(bar); }
-    bar.innerHTML = `<span>↩ <b>${esc(this.replyTo.sender_name || (this.replyTo.sender === "teacher" ? "Багш" : "Зочин"))}</b>-д хариулж байна: <em>${esc(this.replyTo.body.slice(0, 80))}</em></span><button type="button" data-cancel-reply aria-label="Болих">✕</button>`;
+    const who = this.mine(this.replyTo) ? "Өөртөө" : `<b>${esc(this.replyTo.sender_name || (this.replyTo.sender === "teacher" ? "Багш" : "Зочин"))}</b>-д`;
+    bar.innerHTML = `<span>↩ ${who} хариулж байна: <em>${esc((this.replyTo.body || "").replace(/^::sticker::/, "").slice(0, 80))}</em></span><button type="button" data-cancel-reply aria-label="Болих">✕</button>`;
     bar.querySelector("[data-cancel-reply]").onclick = () => { this.replyTo = null; this.renderReply(); };
   }
   // Бичих мөр: [📹 Meet (багш)] [Aa] [➤] — энгийн, зөвхөн уулзалтын товчтой.
