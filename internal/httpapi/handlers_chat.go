@@ -93,11 +93,15 @@ func (s *Server) handleStartChat(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"conversation": conv, "messages": msgs, "me": store.SenderVisitor})
+	if err := s.attachReactions(r, msgs); s.storeErr(w, r, err) {
+		return
+	}
+	reads, _ := s.store.ConversationReads(r.Context(), conv.ID)
+	writeJSON(w, http.StatusOK, map[string]any{"conversation": conv, "messages": msgs, "me": store.SenderVisitor, "me_key": c.VisitorKey(), "reads": reads})
 }
 
 func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
-	_, conv, role, ok := s.loadConv(w, r)
+	c, conv, role, ok := s.loadConv(w, r)
 	if !ok {
 		return
 	}
@@ -105,7 +109,119 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"conversation": conv, "messages": msgs, "me": role})
+	if err := s.attachReactions(r, msgs); s.storeErr(w, r, err) {
+		return
+	}
+	reads, err := s.store.ConversationReads(r.Context(), conv.ID)
+	if s.storeErr(w, r, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"conversation": conv, "messages": msgs, "me": role, "me_key": c.VisitorKey(), "reads": reads})
+}
+
+// attachReactions — мессежүүдэд реакцуудыг нь бөглөнө.
+func (s *Server) attachReactions(r *http.Request, msgs []store.Message) error {
+	ids := make([]string, len(msgs))
+	for i := range msgs {
+		ids[i] = msgs[i].ID
+	}
+	rx, err := s.store.MessageReactions(r.Context(), ids)
+	if err != nil {
+		return err
+	}
+	for i := range msgs {
+		msgs[i].Reactions = rx[msgs[i].ID]
+	}
+	return nil
+}
+
+// chatEvent — ярианы оролцогчдод ердийн мессежээс өөр үйл явдал (реакц, уншсан, бичиж байна).
+func (s *Server) chatEvent(conv *store.Conversation, ev map[string]any) {
+	ev["conversation_id"] = conv.ID
+	s.hub.Fanout(conv.TeacherID, conv.VisitorKey, conv.ID, ev)
+}
+
+// allowedReactions — Messenger маягийн 6 реакц.
+var allowedReactions = map[string]bool{"👍": true, "❤️": true, "😂": true, "😮": true, "😢": true, "🙏": true}
+
+// handleReact: POST /api/chat/{id}/react {message_id, emoji} — ижил эможи дахин дарвал хасна.
+func (s *Server) handleReact(w http.ResponseWriter, r *http.Request) {
+	c, conv, _, ok := s.loadConv(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		MessageID string `json:"message_id"`
+		Emoji     string `json:"emoji"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if in.Emoji != "" && !allowedReactions[in.Emoji] {
+		writeErr(w, http.StatusBadRequest, "реакц: 👍 ❤️ 😂 😮 😢 🙏")
+		return
+	}
+	if _, err := s.store.MessageByID(r.Context(), conv.ID, in.MessageID); err != nil {
+		writeErr(w, http.StatusNotFound, "мессеж олдсонгүй")
+		return
+	}
+	key := c.VisitorKey()
+	cur, _ := s.store.MessageReactions(r.Context(), []string{in.MessageID})
+	for e, users := range cur[in.MessageID] {
+		for _, u := range users {
+			if u.Key == key && e == in.Emoji {
+				in.Emoji = "" // ижил реакц → хасна
+			}
+		}
+	}
+	name := c.Name
+	if !c.IsGuest() {
+		name = s.displayName(r.Context(), c.UID, c.Name)
+	}
+	if err := s.store.ReactMessage(r.Context(), conv.ID, in.MessageID, key, name, in.Emoji); s.storeErr(w, r, err) {
+		return
+	}
+	rx, _ := s.store.MessageReactions(r.Context(), []string{in.MessageID})
+	out := rx[in.MessageID]
+	if out == nil {
+		out = map[string][]store.ReactUser{}
+	}
+	s.chatEvent(conv, map[string]any{"type": "reaction", "message_id": in.MessageID, "reactions": out})
+	writeJSON(w, http.StatusOK, map[string]any{"message_id": in.MessageID, "reactions": out, "mine": in.Emoji})
+}
+
+// handleRead: POST /api/chat/{id}/read {message_id} — энэ хүртэл үзсэн ("Үзсэн" тэмдэг).
+func (s *Server) handleRead(w http.ResponseWriter, r *http.Request) {
+	c, conv, _, ok := s.loadConv(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		MessageID string `json:"message_id"`
+	}
+	if !decode(w, r, &in) || in.MessageID == "" {
+		writeErr(w, http.StatusBadRequest, "message_id хэрэгтэй")
+		return
+	}
+	if err := s.store.MarkRead(r.Context(), conv.ID, c.VisitorKey(), in.MessageID); s.storeErr(w, r, err) {
+		return
+	}
+	s.chatEvent(conv, map[string]any{"type": "read", "key": c.VisitorKey(), "name": c.Name, "last_id": in.MessageID})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleTyping: POST /api/chat/{id}/typing — "бичиж байна…" (хадгалагдахгүй, тухайн агшинд түгээнэ).
+func (s *Server) handleTyping(w http.ResponseWriter, r *http.Request) {
+	c, conv, _, ok := s.loadConv(w, r)
+	if !ok {
+		return
+	}
+	name := c.Name
+	if !c.IsGuest() {
+		name = s.displayName(r.Context(), c.UID, c.Name)
+	}
+	s.chatEvent(conv, map[string]any{"type": "typing", "key": c.VisitorKey(), "name": name})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
@@ -118,7 +234,8 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Body string `json:"body"`
+		Body    string `json:"body"`
+		ReplyTo string `json:"reply_to"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -129,6 +246,14 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := &store.Message{ConversationID: conv.ID, Sender: role, Body: in.Body, SenderName: c.Name}
+	if in.ReplyTo != "" { // хариулж буй мессежийн товч хуулбарыг хамт хадгална
+		orig, err := s.store.MessageByID(r.Context(), conv.ID, in.ReplyTo)
+		if err != nil {
+			writeErr(w, http.StatusNotFound, "хариулах мессеж олдсонгүй")
+			return
+		}
+		m.ReplyTo, m.ReplyBody, m.ReplyName = orig.ID, short(orig.Body), orig.SenderName
+	}
 	if !c.IsGuest() {
 		m.SenderID = c.UID
 		if u, err := s.store.UserByID(r.Context(), c.UID); err == nil && u.DisplayName != "" {

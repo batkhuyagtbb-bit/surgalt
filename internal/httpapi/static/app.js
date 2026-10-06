@@ -222,7 +222,7 @@ function chatRail() {
       <header class="rail-head"><button class="icon-btn" id="railBack" aria-label="Жагсаалт руу буцах">${I.back}</button><div class="grow" id="railWho"></div><button class="icon-btn rail-close" data-rail-close aria-label="Чат хаах">${I.x}</button></header>
       <div class="chat-body" id="railBody"><ol class="chat-msgs" id="railMsgs"></ol></div>
       <form class="chat-input" id="railForm">${teacher ? `<button type="button" class="btn btn-teal btn-icon" id="railMeet" title="Google Meet үүсгээд илгээх" aria-label="Google Meet илгээх">${I.live}</button>` : ""}
-        <input name="body" maxlength="2000" autocomplete="off" placeholder="Мессеж бичих…" required aria-label="Мессеж"><button class="btn btn-gold btn-icon" aria-label="Илгээх">➤</button></form></div>
+        <textarea name="body" rows="1" maxlength="2000" autocomplete="off" placeholder="Мессеж бичих…" aria-label="Мессеж"></textarea><button class="btn btn-gold btn-icon" aria-label="Илгээх">➤</button></form></div>
   </aside><div class="rail-scrim" id="railScrim"></div>`);
   $(".nav-links").insertAdjacentHTML("afterbegin", `<button class="icon-btn rail-toggle" id="railToggle" aria-label="Чат" aria-controls="studioRail" aria-expanded="false">${I.chat}<span class="bell-badge" id="railBadge" hidden></span></button>`);
   const rail = $("#studioRail"), home = $("#railHome"), thread = $("#railThread"), msgs = $("#railMsgs"), body = $("#railBody"), form = $("#railForm");
@@ -254,7 +254,8 @@ function chatRail() {
       `<p class="muted small" style="padding:16px">${convs.length ? "Илэрц алга" : teacher ? "Одоогоор чат алга. Профайлаа түгээгээрэй!" : "Багшийн профайл дээрх «Чатлах» эсвэл сургалтын «Бүлэг чат»-аар яриа эхэлнэ."}</p>`;
   };
   const load = async () => { convs = await norm(); draw(); };
-  const append = (m) => { if (!msgs.querySelector(`[data-id="${m.id}"]`)) { msgs.insertAdjacentHTML("beforeend", msgHTML(m, myRole, curGroup)); body.scrollTop = body.scrollHeight; } };
+  const th = new ChatThread({ ol: msgs, body, form, token: () => Auth.token, convId: () => cur, role: () => myRole, group: () => curGroup });
+  const append = (m) => th.append(m);
   const open = async (id) => {
     cur = id; unread.delete(id); badge(); setRail(true);
     home.hidden = true; thread.hidden = false;
@@ -265,29 +266,22 @@ function chatRail() {
       const c = d.conversation; curGroup = c.kind === "group"; myRole = d.me;
       const known = convs.find((x) => x.id === id);
       $("#railWho").innerHTML = `<strong>${esc(known?.title || c.visitor_name)}</strong><small class="muted">${curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин")}</small>`;
-      msgs.innerHTML = d.messages.map((m) => msgHTML(m, myRole, curGroup)).join("") || `<li class="muted small" style="text-align:center">Анхны мессежээ бичээрэй ✍️</li>`;
-      body.scrollTop = body.scrollHeight; form.body.focus();
+      th.set(d); form.body.focus();
     } catch (e) { $("#railWho").innerHTML = `<span class="form-error" style="margin:0">${esc(e.message)}</span>`; }
   };
   $("#railBack").onclick = () => { cur = null; thread.hidden = true; home.hidden = false; draw(); };
   $("#railSearch").addEventListener("input", draw);
   $("#railList").addEventListener("click", (e) => { const it = e.target.closest(".rail-item"); if (it) open(it.dataset.id); });
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const text = form.body.value.trim(); if (!text || !cur) return;
-    form.body.value = "";
-    try { msgs.querySelector(".muted")?.remove(); append(await api(`/api/chat/${cur}/messages`, { method: "POST", body: { body: text } })); }
-    catch (x) { toast(x.message, true); form.body.value = text; }
-  };
   $("#railMeet")?.addEventListener("click", async () => {
     if (!cur) return;
     try { const d = await api(`/api/chat/${cur}/meet`, { method: "POST" }); append(d.message); toast("Meet холбоос илгээгдлээ"); }
     catch (x) { toast(x.message, true); }
   });
   Live.on((d) => {
+    if (["reaction", "read", "typing"].includes(d.type)) { th.event(d); return; }
     if (d.type !== "message") return;
     const m = d.message;
-    if (m.conversation_id === cur) { msgs.querySelector(".muted")?.remove(); append(m); }
+    if (m.conversation_id === cur) append(m);
     else if (m.sender_id !== u.id) { unread.add(m.conversation_id); badge(); }
     clearTimeout(timer); timer = setTimeout(load, 400);
   });
@@ -1412,11 +1406,130 @@ function linkify(text) {
   return esc(text).replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}" target="_blank" rel="noopener">${u.includes("meet.google.com") ? "📹 Google Meet-д нэгдэх" : u}</a>`);
 }
 // group=true бол бүлэг чат: "миний" эсэхийг хэрэглэгчийн ID-аар, бусдын мессежид нэрийг нь харуулна.
-function msgHTML(m, me, group) {
+function msgHTML(m, me, group) { // хуучин дуудлагад: энгийн бөмбөлөг
   const myId = Auth.user?.id;
   const mine = group && myId ? m.sender_id === myId : m.sender === me;
   const who = group && !mine && m.sender_name ? `<b class="msg-who">${esc(m.sender_name)}${m.sender === "teacher" ? " · багш" : ""}</b>` : "";
   return `<li class="msg ${mine ? "me" : "them"}" data-id="${esc(m.id)}">${who}${linkify(m.body)}<time>${fmtTime(m.created_at)}</time></li>`;
+}
+
+/* ---------- Чатын урсгал (Messenger маягийн): бүлэглэсэн бөмбөлөг, өдрийн тусгаарлагч, хариулах (quote),
+   реакц (👍❤️😂😮😢🙏), "Үзсэн", "бичиж байна…", Enter-ээр илгээх ---------- */
+const REACTS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+function dayLabel(t) {
+  const d = new Date(t), now = new Date(), one = 86400000;
+  const sd = new Date(d.getFullYear(), d.getMonth(), d.getDate()), sn = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = Math.round((sn - sd) / one);
+  if (diff === 0) return "Өнөөдөр";
+  if (diff === 1) return "Өчигдөр";
+  if (diff < 7) return WEEKDAYS?.[d.getDay()] || fmtDate(t);
+  return fmtDate(t).replace(/\s\d{1,2}:\d{2}$/, "");
+}
+class ChatThread {
+  // opts: {ol, body, form, token(): string, convId(): string, role(): "teacher"|"visitor", group(): bool}
+  constructor(o) {
+    Object.assign(this, { list: [], reads: {}, meKey: "", typing: new Map(), replyTo: null, lastReadSent: "", typeAt: 0 }, o);
+    this.ol.classList.add("thread");
+    this.ol.addEventListener("click", (e) => this.click(e));
+    document.addEventListener("click", (e) => { if (!e.target.closest(".react-pick, [data-react]")) $(".react-pick", this.ol)?.remove(); });
+    if (this.form) this.bindForm();
+  }
+  mine(m) { const myId = Auth.user?.id; return this.group() && myId ? m.sender_id === myId : m.sender === this.role(); }
+  set(d) { this.list = d.messages || []; this.reads = d.reads || {}; this.meKey = d.me_key || this.meKey; this.replyTo = null; this.render(); this.scroll(true); this.markRead(); }
+  append(m) {
+    if (this.list.some((x) => x.id === m.id)) return;
+    this.list.push(m); this.typing.delete(m.sender_id ? "u:" + m.sender_id : m.sender_name);
+    const atBottom = this.body.scrollHeight - this.body.scrollTop - this.body.clientHeight < 120;
+    this.render(); if (atBottom || this.mine(m)) this.scroll(true);
+    if (!this.mine(m)) this.markRead();
+  }
+  event(d) {
+    if (d.conversation_id !== this.convId()) return;
+    if (d.type === "reaction") { const m = this.list.find((x) => x.id === d.message_id); if (m) { m.reactions = d.reactions; this.render(); } }
+    if (d.type === "read" && d.key !== this.meKey) { this.reads[d.key] = d.last_id; this.render(); }
+    if (d.type === "typing" && d.key !== this.meKey) { this.typing.set(d.key, { name: d.name, at: Date.now() }); this.render(); this.scroll(); clearTimeout(this._tt); this._tt = setTimeout(() => { this.sweepTyping(); this.render(); }, 4200); }
+  }
+  sweepTyping() { for (const [k, v] of this.typing) if (Date.now() - v.at > 4000) this.typing.delete(k); }
+  scroll(force) { if (force || this.body.scrollHeight - this.body.scrollTop - this.body.clientHeight < 160) this.body.scrollTop = this.body.scrollHeight; }
+  async markRead() {
+    const last = [...this.list].reverse().find((m) => !this.mine(m)); if (!last || last.id === this.lastReadSent || !this.convId()) return;
+    this.lastReadSent = last.id;
+    try { await api(`/api/chat/${this.convId()}/read`, { method: "POST", body: { message_id: last.id }, token: this.token() }); } catch {}
+  }
+  seenBy() { // миний сүүлийн мессежийг хэн үзсэн бэ
+    const mineLast = [...this.list].reverse().find((m) => this.mine(m)); if (!mineLast) return null;
+    const who = Object.entries(this.reads).filter(([k, id]) => k !== this.meKey && id >= mineLast.id);
+    if (!who.length) return null;
+    return { id: mineLast.id, n: who.length };
+  }
+  render() {
+    this.sweepTyping();
+    const L = this.list, out = [], seen = this.seenBy();
+    let lastDay = "";
+    L.forEach((m, i) => {
+      const day = dayLabel(m.created_at);
+      if (day !== lastDay) { out.push(`<li class="msg-day"><span>${esc(day)}</span></li>`); lastDay = day; }
+      const prev = L[i - 1], next = L[i + 1], same = (a, b) => a && b && (a.sender_id || a.sender_name || a.sender) === (b.sender_id || b.sender_name || b.sender) && Math.abs(new Date(a.created_at) - new Date(b.created_at)) < 5 * 60000 && dayLabel(a.created_at) === dayLabel(b.created_at);
+      const first = !same(prev, m), last = !same(m, next), mine = this.mine(m);
+      const name = this.group() && !mine && first && m.sender_name ? `<b class="msg-who">${esc(m.sender_name)}${m.sender === "teacher" ? ` <span class="dc-badge">Багш</span>` : ""}</b>` : "";
+      const quote = m.reply_to ? `<button type="button" class="msg-quote" data-goto="${esc(m.reply_to)}"><b>${esc(m.reply_name || "")}</b><span>${esc(m.reply_body || "")}</span></button>` : "";
+      const rx = Object.entries(m.reactions || {}).filter(([, u]) => u.length);
+      const reacts = rx.length ? `<div class="msg-reacts">${rx.map(([e, u]) => `<button type="button" class="${u.some((x) => x.key === this.meKey) ? "on" : ""}" data-react-one="${e}" title="${esc(u.map((x) => x.name).join(", "))}">${e}${u.length > 1 ? ` ${u.length}` : ""}</button>`).join("")}</div>` : "";
+      const av = !mine && last ? `<span class="msg-av">${avatarHTML({ display_name: m.sender_name || (m.sender === "teacher" ? "Багш" : "?") }, "avatar-sm")}</span>` : `<span class="msg-av"></span>`;
+      const foot = last || rx.length ? `<div class="msg-foot"><time>${fmtTime(m.created_at)}</time>${mine && seen && seen.id === m.id ? `<span class="msg-seen">✓✓ Үзсэн${this.group() && seen.n > 1 ? ` · ${seen.n}` : ""}</span>` : ""}</div>` : "";
+      out.push(`<li class="msg ${mine ? "me" : "them"} ${first ? "first" : ""} ${last ? "last" : ""}" data-id="${esc(m.id)}">${av}<div class="msg-col">${name}
+        <div class="msg-row"><div class="bubble" title="${fmtDate(m.created_at)}">${quote}<span class="msg-text">${linkify(m.body)}</span></div>
+          <div class="msg-tools"><button type="button" data-react="${esc(m.id)}" title="Реакц">☺</button><button type="button" data-reply="${esc(m.id)}" title="Хариулах">↩</button></div></div>
+        ${reacts}${foot}</div></li>`);
+    });
+    for (const [, v] of this.typing) out.push(`<li class="msg them typing"><span class="msg-av"></span><div class="msg-col"><div class="bubble"><span class="dots"><i></i><i></i><i></i></span></div><small class="muted">${esc(v.name)} бичиж байна…</small></div></li>`);
+    if (!out.length) out.push(`<li class="muted small" style="text-align:center">Анхны мессежээ бичээрэй ✍️</li>`);
+    this.ol.innerHTML = out.join("");
+    this.renderReply();
+  }
+  async click(e) {
+    const t = e.target, conv = this.convId();
+    const rb = t.closest("[data-react]");
+    if (rb) { $(".react-pick", this.ol)?.remove(); rb.insertAdjacentHTML("afterend", `<div class="react-pick">${REACTS.map((r) => `<button type="button" data-pick="${r}">${r}</button>`).join("")}</div>`); return; }
+    const pk = t.closest("[data-pick]");
+    if (pk) { const id = pk.closest(".msg").dataset.id; $(".react-pick", this.ol)?.remove(); await this.react(id, pk.dataset.pick); return; }
+    const one = t.closest("[data-react-one]");
+    if (one) { await this.react(one.closest(".msg").dataset.id, one.dataset.reactOne); return; }
+    const rp = t.closest("[data-reply]");
+    if (rp) { const m = this.list.find((x) => x.id === rp.dataset.reply); this.replyTo = m || null; this.renderReply(); this.form?.body.focus(); return; }
+    const go = t.closest("[data-goto]");
+    if (go) { const el = this.ol.querySelector(`[data-id="${CSS.escape(go.dataset.goto)}"]`); if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1200); } return; }
+    if (t.closest("[data-cancel-reply]")) { this.replyTo = null; this.renderReply(); }
+  }
+  async react(id, emoji) {
+    try { const r = await api(`/api/chat/${this.convId()}/react`, { method: "POST", body: { message_id: id, emoji }, token: this.token() }); const m = this.list.find((x) => x.id === id); if (m) { m.reactions = r.reactions; this.render(); } }
+    catch (x) { toast(x.message, true); }
+  }
+  renderReply() {
+    if (!this.form) return;
+    let bar = this.form.querySelector(".reply-bar");
+    if (!this.replyTo) { bar?.remove(); return; }
+    if (!bar) { bar = document.createElement("div"); bar.className = "reply-bar"; this.form.prepend(bar); }
+    bar.innerHTML = `<span>↩ <b>${esc(this.replyTo.sender_name || (this.replyTo.sender === "teacher" ? "Багш" : "Зочин"))}</b>-д хариулж байна: <em>${esc(this.replyTo.body.slice(0, 80))}</em></span><button type="button" data-cancel-reply aria-label="Болих">✕</button>`;
+    bar.querySelector("[data-cancel-reply]").onclick = () => { this.replyTo = null; this.renderReply(); };
+  }
+  bindForm() {
+    const f = this.form, ta = f.body;
+    const grow = () => { if (ta.tagName === "TEXTAREA") { ta.style.height = "auto"; ta.style.height = Math.min(140, ta.scrollHeight) + "px"; } };
+    ta.addEventListener("input", () => { grow(); this.sendTyping(); });
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); } if (e.key === "Escape" && this.replyTo) { this.replyTo = null; this.renderReply(); } });
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = ta.value.trim() || (f.querySelector("[data-quick-like]") ? "" : ""), conv = this.convId();
+      if (!conv) return;
+      const body = text || "👍";
+      ta.value = ""; grow();
+      const reply = this.replyTo; this.replyTo = null; this.renderReply();
+      try { const m = await api(`/api/chat/${conv}/messages`, { method: "POST", body: { body, reply_to: reply?.id || "" }, token: this.token() }); this.append(m); this.onSent?.(m); }
+      catch (x) { toast(x.message, true); ta.value = text; grow(); }
+    });
+  }
+  async sendTyping() { if (Date.now() - this.typeAt < 3000 || !this.convId()) return; this.typeAt = Date.now(); try { await api(`/api/chat/${this.convId()}/typing`, { method: "POST", body: {}, token: this.token() }); } catch {} }
 }
 function chatWidget() {
   const fab = $("#chatFab"), panel = $("#chatPanel");
@@ -1425,7 +1538,7 @@ function chatWidget() {
   const courseId = $(".course-page")?.dataset.course;
   let conv = null, group = false;
   const headText = $(".chat-head > div:nth-child(2)", panel);
-  const render = (list) => list.map((m) => msgHTML(m, "visitor", group)).join("");
+  const thread = new ChatThread({ ol: msgs, body, form, token: () => (group ? Auth.token : Auth.chatToken), convId: () => conv?.id, role: () => "visitor", group: () => group });
   const scroll = () => (body.scrollTop = body.scrollHeight);
   const open = async () => {
     panel.classList.add("open"); panel.setAttribute("aria-hidden", "false"); $(".chat-fab-dot").hidden = true;
@@ -1443,8 +1556,7 @@ function chatWidget() {
       conv = d.conversation; group = true;
       headText.innerHTML = `<strong>${esc(conv.visitor_name)}</strong><small class="chat-status"><i></i>Бүлэг чат · сургалтын суралцагчид</small>`;
       intro.hidden = true; msgs.hidden = false; form.hidden = false;
-      msgs.innerHTML = render(d.messages) || `<li class="muted small" style="text-align:center">Анхны мессежээ бичээрэй ✍️</li>`;
-      scroll(); Live.reconnect(); form.body.focus();
+      thread.set(d); Live.reconnect(); form.body.focus();
     } catch (e) { intro.hidden = true; msgs.hidden = false; form.hidden = true; msgs.innerHTML = `<li class="muted" style="text-align:center;padding:12px">${esc(e.message)}</li>`; }
   };
   const start = async () => {
@@ -1452,8 +1564,7 @@ function chatWidget() {
       const d = await api(`/api/teachers/${teacher}/chat`, { method: "POST", token: Auth.chatToken });
       conv = d.conversation; group = false;
       intro.hidden = true; msgs.hidden = false; form.hidden = false;
-      msgs.innerHTML = d.messages.length ? render(d.messages) : `<li class="muted small" style="text-align:center">Анхны мессежээ бичээрэй ✍️</li>`;
-      scroll();
+      thread.set(d);
       Live.connect(Auth.chatToken);
       form.body.focus();
     } catch (e) {
@@ -1481,24 +1592,11 @@ function chatWidget() {
       await start();
     } catch (err) { toast(err.message, true); }
   });
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const text = form.body.value.trim();
-    if (!text || !conv) return;
-    form.body.value = "";
-    try {
-      const m = await api(`/api/chat/${conv.id}/messages`, { method: "POST", body: { body: text }, token: group ? Auth.token : Auth.chatToken });
-      msgs.querySelector(".muted")?.remove();
-      if (!msgs.querySelector(`[data-id="${m.id}"]`)) msgs.insertAdjacentHTML("beforeend", msgHTML(m, "visitor", group));
-      scroll();
-    } catch (err) { toast(err.message, true); form.body.value = text; }
-  });
   Live.on((d) => {
-    if (d.type !== "message" || !conv || d.message.conversation_id !== conv.id) return;
-    if (msgs.querySelector(`[data-id="${d.message.id}"]`)) return;
-    msgs.querySelector(".muted")?.remove();
-    msgs.insertAdjacentHTML("beforeend", msgHTML(d.message, "visitor", group));
-    scroll();
+    if (!conv) return;
+    if (["reaction", "read", "typing"].includes(d.type)) { thread.event(d); return; }
+    if (d.type !== "message" || d.message.conversation_id !== conv.id) return;
+    thread.append(d.message);
     if (!panel.classList.contains("open")) $(".chat-fab-dot").hidden = false;
   });
   // #chat холбоосоор (нүүр хуудасны "Чат" жагсаалтаас) ирсэн бол шууд нээнэ.
@@ -2244,7 +2342,7 @@ function loginPage() {
 }
 
 /* ---------- эхлүүлэх ---------- */
-window.SG = { pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
+window.SG = { ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх

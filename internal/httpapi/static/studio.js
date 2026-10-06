@@ -1326,32 +1326,28 @@ async function chat(openId) {
     <div class="inbox-thread"><div class="chat-head" id="ibHead"><span class="muted">Яриа сонгоно уу</span></div>
       <div class="chat-body"><ol class="chat-msgs" id="ibMsgs"></ol></div>
       <form class="chat-input" id="ibForm" hidden><button type="button" class="btn btn-teal btn-sm" id="ibMeet" title="Google Meet үүсгээд илгээх">📹 Meet</button>
-        <input name="body" maxlength="2000" autocomplete="off" placeholder="Хариу бичих…" required><button class="btn btn-gold btn-icon">➤</button></form></div></div>`;
-  let cur = null;
+        <textarea name="body" rows="1" maxlength="2000" autocomplete="off" placeholder="Хариу бичих…"></textarea><button class="btn btn-gold btn-icon">➤</button></form></div></div>`;
+  let cur = null, curGroup = false;
   const list = $("#ibList"), msgs = $("#ibMsgs"), form = $("#ibForm"), body = msgs.parentElement;
+  const thread = new SG.ChatThread({ ol: msgs, body, form, token: () => SG.Auth.token, convId: () => cur, role: () => "teacher", group: () => curGroup });
   const open = async (id) => {
     cur = id;
     $$(".inbox-item", list).forEach((x) => x.classList.toggle("active", x.dataset.id === id));
     $(`.inbox-item[data-id="${id}"]`)?.classList.remove("unread");
     const d = await api(`/api/chat/${id}/messages`);
-    $("#ibHead").innerHTML = `<strong>${esc(d.conversation.visitor_name)}</strong><span class="muted small">${d.conversation.user_id ? "Бүртгэлтэй" : "Зочин"}</span>`;
-    msgs.innerHTML = d.messages.map((m) => msgHTML(m, "teacher")).join("");
-    form.hidden = false; body.scrollTop = body.scrollHeight; form.body.focus();
+    curGroup = d.conversation.kind === "group";
+    $("#ibHead").innerHTML = `<strong>${esc(d.conversation.visitor_name)}</strong><span class="muted small">${curGroup ? "Бүлэг чат" : d.conversation.user_id ? "Бүртгэлтэй" : "Зочин"}</span>`;
+    form.hidden = false; thread.set(d); form.body.focus();
     history.replaceState(null, "", "#chat=" + id);
   };
   list.onclick = (e) => { const it = e.target.closest(".inbox-item"); if (it) open(it.dataset.id); };
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const text = form.body.value.trim(); if (!text || !cur) return;
-    form.body.value = "";
-    try { const m = await api(`/api/chat/${cur}/messages`, { method: "POST", body: { body: text } }); append(m); } catch (x) { toast(x.message, true); form.body.value = text; }
-  };
   $("#ibMeet").onclick = async () => {
     try { const d = await api(`/api/chat/${cur}/meet`, { method: "POST" }); append(d.message); toast("📹 Meet холбоос илгээгдлээ"); }
     catch (x) { toast(x.message, true); if (x.status === 428) location.hash = "live"; }
   };
-  const append = (m) => { if (!msgs.querySelector(`[data-id="${m.id}"]`)) { msgs.insertAdjacentHTML("beforeend", msgHTML(m, "teacher")); body.scrollTop = body.scrollHeight; } };
+  const append = (m) => thread.append(m);
   const handler = async (d) => {
+    if (["reaction", "read", "typing"].includes(d.type)) { thread.event(d); return; }
     if (d.type !== "message") return;
     const m = d.message;
     if (m.conversation_id === cur) append(m);

@@ -34,6 +34,8 @@ type Memory struct {
 	progress    map[[2]string]*LessonProgress // (user, lesson)
 	discuss     *discussMem
 	discussOnce sync.Once
+	chatX       *chatExtraMem
+	chatXOnce   sync.Once
 	learn       learnMem  // шалгалт, сесс, лог (memory_learning.go)
 	engage      engageMem // идэвхийн нэмэлт (memory_engagement.go)
 	books       bookMem   // ном (memory_books.go)

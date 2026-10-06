@@ -113,3 +113,86 @@ func (m *Memory) Likes(_ context.Context, userID, target string, targetIDs []str
 	}
 	return counts, mine, nil
 }
+
+// ---- чат: хариулах, реакц, уншсан (санах ой) ----
+
+type chatExtraMem struct {
+	mu        sync.RWMutex
+	reactions map[string]map[string]ReactUser // message → userKey → реакц (Name, эможи нь Key талбарт биш, тусад нь)
+	emoji     map[[2]string]string            // (message, userKey) → эможи
+	reads     map[[2]string]string            // (conversation, userKey) → last_id
+}
+
+func (m *Memory) cx() *chatExtraMem {
+	m.chatXOnce.Do(func() {
+		m.chatX = &chatExtraMem{reactions: map[string]map[string]ReactUser{}, emoji: map[[2]string]string{}, reads: map[[2]string]string{}}
+	})
+	return m.chatX
+}
+
+func (m *Memory) MessageByID(_ context.Context, conversationID, id string) (*Message, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, msg := range m.messages[conversationID] {
+		if msg.ID == id {
+			c := *msg
+			return &c, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
+func (m *Memory) ReactMessage(_ context.Context, _ string, messageID, userKey, name, emoji string) error {
+	x := m.cx()
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if x.reactions[messageID] == nil {
+		x.reactions[messageID] = map[string]ReactUser{}
+	}
+	x.reactions[messageID][userKey] = ReactUser{Key: userKey, Name: name}
+	x.emoji[[2]string{messageID, userKey}] = emoji
+	return nil
+}
+
+func (m *Memory) MessageReactions(_ context.Context, ids []string) (map[string]map[string][]ReactUser, error) {
+	x := m.cx()
+	x.mu.RLock()
+	defer x.mu.RUnlock()
+	out := map[string]map[string][]ReactUser{}
+	for _, id := range ids {
+		for key, u := range x.reactions[id] {
+			e := x.emoji[[2]string{id, key}]
+			if e == "" {
+				continue
+			}
+			if out[id] == nil {
+				out[id] = map[string][]ReactUser{}
+			}
+			out[id][e] = append(out[id][e], u)
+		}
+	}
+	return out, nil
+}
+
+func (m *Memory) MarkRead(_ context.Context, conversationID, userKey, lastID string) error {
+	x := m.cx()
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if cur := x.reads[[2]string{conversationID, userKey}]; lastID > cur {
+		x.reads[[2]string{conversationID, userKey}] = lastID
+	}
+	return nil
+}
+
+func (m *Memory) ConversationReads(_ context.Context, conversationID string) (map[string]string, error) {
+	x := m.cx()
+	x.mu.RLock()
+	defer x.mu.RUnlock()
+	out := map[string]string{}
+	for k, v := range x.reads {
+		if k[0] == conversationID {
+			out[k[1]] = v
+		}
+	}
+	return out, nil
+}

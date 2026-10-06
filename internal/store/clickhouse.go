@@ -135,6 +135,9 @@ var chMigrations = []string{
 	"ALTER TABLE lessons ADD COLUMN IF NOT EXISTS assignment String DEFAULT ''",
 	"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS links Array(String)",
 	"ALTER TABLE lessons ADD COLUMN IF NOT EXISTS discussion Bool DEFAULT true",
+	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to String DEFAULT ''",
+	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_body String DEFAULT ''",
+	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_name String DEFAULT ''",
 }
 
 var chTables = []chTable{
@@ -203,8 +206,13 @@ var chTables = []chTable{
 		INDEX ix_user user_id TYPE bloom_filter GRANULARITY 1)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
 	{"messages", `(id String, conversation_id String, teacher_id String, visitor_key String, sender String,
-		sender_id String, sender_name String, body String, created_at ` + tsType + `)
+		sender_id String, sender_name String, body String, created_at ` + tsType + `,
+		reply_to String DEFAULT '', reply_body String DEFAULT '', reply_name String DEFAULT '')
 	ENGINE = MergeTree ORDER BY (conversation_id, id)`},
+	{"message_reactions", `(message_id String, user_key String, name String, emoji String, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (message_id, user_key)`},
+	{"conversation_reads", `(conversation_id String, user_key String, last_id String, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (conversation_id, user_key)`},
 	{"rank_points", `(user_id String, course_id String, points Int32, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, course_id)`},
 	{"rank_levels", `(user_id String, level Int32, awarded_at ` + tsType + `, ver UInt64)

@@ -2112,3 +2112,70 @@ func TestDiscussion(t *testing.T) {
 		t.Fatalf("эрхгүй хүнд хэлэлцүүлэг хаалттай: %d", code)
 	}
 }
+
+// Чат (Messenger маягийн): хариулах (quote), реакц (toggle/солих), уншсан тэмдэг, бичиж байна.
+func TestChatReactionsRepliesReads(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	s1, _ := register(t, srv, "stud", "student")
+	_, d := call(t, srv, "POST", "/api/teachers/teach/chat", s1, "")
+	conv := d["conversation"].(map[string]any)["id"].(string)
+	_, m1 := call(t, srv, "POST", "/api/chat/"+conv+"/messages", s1, `{"body":"Багшаа, 3-р бодлого хэцүү байна"}`)
+	// Хариу: quote бөглөгдөнө; байхгүй мессежид 404.
+	code, m2 := call(t, srv, "POST", "/api/chat/"+conv+"/messages", tt, `{"body":"Ингэж бод: эхлээд…","reply_to":"`+m1["id"].(string)+`"}`)
+	if code != 201 || m2["reply_to"] != m1["id"] || m2["reply_body"] != "Багшаа, 3-р бодлого хэцүү байна" || m2["reply_name"] == "" {
+		t.Fatalf("хариу: %d %v", code, m2)
+	}
+	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/messages", tt, `{"body":"x","reply_to":"nope"}`); code != 404 {
+		t.Fatal("байхгүй мессежид хариулахад 404")
+	}
+	// Реакц: нэмэх, солих, ижилийг дахин дарахад хасах; зөвшөөрөгдөөгүй эможи 400.
+	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/react", s1, `{"message_id":"`+m2["id"].(string)+`","emoji":"🦄"}`); code != 400 {
+		t.Fatal("зөвшөөрөгдөөгүй реакц 400")
+	}
+	_, r1 := call(t, srv, "POST", "/api/chat/"+conv+"/react", s1, `{"message_id":"`+m2["id"].(string)+`","emoji":"👍"}`)
+	if r1["mine"] != "👍" || len(r1["reactions"].(map[string]any)["👍"].([]any)) != 1 {
+		t.Fatalf("реакц нэмэх: %v", r1)
+	}
+	_, r2 := call(t, srv, "POST", "/api/chat/"+conv+"/react", s1, `{"message_id":"`+m2["id"].(string)+`","emoji":"❤️"}`)
+	if rx := r2["reactions"].(map[string]any); rx["👍"] != nil || len(rx["❤️"].([]any)) != 1 {
+		t.Fatalf("реакц солих: %v", r2)
+	}
+	call(t, srv, "POST", "/api/chat/"+conv+"/react", tt, `{"message_id":"`+m2["id"].(string)+`","emoji":"❤️"}`)
+	_, r3 := call(t, srv, "POST", "/api/chat/"+conv+"/react", s1, `{"message_id":"`+m2["id"].(string)+`","emoji":"❤️"}`)
+	if rx := r3["reactions"].(map[string]any); r3["mine"] != "" || len(rx["❤️"].([]any)) != 1 {
+		t.Fatalf("ижил реакц дахин дарахад хасагдана (багшийнх үлдэнэ): %v", r3)
+	}
+	// Уншсан: суралцагч багшийн хариуг үзлээ → жагсаалтад reads.
+	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/read", s1, `{"message_id":"`+m2["id"].(string)+`"}`); code != 204 {
+		t.Fatal("уншсан тэмдэг 204")
+	}
+	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/typing", tt, `{}`); code != 204 {
+		t.Fatal("бичиж байна 204")
+	}
+	_, lst := call(t, srv, "GET", "/api/chat/"+conv+"/messages", tt, "")
+	msgs := lst["messages"].([]any)
+	if len(msgs) != 2 || lst["me_key"] == "" {
+		t.Fatalf("жагсаалт: %v", lst)
+	}
+	last := msgs[1].(map[string]any)
+	if last["reply_to"] != m1["id"] || len(last["reactions"].(map[string]any)["❤️"].([]any)) != 1 {
+		t.Fatalf("жагсаалтад quote/реакц алга: %v", last)
+	}
+	reads := lst["reads"].(map[string]any)
+	found := false
+	for k, v := range reads {
+		if strings.HasPrefix(k, "u:") && k != lst["me_key"] && v == m2["id"] {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("суралцагчийн уншсан тэмдэг алга: %v", reads)
+	}
+	// Гадны хүн реакц дарж чадахгүй.
+	s3, _ := register(t, srv, "outsider", "student")
+	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/react", s3, `{"message_id":"`+m2["id"].(string)+`","emoji":"👍"}`); code != 404 {
+		t.Fatal("гадны хүнд яриа олдохгүй")
+	}
+}

@@ -130,8 +130,8 @@ func (c *ClickHouse) AddMessage(ctx context.Context, m *Message) error {
 		return err
 	}
 	m.ID, m.CreatedAt, m.TeacherID, m.VisitorKey = NewID(), time.Now(), cv.TeacherID, cv.VisitorKey
-	if err := c.insert(ctx, "messages", []string{"id", "conversation_id", "teacher_id", "visitor_key", "sender", "sender_id", "sender_name", "body", "created_at"},
-		m.ID, m.ConversationID, m.TeacherID, m.VisitorKey, m.Sender, m.SenderID, m.SenderName, m.Body, m.CreatedAt.UTC()); err != nil {
+	if err := c.insert(ctx, "messages", []string{"id", "conversation_id", "teacher_id", "visitor_key", "sender", "sender_id", "sender_name", "body", "created_at", "reply_to", "reply_body", "reply_name"},
+		m.ID, m.ConversationID, m.TeacherID, m.VisitorKey, m.Sender, m.SenderID, m.SenderName, m.Body, m.CreatedAt.UTC(), m.ReplyTo, m.ReplyBody, m.ReplyName); err != nil {
 		return err
 	}
 	cv.LastMessage, cv.LastMessageAt = m.Body, m.CreatedAt
@@ -140,11 +140,11 @@ func (c *ClickHouse) AddMessage(ctx context.Context, m *Message) error {
 
 func (c *ClickHouse) Messages(ctx context.Context, conversationID, beforeID string, limit int) ([]Message, error) {
 	out := []Message{}
-	err := c.query(ctx, `SELECT id, conversation_id, teacher_id, visitor_key, sender, sender_id, sender_name, body, created_at
+	err := c.query(ctx, `SELECT id, conversation_id, teacher_id, visitor_key, sender, sender_id, sender_name, body, created_at, reply_to, reply_body, reply_name
 		FROM messages WHERE conversation_id = ? AND (? = '' OR id < ?) ORDER BY id DESC LIMIT ?`,
 		[]any{conversationID, beforeID, beforeID, limit}, func(r driver.Rows) error {
 			var m Message
-			if err := r.Scan(&m.ID, &m.ConversationID, &m.TeacherID, &m.VisitorKey, &m.Sender, &m.SenderID, &m.SenderName, &m.Body, &m.CreatedAt); err != nil {
+			if err := r.Scan(&m.ID, &m.ConversationID, &m.TeacherID, &m.VisitorKey, &m.Sender, &m.SenderID, &m.SenderName, &m.Body, &m.CreatedAt, &m.ReplyTo, &m.ReplyBody, &m.ReplyName); err != nil {
 				return err
 			}
 			out = append(out, m)
@@ -157,4 +157,67 @@ func (c *ClickHouse) Messages(ctx context.Context, conversationID, beforeID stri
 		out[i], out[j] = out[j], out[i]
 	}
 	return out, nil
+}
+
+// ---- хариулах, реакц, уншсан ----
+
+func (c *ClickHouse) MessageByID(ctx context.Context, conversationID, id string) (*Message, error) {
+	var out *Message
+	err := c.query(ctx, `SELECT id, conversation_id, teacher_id, visitor_key, sender, sender_id, sender_name, body, created_at, reply_to, reply_body, reply_name
+		FROM messages WHERE conversation_id = ? AND id = ? LIMIT 1`, []any{conversationID, id}, func(r driver.Rows) error {
+		var m Message
+		if err := r.Scan(&m.ID, &m.ConversationID, &m.TeacherID, &m.VisitorKey, &m.Sender, &m.SenderID, &m.SenderName, &m.Body, &m.CreatedAt, &m.ReplyTo, &m.ReplyBody, &m.ReplyName); err != nil {
+			return err
+		}
+		out = &m
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if out == nil {
+		return nil, ErrNotFound
+	}
+	return out, nil
+}
+
+func (c *ClickHouse) ReactMessage(ctx context.Context, conversationID, messageID, userKey, name, emoji string) error {
+	return c.insert(ctx, "message_reactions", []string{"message_id", "user_key", "name", "emoji", "ver"}, messageID, userKey, name, emoji, ver())
+}
+
+func (c *ClickHouse) MessageReactions(ctx context.Context, ids []string) (map[string]map[string][]ReactUser, error) {
+	out := map[string]map[string][]ReactUser{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	err := c.query(ctx, "SELECT message_id, user_key, name, emoji FROM message_reactions FINAL WHERE has(?, message_id) AND emoji != '' ORDER BY message_id, name",
+		[]any{ids}, func(r driver.Rows) error {
+			var mid, key, name, emoji string
+			if err := r.Scan(&mid, &key, &name, &emoji); err != nil {
+				return err
+			}
+			if out[mid] == nil {
+				out[mid] = map[string][]ReactUser{}
+			}
+			out[mid][emoji] = append(out[mid][emoji], ReactUser{Key: key, Name: name})
+			return nil
+		})
+	return out, err
+}
+
+func (c *ClickHouse) MarkRead(ctx context.Context, conversationID, userKey, lastID string) error {
+	return c.insert(ctx, "conversation_reads", []string{"conversation_id", "user_key", "last_id", "ver"}, conversationID, userKey, lastID, ver())
+}
+
+func (c *ClickHouse) ConversationReads(ctx context.Context, conversationID string) (map[string]string, error) {
+	out := map[string]string{}
+	err := c.query(ctx, "SELECT user_key, last_id FROM conversation_reads FINAL WHERE conversation_id = ?", []any{conversationID}, func(r driver.Rows) error {
+		var k, id string
+		if err := r.Scan(&k, &id); err != nil {
+			return err
+		}
+		out[k] = id
+		return nil
+	})
+	return out, err
 }

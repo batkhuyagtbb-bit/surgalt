@@ -409,11 +409,35 @@ type Message struct {
 	SenderName string    `json:"sender_name,omitempty"`
 	Body       string    `json:"body"`
 	CreatedAt  time.Time `json:"created_at"`
+	// Хариулсан мессеж (Messenger маягийн quote): ID ба товч хуулбар (нэгдэх шаардлагагүй).
+	ReplyTo   string `json:"reply_to,omitempty"`
+	ReplyBody string `json:"reply_body,omitempty"`
+	ReplyName string `json:"reply_name,omitempty"`
+	// Реакцууд: эможи → хэн дарсан (хариу буцаахад бөглөгдөнө, хадгалагдахгүй).
+	Reactions map[string][]ReactUser `json:"reactions,omitempty"`
+}
+
+// ReactUser — мессежид реакц дарсан хүн (түлхүүр нь зочин/хэрэглэгчийн VisitorKey).
+type ReactUser struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
+// ChatExtras — хариулах, реакц, уншсан тэмдэг.
+type ChatExtras interface {
+	MessageByID(ctx context.Context, conversationID, id string) (*Message, error)
+	// ReactMessage: emoji хоосон бол хасна; нэг хүн нэг мессежид нэг эможи.
+	ReactMessage(ctx context.Context, conversationID, messageID, userKey, name, emoji string) error
+	MessageReactions(ctx context.Context, messageIDs []string) (map[string]map[string][]ReactUser, error)
+	// Уншсан тэмдэг: яриа бүрт оролцогч бүрийн сүүлд үзсэн мессежийн ID.
+	MarkRead(ctx context.Context, conversationID, userKey, lastID string) error
+	ConversationReads(ctx context.Context, conversationID string) (map[string]string, error)
 }
 
 type Store interface {
 	LearningStore
 	DiscussionStore
+	ChatExtras
 	BookStore
 	CreateUser(ctx context.Context, u *User) error
 	UserByID(ctx context.Context, id string) (*User, error)

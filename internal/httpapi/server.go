@@ -209,6 +209,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/courses/{id}/chat", s.handleCourseChat)
 	mux.HandleFunc("GET /api/chat/{id}/messages", s.handleListMessages)
 	mux.HandleFunc("POST /api/chat/{id}/messages", s.handleSendMessage)
+	mux.HandleFunc("POST /api/chat/{id}/react", s.handleReact)
+	mux.HandleFunc("POST /api/chat/{id}/read", s.handleRead)
+	mux.HandleFunc("POST /api/chat/{id}/typing", s.handleTyping)
 	mux.HandleFunc("GET /api/chat/ws", s.handleWS)
 
 	// Хуудсууд

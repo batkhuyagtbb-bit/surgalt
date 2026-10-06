@@ -130,10 +130,23 @@ func (h *Hub) Deliver(m store.Message) {
 	if err != nil {
 		return
 	}
-	h.publish(TeacherKey(m.TeacherID), payload)
-	if strings.HasPrefix(m.VisitorKey, "course:") {
-		h.publish(GroupKey(m.ConversationID), payload) // бүлгийн бүх гишүүнд
+	h.fanout(m.TeacherID, m.VisitorKey, m.ConversationID, payload)
+}
+
+// Fanout нь ярианы оролцогчдод дурын үйл явдал (реакц, уншсан, бичиж байна) түгээнэ.
+func (h *Hub) Fanout(teacherID, visitorKey, conversationID string, event any) {
+	payload, err := json.Marshal(event)
+	if err != nil {
 		return
 	}
-	h.publish(VisitorKey(m.VisitorKey), payload)
+	h.fanout(teacherID, visitorKey, conversationID, payload)
+}
+
+func (h *Hub) fanout(teacherID, visitorKey, conversationID string, payload []byte) {
+	h.publish(TeacherKey(teacherID), payload)
+	if strings.HasPrefix(visitorKey, "course:") {
+		h.publish(GroupKey(conversationID), payload) // бүлгийн бүх гишүүнд
+		return
+	}
+	h.publish(VisitorKey(visitorKey), payload)
 }
