@@ -1529,8 +1529,8 @@ class ChatThread {
     const f = this.form, extra = [...f.querySelectorAll("[data-plus]")];
     f.classList.add("composer-bar");
     f.innerHTML = `${extra.length ? `<div class="cb-left">${extra.map((b) => `<button type="button" class="cb-ic" id="${esc(b.id)}" title="${esc(b.textContent.trim())}" aria-label="${esc(b.textContent.trim())}">${b.querySelector("svg")?.outerHTML || "📹"}</button>`).join("")}</div>` : ""}
-      <div class="cb-input"><textarea name="body" rows="1" maxlength="2000" placeholder="Aa" aria-label="Мессеж"></textarea></div>
-      <button class="cb-send has-arrow" aria-label="Илгээх"><span class="cb-arrow">➤</span></button>`;
+      <div class="cb-input"><textarea name="body" rows="1" maxlength="2000" placeholder="Мессеж бичих…" aria-label="Мессеж"></textarea></div>
+      <button class="cb-send has-arrow" aria-label="Илгээх" title="Илгээх (Enter)"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21.9 12 3.4 3.6l-.1 6.6L15 12 3.3 13.8l.1 6.6Z"/></svg></button>`;
     const ta = f.body;
     const grow = () => { ta.style.height = "auto"; ta.style.height = Math.min(140, ta.scrollHeight) + "px"; f.classList.toggle("has-text", !!ta.value.trim()); };
     ta.addEventListener("input", () => { grow(); this.sendTyping(); });
