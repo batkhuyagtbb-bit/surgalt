@@ -12,21 +12,23 @@ import (
 // ---- сургалт ----
 
 const courseCols = `id, teacher_id, title, description, price, published, drip, unlock_all_paid, camera, certificate,
-	created_at, updated_at, deleted`
+	created_at, updated_at, deleted, max_warnings, block_hours, block_minutes`
 
 func scanCourse(r driver.Rows) (Course, bool, error) {
 	var c Course
 	var deleted bool
+	var mw, bh, bm int32
 	err := r.Scan(&c.ID, &c.TeacherID, &c.Title, &c.Description, &c.Price, &c.Published, &c.Drip, &c.UnlockAllPaid,
-		&c.Camera, &c.Certificate, &c.CreatedAt, &c.UpdatedAt, &deleted)
+		&c.Camera, &c.Certificate, &c.CreatedAt, &c.UpdatedAt, &deleted, &mw, &bh, &bm)
+	c.MaxWarnings, c.BlockHours, c.BlockMinutes = int(mw), int(bh), int(bm)
 	return c, deleted, err
 }
 
 func (c *ClickHouse) writeCourse(ctx context.Context, co *Course) error {
 	return c.insert(ctx, "courses", []string{"id", "teacher_id", "title", "description", "price", "published", "drip",
-		"unlock_all_paid", "camera", "certificate", "created_at", "updated_at", "ver", "deleted"},
+		"unlock_all_paid", "camera", "certificate", "created_at", "updated_at", "ver", "deleted", "max_warnings", "block_hours", "block_minutes"},
 		co.ID, co.TeacherID, co.Title, co.Description, co.Price, co.Published, co.Drip, co.UnlockAllPaid, co.Camera,
-		co.Certificate, co.CreatedAt.UTC(), co.UpdatedAt.UTC(), ver(), false)
+		co.Certificate, co.CreatedAt.UTC(), co.UpdatedAt.UTC(), ver(), false, int32(co.MaxWarnings), int32(co.BlockHours), int32(co.BlockMinutes))
 }
 
 // enrichCourses нь хичээлийн тоо (lessons-оос) ба үзэлт (counters-оос) бөглөнө.
@@ -103,6 +105,7 @@ func (c *ClickHouse) UpdateCourse(ctx context.Context, co *Course) error {
 	}
 	cur.Title, cur.Description, cur.Price, cur.Published = co.Title, co.Description, co.Price, co.Published
 	cur.Drip, cur.UnlockAllPaid, cur.Camera, cur.Certificate = co.Drip, co.UnlockAllPaid, co.Camera, co.Certificate
+	cur.MaxWarnings, cur.BlockHours, cur.BlockMinutes = co.MaxWarnings, co.BlockHours, co.BlockMinutes
 	cur.UpdatedAt = time.Now()
 	if err := c.writeCourse(ctx, cur); err != nil {
 		return err

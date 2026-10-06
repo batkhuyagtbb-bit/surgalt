@@ -2005,3 +2005,14 @@ html.reader-open{overflow:hidden}
 .ur-ic{font-size:1.2rem;line-height:1.2}
 .ur strong{display:block;font-size:.86rem}
 .ur small{display:block;font-size:.74rem;color:var(--muted);font-weight:500;line-height:1.35}
+
+/* Хаагдсан хичээл, багшийн "Дахин нээх" мэдэгдэл */
+.lesson.is-blocked .lesson-state{color:#b91c1c;font-weight:700}
+.bell-blocked{border-left:3px solid #dc2626}
+.bell-blocked>div{display:grid;gap:3px;padding:10px 12px}
+.bell-unblock{justify-self:start;margin-top:6px;background:#dc2626;color:#fff;border:0;border-radius:999px;font-weight:800;padding:6px 12px;box-shadow:0 6px 16px -6px rgba(220,38,38,.6)}
+.bell-unblock:hover{background:#b91c1c}
+.bell-unblock.done{background:#0f9d8a;box-shadow:none}
+.warn-set{margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+.warn-set legend{font-weight:800;font-size:.85rem;padding:0 6px}
+.bell-unblock{max-width:100%;white-space:normal;text-align:left;line-height:1.3}

@@ -25,6 +25,9 @@ type courseInput struct {
 	UnlockAllPaid bool   `json:"unlock_all_paid"` // багц төлсөн бол бүгд шууд
 	Camera        string `json:"camera"`          // off | optional | required
 	Certificate   bool   `json:"certificate"`     // сертификат олгоно
+	MaxWarnings   int    `json:"max_warnings"`    // таб солих сануулгын тоо (1-20, 0 = 3)
+	BlockHours    int    `json:"block_hours"`     // (хуучин) хориг, цаг
+	BlockMinutes  int    `json:"block_minutes"`   // хэтэрвэл хэдэн минутын дараа автоматаар нээгдэх (0 = багш нээтэл)
 }
 
 func (in *courseInput) validate() string {
@@ -37,6 +40,19 @@ func (in *courseInput) validate() string {
 	case in.Price < 0 || in.Price > maxPrice:
 		return "үнэ 0-100,000,000₮"
 	}
+	if in.MaxWarnings < 0 || in.MaxWarnings > 20 {
+		return "сануулгын тоо 1-20"
+	}
+	if in.BlockHours < 0 || in.BlockHours > 24*30 {
+		return "хоригийн хугацаа 0-720 цаг"
+	}
+	if in.BlockMinutes < 0 || in.BlockMinutes > 60*24*30 {
+		return "хоригийн хугацаа 0-43200 минут"
+	}
+	if in.BlockMinutes == 0 && in.BlockHours > 0 { // хуучин талбараар ирвэл минут руу хөрвүүлнэ
+		in.BlockMinutes = in.BlockHours * 60
+	}
+	in.BlockHours = 0
 	switch in.Camera {
 	case "":
 		in.Camera = "optional"
@@ -71,7 +87,7 @@ func (s *Server) handleCreateCourse(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, msg)
 		return
 	}
-	course := &store.Course{TeacherID: c.UID, Title: in.Title, Description: in.Description, Price: in.Price, Published: in.Published, Drip: in.Drip, UnlockAllPaid: in.UnlockAllPaid, Camera: in.Camera, Certificate: in.Certificate}
+	course := &store.Course{TeacherID: c.UID, Title: in.Title, Description: in.Description, Price: in.Price, Published: in.Published, Drip: in.Drip, UnlockAllPaid: in.UnlockAllPaid, Camera: in.Camera, Certificate: in.Certificate, MaxWarnings: in.MaxWarnings, BlockHours: in.BlockHours, BlockMinutes: in.BlockMinutes}
 	if err := s.store.CreateCourse(r.Context(), course); s.storeErr(w, r, err) {
 		return
 	}
@@ -93,7 +109,7 @@ func (s *Server) handleUpdateCourse(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, msg)
 		return
 	}
-	course := &store.Course{ID: r.PathValue("id"), TeacherID: c.UID, Title: in.Title, Description: in.Description, Price: in.Price, Published: in.Published, Drip: in.Drip, UnlockAllPaid: in.UnlockAllPaid, Camera: in.Camera, Certificate: in.Certificate}
+	course := &store.Course{ID: r.PathValue("id"), TeacherID: c.UID, Title: in.Title, Description: in.Description, Price: in.Price, Published: in.Published, Drip: in.Drip, UnlockAllPaid: in.UnlockAllPaid, Camera: in.Camera, Certificate: in.Certificate, MaxWarnings: in.MaxWarnings, BlockHours: in.BlockHours, BlockMinutes: in.BlockMinutes}
 	if err := s.store.UpdateCourse(r.Context(), course); s.storeErr(w, r, err) {
 		return
 	}
@@ -663,7 +679,9 @@ func (s *Server) handleCourseAccess(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"enrolled": enrolled, "owner": owner,
 		"all": owner || (enrolled && course.Price > 0), "lessons": bought,
 		"states": states, "progress": progress, "done": done, "total": len(lessons),
-		"ranks": rankBy, "rank": rank, "rank_total": total, "rank_awarded": awarded})
+		"ranks": rankBy, "rank": rank, "rank_total": total, "rank_awarded": awarded,
+		"blocks":       s.lessonBlocks(r.Context(), c.UID, store.ActivityFilter{CourseID: course.ID}, func(string) int { return blockMinutes(course) }),
+		"max_warnings": maxWarnings(course)})
 }
 
 // handleGetLesson: үнэгүй хичээлийг хэн ч, бусдыг зөвхөн элссэн хүн эсвэл багш үзнэ.
@@ -677,6 +695,13 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 				if l.IsFree {
 					s.trackView(r, pc.Data.Course.TeacherID, NotifLessonView, l.ID, l.Title, "/c/"+cid)
 					if p, ok := s.principal(r); ok && !p.IsGuest() { // нэвтэрсэн бол явцад тэмдэглэнэ (дараалалд хэрэгтэй)
+						if co, err := s.store.CourseByID(r.Context(), cid); err == nil {
+							if b := s.lessonBlocked(r.Context(), p.UID, co, l.ID); b != nil {
+								b.Title = l.Title
+								s.apiErr(w, r, blockedErr(b))
+								return
+							}
+						}
 						_ = s.store.MarkLessonViewed(r.Context(), p.UID, cid, l.ID)
 					}
 					writeJSON(w, http.StatusOK, l)
@@ -752,6 +777,11 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusLocked, map[string]any{"error": msg, "state": st})
 			return
 		}
+	}
+	if b := s.lessonBlocked(r.Context(), c.UID, course, l.ID); b != nil {
+		b.Title = l.Title
+		s.apiErr(w, r, blockedErr(b))
+		return
 	}
 	if course.TeacherID != c.UID {
 		_ = s.store.MarkLessonViewed(r.Context(), c.UID, course.ID, l.ID)

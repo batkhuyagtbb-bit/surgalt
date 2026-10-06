@@ -2462,3 +2462,96 @@ func TestUnlockRules(t *testing.T) {
 		t.Fatalf("нийтийн хөтөлбөрт unlock_rule алга")
 	}
 }
+
+// Сануулгын хязгаар: багш тоог тохируулна; хэтэрвэл (auto_block) хичээлд орохгүй, багшид "blocked"
+// мэдэгдэл очиж, багш дахин нээнэ. Суралцагч өөрөө teacher_unblock илгээж чадахгүй.
+func TestWarningLimitBlock(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	if code, _ := call(t, srv, "POST", "/api/courses", tt, `{"title":"x","price":0,"max_warnings":99}`); code != 400 {
+		t.Fatal("сануулгын тоо 1-20")
+	}
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Хяналт","price":0,"published":true,"max_warnings":5,"block_hours":0}`)
+	cid := c["id"].(string)
+	if c["max_warnings"].(float64) != 5 {
+		t.Fatalf("тохиргоо хадгалагдаагүй: %v", c)
+	}
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true}`)
+	lid := l["id"].(string)
+	s1, uid := register(t, srv, "stud", "student")
+	_, acc := call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
+	if acc["max_warnings"].(float64) != 5 {
+		t.Fatalf("access-д max_warnings алга: %v", acc["max_warnings"])
+	}
+	_, ss := call(t, srv, "POST", "/api/activity/start", s1, `{"course_id":"`+cid+`","lesson_id":"`+lid+`","kind":"lesson"}`)
+	sid := ss["session_id"].(string)
+	if ss["policy"].(map[string]any)["max_warn"].(float64) != 5 {
+		t.Fatalf("policy max_warn: %v", ss["policy"])
+	}
+	// Суралцагч хуурамч teacher_unblock илгээх → үл тооцогдоно.
+	call(t, srv, "POST", "/api/activity/beat", s1, `{"session_id":"`+sid+`","active":5,"events":[{"type":"teacher_unblock","detail":"хуурамч"}]}`)
+	// 5 дахь сануулгаар зогсов.
+	call(t, srv, "POST", "/api/activity/beat", s1, `{"session_id":"`+sid+`","active":5,"events":[{"type":"auto_block","detail":"5 удаа хичээлээс гарсан"}],"end":"auto_block"}`)
+	if code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid, s1, ""); code != http.StatusLocked || r["blocked"] == nil {
+		t.Fatalf("хаагдсан хичээлд орохгүй: %d %v", code, r)
+	}
+	if code, _ := call(t, srv, "POST", "/api/activity/start", s1, `{"course_id":"`+cid+`","lesson_id":"`+lid+`","kind":"lesson"}`); code != http.StatusLocked {
+		t.Fatalf("хаагдсан хичээлд сесс нээхгүй: %d", code)
+	}
+	_, acc = call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
+	if b := acc["blocks"].(map[string]any)[lid]; b == nil || b.(map[string]any)["until"] != nil {
+		t.Fatalf("access.blocks (багш нээтэл): %v", acc["blocks"])
+	}
+	// Багш хичээлдээ орж чадна.
+	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid, tt, ""); code != 200 {
+		t.Fatal("багш хоригдохгүй")
+	}
+	// Багшид улаан "blocked" мэдэгдэл, линк нь unblock:<uid>:<lid>.
+	_, ns := call(t, srv, "GET", "/api/me/notifications", tt, "")
+	found := false
+	for _, x := range ns["items"].([]any) {
+		n := x.(map[string]any)
+		if n["type"] == "blocked" && n["link"] == "unblock:"+uid+":"+lid && strings.Contains(n["title"].(string), "«Нэг»") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("багшид хаагдсан мэдэгдэл алга: %v", ns["items"])
+	}
+	// Суралцагч өөрөө нээж чадахгүй (багшийн эрх).
+	if code, _ := call(t, srv, "POST", "/api/me/students/"+uid+"/unblock", s1, `{"lesson_id":"`+lid+`"}`); code != 403 {
+		t.Fatalf("суралцагч нээхгүй: %d", code)
+	}
+	// Багш дахин нээнэ → орно, суралцагчид мэдэгдэл.
+	code, r := call(t, srv, "POST", "/api/me/students/"+uid+"/unblock", tt, `{"lesson_id":"`+lid+`"}`)
+	if code != 200 || r["unblocked"].(float64) != 1 {
+		t.Fatalf("багш нээх: %d %v", code, r)
+	}
+	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid, s1, ""); code != 200 {
+		t.Fatal("нээсний дараа орно")
+	}
+	_, sn := call(t, srv, "GET", "/api/me/notifications", s1, "")
+	if !strings.Contains(fmt.Sprint(sn), "дахин нээлээ") {
+		t.Fatalf("суралцагчид мэдэгдэл алга: %v", sn)
+	}
+	// Дахин нээх нь давтагдахгүй (0).
+	_, r = call(t, srv, "POST", "/api/me/students/"+uid+"/unblock", tt, `{"lesson_id":"`+lid+`"}`)
+	if r["unblocked"].(float64) != 0 {
+		t.Fatalf("давхар нээлт: %v", r)
+	}
+	// block_minutes > 0: until тодорхойлогдоно (давтан тул 2 дахин: 10 мин → 20 мин).
+	call(t, srv, "PUT", "/api/courses/"+cid, tt, `{"title":"Хяналт","price":0,"published":true,"max_warnings":5,"block_minutes":10}`)
+	_, ss2 := call(t, srv, "POST", "/api/activity/start", s1, `{"course_id":"`+cid+`","lesson_id":"`+lid+`","kind":"lesson"}`)
+	call(t, srv, "POST", "/api/activity/beat", s1, `{"session_id":"`+ss2["session_id"].(string)+`","active":5,"events":[{"type":"auto_block","detail":"дахин"}],"end":"auto_block"}`)
+	_, acc = call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
+	b2, _ := acc["blocks"].(map[string]any)[lid].(map[string]any)
+	if b2 == nil || b2["until"] == nil || b2["count"].(float64) != 2 {
+		t.Fatalf("10 минутын хориг until-тэй, 2 дахь удаа: %v", acc["blocks"])
+	}
+	at, _ := time.Parse(time.RFC3339Nano, b2["at"].(string))
+	until, _ := time.Parse(time.RFC3339Nano, b2["until"].(string))
+	if d := until.Sub(at); d != 20*time.Minute {
+		t.Fatalf("давтан хоригт хугацаа 2 дахин (20 мин) байх ёстой: %v", d)
+	}
+}

@@ -667,7 +667,8 @@ func (s *Server) handleStudentAnalytics(w http.ResponseWriter, r *http.Request) 
 		st = data.Students[0]
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"student": st, "sessions": ss, "lessons": perLesson, "exams": atts, "events": data.Events, "daily": data.Daily, "labels": eventLabels(),
-		"quiz_logs": quizLogs, "quiz_lessons": quizLessons, "lesson_titles": titleByLesson, "reflections": refs, "watches": watchRows})
+		"quiz_logs": quizLogs, "quiz_lessons": quizLessons, "lesson_titles": titleByLesson, "reflections": refs, "watches": watchRows,
+		"blocks": s.teacherStudentBlocks(r, c.UID, uid, titleByLesson)})
 }
 
 func eventLabels() map[string]string {
@@ -739,4 +740,22 @@ func (s *Server) handleAnalyticsExport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	cw.Flush()
+}
+
+// teacherStudentBlocks — багшийн сургалтууд дахь суралцагчийн идэвхтэй хоригууд (нэртэй).
+func (s *Server) teacherStudentBlocks(r *http.Request, teacherID, uid string, titles map[string]string) []LessonBlock {
+	courses, _ := s.store.CoursesByTeacher(r.Context(), teacherID, false)
+	hours := map[string]int{}
+	for _, co := range courses {
+		hours[co.ID] = blockMinutes(&co)
+	}
+	bs := s.lessonBlocks(r.Context(), uid, store.ActivityFilter{TeacherID: teacherID}, func(cid string) int { return hours[cid] })
+	out := make([]LessonBlock, 0, len(bs))
+	for _, b := range bs {
+		if b.Title == "" {
+			b.Title = titles[b.LessonID]
+		}
+		out = append(out, b)
+	}
+	return out
 }

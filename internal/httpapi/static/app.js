@@ -379,7 +379,20 @@ function bell() {
   const badge = $(".bell-badge"), panel = $("#bellPanel"), list = $("#bellList");
   let unread = 0;
   const setBadge = (n) => { unread = n; badge.hidden = !n; badge.textContent = n > 99 ? "99+" : n; };
-  const item = (n) => `<li class="bell-item ${n.read ? "" : "unread"}"><a href="${esc(n.Link || n.link || "#")}"><strong>${esc(n.title)}</strong>${n.body ? `<span>${esc(n.body)}</span>` : ""}<time>${fmtDate(n.created_at)}</time></a></li>`;
+  const item = (n) => {
+    const ub = n.type === "blocked" && /^unblock:([^:]+):(.+)$/.exec(n.link || "");
+    if (ub) return `<li class="bell-item bell-blocked ${n.read ? "" : "unread"}"><div><strong>${esc(n.title)}</strong>${n.body ? `<span>${esc(n.body)}</span>` : ""}<time>${fmtDate(n.created_at)}</time>
+      <button type="button" class="btn btn-sm bell-unblock" data-unblock-user="${esc(ub[1])}" data-unblock-lesson="${esc(ub[2])}">⛔ Хаагдсан — 🔓 Дахин нээх</button></div></li>`;
+    return `<li class="bell-item ${n.read ? "" : "unread"}"><a href="${esc(n.Link || n.link || "#")}"><strong>${esc(n.title)}</strong>${n.body ? `<span>${esc(n.body)}</span>` : ""}<time>${fmtDate(n.created_at)}</time></a></li>`;
+  };
+  list.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-unblock-user]"); if (!b) return;
+    e.preventDefault(); e.stopPropagation(); b.disabled = true;
+    try {
+      const r = await api(`/api/me/students/${b.dataset.unblockUser}/unblock`, { method: "POST", body: { lesson_id: b.dataset.unblockLesson } });
+      b.className = "btn btn-sm bell-unblock done"; b.textContent = r.unblocked ? "✓ Дахин нээгдлээ — суралцагчид мэдэгдлээ" : "✓ Аль хэдийн нээлттэй";
+    } catch (x) { toast(x.message, true); b.disabled = false; }
+  });
   const load = async () => {
     try {
       const d = await api("/api/me/notifications");
@@ -407,7 +420,7 @@ function bell() {
     toast(n.title);
     if (document.hidden && "Notification" in window && Notification.permission === "granted") {
       const bn = new Notification(n.title, { body: n.body || "", tag: n.id });
-      bn.onclick = () => { focus(); if (n.link) location.href = n.link; };
+      bn.onclick = () => { focus(); if (n.link && !n.link.startsWith("unblock:")) location.href = n.link; else panel.hidden = false; };
     }
   });
   Live.connect(Auth.token);
@@ -727,7 +740,8 @@ function watchAlert(html, btn, onClose) {
 // Өөр таб/цонх руу шилжвэл сануулга (3 дахь удаад зогсоно), 5 минут тутам "Та үзэж байна уу?" (30 сек),
 // хөдөлгөөнт усан тэмдэг (нэр, ID, IP), идэвхтэй хугацааны тоолуур.
 const WATCH_PING_SEC = 300, WATCH_PING_ANSWER = 30, WATCH_IDLE_MS = 120000;
-function watchLesson({ courseId, lessonId, modal, onStop, onActive }) {
+function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
+  const WATCH_MAX_WARN = Math.max(1, +maxWarn || 3); // багш сургалтын тохиргоонд тоогоор оруулна
   if (!Auth.token) return () => {};
   let sid = null, owner = false, warns = 0, stopped = false, away = false, awayAt = 0, last = Date.now(), lastInput = Date.now(), idleLogged = false;
   let acc = { active: 0, idle: 0, away: 0 }, events = [], pingAt = Date.now() + WATCH_PING_SEC * 1000, pingTimer = null, wmTimer = null;
@@ -777,6 +791,9 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive }) {
     tick(); away = false;
     const sec = Math.max(1, Math.round((Date.now() - awayAt) / 1000));
     if (owner) return; // багш өөрийн хичээлийг шалгаж байна
+    if (Date.now() - awayAt < 3000) { // санамсаргүй богино шилжилт (мэдэгдэл, дуудлага) — тоолохгүй, зөөлөн сануулна
+      toast("👀 Хичээлдээ анхаараарай — дахин гарвал сануулга тоологдоно"); return;
+    }
     warns++; paint();
     events.push({ type: "tab_switch", detail: `${sec} сек өөр цонхонд байсан (сануулга ${warns}/${WATCH_MAX_WARN})` });
     if (warns >= WATCH_MAX_WARN) return stop(`${WATCH_MAX_WARN} удаа хичээлээс гарсан`, `Та ${WATCH_MAX_WARN} удаа хичээлээс гарсан тул хичээл зогслоо.`);
@@ -2096,14 +2113,15 @@ async function coursePage() {
     access = a;
     const states = a.states || {}, prog = a.progress || {};
     $$(".lesson").forEach((li) => {
-      const st = states[li.dataset.lesson], p = prog[li.dataset.lesson], lbl = $(".lesson-state", li);
+      const st = states[li.dataset.lesson], p = prog[li.dataset.lesson], lbl = $(".lesson-state", li), blk = a.blocks?.[li.dataset.lesson];
+      li.classList.toggle("is-blocked", !!blk);
       li.classList.toggle("is-done", !!p?.completed_at);
-      const dripLocked = st && !st.open && !li.classList.contains("is-free");
+      const dripLocked = (st && !st.open && !li.classList.contains("is-free")) || !!blk;
       li.classList.toggle("is-drip", !!dripLocked);
       if (!lbl) return;
       if (dripLocked) {
         lbl.hidden = false; lbl.className = "lesson-state " + (st.reason === "timer" ? "timer" : "");
-        lbl.textContent = st.reason === "timer" ? `⏳ ${fmtDate(st.unlock_at)}-д нээгдэнэ`
+        lbl.textContent = blk ? `⛔ Сануулга хэтэрсэн тул хаагдсан${blk.until ? " · " + fmtDate(blk.until) + " хүртэл" : " · багш нээх хүртэл"}` : st.reason === "timer" ? `⏳ ${fmtDate(st.unlock_at)}-д нээгдэнэ`
           : st.reason === "quiz" ? `🔒 «${st.prev_title}» хичээлийн асуултуудад бүгдэд нь зөв хариулсны дараа нээгдэнэ (${st.quiz_left}/${st.quiz_total} үлдсэн)`
           : st.reason === "active" ? `🕒 «${st.prev_title}» хичээлийг дахиад ${st.active_left} мин идэвхтэй судлаарай`
           : st.reason === "exam" ? `📝 «${st.prev_title}» шалгалтад тэнцсэний дараа нээгдэнэ`
@@ -2308,6 +2326,17 @@ async function coursePage() {
     $("[data-dp-go], [data-dp-close]", pop)?.focus();
   };
   const expandRow = async (row, scroll) => {
+    const blk = access?.blocks?.[row.dataset.lesson];
+    if (blk) { // сануулгын хязгаар хэтэрсэн: орж болохгүй
+      $(".drip-pop")?.remove();
+      const pop = document.createElement("div"); pop.className = "drip-pop";
+      pop.innerHTML = `<div class="dp-card"><button class="icon-btn dp-x" aria-label="Хаах">✕</button><div class="dp-steps"><span class="dp-step lock" style="background:#fee2e2;color:#b91c1c">⛔</span></div>
+        <h3>Энэ хичээл хаагдсан байна</h3><p>Та хичээл үзэж байхдаа өөр цонх руу ${access?.max_warnings || 3}-аас олон удаа шилжсэн тул хичээл зогсож хаагдсан. ${blk.until ? `<b>${esc(fmtDate(blk.until))}</b> хүртэл хүлээнэ үү.` : "Багш тань дахин нээх хүртэл хүлээнэ үү — багшид мэдэгдэл очсон."}</p>
+        <div class="dp-acts"><button class="btn btn-ghost" data-dp-close>Ойлголоо</button></div></div>`;
+      document.body.append(pop);
+      pop.onclick = (e) => { if (e.target === pop || e.target.closest(".dp-x, [data-dp-close]")) pop.remove(); };
+      return;
+    }
     if (row.classList.contains("is-drip")) { dripPrompt(row); return; }
     const was = row.classList.contains("open");
     collapseAll();
@@ -2396,7 +2425,7 @@ async function coursePage() {
       if (sec < need) cb.textContent = `🕒 ${l.active_min} мин идэвхтэй үзсний дараа дуусгана`; else { cb.textContent = "✓ Энэ хичээлийг дууслаа"; finishByTime(); }
     };
     stopWatch?.();
-    stopWatch = l.exam ? null : watchLesson({ courseId: id, lessonId: lid, modal, onStop: () => closeModal(modal), onActive });
+    stopWatch = l.exam ? null : watchLesson({ courseId: id, lessonId: lid, modal, onStop: () => { closeModal(modal); refreshAccess(); }, onActive, maxWarn: access?.max_warnings });
     reflectDone = !!(Auth.token && access?.progress?.[lid]?.completed_at) || isOwner || !Auth.token || !!l.exam;
     curLesson = reflectDone ? null : { id, lid, title: l.title };
     openModal(modal);
@@ -2419,6 +2448,7 @@ async function coursePage() {
     if (b && !e.target.closest(".lesson-more") && canOpen(b.closest(".lesson"))) { await expandRow(b.closest(".lesson")); return; }
     if (!b) return;
     const li = b.closest(".lesson"), lid = li.dataset.lesson, price = +li.dataset.price;
+    if (access?.blocks?.[lid]) { await expandRow(li); return; }
     if (li.classList.contains("is-drip")) { dripPrompt(li); return; }
     if (!li.classList.contains("is-locked")) { try { await play(lid); } catch (err) { toast(err.message, true); } return; }
     if (!price) { // зөвхөн багцаар

@@ -156,6 +156,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/activity/start", s.handleActivityStart)
 	mux.HandleFunc("POST /api/activity/beat", s.handleActivityBeat)
 	mux.HandleFunc("POST /api/me/students/{uid}/remind", s.handleRemindStudent)
+	mux.HandleFunc("POST /api/me/students/{uid}/unblock", s.handleUnblockStudent)
 	mux.HandleFunc("GET /api/me/analytics", s.handleAnalytics)
 	mux.HandleFunc("GET /api/me/analytics/students/{uid}", s.handleStudentAnalytics)
 	mux.HandleFunc("GET /api/me/analytics/export", s.handleAnalyticsExport)

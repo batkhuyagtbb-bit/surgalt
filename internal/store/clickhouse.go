@@ -154,6 +154,9 @@ var chMigrations = []string{
 	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_name String DEFAULT ''",
 	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment String DEFAULT ''",
 	"ALTER TABLE lessons ADD COLUMN IF NOT EXISTS unlock_rule String DEFAULT ''",
+	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS max_warnings Int32 DEFAULT 0",
+	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS block_hours Int32 DEFAULT 0",
+	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS block_minutes Int32 DEFAULT 0",
 }
 
 var chTables = []chTable{
@@ -185,6 +188,7 @@ var chTables = []chTable{
 	{"courses", `(id String, teacher_id String, title String, description String, price Int64,
 		published Bool, drip Bool, unlock_all_paid Bool, camera String, certificate Bool,
 		created_at ` + tsType + `, updated_at ` + tsType + `, ver UInt64, deleted Bool DEFAULT false,
+		max_warnings Int32 DEFAULT 0, block_hours Int32 DEFAULT 0, block_minutes Int32 DEFAULT 0,
 		INDEX ix_teacher teacher_id TYPE bloom_filter GRANULARITY 1)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
 	{"lessons", `(id String, course_id String, title String, content String, video_url String,

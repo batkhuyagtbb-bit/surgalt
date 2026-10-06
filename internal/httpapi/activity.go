@@ -30,6 +30,7 @@ var eventInfo = map[string]eventMeta{
 	"idle":            {"2 минутаас дээш хөдөлгөөнгүй", false, false},
 	"ping_missed":     {"Идэвхийн шалгалтад хариу өгөөгүй", true, false},
 	"auto_block":      {"Хичээл автоматаар зогссон", true, false},
+	"teacher_unblock": {"Багш хоригийг цуцалсан", false, false},
 	"face_missing":    {"Камерт царай харагдаагүй", false, true},
 	"eyes_closed":     {"Нүдээ аньсан (нойрмоглосон)", false, false},
 	"look_away":       {"Дэлгэцээс өөр тийш харсан", false, true},
@@ -60,9 +61,14 @@ func (s *Server) logEvents(ctx context.Context, evs []store.ActivityEvent) {
 	var ns []*store.Notification
 	n := s.notif
 	n.mu.Lock()
+	var blocked []store.ActivityEvent
 	for _, e := range evs {
 		m := eventInfo[e.Type]
 		if !m.Notify || e.UserID == e.TeacherID {
+			continue
+		}
+		if e.Type == "auto_block" && e.LessonID != "" { // багшид улаан "Нээх" товчтой мэдэгдэл (тусад нь)
+			blocked = append(blocked, e)
 			continue
 		}
 		k := "act|" + e.UserID + "|" + e.Type
@@ -73,6 +79,26 @@ func (s *Server) logEvents(ctx context.Context, evs []store.ActivityEvent) {
 		ns = append(ns, &store.Notification{UserID: e.TeacherID, Type: "violation", Title: "⚠️ " + e.UserName + ": " + m.Label, Body: short(e.Detail), Link: "/me#students"})
 	}
 	n.mu.Unlock()
+	for _, e := range blocked {
+		title := e.LessonID
+		if l, err := s.store.LessonByID(ctx, e.CourseID, e.LessonID); err == nil {
+			title = l.Title
+		}
+		body := short(e.Detail)
+		if prev, err := s.store.ActivityEvents(ctx, store.ActivityFilter{UserID: e.UserID, CourseID: e.CourseID}, 500); err == nil {
+			n := 0
+			for _, x := range prev {
+				if x.Type == "auto_block" {
+					n++
+				}
+			}
+			if n > 1 {
+				body = fmt.Sprintf("Энэ сургалтад %d дахь удаагаа хаагдлаа · %s", n, body)
+			}
+		}
+		ns = append(ns, &store.Notification{UserID: e.TeacherID, Type: "blocked", Title: "⛔ " + e.UserName + ": «" + title + "» хичээл хаагдсан",
+			Body: body, Link: "unblock:" + e.UserID + ":" + e.LessonID})
+	}
 	s.notify(ctx, ns...)
 }
 

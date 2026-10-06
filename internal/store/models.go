@@ -109,7 +109,13 @@ type Course struct {
 	// Camera — камертай анхаарлын хяналт: off | optional | required.
 	Camera string `json:"camera"`
 	// Certificate — сургалтыг дүүргэсэн суралцагчид сертификат олгоно (хайлтад шошго болно).
-	Certificate     bool      `json:"certificate"`
+	Certificate bool `json:"certificate"`
+	// MaxWarnings — хичээл үзэж байхад таб/цонх солих сануулгын тоо (0 = анхдагч 3). Хэтэрвэл хичээл зогсоно.
+	MaxWarnings int `json:"max_warnings"`
+	// BlockHours — (хуучин) хориг хэдэн цаг; BlockMinutes байвал түүнийг ашиглана.
+	BlockHours int `json:"block_hours"`
+	// BlockMinutes — сануулга хэтэрсний дараа хориг хэдэн минутын дараа автоматаар нээгдэх (0 = багш нээтэл).
+	BlockMinutes    int       `json:"block_minutes"`
 	LessonCount     int       `json:"lesson_count"`
 	FreeLessonCount int       `json:"free_lesson_count"`
 	Views           int64     `json:"views"`

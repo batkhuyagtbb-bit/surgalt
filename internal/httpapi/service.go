@@ -62,6 +62,10 @@ func (s *Server) LessonFor(ctx context.Context, uid, cid, lid string) (*store.Co
 	if !has {
 		return nil, nil, apiError(http.StatusPaymentRequired, "энэ хичээл төлбөртэй", map[string]any{"lesson_price": l.Price, "course_price": course.Price})
 	}
+	if b := s.lessonBlocked(ctx, uid, course, l.ID); b != nil {
+		b.Title = l.Title
+		return nil, nil, blockedErr(b)
+	}
 	if course.Drip && !l.AlwaysOpen && course.TeacherID != uid {
 		lessons, err := s.store.LessonsByCourse(ctx, course.ID)
 		if err != nil {
@@ -95,6 +99,7 @@ type ActivityPolicy struct {
 	ActiveMin     int    `json:"active_min"`
 	ActiveDoneSec int    `json:"active_done_sec"`
 	Owner         bool   `json:"owner"`
+	MaxWarn       int    `json:"max_warn"` // таб солих сануулгын тоо (хэтэрвэл хичээл зогсож хаагдана)
 }
 
 // StartActivity нь хичээл үзэх идэвхийн сесс нээнэ (HTTP ба gRPC).
@@ -124,7 +129,7 @@ func (s *Server) StartActivity(ctx context.Context, uid, fallbackName, ip, cours
 		SessionID: sess.ID,
 		Watermark: map[string]string{"name": name, "id": tail(uid, 6), "ip": sess.IP},
 		Policy: ActivityPolicy{Camera: camera, PingSec: 300, PingAnswerSec: 30, IdleSec: 120, BeatSec: 15,
-			ActiveMin: l.ActiveMin, ActiveDoneSec: done, Owner: course.TeacherID == uid},
+			ActiveMin: l.ActiveMin, ActiveDoneSec: done, Owner: course.TeacherID == uid, MaxWarn: maxWarnings(course)},
 	}, nil
 }
 
@@ -180,7 +185,7 @@ func (s *Server) RecordBeat(ctx context.Context, uid string, in BeatInput) (int,
 		if i >= maxBeatEvents {
 			break
 		}
-		if _, ok := eventInfo[e.Type]; !ok || strings.HasPrefix(e.Type, "exam_") || e.Type == "teacher_remind" {
+		if _, ok := eventInfo[e.Type]; !ok || strings.HasPrefix(e.Type, "exam_") || e.Type == "teacher_remind" || e.Type == "teacher_unblock" {
 			continue
 		}
 		b.Counts[e.Type]++
