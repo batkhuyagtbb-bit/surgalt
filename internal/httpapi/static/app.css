@@ -1535,3 +1535,35 @@ html.reader-open{overflow:hidden}
 .rank-courses a:hover{background:var(--ink-2)}
 .rank-courses a>span:first-child{font-size:1.3rem;min-width:36px;text-align:center}
 .rank-courses small{display:block;color:var(--muted)}
+
+/* Хичээл оруулах маягт v2: алхамчилсан, цэгцтэй */
+.pe-v2{gap:12px}
+.pe-step{display:grid;grid-template-columns:30px 1fr;gap:12px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.pe-step[hidden]{display:none}
+.pe-num{width:30px;height:30px;border-radius:50%;background:var(--brand);color:#fff;font-weight:800;font-size:.85rem;display:grid;place-items:center}
+.pe-step-body{min-width:0;display:grid;gap:8px}
+.pe-step h4{margin:0;font-size:.98rem;display:flex;align-items:center;gap:8px}
+.pe-step h4 small{font-weight:500}
+.pe-step h5{margin:10px 0 0;font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.pe-kind-hint{margin:0}
+.pe-content-hint{margin:0}
+.pe-grid{display:grid;gap:10px}
+.pe-grid-2{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.pe-grid-3{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.pe-grid label,.pe-entry{display:grid;gap:4px;align-content:start;font-size:.8rem;font-weight:700;color:var(--text-2);margin:0}
+.pe-grid label small,.pe-entry small{font-weight:500;color:var(--muted)}
+.pe-grid input,.pe-grid select,.pe-entry input{padding:9px 12px}
+.pe-entry{max-width:360px}
+.pe-checks{display:flex;gap:16px;flex-wrap:wrap}
+.pe-checks .check{margin:0;font-size:.85rem}
+.pe-more{padding:0;overflow:hidden}
+.pe-more summary{display:grid;grid-template-columns:30px 1fr;gap:12px;padding:12px 16px;cursor:pointer;list-style:none}
+.pe-more summary::-webkit-details-marker{display:none}
+.pe-more summary .pe-num{background:var(--ink-2);color:var(--muted)}
+.pe-more summary .pe-step-body{display:flex;align-items:center;min-height:30px}
+.pe-more summary h4{flex-wrap:wrap;gap:4px 8px}
+.pe-more summary h4 small{white-space:nowrap}
+.pe-more-body{padding:0 16px 14px 58px}
+.pe-v2 .pe-foot{position:sticky;bottom:0;z-index:2;margin-top:2px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 -6px 20px rgba(15,23,42,.06)}
+.pe-access{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+@media (max-width:640px){.pe-step{grid-template-columns:1fr}.pe-num{display:none}.pe-more-body{padding-left:16px}}

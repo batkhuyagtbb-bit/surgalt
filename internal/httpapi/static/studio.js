@@ -606,52 +606,62 @@ async function courseEditor(id) {
       <input name="section_new" maxlength="80" placeholder="Шинэ бүлгийн нэр (ж: 1-р бүлэг. Алгебр)" hidden></div>`;
   // Нийтлэл бичих/засах маягт (шинэ хичээл ба засварт ижил). preset — бүлгийн толгойноос "+ Хичээл нэмэх" дарахад.
   const toLocal = (iso) => { if (!iso) return ""; const d = new Date(iso); if (isNaN(d)) return ""; const p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
-  // Хугацаа ба хоцорсон тохиолдлын бодлого (шалгалт, даалгаварт ижил).
-  const dueHTML = (pfx, due, what) => `<label>Эхлэх цаг<input name="${pfx}_start" type="datetime-local" value="${toLocal(due?.start_at)}"><small class="muted">Хоосон = шууд</small></label>
-        <label>Дуусах цаг<input name="${pfx}_due" type="datetime-local" value="${toLocal(due?.at)}"><small class="muted">Хоосон = хугацаагүй</small></label>
-        <label>Дуусах цаг өнгөрсөн бол<select name="${pfx}_late"><option value="free" ${!due?.late || due.late === "free" ? "selected" : ""}>Төлбөргүй үргэлжлүүлнэ</option><option value="paid" ${due?.late === "paid" ? "selected" : ""}>Хоцролтын төлбөр төлж нээнэ</option><option value="closed" ${due?.late === "closed" ? "selected" : ""}>Хаалттай</option></select></label>
-        <label class="pe-fee" ${due?.late === "paid" ? "" : "hidden"}>Хоцролтын төлбөр (₮)<input name="${pfx}_fee" type="number" min="0" step="500" value="${due?.late_fee || 5000}"></label>
-        <label>${what} төлбөр (₮)<input name="${pfx}_entry" type="number" min="0" step="500" value="${due?.fee || 0}"><small class="muted">0 = үнэгүй. Тавьсан бол суралцагч төлж байж ${what === "Шалгалтын" ? "шалгалт өгнө" : "хариу илгээнэ"} (сургалтад элссэн ч).</small></label>`;
+  // Хугацаа ба төлбөр (шалгалт, даалгаварт ижил): эхлэх/дуусах цаг, хоцорсон тохиолдол, оролцооны төлбөр.
+  const dueHTML = (pfx, due, what) => `<div class="pe-grid pe-grid-2">
+        <label>Эхлэх цаг<input name="${pfx}_start" type="datetime-local" value="${toLocal(due?.start_at)}"><small>Хоосон бол шууд нээлттэй</small></label>
+        <label>Дуусах цаг<input name="${pfx}_due" type="datetime-local" value="${toLocal(due?.at)}"><small>Хоосон бол хугацаагүй</small></label></div>
+      <div class="pe-grid pe-grid-2">
+        <label>Дуусах цаг өнгөрсөн бол<select name="${pfx}_late"><option value="free" ${!due?.late || due.late === "free" ? "selected" : ""}>Төлбөргүй үргэлжлүүлнэ</option><option value="paid" ${due?.late === "paid" ? "selected" : ""}>Хоцролтын төлбөр төлж нээнэ</option><option value="closed" ${due?.late === "closed" ? "selected" : ""}>Хаалттай болно</option></select></label>
+        <label class="pe-fee" ${due?.late === "paid" ? "" : "hidden"}>Хоцролтын төлбөр (₮)<input name="${pfx}_fee" type="number" min="0" step="500" value="${due?.late_fee || 5000}"></label></div>
+      <label class="pe-entry">${what} төлбөр (₮)<input name="${pfx}_entry" type="number" min="0" step="500" value="${due?.fee || 0}"><small>0 бол үнэгүй. Тавьсан бол суралцагч сургалтад элссэн ч төлж байж ${what === "Шалгалтын" ? "шалгалт өгнө" : "хариу илгээнэ"}.</small></label>`;
   const kindOf = (l) => l?.exam ? "exam" : l?.assignment ? "assignment" : "lesson";
-  const editorHTML = (l, preset, kind) => { kind = kind || kindOf(l); return `<form class="form post-editor" ${l ? `data-edit="${esc(l.id)}"` : `id="composerForm"`} data-kind="${kind}">
-      <div class="seg pe-kind" role="radiogroup" aria-label="Төрөл">
+  const KIND_TXT = {
+    lesson: { title: "Хичээлийн гарчиг", content: "Агуулга", hint: "Текст, зураг, видео, файл, асуулт — дарааллаар нь нэмнэ. Чирж зөөж болно." },
+    exam: { title: "Шалгалтын нэр", content: "Шалгалтын асуултууд", hint: "«Асуулт» товчоор асуултуудаа нэмнэ. Тайлбар текст нэмж болно. Суралцагчид асуултууд нэг дор өгөгдөж, өөр цонх руу шилжих эсвэл хуулах үед шалгалт шууд хаагдана." },
+    assignment: { title: "Даалгаврын нэр", content: "Даалгаврын нөхцөл", hint: "Юу хийх, юуг хэрхэн илгээхийг энд бичнэ. Суралцагч хариугаа текст ба холбоосоор илгээж, та оноо, тайлбар өгнө." },
+  };
+  const step = (n, title, body, cls = "", hidden = false) => `<section class="pe-step ${cls}" ${hidden ? "hidden" : ""}><span class="pe-num" aria-hidden="true">${n}</span><div class="pe-step-body"><h4>${title}</h4>${body}</div></section>`;
+  // Хичээл оруулах маягт: 1 Төрөл → 2 Нэр, бүлэг → 3 Агуулга → 4 Тохиргоо (төрлөөс хамаарна) → Нэмэлт → Нийтлэх.
+  const editorHTML = (l, preset, kind) => { kind = kind || kindOf(l); const T = KIND_TXT[kind]; return `<form class="form post-editor pe-v2" ${l ? `data-edit="${esc(l.id)}"` : `id="composerForm"`} data-kind="${kind}">
+      ${step(1, "Төрөл", `<div class="seg pe-kind" role="radiogroup" aria-label="Төрөл">
         <label><input type="radio" name="kind" value="lesson" ${kind === "lesson" ? "checked" : ""}><span>📄 Хичээл</span></label>
         <label><input type="radio" name="kind" value="exam" ${kind === "exam" ? "checked" : ""}><span>📝 Шалгалт</span></label>
         <label><input type="radio" name="kind" value="assignment" ${kind === "assignment" ? "checked" : ""}><span>📎 Даалгавар</span></label></div>
-      <input name="title" required maxlength="200" class="pe-title" placeholder="${kind === "exam" ? "Шалгалтын нэр" : kind === "assignment" ? "Даалгаврын нэр" : "Хичээлийн гарчиг"}" value="${esc(l?.title || "")}">
-      ${sectionPicker(l ? l.section || "" : preset || "")}
-      <div class="kind-row">
-        <label>Сургалтын хэлбэр<select name="format">${FORMATS.map(([v, t]) => `<option value="${v}" ${(l?.format || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-        <label>Заах аргын төрөл<select name="mode_kind">${MODES.map(([v, t]) => `<option value="${v}" ${(l?.mode || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-      </div>
-      <div class="pe-exam pe-section" ${kind === "exam" ? "" : "hidden"}><p class="muted small" style="margin:0 0 6px">📝 Шалгалт: асуултууд нэг дор өгөгдөж, өөр цонх руу шилжих эсвэл хуулах үед шууд хаагдана. Асуултуудаа доорх агуулгад нэмнэ.</p>
-        <div class="kind-row">
-          <label>Хугацаа (мин, 0 = хязгааргүй)<input name="ex_time" type="number" min="0" max="600" value="${l?.exam?.time_min ?? 30}"></label>
-          <label>Оролдлого (0 = хязгааргүй)<input name="ex_attempts" type="number" min="0" max="100" value="${l?.exam?.attempts ?? 1}"></label>
-          <label>Тэнцэх хувь<input name="ex_pass" type="number" min="0" max="100" value="${l?.exam?.pass_pct ?? 60}"></label>
-          ${dueHTML("ex", l?.exam?.due, "Шалгалтын")}
-          <label class="check"><input type="checkbox" name="ex_shuffle" ${l?.exam?.shuffle ? "checked" : ""}> Асуултыг холих</label>
-          <label class="check"><input type="checkbox" name="ex_show" ${l?.exam ? (l.exam.show_answers ? "checked" : "") : "checked"}> Дууссаны дараа зөв хариултыг харуулах</label></div></div>
-      <div class="pe-asg pe-section" ${kind === "assignment" ? "" : "hidden"}><p class="muted small" style="margin:0 0 6px">📎 Даалгавар: нөхцөлөө доорх агуулгад бичнэ. Суралцагч текст, холбоосоор хариугаа илгээж, та оноо, тайлбар өгнө.</p>
-        <div class="kind-row">
-          ${dueHTML("asg", l?.assignment?.due, "Даалгаврын")}
-          <label>Дээд оноо<input name="asg_max" type="number" min="1" max="1000" value="${l?.assignment?.max_score || 100}"></label></div>
-        <p class="muted small" style="margin:6px 0 0">Суралцагч хариугаа текст мэдээлэл ба холбоосоор (Google Docs, видео, GitHub г.м) илгээнэ — файл илгээхгүй.</p></div>
-      <details class="pe-more" ${l?.active_min ? "open" : ""}><summary>${ico("gear", 15)}Идэвхтэй хугацаа</summary>
-        <label>Идэвхтэй суралцах хугацаа (минут)<input name="active_min" type="number" min="0" max="600" value="${l?.active_min || 0}"><small class="muted">0 = шаардахгүй. Тавьсан бол суралцагч энэ хугацаанд идэвхтэй үзэж байж «дууслаа» дарна.</small></label></details>
-      <div class="be" data-be></div>
+        <p class="pe-kind-hint muted small" data-k="lesson" ${kind === "lesson" ? "" : "hidden"}>Ердийн хичээл: үзэж, асуултад хариулж, дуусгана.</p>
+        <p class="pe-kind-hint muted small" data-k="exam" ${kind === "exam" ? "" : "hidden"}>Хугацаатай, хамгаалалттай шалгалт. Оноогоор тэнцэнэ.</p>
+        <p class="pe-kind-hint muted small" data-k="assignment" ${kind === "assignment" ? "" : "hidden"}>Суралцагч хариу илгээж, та дүгнэнэ.</p>`)}
+      ${step(2, "Нэр ба бүлэг", `<input name="title" required maxlength="200" class="pe-title" placeholder="${T.title}" value="${esc(l?.title || "")}">
+        ${sectionPicker(l ? l.section || "" : preset || "")}`)}
+      ${step(3, `<span data-content-title>${T.content}</span>`, `<p class="muted small pe-content-hint" data-content-hint>${T.hint}</p><div class="be" data-be></div>`)}
+      ${step(4, "Шалгалтын тохиргоо", `<div class="pe-grid pe-grid-3">
+          <label>Хугацаа (минут)<input name="ex_time" type="number" min="0" max="600" value="${l?.exam?.time_min ?? 30}"><small>0 бол хязгааргүй</small></label>
+          <label>Оролдлого<input name="ex_attempts" type="number" min="0" max="100" value="${l?.exam?.attempts ?? 1}"><small>0 бол хязгааргүй</small></label>
+          <label>Тэнцэх хувь<input name="ex_pass" type="number" min="0" max="100" value="${l?.exam?.pass_pct ?? 60}"></label></div>
+        <div class="pe-checks"><label class="check"><input type="checkbox" name="ex_shuffle" ${l?.exam?.shuffle ? "checked" : ""}> Асуултыг холих</label>
+          <label class="check"><input type="checkbox" name="ex_show" ${l?.exam ? (l.exam.show_answers ? "checked" : "") : "checked"}> Дууссаны дараа зөв хариултыг харуулах</label></div>
+        <h5>Хугацаа ба төлбөр</h5>${dueHTML("ex", l?.exam?.due, "Шалгалтын")}`, "pe-exam", kind !== "exam")}
+      ${step(4, "Даалгаврын тохиргоо", `<div class="pe-grid pe-grid-3"><label>Дээд оноо<input name="asg_max" type="number" min="1" max="1000" value="${l?.assignment?.max_score || 100}"></label></div>
+        <h5>Хугацаа ба төлбөр</h5>${dueHTML("asg", l?.assignment?.due, "Даалгаврын")}
+        <p class="muted small" style="margin:8px 0 0">Хариу: текст мэдээлэл ба холбоос (Google Docs, видео, GitHub г.м). Файл илгээхгүй.</p>`, "pe-asg", kind !== "assignment")}
+      <details class="pe-step pe-more" ${l?.active_min || l?.format || l?.mode ? "open" : ""}><summary><span class="pe-num" aria-hidden="true">${ico("gear", 14)}</span><span class="pe-step-body"><h4>Нэмэлт тохиргоо <small class="muted">хэлбэр, идэвхтэй хугацаа${c.drip ? ", дараалал" : ""}</small></h4></span></summary>
+        <div class="pe-more-body">
+          <div class="pe-grid pe-grid-3">
+            <label>Сургалтын хэлбэр<select name="format">${FORMATS.map(([v, t]) => `<option value="${v}" ${(l?.format || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+            <label>Заах аргын төрөл<select name="mode_kind">${MODES.map(([v, t]) => `<option value="${v}" ${(l?.mode || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+            <label>Идэвхтэй суралцах хугацаа (мин)<input name="active_min" type="number" min="0" max="600" value="${l?.active_min || 0}"><small>0 бол шаардахгүй. Тавьсан бол энэ хугацаанд идэвхтэй үзэж байж «дууслаа» дарна.</small></label></div>
+          ${c.drip ? `<div class="pe-grid pe-grid-2" style="margin-top:10px"><label>Өмнөх хичээлийг үзснээс хойш нээгдэх<select name="unlock_after_h">${UNLOCKS.map(([h, t]) => `<option value="${h}" ${(l?.unlock_after_h || 0) === h ? "selected" : ""}>${t}</option>`).join("")}${l && !UNLOCKS.some(([h]) => h === (l.unlock_after_h || 0)) ? `<option value="${l.unlock_after_h}" selected>${l.unlock_after_h} цаг</option>` : ""}</select></label>
+            <label class="check" style="align-self:end"><input type="checkbox" name="always_open" ${l?.always_open ? "checked" : ""}> Дарааллаас үл хамааран нээлттэй</label></div>` : ""}
+        </div></details>
       <div class="pe-foot">
-        <div class="seg" role="radiogroup" aria-label="Хэн үзэх вэ">
-          <label><input type="radio" name="mode" value="free" ${l?.is_free ? "checked" : ""}><span>${ico("globe", 15)}Үнэгүй</span></label>
-          <label><input type="radio" name="mode" value="paid" ${l?.is_free ? "" : "checked"}><span>${ico("lock", 15)}Төлбөртэй</span></label></div>
-        <label class="pe-price" ${l?.is_free ? "hidden" : ""}><input name="price" type="number" min="0" step="500" value="${l ? l.price || 0 : c.price ? 0 : 10000}" aria-label="Үнэ"><span>₮</span></label>
+        <div class="pe-access"><span class="muted small">Хэн үзэх вэ</span>
+          <div class="seg" role="radiogroup" aria-label="Хэн үзэх вэ">
+            <label><input type="radio" name="mode" value="free" ${l?.is_free ? "checked" : ""}><span>${ico("globe", 15)}Үнэгүй</span></label>
+            <label><input type="radio" name="mode" value="paid" ${l?.is_free ? "" : "checked"}><span>${ico("lock", 15)}Төлбөртэй</span></label></div>
+          <label class="pe-price" ${l?.is_free ? "hidden" : ""}><input name="price" type="number" min="0" step="500" value="${l ? l.price || 0 : c.price ? 0 : 10000}" aria-label="Үнэ"><span>₮</span></label></div>
         <span class="grow"></span>
         ${l ? `<button type="button" class="btn btn-ghost btn-sm" data-cancel>Болих</button>` : ""}
-        <button class="btn btn-gold btn-sm">${l ? "Хадгалах" : "Нийтлэх"}</button></div>
-      <p class="muted small pe-hint">${c.price ? "Үнэ 0 бол хичээл зөвхөн сургалтын багцаар нээгдэнэ." : "Энэ сургалт багц үнэгүй тул төлбөртэй хичээл бүр өөрийн үнэтэй байна."}</p>
-      ${c.drip ? `<div class="drip-row"><span class="muted small">Өмнөх хичээлийг үзснээс хойш:</span>
-        <select name="unlock_after_h" aria-label="Нээгдэх хугацаа">${UNLOCKS.map(([h, t]) => `<option value="${h}" ${(l?.unlock_after_h || 0) === h ? "selected" : ""}>${t}</option>`).join("")}${l && !UNLOCKS.some(([h]) => h === (l.unlock_after_h || 0)) ? `<option value="${l.unlock_after_h}" selected>${l.unlock_after_h} цаг</option>` : ""}</select>
-        <label class="check small"><input type="checkbox" name="always_open" ${l?.always_open ? "checked" : ""}> Дарааллаас үл хамааран нээлттэй</label></div>` : ""}
+        <button class="btn btn-gold">${l ? "Хадгалах" : kind === "exam" ? "Шалгалт нийтлэх" : kind === "assignment" ? "Даалгавар нийтлэх" : "Хичээл нийтлэх"}</button></div>
+      <p class="muted small pe-hint">${c.price ? "Үнэ 0 бол зөвхөн сургалтын багцаар нээгдэнэ." : "Энэ сургалт багц үнэгүй тул төлбөртэй хичээл бүр өөрийн үнэтэй байна."}</p>
       <p class="form-error" role="alert"></p></form>`; };
 
   // Блоктой нийтлэл: эхний зураг + агуулгын тоо + урьдчилан харах.
@@ -956,8 +966,14 @@ async function courseEditor(id) {
     const f = e.target.closest(".post-editor");
     if (!f) return;
     if (e.target.name === "mode") $(".pe-price", f).hidden = f.mode.value === "free";
-    if (e.target.name === "kind") { f.dataset.kind = f.kind.value; $(".pe-exam", f).hidden = f.kind.value !== "exam"; $(".pe-asg", f).hidden = f.kind.value !== "assignment"; }
-    if (/_late$/.test(e.target.name)) { const fee = e.target.closest(".kind-row")?.querySelector(".pe-fee"); if (fee) fee.hidden = e.target.value !== "paid"; }
+    if (e.target.name === "kind") {
+      const k = f.kind.value, T = KIND_TXT[k]; f.dataset.kind = k;
+      $(".pe-exam", f).hidden = k !== "exam"; $(".pe-asg", f).hidden = k !== "assignment";
+      $$(".pe-kind-hint", f).forEach((p) => (p.hidden = p.dataset.k !== k));
+      f.title.placeholder = T.title; $("[data-content-title]", f).textContent = T.content; $("[data-content-hint]", f).textContent = T.hint;
+      if (!f.dataset.edit) $(".pe-foot .btn-gold", f).textContent = k === "exam" ? "Шалгалт нийтлэх" : k === "assignment" ? "Даалгавар нийтлэх" : "Хичээл нийтлэх";
+    }
+    if (/_late$/.test(e.target.name)) { const fee = e.target.closest(".pe-grid")?.querySelector(".pe-fee"); if (fee) fee.hidden = e.target.value !== "paid"; }
     if (e.target.name === "section_pick") { const isNew = f.section_pick.value === "__new"; f.section_new.hidden = !isNew; f.section_new.required = isNew; if (isNew) f.section_new.focus(); }
   };
   const onSubmit = async (e) => {
