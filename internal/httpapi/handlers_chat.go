@@ -505,3 +505,64 @@ func gctx2(r *http.Request) context.Context {
 	_ = cancel // богино асуулга; холболт дуустал амьдарна
 	return ctx
 }
+
+// handleEditMessage: PUT /api/chat/{id}/messages/{mid} {body} — зөвхөн өөрийн мессеж.
+func (s *Server) handleEditMessage(w http.ResponseWriter, r *http.Request) {
+	c, conv, _, ok := s.loadConv(w, r)
+	if !ok {
+		return
+	}
+	m, err := s.store.MessageByID(r.Context(), conv.ID, r.PathValue("mid"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "мессеж олдсонгүй")
+		return
+	}
+	if m.Deleted || (m.SenderID != "" && m.SenderID != c.UID) || (m.SenderID == "" && m.Sender != "visitor") || (m.SenderID == "" && c.VisitorKey() != conv.VisitorKey) {
+		writeErr(w, http.StatusForbidden, "зөвхөн өөрийн мессежийг засна")
+		return
+	}
+	var in struct {
+		Body string `json:"body"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	in.Body = strings.TrimSpace(in.Body)
+	if n := utf8.RuneCountInString(in.Body); n < 1 || n > 2000 {
+		writeErr(w, http.StatusBadRequest, "мессеж 1-2000 тэмдэгт")
+		return
+	}
+	if err := s.store.EditMessage(r.Context(), conv.ID, m.ID, in.Body); s.storeErr(w, r, err) {
+		return
+	}
+	m.Body, m.Edited = in.Body, true
+	if m.Attachment != "" {
+		m.AttachmentURL = s.media(m.Attachment)
+	}
+	s.chatEvent(conv, map[string]any{"type": "edit", "message": m})
+	writeJSON(w, http.StatusOK, m)
+}
+
+// handleDeleteMessage: DELETE /api/chat/{id}/messages/{mid} — өөрийнхөө, эсвэл багш (өөрийн яриандаа) бүгдийг.
+func (s *Server) handleDeleteMessage(w http.ResponseWriter, r *http.Request) {
+	c, conv, role, ok := s.loadConv(w, r)
+	if !ok {
+		return
+	}
+	m, err := s.store.MessageByID(r.Context(), conv.ID, r.PathValue("mid"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "мессеж олдсонгүй")
+		return
+	}
+	mine := (m.SenderID != "" && m.SenderID == c.UID) || (m.SenderID == "" && m.Sender == role && c.VisitorKey() == conv.VisitorKey)
+	teacherOwner := role == store.SenderTeacher && conv.Kind != store.ConvDM && conv.Kind != store.ConvTeam
+	if !mine && !teacherOwner {
+		writeErr(w, http.StatusForbidden, "зөвхөн өөрийн мессежийг устгана")
+		return
+	}
+	if err := s.store.DeleteMessage(r.Context(), conv.ID, m.ID); s.storeErr(w, r, err) {
+		return
+	}
+	s.chatEvent(conv, map[string]any{"type": "delete", "message_id": m.ID})
+	w.WriteHeader(http.StatusNoContent)
+}

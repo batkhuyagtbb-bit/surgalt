@@ -156,7 +156,52 @@ func (c *ClickHouse) Messages(ctx context.Context, conversationID, beforeID stri
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 { // хуучнаас шинэ рүү
 		out[i], out[j] = out[j], out[i]
 	}
-	return out, nil
+	return out, c.applyEdits(ctx, conversationID, out)
+}
+
+// applyEdits — засвар/устгалын давхаргыг мессежүүдэд тусгана.
+func (c *ClickHouse) applyEdits(ctx context.Context, conversationID string, msgs []Message) error {
+	if len(msgs) == 0 {
+		return nil
+	}
+	ids := make([]string, len(msgs))
+	for i := range msgs {
+		ids[i] = msgs[i].ID
+	}
+	type ed struct {
+		body    string
+		deleted bool
+	}
+	eds := map[string]ed{}
+	if err := c.query(ctx, "SELECT message_id, body, deleted FROM message_edits FINAL WHERE conversation_id = ? AND has(?, message_id)", []any{conversationID, ids}, func(r driver.Rows) error {
+		var id, body string
+		var del bool
+		if err := r.Scan(&id, &body, &del); err != nil {
+			return err
+		}
+		eds[id] = ed{body, del}
+		return nil
+	}); err != nil {
+		return err
+	}
+	for i := range msgs {
+		if e, ok := eds[msgs[i].ID]; ok {
+			if e.deleted {
+				msgs[i].Deleted, msgs[i].Body, msgs[i].Attachment = true, "", ""
+			} else {
+				msgs[i].Edited, msgs[i].Body = true, e.body
+			}
+		}
+	}
+	return nil
+}
+
+func (c *ClickHouse) EditMessage(ctx context.Context, conversationID, messageID, body string) error {
+	return c.insert(ctx, "message_edits", []string{"message_id", "conversation_id", "body", "deleted", "edited_at", "ver"}, messageID, conversationID, body, false, time.Now().UTC(), ver())
+}
+
+func (c *ClickHouse) DeleteMessage(ctx context.Context, conversationID, messageID string) error {
+	return c.insert(ctx, "message_edits", []string{"message_id", "conversation_id", "body", "deleted", "edited_at", "ver"}, messageID, conversationID, "", true, time.Now().UTC(), ver())
 }
 
 // ---- хариулах, реакц, уншсан ----
@@ -178,7 +223,11 @@ func (c *ClickHouse) MessageByID(ctx context.Context, conversationID, id string)
 	if out == nil {
 		return nil, ErrNotFound
 	}
-	return out, nil
+	one := []Message{*out}
+	if err := c.applyEdits(ctx, conversationID, one); err != nil {
+		return nil, err
+	}
+	return &one[0], nil
 }
 
 func (c *ClickHouse) ReactMessage(ctx context.Context, conversationID, messageID, userKey, name, emoji string) error {

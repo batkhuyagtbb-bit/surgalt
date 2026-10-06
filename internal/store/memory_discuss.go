@@ -285,3 +285,27 @@ func (m *Memory) UserTeamConversations(_ context.Context, userID string, limit i
 	}
 	return out, nil
 }
+
+func (m *Memory) EditMessage(_ context.Context, conversationID, messageID, body string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, msg := range m.messages[conversationID] {
+		if msg.ID == messageID {
+			msg.Body, msg.Edited = body, true
+			return nil
+		}
+	}
+	return ErrNotFound
+}
+
+func (m *Memory) DeleteMessage(_ context.Context, conversationID, messageID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, msg := range m.messages[conversationID] {
+		if msg.ID == messageID {
+			msg.Body, msg.Attachment, msg.Deleted = "", "", true
+			return nil
+		}
+	}
+	return ErrNotFound
+}

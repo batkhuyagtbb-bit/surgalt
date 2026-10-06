@@ -224,6 +224,8 @@ var chTables = []chTable{
 		sender_id String, sender_name String, body String, created_at ` + tsType + `,
 		reply_to String DEFAULT '', reply_body String DEFAULT '', reply_name String DEFAULT '', attachment String DEFAULT '')
 	ENGINE = MergeTree ORDER BY (conversation_id, id)`},
+	{"message_edits", `(message_id String, conversation_id String, body String, deleted Bool, edited_at ` + tsType + `, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (conversation_id, message_id)`},
 	{"conversation_members", `(conversation_id String, user_id String, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (conversation_id, user_id)`},
 	{"message_reactions", `(message_id String, user_key String, name String, emoji String, ver UInt64)

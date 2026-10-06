@@ -247,6 +247,7 @@ type Home struct {
 	Teacher  *HomeTeacherPanel `json:"teacher,omitempty"`
 	// Суралцагчийн өөрийн хэсэг: систем олгосон цол, сургалт бүрийн цол, даалгавар/шалгалтын төлөв.
 	Rank        *RankInfo        `json:"rank,omitempty"`
+	RankLadder  []RankStep       `json:"rank_ladder,omitempty"`
 	CourseRanks []HomeCourseRank `json:"course_ranks"`
 	Tasks       []HomeTask       `json:"tasks"`
 	RankAwarded bool             `json:"rank_awarded,omitempty"`
@@ -475,6 +476,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if u.Role != store.RoleTeacher && len(out.Courses) > 0 {
 		rank, byCourse, tasks, awarded := s.myProgress(ctx, c.UID, out.Courses)
 		out.Rank, out.CourseRanks, out.Tasks, out.RankAwarded = &rank, byCourse, tasks, awarded
+		out.RankLadder = RankLadder()
 	}
 	if out.CourseRanks == nil {
 		out.CourseRanks = []HomeCourseRank{}

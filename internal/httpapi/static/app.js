@@ -1498,9 +1498,16 @@ function dayLabel(t) {
 class ChatThread {
   // opts: {ol, body, form, token(): string, convId(): string, role(): "teacher"|"visitor", group(): bool}
   constructor(o) {
-    Object.assign(this, { list: [], reads: {}, meKey: "", typing: new Map(), replyTo: null, lastReadSent: "", typeAt: 0 }, o);
+    Object.assign(this, { list: [], reads: {}, meKey: "", typing: new Map(), replyTo: null, lastReadSent: "", typeAt: 0, editing: null }, o);
     this.ol.classList.add("thread");
     this.ol.addEventListener("click", (e) => this.click(e));
+    this.ol.addEventListener("submit", async (e) => { // мессеж засах
+      const f = e.target.closest(".msg-edit"); if (!f) return; e.preventDefault();
+      const id = this.editing, body = f.querySelector("textarea").value.trim(); if (!body) return;
+      try { const m = await api(`/api/chat/${this.convId()}/messages/${id}`, { method: "PUT", body: { body }, token: this.token() }); const cur = this.list.find((x) => x.id === id); if (cur) Object.assign(cur, m); this.editing = null; this.render(); }
+      catch (x) { toast(x.message, true); }
+    });
+    this.ol.addEventListener("keydown", (e) => { if (e.target.matches(".msg-edit textarea")) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.target.closest("form").requestSubmit(); } if (e.key === "Escape") { this.editing = null; this.render(); } } });
     document.addEventListener("click", (e) => { if (!e.target.closest(".react-pick, [data-react]")) $(".react-pick", this.ol)?.remove(); });
     if (this.form) this.bindForm();
   }
@@ -1517,6 +1524,8 @@ class ChatThread {
     if (d.conversation_id !== this.convId()) return;
     if (d.type === "reaction") { const m = this.list.find((x) => x.id === d.message_id); if (m) { m.reactions = d.reactions; this.render(); } }
     if (d.type === "read" && d.key !== this.meKey) { this.reads[d.key] = d.last_id; this.render(); }
+    if (d.type === "edit") { const m = this.list.find((x) => x.id === d.message.id); if (m) { Object.assign(m, d.message); this.render(); } }
+    if (d.type === "delete") { const m = this.list.find((x) => x.id === d.message_id); if (m) { m.deleted = true; m.body = ""; m.attachment_url = ""; m.reactions = {}; this.render(); } }
     if (d.type === "typing" && d.key !== this.meKey) { this.typing.set(d.key, { name: d.name, at: Date.now() }); this.render(); this.scroll(); clearTimeout(this._tt); this._tt = setTimeout(() => { this.sweepTyping(); this.render(); }, 4200); }
   }
   sweepTyping() { for (const [k, v] of this.typing) if (Date.now() - v.at > 4000) this.typing.delete(k); }
@@ -1550,13 +1559,14 @@ class ChatThread {
       const rx = Object.entries(m.reactions || {}).filter(([, u]) => u.length);
       const reacts = rx.length ? `<div class="msg-reacts">${rx.map(([e, u]) => `<button type="button" class="${u.some((x) => x.key === this.meKey) ? "on" : ""}" data-react-one="${e}" title="${esc(u.map((x) => x.name).join(", "))}">${e}${u.length > 1 ? ` ${u.length}` : ""}</button>`).join("")}</div>` : "";
       const av = !mine && last ? `<span class="msg-av">${avatarHTML({ display_name: m.sender_name || (m.sender === "teacher" ? "Багш" : "?") }, "avatar-sm")}</span>` : `<span class="msg-av"></span>`;
-      const foot = last || rx.length ? `<div class="msg-foot"><time>${fmtTime(m.created_at)}</time>${mine && seen && seen.id === m.id ? `<span class="msg-seen">✓✓ Үзсэн${this.group() && seen.n > 1 ? ` · ${seen.n}` : ""}</span>` : ""}</div>` : "";
-      const sticker = /^::sticker::(.+)$/.exec(m.body || "");
-      const imgUrl = m.attachment_url || (/^https?:\/\/\S+\.(gif|png|jpe?g|webp)(\?\S*)?$/i.test(m.body || "") ? m.body : "");
-      const content = sticker ? `<span class="msg-sticker">${esc(sticker[1])}</span>` : imgUrl ? `<a class="msg-img" href="${esc(imgUrl)}" target="_blank" rel="noopener"><img src="${esc(imgUrl)}" alt="" loading="lazy"></a>${m.attachment_url && m.body && m.body !== "📷 Зураг" ? `<span class="msg-text">${linkify(m.body)}</span>` : ""}` : `<span class="msg-text">${linkify(m.body)}</span>`;
+      const foot = last || rx.length || m.edited ? `<div class="msg-foot"><time>${fmtTime(m.created_at)}</time>${m.edited && !m.deleted ? `<span class="msg-edited">засварласан</span>` : ""}${mine && seen && seen.id === m.id ? `<span class="msg-seen">✓✓ Үзсэн${this.group() && seen.n > 1 ? ` · ${seen.n}` : ""}</span>` : ""}</div>` : "";
+      const sticker = !m.deleted && /^::sticker::(.+)$/.exec(m.body || "");
+      const imgUrl = m.deleted ? "" : m.attachment_url || (/^https?:\/\/\S+\.(gif|png|jpe?g|webp)(\?\S*)?$/i.test(m.body || "") ? m.body : "");
+      const editing = this.editing === m.id;
+      const content = m.deleted ? `<span class="msg-text msg-deleted">Мессеж устгагдсан</span>` : editing ? `<form class="msg-edit"><textarea rows="2" maxlength="2000">${esc(m.body)}</textarea><div><button type="submit" class="btn btn-gold btn-sm">Хадгалах</button><button type="button" class="btn btn-ghost btn-sm" data-edit-cancel>Болих</button></div></form>` : sticker ? `<span class="msg-sticker">${esc(sticker[1])}</span>` : imgUrl ? `<a class="msg-img" href="${esc(imgUrl)}" target="_blank" rel="noopener"><img src="${esc(imgUrl)}" alt="" loading="lazy"></a>${m.attachment_url && m.body && m.body !== "📷 Зураг" ? `<span class="msg-text">${linkify(m.body)}</span>` : ""}` : `<span class="msg-text">${linkify(m.body)}</span>`;
       out.push(`<li class="msg ${mine ? "me" : "them"} ${first ? "first" : ""} ${last ? "last" : ""} ${sticker ? "is-sticker" : ""} ${imgUrl ? "has-img" : ""}" data-id="${esc(m.id)}">${av}<div class="msg-col">${name}
         <div class="msg-row"><div class="bubble" title="${fmtDate(m.created_at)}">${quote}${content}</div>
-          <div class="msg-tools"><button type="button" data-react="${esc(m.id)}" title="Реакц">☺</button>${mine ? "" : `<button type="button" data-reply="${esc(m.id)}" title="Хариулах">↩</button>`}</div></div>
+          <div class="msg-tools">${m.deleted ? "" : `<button type="button" data-react="${esc(m.id)}" title="Реакц">☺</button>`}${mine || m.deleted ? "" : `<button type="button" data-reply="${esc(m.id)}" title="Хариулах">↩</button>`}${mine && !m.deleted ? `<button type="button" data-edit="${esc(m.id)}" title="Засах">✎</button>` : ""}${(mine || this.role() === "teacher") && !m.deleted ? `<button type="button" data-del="${esc(m.id)}" title="Устгах">🗑</button>` : ""}</div></div>
         ${reacts}${foot}</div></li>`);
     });
     for (const [, v] of this.typing) out.push(`<li class="msg them typing"><span class="msg-av"></span><div class="msg-col"><div class="bubble"><span class="dots"><i></i><i></i><i></i></span></div><small class="muted">${esc(v.name)} бичиж байна…</small></div></li>`);
@@ -1575,6 +1585,11 @@ class ChatThread {
     if (one) { await this.react(one.closest(".msg").dataset.id, one.dataset.reactOne); return; }
     const rp = t.closest("[data-reply]");
     if (rp) { const m = this.list.find((x) => x.id === rp.dataset.reply); this.replyTo = m || null; this.renderReply(); this.form?.body.focus(); return; }
+    const ed = t.closest("[data-edit]");
+    if (ed) { this.editing = ed.dataset.edit; this.render(); const ta = $(".msg-edit textarea", this.ol); if (ta) { ta.focus(); ta.selectionStart = ta.value.length; } return; }
+    if (t.closest("[data-edit-cancel]")) { this.editing = null; this.render(); return; }
+    const del = t.closest("[data-del]");
+    if (del && confirm("Мессежийг устгах уу?")) { try { await api(`/api/chat/${conv}/messages/${del.dataset.del}`, { method: "DELETE", token: this.token() }); const m = this.list.find((x) => x.id === del.dataset.del); if (m) { m.deleted = true; m.body = ""; m.attachment_url = ""; m.reactions = {}; } this.render(); } catch (x) { toast(x.message, true); } return; }
     const go = t.closest("[data-goto]");
     if (go) { const el = this.ol.querySelector(`[data-id="${CSS.escape(go.dataset.goto)}"]`); if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1200); } return; }
     if (t.closest("[data-cancel-reply]")) { this.replyTo = null; this.renderReply(); }
@@ -1953,14 +1968,23 @@ async function homePage() {
       <a class="btn btn-gold" href="/c/${esc(last.course)}${last.lesson ? "#l=" + esc(last.lesson) : ""}">Үзэх</a></div>`);
 
   if (h.rank) {
-    const rk = h.rank;
-    parts.push(sec("my-rank", "🎖 Миний цол", `<div class="rank-card">
-      <div class="rank-main"><span class="rank-big rank-shine" data-level="${rk.level}">${esc(rk.insignia)}</span><div class="grow"><strong class="rank-title">${esc(rk.name)}</strong>
-        <span class="muted small">${rk.points} оноо · ${rk.honest} шударга хичээл${rk.cheated ? ` · <span class="cr-bad">${rk.cheated} хичээлд хуулах оролдлогоос цол олгоогүй</span>` : ""}</span>
-        <div class="meter cr-meter" style="margin-top:8px"><i style="width:${rk.progress}%"></i></div>
-        <span class="muted small">${rk.next ? `Дараагийн «${esc(rk.next_name)}» цол ${rk.next} оноонд — ${rk.next - rk.points} дутуу` : "Дээд цол — баяр хүргэе!"}</span></div></div>
-      ${rk.tips?.length ? `<div class="rank-tips"><b>Систем зөвлөж байна</b><ul>${rk.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div>` : ""}
-      ${h.course_ranks.length ? `<ul class="rank-courses">${h.course_ranks.map((c) => `<li><a href="/c/${esc(c.course_id)}"><span class="rank-shine" data-level="${c.rank.level}">${esc(c.rank.insignia)}</span><span class="grow"><strong>${esc(c.title)}</strong><small>${esc(c.rank.name)} · ${c.rank.points} оноо · ${c.lessons.length} хичээл үнэлэгдсэн</small></span><span class="chip chip-teal">Үзэх</span></a></li>`).join("")}</ul>` : ""}</div>`));
+    const rk = h.rank, left = rk.next ? rk.next - rk.points : 0, ladder = h.rank_ladder || [];
+    // Урам зоригийн үг: явцаас хамаарч өөрчлөгдөнө.
+    const cheer = !rk.next ? "Дээд цол! Та энэ сургалтын жинхэнэ генерал. 🫡" : rk.progress >= 80 ? `Бараг боллоо! Ердөө ${left} оноо дутуу — өнөөдөр нэг хичээл дуусгавал хүрнэ. 🔥` : rk.progress >= 40 ? `Сайн явж байна — замын тал нь ардаа үлдлээ. ${left} оноо үлдсэн. 💪` : rk.points > 0 ? `Сайн эхлэл! Хичээл бүр оноо нэмнэ — ${left} оноонд дараагийн цол. 🚀` : "Анхны хичээлээ дуусгаад анхны цолоо аваарай! 🎯";
+    const ring = `<div class="rank-ring" style="--p:${rk.progress}"><div class="rank-ring-in"><span class="rank-shine" data-level="${rk.level}">${esc(rk.insignia)}</span></div></div>`;
+    const steps = ladder.map((st, i) => `<li class="${i < rk.level ? "done" : i === rk.level ? "cur" : i === rk.level + 1 ? "next" : ""}" title="${esc(st.name)} · ${st.points} оноо"><b class="${i <= rk.level ? "rank-shine" : ""}" data-level="${i}">${esc(st.insignia)}</b><span>${esc(st.name)}</span><small>${st.points}</small></li>`).join("");
+    const tipLine = (t) => { const m = /\(\+(\d+)/.exec(t); return `<li><i>${m ? "+" + m[1] : "✓"}</i><span>${esc(t.replace(/\s*\(\+.*$/, ""))}</span></li>`; };
+    parts.push(sec("my-rank", "🎖 Миний цол", `<div class="rank-hero">
+      <div class="rank-hero-top">${ring}
+        <div class="grow"><span class="eyebrow">Цэргийн цол · систем автоматаар олгоно</span><strong class="rank-title">${esc(rk.name)}</strong>
+          <p class="rank-cheer">${cheer}</p>
+          <div class="rank-stats"><span><b>${rk.points}</b> оноо</span><span><b>${rk.honest}</b> шударга хичээл</span>${rk.cheated ? `<span class="bad"><b>${rk.cheated}</b> цолгүй</span>` : ""}${rk.next ? `<span><b>${left}</b> оноо дараагийн цолд</span>` : ""}</div>
+          ${rk.next ? `<div class="rank-next"><div class="meter"><i style="width:${rk.progress}%"></i></div><span>${esc(rk.name)} <em>→</em> ${esc(rk.next_name)} <b>${rk.progress}%</b></span></div>` : ""}</div></div>
+      ${ladder.length ? `<div class="rank-ladder-wrap"><ol class="rank-ladder">${steps}</ol></div>` : ""}
+      <div class="rank-grid">
+        ${rk.tips?.length ? `<div class="rank-box rank-todo"><b>Дараагийн алхам — оноо нэмэх</b><ul>${rk.tips.filter((t) => !t.startsWith("дараагийн")).map(tipLine).join("")}</ul></div>` : ""}
+        ${h.course_ranks.length ? `<div class="rank-box"><b>Сургалт бүрээр</b><ul class="rank-courses">${h.course_ranks.map((c) => `<li><a href="/c/${esc(c.course_id)}"><span class="rank-shine" data-level="${c.rank.level}">${esc(c.rank.insignia)}</span><span class="grow"><strong>${esc(c.title)}</strong><small>${esc(c.rank.name)} · ${c.rank.points} оноо · ${c.lessons.length} хичээл</small></span><span class="chip chip-teal">Үргэлжлүүлэх</span></a></li>`).join("")}</ul></div>` : ""}
+      </div></div>`));
   }
   if (h.tasks?.length) {
     const label = (t) => ({ open: ["Хийх", "chip-amber"], not_started: [`${fmtDate(t.due.start_at)}-д эхэлнэ`, ""], need_pay: [(t.due.need_late ? "Хоцорсон · " : "Төлбөртэй · ") + money(t.due.fee) + " төлж нээнэ", "chip-amber"], closed: ["Хаалттай", ""], submitted: ["Илгээсэн · дүгнэхийг хүлээж байна", "chip-teal"],
@@ -1995,7 +2019,7 @@ async function homePage() {
   const teachers = h.teachers.length ? sec("my-teachers", "Миний багш нар", `<div class="people">${h.teachers.map((t) => `
       <a class="person" href="/t/${esc(t.username)}">${avatarHTML(t)}<span class="grow"><strong>${esc(t.display_name)}</strong><small>${esc(t.headline || "@" + t.username)}</small></span></a>`).join("")}</div>`) : `<span id="my-teachers"></span>`;
   const chats = h.chats.length ? sec("my-chats", "Чат", `<ul class="items">${h.chats.map((c) => `
-      <li><a class="item" href="${c.kind === "group" ? `/c/${esc(c.course_id)}#chat=group` : `/t/${esc(c.teacher.username)}#chat`}" data-rail-open="${esc(c.id)}">${c.kind === "group" ? `<span class="avatar avatar-sm group">👥</span>` : avatarHTML(c.teacher)}<span class="grow"><strong>${esc(c.kind === "group" ? c.title : c.teacher.display_name)}</strong><small>${c.kind === "group" ? "Бүлэг · " + esc(c.teacher.display_name) + " · " : ""}${esc(c.last_message)}</small></span><time class="muted small">${fmtDate(c.last_message_at)}</time></a></li>`).join("")}</ul>`) : `<span id="my-chats"></span>`;
+      <li><a class="item" href="${c.kind === "group" ? `/c/${esc(c.course_id)}#chat=group` : c.teacher?.username && !c.kind ? `/t/${esc(c.teacher.username)}#chat` : "#my-chats"}" data-rail-open="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group">${c.kind === "team" ? "🧑‍🤝‍🧑" : "👥"}</span>` : c.teacher ? avatarHTML(c.teacher) : `<span class="avatar avatar-sm">?</span>`}<span class="grow"><strong>${esc(c.kind === "group" || c.kind === "team" ? c.title : c.teacher?.display_name || c.title || "")}</strong><small>${c.kind === "group" ? "Бүлэг · " + esc(c.teacher?.display_name || "") + " · " : c.kind === "team" ? "Сурагчдын бүлэг · " : c.kind === "dm" ? "Ангийн найз · " : ""}${esc(c.last_message || "")}</small></span><time class="muted small">${fmtDate(c.last_message_at)}</time></a></li>`).join("")}</ul>`) : `<span id="my-chats"></span>`;
   parts.push(`<div class="dash-cols">${teachers}${chats}</div>`);
 
   dash.innerHTML = parts.join("") + (tp ? "" : `<div class="modal" id="stuModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>

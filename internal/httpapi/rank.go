@@ -66,6 +66,22 @@ var rankLadder = []rankStep{
 	{6800, "Генерал", "✪✪✪✪"},
 }
 
+// RankStep — шатлалын нэг цол (клиентэд: шатлалын зураас).
+type RankStep struct {
+	Points   int    `json:"points"`
+	Name     string `json:"name"`
+	Insignia string `json:"insignia"`
+}
+
+// RankLadder — бүх цолын шатлал (суралцагчид зорилгоо харуулахад).
+func RankLadder() []RankStep {
+	out := make([]RankStep, len(rankLadder))
+	for i, s := range rankLadder {
+		out[i] = RankStep{Points: s.Points, Name: s.Name, Insignia: s.Sign}
+	}
+	return out
+}
+
 // lessonRankName — нэг хичээлийн оноогоор олгох цол.
 func lessonRankName(points int, disqualified bool) string {
 	switch {

@@ -2218,6 +2218,31 @@ func TestChatReactionsRepliesReads(t *testing.T) {
 	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/messages", tt, `{"body":"::sticker::🎉"}`); code != 201 {
 		t.Fatal("стикер илгээгдэнэ")
 	}
+	// Засах/устгах: өөрийнхөө засна, бусдынхыг засахгүй; багш суралцагчийнхыг устгана; устгасан нь "deleted".
+	if code, _ := call(t, srv, "PUT", "/api/chat/"+conv+"/messages/"+m1["id"].(string), tt, `{"body":"x"}`); code != 403 {
+		t.Fatal("бусдын мессежийг засахгүй")
+	}
+	code, em := call(t, srv, "PUT", "/api/chat/"+conv+"/messages/"+m1["id"].(string), s1, `{"body":"Багшаа, 3-р бодлого (засав)"}`)
+	if code != 200 || em["edited"] != true || em["body"] != "Багшаа, 3-р бодлого (засав)" {
+		t.Fatalf("засах: %d %v", code, em)
+	}
+	_, lst3 := call(t, srv, "GET", "/api/chat/"+conv+"/messages", tt, "")
+	if first := lst3["messages"].([]any)[0].(map[string]any); first["body"] != "Багшаа, 3-р бодлого (засав)" || first["edited"] != true {
+		t.Fatalf("засвар жагсаалтад тусаагүй: %v", first)
+	}
+	if code, _ := call(t, srv, "DELETE", "/api/chat/"+conv+"/messages/"+m2["id"].(string), s1, ""); code != 403 {
+		t.Fatal("суралцагч багшийн мессежийг устгахгүй")
+	}
+	if code, _ := call(t, srv, "DELETE", "/api/chat/"+conv+"/messages/"+m1["id"].(string), tt, ""); code != 204 {
+		t.Fatal("багш суралцагчийн мессежийг устгана")
+	}
+	_, lst4 := call(t, srv, "GET", "/api/chat/"+conv+"/messages", s1, "")
+	if first := lst4["messages"].([]any)[0].(map[string]any); first["deleted"] != true || first["body"] != "" {
+		t.Fatalf("устгасан мессеж: %v", first)
+	}
+	if code, _ := call(t, srv, "PUT", "/api/chat/"+conv+"/messages/"+m1["id"].(string), s1, `{"body":"дахин"}`); code != 403 {
+		t.Fatal("устгасныг засахгүй")
+	}
 	// Гадны хүн реакц дарж чадахгүй.
 	s3, _ := register(t, srv, "outsider", "student")
 	if code, _ := call(t, srv, "POST", "/api/chat/"+conv+"/react", s3, `{"message_id":"`+m2["id"].(string)+`","emoji":"👍"}`); code != 404 {

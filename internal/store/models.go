@@ -423,6 +423,9 @@ type Message struct {
 	AttachmentURL string `json:"attachment_url,omitempty"`
 	// Реакцууд: эможи → хэн дарсан (хариу буцаахад бөглөгдөнө, хадгалагдахгүй).
 	Reactions map[string][]ReactUser `json:"reactions,omitempty"`
+	// Засварласан / устгасан (message_edits давхаргаас).
+	Edited  bool `json:"edited,omitempty"`
+	Deleted bool `json:"deleted,omitempty"`
 }
 
 // ReactUser — мессежид реакц дарсан хүн (түлхүүр нь зочин/хэрэглэгчийн VisitorKey).
@@ -441,6 +444,9 @@ type ChatExtras interface {
 	IsTeamMember(ctx context.Context, convID, userID string) (bool, error)
 	UserDMConversations(ctx context.Context, userID string, limit int) ([]Conversation, error)
 	UserTeamConversations(ctx context.Context, userID string, limit int) ([]Conversation, error)
+	// Засах/устгах: messages хүснэгт append-only тул давхаргад хадгалж, уншихад тусгана.
+	EditMessage(ctx context.Context, conversationID, messageID, body string) error
+	DeleteMessage(ctx context.Context, conversationID, messageID string) error
 	MessageByID(ctx context.Context, conversationID, id string) (*Message, error)
 	// ReactMessage: emoji хоосон бол хасна; нэг хүн нэг мессежид нэг эможи.
 	ReactMessage(ctx context.Context, conversationID, messageID, userKey, name, emoji string) error
