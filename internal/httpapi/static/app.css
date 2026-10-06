@@ -1871,3 +1871,19 @@ html.reader-open{overflow:hidden}
 .msg-edit textarea{width:100%;min-height:0;padding:8px 10px;border-radius:10px;font:inherit;color:var(--text);background:#fff;border:1px solid var(--line)}
 .msg-edit div{display:flex;gap:6px;justify-content:flex-end}
 .thread .msg.me .msg-edit textarea{color:#0f172a}
+
+/* Чатын бөмбөлөг — FB маягийн тогтвортой өргөн: мөр бүтэн өргөн, багана 80% хүртэл, товчнууд давхарлана */
+.thread .msg{width:100%;max-width:100%;align-self:stretch;justify-content:flex-start}
+.thread .msg.me{justify-content:flex-start}
+.msg-col{max-width:80%;min-width:0;width:auto}
+.msg-row{position:relative;display:flex;align-items:center}
+.bubble{flex:0 1 auto;max-width:100%;min-width:0}
+.msg-tools{position:absolute;top:50%;transform:translateY(-50%);left:calc(100% + 4px);display:flex;gap:0;padding:2px;border-radius:999px;background:var(--surface);border:1px solid var(--line);box-shadow:0 4px 12px rgba(15,23,42,.08);opacity:0;pointer-events:none;transition:opacity .15s;white-space:nowrap;z-index:2}
+.thread .msg.me .msg-tools{left:auto;right:calc(100% + 4px)}
+.thread .msg:hover .msg-tools,.msg-tools:focus-within{opacity:1;pointer-events:auto}
+.msg-tools button{width:26px;height:26px;font-size:.85rem}
+.msg-deleted{font-style:italic;opacity:.6}
+.thread .msg .bubble:has(.msg-deleted){background:transparent;border:1px dashed var(--line);color:var(--muted)}
+.thread .msg.me .bubble:has(.msg-deleted){background:transparent;color:var(--muted)}
+.msg-col .msg-foot{margin-top:2px}
+@media (max-width:640px){.msg-col{max-width:86%}}
