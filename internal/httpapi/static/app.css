@@ -1652,3 +1652,5 @@ html.reader-open{overflow:hidden}
 .reply-bar{flex-basis:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:10px;background:var(--brand-soft);color:var(--brand-2);font-size:.78rem}
 .reply-bar em{font-style:normal;color:var(--muted)}
 .reply-bar button{border:0;background:none;font-size:.95rem;cursor:pointer;color:var(--muted)}
+.msg-gap{margin:12px 0 4px;text-transform:none;letter-spacing:0;font-weight:600}
+.msg-gap span{background:none}

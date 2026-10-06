@@ -1466,10 +1466,14 @@ class ChatThread {
     this.sweepTyping();
     const L = this.list, out = [], seen = this.seenBy();
     let lastDay = "";
+    const GAP = 15 * 60000; // ойрхон цагт (15 мин дотор) бичсэн нь нэг бүлэг
+    const who = (m) => m.sender_id || m.sender_name || m.sender;
     L.forEach((m, i) => {
       const day = dayLabel(m.created_at);
+      const prev = L[i - 1], next = L[i + 1];
       if (day !== lastDay) { out.push(`<li class="msg-day"><span>${esc(day)}</span></li>`); lastDay = day; }
-      const prev = L[i - 1], next = L[i + 1], same = (a, b) => a && b && (a.sender_id || a.sender_name || a.sender) === (b.sender_id || b.sender_name || b.sender) && Math.abs(new Date(a.created_at) - new Date(b.created_at)) < 5 * 60000 && dayLabel(a.created_at) === dayLabel(b.created_at);
+      else if (prev && new Date(m.created_at) - new Date(prev.created_at) > GAP) out.push(`<li class="msg-day msg-gap"><span>${fmtTime(m.created_at)}</span></li>`); // завсар их → цагийн шошго
+      const same = (a, b) => a && b && who(a) === who(b) && Math.abs(new Date(a.created_at) - new Date(b.created_at)) < GAP && dayLabel(a.created_at) === dayLabel(b.created_at);
       const first = !same(prev, m), last = !same(m, next), mine = this.mine(m);
       const name = this.group() && !mine && first && m.sender_name ? `<b class="msg-who">${esc(m.sender_name)}${m.sender === "teacher" ? ` <span class="dc-badge">Багш</span>` : ""}</b>` : "";
       const quote = m.reply_to ? `<button type="button" class="msg-quote" data-goto="${esc(m.reply_to)}"><b>${esc(m.reply_name || "")}</b><span>${esc(m.reply_body || "")}</span></button>` : "";
@@ -1479,7 +1483,7 @@ class ChatThread {
       const foot = last || rx.length ? `<div class="msg-foot"><time>${fmtTime(m.created_at)}</time>${mine && seen && seen.id === m.id ? `<span class="msg-seen">✓✓ Үзсэн${this.group() && seen.n > 1 ? ` · ${seen.n}` : ""}</span>` : ""}</div>` : "";
       out.push(`<li class="msg ${mine ? "me" : "them"} ${first ? "first" : ""} ${last ? "last" : ""}" data-id="${esc(m.id)}">${av}<div class="msg-col">${name}
         <div class="msg-row"><div class="bubble" title="${fmtDate(m.created_at)}">${quote}<span class="msg-text">${linkify(m.body)}</span></div>
-          <div class="msg-tools"><button type="button" data-react="${esc(m.id)}" title="Реакц">☺</button><button type="button" data-reply="${esc(m.id)}" title="Хариулах">↩</button></div></div>
+          <div class="msg-tools"><button type="button" data-react="${esc(m.id)}" title="Реакц">☺</button>${mine ? "" : `<button type="button" data-reply="${esc(m.id)}" title="Хариулах">↩</button>`}</div></div>
         ${reacts}${foot}</div></li>`);
     });
     for (const [, v] of this.typing) out.push(`<li class="msg them typing"><span class="msg-av"></span><div class="msg-col"><div class="bubble"><span class="dots"><i></i><i></i><i></i></span></div><small class="muted">${esc(v.name)} бичиж байна…</small></div></li>`);
