@@ -149,7 +149,7 @@ func (c *ClickHouse) CoursesByIDs(ctx context.Context, ids []string) ([]Course, 
 // ---- хичээл ----
 
 const lessonCols = `id, course_id, title, content, video_url, is_free, price, unlock_after_h, always_open, format, mode,
-	section, blocks, active_min, exam, position, created_at, deleted, assignment, discussion`
+	section, blocks, active_min, exam, position, created_at, deleted, assignment, discussion, unlock_rule`
 
 func scanLesson(r driver.Rows) (Lesson, bool, error) {
 	var l Lesson
@@ -157,7 +157,7 @@ func scanLesson(r driver.Rows) (Lesson, bool, error) {
 	var unlock, active, pos int32
 	var blocks, exam, asg string
 	err := r.Scan(&l.ID, &l.CourseID, &l.Title, &l.Content, &l.VideoURL, &l.IsFree, &l.Price, &unlock, &l.AlwaysOpen,
-		&l.Format, &l.Mode, &l.Section, &blocks, &active, &exam, &pos, &l.CreatedAt, &deleted, &asg, &l.Discussion)
+		&l.Format, &l.Mode, &l.Section, &blocks, &active, &exam, &pos, &l.CreatedAt, &deleted, &asg, &l.Discussion, &l.UnlockRule)
 	if err != nil {
 		return l, false, err
 	}
@@ -196,9 +196,9 @@ func (c *ClickHouse) writeLesson(ctx context.Context, l *Lesson, deleted bool) e
 		asg = string(b)
 	}
 	return c.insert(ctx, "lessons", []string{"id", "course_id", "title", "content", "video_url", "is_free", "price",
-		"unlock_after_h", "always_open", "format", "mode", "section", "blocks", "active_min", "exam", "position", "created_at", "ver", "deleted", "assignment", "discussion"},
+		"unlock_after_h", "always_open", "format", "mode", "section", "blocks", "active_min", "exam", "position", "created_at", "ver", "deleted", "assignment", "discussion", "unlock_rule"},
 		l.ID, l.CourseID, l.Title, l.Content, l.VideoURL, l.IsFree, l.Price, int32(l.UnlockAfterH), l.AlwaysOpen,
-		l.Format, l.Mode, l.Section, blocks, int32(l.ActiveMin), exam, int32(l.Position), l.CreatedAt.UTC(), ver(), deleted, asg, l.Discussion)
+		l.Format, l.Mode, l.Section, blocks, int32(l.ActiveMin), exam, int32(l.Position), l.CreatedAt.UTC(), ver(), deleted, asg, l.Discussion, l.UnlockRule)
 }
 
 func (c *ClickHouse) lessonsWhere(ctx context.Context, where string, args ...any) ([]Lesson, error) {
@@ -261,7 +261,7 @@ func (c *ClickHouse) UpdateLesson(ctx context.Context, l *Lesson) error {
 	}
 	cur.Title, cur.Content, cur.VideoURL, cur.IsFree, cur.Price = l.Title, l.Content, l.VideoURL, l.IsFree, l.Price
 	cur.UnlockAfterH, cur.AlwaysOpen, cur.Format, cur.Mode, cur.Section, cur.Blocks = l.UnlockAfterH, l.AlwaysOpen, l.Format, l.Mode, l.Section, l.Blocks
-	cur.ActiveMin, cur.Exam, cur.Assignment, cur.Discussion = l.ActiveMin, l.Exam, l.Assignment, l.Discussion
+	cur.ActiveMin, cur.Exam, cur.Assignment, cur.Discussion, cur.UnlockRule = l.ActiveMin, l.Exam, l.Assignment, l.Discussion, l.UnlockRule
 	if err := c.writeLesson(ctx, cur, false); err != nil {
 		return err
 	}

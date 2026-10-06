@@ -1993,3 +1993,15 @@ html.reader-open{overflow:hidden}
 /* Наалдсан табын цэс: багшийн удирдлага (.manage) дээр ч бүтэн өргөнөөр, агуулгатай ижил тэнхлэгт */
 .pf-stuck .pf-tabs,.pf-stuck.pf .pf-tabs,.pf.manage.pf-stuck .pf-tabs,.pf-stuck .pf.manage .pf-tabs{max-width:none;margin:0;width:auto}
 .pf.manage.pf-stuck .pf-tabs,.pf-stuck .pf.manage .pf-tabs{padding:0 max(16px,calc((100vw - var(--rail-w,0px) - 1360px)/2 + 16px))}
+
+/* Хичээл хэзээ нээгдэх — сонголтын картууд */
+.pe-unlock{margin-top:12px;display:grid;gap:8px}
+.pe-unlock>b{font-size:.85rem}
+.ur-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.ur{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;cursor:pointer;background:var(--surface);transition:border-color .15s,background .15s}
+.ur:hover{border-color:var(--brand)}
+.ur.on{border-color:var(--brand);background:var(--brand-soft)}
+.ur input{position:absolute;opacity:0;pointer-events:none}
+.ur-ic{font-size:1.2rem;line-height:1.2}
+.ur strong{display:block;font-size:.86rem}
+.ur small{display:block;font-size:.74rem;color:var(--muted);font-weight:500;line-height:1.35}

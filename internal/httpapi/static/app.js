@@ -2107,6 +2107,8 @@ async function coursePage() {
           : st.reason === "quiz" ? `🔒 «${st.prev_title}» хичээлийн асуултуудад бүгдэд нь зөв хариулсны дараа нээгдэнэ (${st.quiz_left}/${st.quiz_total} үлдсэн)`
           : st.reason === "active" ? `🕒 «${st.prev_title}» хичээлийг дахиад ${st.active_left} мин идэвхтэй судлаарай`
           : st.reason === "exam" ? `📝 «${st.prev_title}» шалгалтад тэнцсэний дараа нээгдэнэ`
+          : st.reason === "complete" ? `☑️ «${st.prev_title}» хичээлийг дуусгасны дараа нээгдэнэ`
+          : st.reason === "manual" ? "🔐 Багш нээх хүртэл хүлээнэ үү"
           : `🔒 Эхлээд «${st.prev_title}» хичээлийг үзнэ үү`;
       } else if (p?.completed_at) { lbl.hidden = false; lbl.className = "lesson-state"; lbl.textContent = "✓ Дууссан · " + fmtDate(p.completed_at); }
       else if (drip && +li.dataset.unlock && li.dataset.always !== "1" && !li.classList.contains("is-free")) { lbl.hidden = false; lbl.className = "lesson-state"; lbl.textContent = `⏱ Өмнөхийг үзснээс ${humanHours(li.dataset.unlock)}-ийн дараа`; }
@@ -2151,15 +2153,16 @@ async function coursePage() {
   };
   const refreshAccess = () => api(`/api/courses/${id}/access`).then((a) => { applyStates(a); return a; }).catch(() => null);
   // Асуулга/шалгалт амжилттай → access шинэчилнэ; дараагийн хичээл нээгдсэн бол автоматаар шилжинэ.
-  const autoAdvance = async () => {
+  const autoAdvance = async (force) => {
     const curRow = $(".lesson.open"), rowsBefore = lessonRows(), i = curRow ? rowsBefore.indexOf(curRow) : -1;
-    const next = i >= 0 ? rowsBefore[i + 1] : null;
+    const next = i >= 0 ? rowsBefore[i + 1] : null, wasLocked = next?.classList.contains("is-drip");
     await refreshAccess();
     if (!next || next.classList.contains("is-drip") || !canOpen(next)) return;
+    if (!wasLocked && force !== true) return; // аль хэдийн нээлттэй байсан бол асуулт хариулахад үсрэхгүй
     toast("🎉 Амжилттай! Дараагийн хичээл нээгдлээ — шилжиж байна…");
     setTimeout(() => { if ($(".lesson.open") === curRow) expandRow(next, true); }, 1600);
   };
-  document.addEventListener("sg:quiz-mastered", autoAdvance); // асуулгыг дуусгамагц түгжээ шууд нээгдэж шилжинэ
+  document.addEventListener("sg:quiz-mastered", () => autoAdvance(false)); // асуулгыг дуусгамагц түгжээ шууд нээгдэж шилжинэ
   const unlockLesson = (lid) => {
     const li = $(`.lesson[data-lesson="${lid}"]`);
     if (!li || li.classList.contains("is-free")) return;
@@ -2288,6 +2291,8 @@ async function coursePage() {
       : st.reason === "quiz" ? `🧩 «<b>${esc(pTitle)}</b>» хичээлийн асуултуудад бүгдэд нь зөв хариулбал цаг, өдрөөс үл хамааран энэ хичээл <b>шууд</b> нээгдэнэ. <span class="dp-left">${st.quiz_left}/${st.quiz_total} асуулт үлдсэн</span>`
       : st.reason === "active" ? `🕒 «<b>${esc(pTitle)}</b>» хичээлийн идэвхтэй суралцах хугацаа (${st.active_min} мин) гүйцээгүй байна. <span class="dp-left">${st.active_left} мин дутуу</span>`
       : st.reason === "exam" ? `📝 «<b>${esc(pTitle)}</b>» шалгалтад тэнцмэгц энэ хичээл шууд нээгдэнэ.`
+      : st.reason === "complete" ? `☑️ «<b>${esc(pTitle)}</b>» хичээлийг судлаад «Дууслаа» дармагц энэ хичээл нээгдэнэ.`
+      : st.reason === "manual" ? `🔐 Энэ хичээлийг багш тань гараар нээнэ.`
       : `📘 Эхлээд «<b>${esc(pTitle)}</b>» хичээлийг судалж дуусгаад дараа нь энэ хичээлийг үзнэ.`;
     const pop = document.createElement("div"); pop.className = "drip-pop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Өмнөх хичээл");
     pop.innerHTML = `<div class="dp-card"><button class="icon-btn dp-x" aria-label="Хаах">✕</button>
@@ -2345,7 +2350,7 @@ async function coursePage() {
     const isOwner = !!Auth.user?.username && $(".teacher-chip")?.getAttribute("href") === "/t/" + Auth.user.username;
     if (l.exam) { // шалгалт: асуултууд зөвхөн "эхлүүлэх"-ээр ирнэ
       if (done) done.hidden = true;
-      examCard(body, { courseId: id, lessonId: lid, title: l.title, onFinish: autoAdvance });
+      examCard(body, { courseId: id, lessonId: lid, title: l.title, onFinish: () => autoAdvance(false) });
     }
     if (l.assignment) { // даалгавар: хариу илгээснээр дуусна
       if (done) done.hidden = true;
@@ -2377,7 +2382,7 @@ async function coursePage() {
           await api(`/api/courses/${id}/lessons/${lid}/complete`, { method: "POST" });
           if (cb) { cb.disabled = true; cb.textContent = "✓ Дууссан"; }
           toast("✓ Хичээлийн хугацаа бүрэн гүйцлээ — дараагийн хичээл рүү шилжиж байна…");
-          await autoAdvance();
+          await autoAdvance(true);
           return;
         } catch (e) { if (e.status !== 409) { autoDone = false; return; } await new Promise((r) => setTimeout(r, 6000)); }
       }

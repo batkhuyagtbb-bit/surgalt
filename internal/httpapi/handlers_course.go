@@ -132,6 +132,7 @@ type lessonInput struct {
 	Exam         *store.Exam       `json:"exam"`           // хоосон биш бол шалгалт
 	Assignment   *store.Assignment `json:"assignment"`     // хоосон биш бол даалгавар
 	Discussion   bool              `json:"discussion"`     // хэлэлцүүлэгтэй (лайк, сэтгэгдэл)
+	UnlockRule   string            `json:"unlock_rule"`    // дараалалд нээгдэх нөхцөл (store.UnlockRules)
 }
 
 const maxUnlockHours = 24 * 365
@@ -163,6 +164,8 @@ func (in *lessonInput) validate(teacherID string, course *store.Course) string {
 		return "заах аргын төрөл: танхимын, цахим, холимог"
 	case utf8.RuneCountInString(in.Section) > 80:
 		return "бүлгийн нэр 80 тэмдэгтээс хэтрэхгүй"
+	case store.UnlockRules[in.UnlockRule] == "":
+		return "нээгдэх нөхцөл буруу"
 	}
 	if in.ActiveMin < 0 || in.ActiveMin > 600 {
 		return "идэвхтэй суралцах хугацаа 0-600 минут"
@@ -181,7 +184,7 @@ func (in *lessonInput) validate(teacherID string, course *store.Course) string {
 
 func lessonFromInput(in lessonInput, courseID string) *store.Lesson {
 	return &store.Lesson{CourseID: courseID, Title: in.Title, Content: in.Content, VideoURL: in.VideoURL, IsFree: in.IsFree, Price: in.Price,
-		UnlockAfterH: in.UnlockAfterH, AlwaysOpen: in.AlwaysOpen, Format: in.Format, Mode: in.Mode, Section: in.Section, Blocks: in.Blocks, ActiveMin: in.ActiveMin, Exam: in.Exam, Assignment: in.Assignment, Discussion: in.Discussion}
+		UnlockAfterH: in.UnlockAfterH, AlwaysOpen: in.AlwaysOpen, Format: in.Format, Mode: in.Mode, Section: in.Section, Blocks: in.Blocks, ActiveMin: in.ActiveMin, Exam: in.Exam, Assignment: in.Assignment, Discussion: in.Discussion, UnlockRule: in.UnlockRule}
 }
 
 func (s *Server) handleCreateLesson(w http.ResponseWriter, r *http.Request) {
@@ -398,9 +401,15 @@ func dripState(course *store.Course, lessons []store.Lesson, l *store.Lesson, pr
 	if prev == nil {
 		return LessonState{Open: true}
 	}
+	if l.UnlockRule == "manual" { // багш гараар нээнэ ("Шууд нээлттэй болгох" = AlwaysOpen)
+		return LessonState{Reason: "manual", PrevTitle: prev.Title}
+	}
 	p, ok := progress[prev.ID]
 	if !ok {
 		return LessonState{Reason: "prev", PrevTitle: prev.Title}
+	}
+	if l.UnlockRule != "" {
+		return ruleState(l, prev, &p, now, x)
 	}
 	if need := prev.ActiveMin * 60; need > 0 && p.CompletedAt == nil && x.active[prev.ID] < need {
 		left := (need - x.active[prev.ID] + 59) / 60
@@ -731,6 +740,12 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 			if st.Reason == "exam" {
 				msg = "Эхлээд «" + st.PrevTitle + "» шалгалтад тэнцэнэ үү"
 			}
+			if st.Reason == "complete" {
+				msg = "Эхлээд «" + st.PrevTitle + "» хичээлийг дуусгана уу"
+			}
+			if st.Reason == "manual" {
+				msg = "Энэ хичээлийг багш нээх хүртэл хүлээнэ үү"
+			}
 			if st.Reason == "timer" {
 				msg = "Энэ хичээл " + st.UnlockAt.Local().Format("01/02 15:04") + "-д нээгдэнэ"
 			}
@@ -865,4 +880,45 @@ func (s *Server) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 		s.notifyPaid(r.Context(), o)
 	}
 	writeJSON(w, http.StatusOK, o)
+}
+
+// ruleState — багшийн гараар сонгосон нөхцөлөөр (нөхцөл биелсэн мөчөөс хүлээх хугацаа тоологдоно).
+func ruleState(l, prev *store.Lesson, p *store.LessonProgress, now time.Time, x dripExtra) LessonState {
+	base := p.ViewedAt
+	switch l.UnlockRule {
+	case "complete":
+		if p.CompletedAt == nil {
+			return LessonState{Reason: "complete", PrevTitle: prev.Title}
+		}
+		base = *p.CompletedAt
+	case "active": // хугацааг бүрэн судалсан бол шууд
+		if need := prev.ActiveMin * 60; need > 0 && p.CompletedAt == nil && x.active[prev.ID] < need {
+			return LessonState{Reason: "active", PrevTitle: prev.Title, ActiveLeft: (need - x.active[prev.ID] + 59) / 60, ActiveMin: prev.ActiveMin}
+		}
+		return LessonState{Open: true}
+	case "quiz": // асуултуудад бүрэн зөв хариулсан бол шууд
+		correct, total, done, _ := quizMastery(prev, p)
+		if total > 0 && !done {
+			return LessonState{Reason: "quiz", PrevTitle: prev.Title, QuizLeft: total - correct, QuizTotal: total}
+		}
+		return LessonState{Open: true}
+	case "quiz_active": // асуулт бүрэн зөв БА хугацаа бүрэн
+		if need := prev.ActiveMin * 60; need > 0 && p.CompletedAt == nil && x.active[prev.ID] < need {
+			return LessonState{Reason: "active", PrevTitle: prev.Title, ActiveLeft: (need - x.active[prev.ID] + 59) / 60, ActiveMin: prev.ActiveMin}
+		}
+		if correct, total, done, _ := quizMastery(prev, p); total > 0 && !done {
+			return LessonState{Reason: "quiz", PrevTitle: prev.Title, QuizLeft: total - correct, QuizTotal: total}
+		}
+		return LessonState{Open: true}
+	case "exam": // шалгалтад тэнцсэн бол шууд
+		if prev.Exam != nil && !x.passed[prev.ID] {
+			return LessonState{Reason: "exam", PrevTitle: prev.Title}
+		}
+		return LessonState{Open: true}
+	}
+	at := base.Add(time.Duration(l.UnlockAfterH) * time.Hour)
+	if now.Before(at) {
+		return LessonState{Reason: "timer", PrevTitle: prev.Title, UnlockAt: &at}
+	}
+	return LessonState{Open: true}
 }

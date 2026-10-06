@@ -614,7 +614,23 @@ async function courseEditor(id) {
         <label>Дуусах цаг өнгөрсөн бол<select name="${pfx}_late"><option value="free" ${!due?.late || due.late === "free" ? "selected" : ""}>Төлбөргүй үргэлжлүүлнэ</option><option value="paid" ${due?.late === "paid" ? "selected" : ""}>Хоцролтын төлбөр төлж нээнэ</option><option value="closed" ${due?.late === "closed" ? "selected" : ""}>Хаалттай болно</option></select></label>
         <label class="pe-fee" ${due?.late === "paid" ? "" : "hidden"}>Хоцролтын төлбөр (₮)<input name="${pfx}_fee" type="number" min="0" step="500" value="${due?.late_fee || 5000}"></label></div>
       <label class="pe-entry">${what} төлбөр (₮)<input name="${pfx}_entry" type="number" min="0" step="500" value="${due?.fee || 0}"><small>0 бол үнэгүй. Тавьсан бол суралцагч сургалтад элссэн ч төлж байж ${what === "Шалгалтын" ? "шалгалт өгнө" : "хариу илгээнэ"}.</small></label>`;
+  const ruleBadge = (l) => { const r = UNLOCK_RULES.find(([v]) => v === (l.unlock_rule ?? "")) || UNLOCK_RULES[0]; return `<span class="aud" title="${esc(r[3])}">${r[1]} ${esc(r[2])}${["view", "complete", ""].includes(l.unlock_rule ?? "") && l.unlock_after_h ? " · " + window.SG_humanHours(l.unlock_after_h) : ""}</span>`; };
   const kindOf = (l) => l?.exam ? "exam" : l?.assignment ? "assignment" : "lesson";
+  // Энэ хичээл хэзээ нээгдэх вэ (дараалалтай сургалтад): багш гараар сонгоно.
+  const UNLOCK_RULES = [
+    ["view", "⏱", "Цагаар", "Өмнөх хичээлийг үзсэнээс хойш тохируулсан хугацааны дараа"],
+    ["quiz", "🧩", "Асуултад бүрэн зөв хариулсан бол", "Өмнөх хичээлийн бүх асуултад зөв хариулмагц шууд"],
+    ["active", "🕒", "Хугацааг бүрэн судалсан бол", "Өмнөх хичээлийн идэвхтэй минутыг бүрэн гүйцээмэгц шууд"],
+    ["quiz_active", "✅", "Асуулт + хугацаа хоёулаа", "Асуултууд бүгд зөв БА минут бүрэн гүйцсэн үед"],
+    ["complete", "☑️", "«Дууслаа» дармагц", "Өмнөхийг дууссан гэж тэмдэглэснээс хойш (хугацаа нэмж болно)"],
+    ["exam", "📝", "Шалгалтад тэнцсэн бол", "Өмнөх хичээл шалгалт бол тэнцмэгц шууд"],
+    ["manual", "🔐", "Багш гараар нээнэ", "Та «Шууд нээлттэй болгох» дартал хаалттай"],
+    ["", "✨", "Автомат", "Минут → асуулт/шалгалт → эс бөгөөс хугацаа (систем өөрөө)"],
+  ];
+  const unlockHTML = (l) => { const cur = l?.unlock_rule ?? "view", h = l?.unlock_after_h || 0; return `<div class="pe-unlock"><b>Энэ хичээл хэзээ нээгдэх вэ?</b>
+      <div class="ur-grid">${UNLOCK_RULES.map(([v, ic, t, d]) => `<label class="ur ${cur === v ? "on" : ""}"><input type="radio" name="unlock_rule" value="${v}" ${cur === v ? "checked" : ""}><span class="ur-ic">${ic}</span><span><strong>${t}</strong><small>${d}</small></span></label>`).join("")}</div>
+      <div class="pe-grid pe-grid-2 ur-time" ${["view", "complete", ""].includes(cur) ? "" : "hidden"}><label>Хүлээх хугацаа<select name="unlock_after_h">${UNLOCKS.map(([hv, t]) => `<option value="${hv}" ${h === hv ? "selected" : ""}>${t}</option>`).join("")}${l && !UNLOCKS.some(([hv]) => hv === h) ? `<option value="${h}" selected>${h} цаг</option>` : ""}</select></label>
+        <label class="check" style="align-self:end"><input type="checkbox" name="always_open" ${l?.always_open ? "checked" : ""}> Дарааллаас үл хамааран нээлттэй</label></div></div>`; };
   const KIND_TXT = {
     lesson: { title: "Хичээлийн гарчиг", content: "Агуулга", hint: "Текст, зураг, видео, файл, асуулт — дарааллаар нь нэмнэ. Чирж зөөж болно." },
     exam: { title: "Шалгалтын нэр", content: "Шалгалтын асуултууд", hint: "«Асуулт» товчоор асуултуудаа нэмнэ. Тайлбар текст нэмж болно. Суралцагчид асуултууд нэг дор өгөгдөж, өөр цонх руу шилжих эсвэл хуулах үед шалгалт шууд хаагдана." },
@@ -643,15 +659,14 @@ async function courseEditor(id) {
       ${step(4, "Даалгаврын тохиргоо", `<div class="pe-grid pe-grid-3"><label>Дээд оноо<input name="asg_max" type="number" min="1" max="1000" value="${l?.assignment?.max_score || 100}"></label></div>
         <h5>Хугацаа ба төлбөр</h5>${dueHTML("asg", l?.assignment?.due, "Даалгаврын")}
         <p class="muted small" style="margin:8px 0 0">Хариу: текст мэдээлэл ба холбоос (Google Docs, видео, GitHub г.м). Файл илгээхгүй.</p>`, "pe-asg", kind !== "assignment")}
-      <details class="pe-step pe-more" ${l?.active_min || l?.format || l?.mode ? "open" : ""}><summary><span class="pe-num" aria-hidden="true">${ico("gear", 14)}</span><span class="pe-step-body"><h4>Нэмэлт тохиргоо <small class="muted">хэлбэр, идэвхтэй хугацаа${c.drip ? ", дараалал" : ""}</small></h4></span></summary>
+      <details class="pe-step pe-more" ${l?.active_min || l?.format || l?.mode || c.drip ? "open" : ""}><summary><span class="pe-num" aria-hidden="true">${ico("gear", 14)}</span><span class="pe-step-body"><h4>Нэмэлт тохиргоо <small class="muted">хэлбэр, идэвхтэй хугацаа${c.drip ? ", хэзээ нээгдэх" : ""}</small></h4></span></summary>
         <div class="pe-more-body">
           <div class="pe-grid pe-grid-3">
             <label>Сургалтын хэлбэр<select name="format">${FORMATS.map(([v, t]) => `<option value="${v}" ${(l?.format || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
             <label>Заах аргын төрөл<select name="mode_kind">${MODES.map(([v, t]) => `<option value="${v}" ${(l?.mode || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
             <label>Идэвхтэй суралцах хугацаа (мин)<input name="active_min" type="number" min="0" max="600" value="${l?.active_min || 0}"><small>0 бол шаардахгүй. Тавьсан бол энэ хугацаанд идэвхтэй үзэж байж «дууслаа» дарна.</small></label></div>
           <label class="check" style="margin-top:10px"><input type="checkbox" name="discussion" ${l ? (l.discussion ? "checked" : "") : "checked"}> 💬 Хэлэлцүүлэгтэй — хичээлийн доор суралцагчид лайк дарж, сэтгэгдэл, асуулт бичиж, хоорондоо ярилцана (та ч хариулна)</label>
-          ${c.drip ? `<div class="pe-grid pe-grid-2" style="margin-top:10px"><label>Өмнөх хичээлийг үзснээс хойш нээгдэх<select name="unlock_after_h">${UNLOCKS.map(([h, t]) => `<option value="${h}" ${(l?.unlock_after_h || 0) === h ? "selected" : ""}>${t}</option>`).join("")}${l && !UNLOCKS.some(([h]) => h === (l.unlock_after_h || 0)) ? `<option value="${l.unlock_after_h}" selected>${l.unlock_after_h} цаг</option>` : ""}</select></label>
-            <label class="check" style="align-self:end"><input type="checkbox" name="always_open" ${l?.always_open ? "checked" : ""}> Дарааллаас үл хамааран нээлттэй</label></div>` : ""}
+          ${c.drip ? unlockHTML(l) : ""}
         </div></details>
       <div class="pe-foot">
         <div class="pe-access"><span class="muted small">Хэн үзэх вэ</span>
@@ -701,7 +716,7 @@ async function courseEditor(id) {
   const rowHTML = (l, n) => `<li class="ol-row" data-lid="${esc(l.id)}">
       <button type="button" class="ol-handle" data-drag="row" aria-label="«${esc(l.title)}» хичээлийг зөөх (↑↓ товч)" title="Чирж зөөх">${ico("grip", 18)}</button>
       <span class="ol-num">${String(n).padStart(2, "0")}</span>
-      <span class="ol-title"><strong>${esc(l.title)}</strong><small>${[l.format && kindName(l.format), l.mode && kindName(l.mode)].filter(Boolean).map((k) => `<span class="kind">${esc(k)}</span>`).join("")}${audience(l)}${c.drip && !l.always_open && n > 1 && l.unlock_after_h ? `<span class="aud">⏱ ${window.SG_humanHours(l.unlock_after_h)}</span>` : ""}${kindBadge(l)}${l.active_min ? `<span class="aud">🕒 ${l.active_min} мин идэвхтэй</span>` : ""}</small></span>
+      <span class="ol-title"><strong>${esc(l.title)}</strong><small>${[l.format && kindName(l.format), l.mode && kindName(l.mode)].filter(Boolean).map((k) => `<span class="kind">${esc(k)}</span>`).join("")}${audience(l)}${c.drip && !l.always_open && n > 1 ? ruleBadge(l) : ""}${kindBadge(l)}${l.active_min ? `<span class="aud">🕒 ${l.active_min} мин идэвхтэй</span>` : ""}</small></span>
       <button type="button" class="icon-btn" data-edit-post aria-label="Засах" title="Засах">${ico("edit", 17)}</button>
       <button type="button" class="icon-btn ol-del" data-del-post aria-label="Устгах" title="Устгах">${ico("x", 17)}</button></li>`;
   const outlineHTML = () => {
@@ -791,10 +806,11 @@ async function courseEditor(id) {
     }
     return { title: f.title.value, content: blocksSummary(blocks), video_url: "", blocks, active_min: +f.active_min.value || 0, exam, assignment, is_free: isFree, price: isFree ? 0 : +f.price.value || 0,
       unlock_after_h: f.unlock_after_h ? +f.unlock_after_h.value || 0 : l?.unlock_after_h || 0, always_open: f.always_open ? f.always_open.checked : !!l?.always_open,
-      format: f.format.value, mode: f.mode_kind.value, section: sectionOf(f), discussion: f.discussion.checked };
+      format: f.format.value, mode: f.mode_kind.value, section: sectionOf(f), discussion: f.discussion.checked,
+      unlock_rule: f.querySelector("input[name=unlock_rule]:checked")?.value ?? l?.unlock_rule ?? "" };
   };
   const sectionOf = (f) => (f.section_pick.value === "__new" ? f.section_new.value : f.section_pick.value).trim();
-  const lessonPut = (l, patch) => api(`/api/courses/${c.id}/lessons/${l.id}`, { method: "PUT", body: { title: l.title, content: l.content, video_url: stripSig(l.video_url), is_free: l.is_free, price: l.price || 0, unlock_after_h: l.unlock_after_h || 0, always_open: !!l.always_open, format: l.format || "", mode: l.mode || "", section: l.section || "", blocks: (l.blocks || []).map((b) => (b.url ? { ...b, url: stripQ(b.url) } : b.quiz?.image ? { ...b, quiz: { ...b.quiz, image: stripQ(b.quiz.image) } } : b)), active_min: l.active_min || 0, exam: l.exam || null, assignment: l.assignment || null, discussion: !!l.discussion, ...patch } });
+  const lessonPut = (l, patch) => api(`/api/courses/${c.id}/lessons/${l.id}`, { method: "PUT", body: { title: l.title, content: l.content, video_url: stripSig(l.video_url), is_free: l.is_free, price: l.price || 0, unlock_after_h: l.unlock_after_h || 0, always_open: !!l.always_open, format: l.format || "", mode: l.mode || "", section: l.section || "", blocks: (l.blocks || []).map((b) => (b.url ? { ...b, url: stripQ(b.url) } : b.quiz?.image ? { ...b, quiz: { ...b.quiz, image: stripQ(b.quiz.image) } } : b)), active_min: l.active_min || 0, exam: l.exam || null, assignment: l.assignment || null, discussion: !!l.discussion, unlock_rule: l.unlock_rule || "", ...patch } });
   const reload = async () => { const d = await api(`/api/me/courses/${id}`); c = d.course; lessons = d.lessons; commentCounts = d.comments || {}; roster = await api(`/api/me/courses/${id}/students`).catch(() => roster); render(); };
 
   // Засварлах маягт + блок засварлагч.
@@ -974,6 +990,7 @@ async function courseEditor(id) {
       f.title.placeholder = T.title; $("[data-content-title]", f).textContent = T.content; $("[data-content-hint]", f).textContent = T.hint;
       if (!f.dataset.edit) $(".pe-foot .btn-gold", f).textContent = k === "exam" ? "Шалгалт нийтлэх" : k === "assignment" ? "Даалгавар нийтлэх" : "Хичээл нийтлэх";
     }
+    if (e.target.name === "unlock_rule") { $$(".ur", f).forEach((x) => x.classList.toggle("on", x.contains(e.target))); const tm = $(".ur-time", f); if (tm) tm.hidden = !["view", "complete", ""].includes(e.target.value); }
     if (/_late$/.test(e.target.name)) { const fee = e.target.closest(".pe-grid")?.querySelector(".pe-fee"); if (fee) fee.hidden = e.target.value !== "paid"; }
     if (e.target.name === "section_pick") { const isNew = f.section_pick.value === "__new"; f.section_new.hidden = !isNew; f.section_new.required = isNew; if (isNew) f.section_new.focus(); }
   };

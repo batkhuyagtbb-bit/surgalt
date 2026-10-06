@@ -611,7 +611,7 @@ func (m *Memory) UpdateLesson(_ context.Context, l *Lesson) error {
 		if cur.ID == l.ID {
 			cur.Title, cur.Content, cur.VideoURL, cur.IsFree, cur.Price = l.Title, l.Content, l.VideoURL, l.IsFree, l.Price
 			cur.UnlockAfterH, cur.AlwaysOpen, cur.Format, cur.Mode, cur.Section, cur.Blocks = l.UnlockAfterH, l.AlwaysOpen, l.Format, l.Mode, l.Section, l.Blocks
-			cur.ActiveMin, cur.Exam, cur.Assignment, cur.Discussion = l.ActiveMin, l.Exam, l.Assignment, l.Discussion
+			cur.ActiveMin, cur.Exam, cur.Assignment, cur.Discussion, cur.UnlockRule = l.ActiveMin, l.Exam, l.Assignment, l.Discussion, l.UnlockRule
 			*l = *cur
 			return nil
 		}

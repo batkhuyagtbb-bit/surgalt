@@ -146,7 +146,11 @@ type Lesson struct {
 	// Assignment — хоосон биш бол энэ хичээл даалгавар (хугацаатай, хариу илгээж дүгнүүлнэ).
 	Assignment *Assignment `json:"assignment,omitempty"`
 	// Discussion — хэлэлцүүлэгтэй: доор нь лайк, сэтгэгдэл, асуулт, хариу бичиж хоорондоо ярилцана.
-	Discussion bool      `json:"discussion"`
+	Discussion bool `json:"discussion"`
+	// UnlockRule — энэ хичээл ямар нөхцөлөөр нээгдэх (дараалалтай сургалтад, багш гараар сонгоно):
+	// "" автомат, "view" өмнөхийг үзмэгц, "complete" өмнөхийг дуусгамагц, "active" өмнөхийн идэвхтэй минут
+	// гүйцмэгц, "quiz" өмнөхийн асуултууд бүгд зөв, "exam" өмнөх шалгалтад тэнцмэгц, "manual" багш гараар нээнэ.
+	UnlockRule string    `json:"unlock_rule,omitempty"`
 	Position   int       `json:"position"`
 	CreatedAt  time.Time `json:"created_at"`
 }
@@ -301,6 +305,7 @@ type LessonOrder struct {
 
 // Хичээлийн хэлбэр ба заах аргын төрөл: түлхүүр → монгол нэр.
 var LessonFormats = map[string]string{"lecture": "Лекц", "seminar": "Семинар", "practice": "Дадлага", "lab": "Лаборатори"}
+var UnlockRules = map[string]string{"": "Автомат", "view": "Цагаар", "complete": "Өмнөхийг дуусгамагц", "active": "Хугацааг бүрэн судалсан", "quiz": "Асуултад бүрэн зөв", "quiz_active": "Асуулт + хугацаа хоёулаа", "exam": "Шалгалтад тэнцмэгц", "manual": "Багш гараар нээнэ"}
 var LessonModes = map[string]string{"classroom": "Танхимын", "online": "Цахим", "blended": "Холимог"}
 
 // LessonProgress нь суралцагчийн нэг хичээл дээрх явц: анх үзсэн ба дууссан цаг.

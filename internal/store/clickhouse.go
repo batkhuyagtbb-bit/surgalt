@@ -153,6 +153,7 @@ var chMigrations = []string{
 	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_body String DEFAULT ''",
 	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_name String DEFAULT ''",
 	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment String DEFAULT ''",
+	"ALTER TABLE lessons ADD COLUMN IF NOT EXISTS unlock_rule String DEFAULT ''",
 }
 
 var chTables = []chTable{
@@ -189,7 +190,7 @@ var chTables = []chTable{
 	{"lessons", `(id String, course_id String, title String, content String, video_url String,
 		is_free Bool, price Int64, unlock_after_h Int32, always_open Bool, format String, mode String,
 		section String, blocks String, active_min Int32, exam String, position Int32,
-		created_at ` + tsType + `, ver UInt64, deleted Bool DEFAULT false, assignment String DEFAULT '', discussion Bool DEFAULT true)
+		created_at ` + tsType + `, ver UInt64, deleted Bool DEFAULT false, assignment String DEFAULT '', discussion Bool DEFAULT true, unlock_rule String DEFAULT '')
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (course_id, id)`},
 	{"comments", `(id String, course_id String, lesson_id String, teacher_id String, user_id String, user_name String,
 		parent_id String, body String, created_at ` + tsType + `, deleted Bool DEFAULT false, ver UInt64)

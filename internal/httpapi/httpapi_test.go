@@ -2371,3 +2371,94 @@ func TestClassmatesDMAndTeam(t *testing.T) {
 		t.Fatalf("conv_id алга: %s", raw2)
 	}
 }
+
+// Хичээл хэзээ нээгдэх — багшийн гараар сонгох нөхцөлүүд.
+func TestUnlockRules(t *testing.T) {
+	srv, st := newTestServer(t)
+	defer srv.Close()
+	mem, _ := st.(*store.Memory)
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Дүрэм","price":0,"published":true,"drip":true}`)
+	cid := c["id"].(string)
+	id := func(m map[string]any) string { return m["id"].(string) }
+	q := `"blocks":[{"id":"q001","type":"quiz","quiz":{"question":"?","options":["a","b"],"correct":[0]}}]`
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"x","price":1000,"unlock_rule":"magic"}`); code != 400 {
+		t.Fatal("буруу нөхцөл татгалзагдана")
+	}
+	_, a := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"A","price":1000,"active_min":5,`+q+`}`)
+	_, bView := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"B","price":1000,"unlock_rule":"view","unlock_after_h":24}`)
+	_ = bView
+	s1, uid := register(t, srv, "stud", "student")
+	call(t, srv, "POST", "/api/courses/"+cid+"/enroll", s1, "")
+	buy := func(l map[string]any) {
+		_, o := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+id(l)+"/buy", s1, "")
+		call(t, srv, "POST", "/api/orders/"+o["order"].(map[string]any)["id"].(string)+"/dev-pay", s1, "")
+	}
+	buy(a)
+	buy(bView)
+	reason := func(l map[string]any) string {
+		code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(l), s1, "")
+		if code == 200 {
+			return "open"
+		}
+		return r["state"].(map[string]any)["reason"].(string)
+	}
+	call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+id(a), s1, "")
+	// view + 24 цаг: асуулт зөв ч хугацаа болоогүй тул timer.
+	call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+id(a)+"/quiz/q001", s1, `{"answer":[0]}`)
+	if r := reason(bView); r != "timer" {
+		t.Fatalf("view+24ц → timer: %s", r)
+	}
+	if mem != nil {
+		mem.BackdateProgress(uid, id(a), 25*time.Hour)
+		if r := reason(bView); r != "open" {
+			t.Fatalf("24ц өнгөрсөн → open: %s", r)
+		}
+	}
+	// Дүрэм бүрийг өмнөх хичээл A-аас хамааруулан солин шалгана (B-г засна).
+	set := func(rule string, h int) {
+		code, r := call(t, srv, "PUT", "/api/courses/"+cid+"/lessons/"+id(bView), tt, fmt.Sprintf(`{"title":"B","price":1000,"unlock_rule":%q,"unlock_after_h":%d}`, rule, h))
+		if code != 200 {
+			t.Fatalf("засвар %s: %d %v", rule, code, r)
+		}
+	}
+	set("quiz", 720) // асуулт зөв → хугацаа үл хамааран шууд
+	if r := reason(bView); r != "open" {
+		t.Fatalf("quiz → open (таймер хамаагүй): %s", r)
+	}
+	set("active", 720) // 5 мин дутуу
+	if r := reason(bView); r != "active" {
+		t.Fatalf("active → active: %s", r)
+	}
+	set("quiz_active", 0)
+	if r := reason(bView); r != "active" {
+		t.Fatalf("quiz_active (минут дутуу) → active: %s", r)
+	}
+	set("complete", 0)
+	if r := reason(bView); r != "complete" {
+		t.Fatalf("complete → complete: %s", r)
+	}
+	set("manual", 0)
+	if r := reason(bView); r != "manual" {
+		t.Fatalf("manual → manual: %s", r)
+	}
+	// Дууссан → active, quiz_active, complete нээгдэнэ.
+	if mem != nil {
+		mem.MarkLessonCompleted(context.Background(), uid, cid, id(a))
+		for _, rule := range []string{"active", "quiz_active", "complete", "exam"} {
+			set(rule, 0)
+			if r := reason(bView); r != "open" {
+				t.Fatalf("%s (дууссан) → open: %s", rule, r)
+			}
+		}
+	}
+	// Багш "Шууд нээлттэй" (always_open) → manual ч нээгдэнэ.
+	code, _ := call(t, srv, "PUT", "/api/courses/"+cid+"/lessons/"+id(bView), tt, `{"title":"B","price":1000,"unlock_rule":"manual","always_open":true}`)
+	if code != 200 || reason(bView) != "open" {
+		t.Fatal("manual + багш нээсэн → open")
+	}
+	_, pc := call(t, srv, "GET", "/api/courses/"+cid, s1, "")
+	if pc["lessons"].([]any)[1].(map[string]any)["unlock_rule"] != "manual" {
+		t.Fatalf("нийтийн хөтөлбөрт unlock_rule алга")
+	}
+}
