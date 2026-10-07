@@ -201,7 +201,7 @@ function closeModal(el) {
 }
 document.addEventListener("click", (e) => {
   const m = e.target.closest(".modal");
-  if (m && (e.target === m || e.target.closest("[data-close]"))) closeModal(m);
+  if (m && ((e.target === m && !m.classList.contains("inline")) || e.target.closest("[data-close]"))) closeModal(m);
 });
 addEventListener("keydown", (e) => { if (e.key === "Escape") $$(".modal.open").forEach(closeModal); });
 
@@ -959,6 +959,7 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
   // Курсор хичээлийн цонхноос 2.5 сек+ гарвал тусдаа (шар) сануулга; буцаж ороход алга болж, хугацааг нь тэмдэглэнэ.
   const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;
   let outT = 0, outAt = 0, outs = 0, ca = null;
+  const area = modal.closest("#lessonStage") || card; // хичээл үзэх горимд хөтөлбөрийн самбар ч хичээлийн цонхонд тооцогдоно
   const overlayOpen = () => $(".watch-alert") || $(".dv-full") || $$(".modal.open").some((m) => m !== modal);
   const cursorBack = () => {
     clearTimeout(outT); if (!ca) return;
@@ -966,11 +967,11 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
     const el = ca; ca = null; el.classList.add("out"); setTimeout(() => el.remove(), 250); card.classList.remove("cursor-out");
   };
   const onLeaveCard = (e) => {
-    if (!fine || owner || stopped || e.pointerType === "touch" || (e.relatedTarget && card.contains(e.relatedTarget))) return;
+    if (!fine || owner || stopped || e.pointerType === "touch" || (e.relatedTarget && area.contains(e.relatedTarget))) return;
     clearTimeout(outT); outAt = Date.now();
-    outT = setTimeout(() => { if (stopped || away || owner || ca || overlayOpen() || card.matches(":hover")) return; outs++; ca = cursorAlert(outs); card.classList.add("cursor-out"); }, 2500);
+    outT = setTimeout(() => { if (stopped || away || owner || ca || overlayOpen() || area.matches(":hover")) return; outs++; ca = cursorAlert(outs); card.classList.add("cursor-out"); }, 2500);
   };
-  card.addEventListener("pointerleave", onLeaveCard); card.addEventListener("pointerenter", cursorBack);
+  area.addEventListener("pointerleave", onLeaveCard); area.addEventListener("pointerenter", cursorBack);
   document.addEventListener("visibilitychange", onVis);
   addEventListener("blur", onBlur); addEventListener("focus", onFocus);
   inputs.forEach((n) => addEventListener(n, onInput, { passive: true }));
@@ -996,7 +997,7 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
     document.removeEventListener("visibilitychange", onVis);
     removeEventListener("blur", onBlur); removeEventListener("focus", onFocus);
     inputs.forEach((n) => removeEventListener(n, onInput));
-    card.removeEventListener("pointerleave", onLeaveCard); card.removeEventListener("pointerenter", cursorBack);
+    area.removeEventListener("pointerleave", onLeaveCard); area.removeEventListener("pointerenter", cursorBack);
     clearTimeout(outT); ca?.remove(); ca = null; card.classList.remove("cursor-out"); flashOff();
     badge.remove(); wm.remove();
     if (!fromStop) send("closed");
@@ -2903,7 +2904,7 @@ async function coursePage() {
         ${rk.tips?.length ? `<ul class="cr-tips">${rk.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}`;
     }
   };
-  const refreshAccess = () => api(`/api/courses/${id}/access`).then((a) => { applyStates(a); return a; }).catch(() => null);
+  const refreshAccess = () => api(`/api/courses/${id}/access`).then((a) => { applyStates(a); drawStage(); return a; }).catch(() => null);
   // Асуулга/шалгалт амжилттай → access шинэчилнэ; дараагийн хичээл нээгдсэн бол автоматаар шилжинэ.
   const autoAdvance = async (force) => {
     const curRow = $(".lesson.open"), rowsBefore = lessonRows(), i = curRow ? rowsBefore.indexOf(curRow) : -1;
@@ -2927,8 +2928,8 @@ async function coursePage() {
     buy.textContent = "✓ Бүх хичээл нээлттэй — үзэж эхлэх";
     $$(".lesson").forEach((l) => unlockLesson(l.dataset.lesson));
   };
-  if (Auth.token) refreshAccess().then((a) => { if (!a) return; if (a.all) unlockAll(); a.lessons.forEach(unlockLesson); if (mode === "free" && a.enrolled) buy.textContent = "✓ Та элссэн — үзэж эхлэх"; });
-  else if (drip) $$(".lesson:not(.is-free)").forEach((li) => { const lbl = $(".lesson-state", li); if (lbl && +li.dataset.unlock && li.dataset.always !== "1") { lbl.hidden = false; lbl.textContent = `⏱ Өмнөхийг үзснээс ${humanHours(li.dataset.unlock)}-ийн дараа`; } });
+  const ready = Auth.token ? refreshAccess().then((a) => { if (!a) return; if (a.all) unlockAll(); a.lessons.forEach(unlockLesson); if (mode === "free" && a.enrolled) buy.textContent = "✓ Та элссэн — үзэж эхлэх"; drawStage(); }) : Promise.resolve();
+  if (!Auth.token && drip) $$(".lesson:not(.is-free)").forEach((li) => { const lbl = $(".lesson-state", li); if (lbl && +li.dataset.unlock && li.dataset.always !== "1") { lbl.hidden = false; lbl.textContent = `⏱ Өмнөхийг үзснээс ${humanHours(li.dataset.unlock)}-ийн дараа`; } });
   // Товлосон шууд хичээлүүд (Google Meet): үнэгүй нь сургалтын дүрмээр, төлбөртэйг тусад нь худалдаж авна.
   const meetsHTML = (d) => `<div class="section-head reveal in" id="meetHead"><span class="eyebrow">Шууд хичээл</span></div><div class="meet-list" id="meetList">${d.meetings.map((m) => `
       <div class="meet-item" id="meet-${esc(m.id)}"><time>${fmtDate(m.starts_at)}</time><span class="grow" style="flex:1">${esc(m.title)} · ${m.duration_min} мин
@@ -3008,7 +3009,7 @@ async function coursePage() {
     if (lm.classList.contains("open")) { lm.dataset.wasOpen = "1"; return; }
     if (!lm.dataset.wasOpen) return; // "inline" нэмэх зэрэг бусад өөрчлөлт — хаагдаагүй
     delete lm.dataset.wasOpen;
-    if (lm.classList.contains("inline")) setTimeout(() => { if (!lm.classList.contains("open")) collapseAll(); }, 0);
+    if (lm.classList.contains("inline")) setTimeout(() => { if (!lm.classList.contains("open")) (stageOn() ? exitStage() : collapseAll()); }, 0);
     stopWatch?.(); stopWatch = null;
     stopVideos?.(); stopVideos = null;
     if (curLesson && Auth.token && !reflectDone) askReflection(curLesson.id, curLesson.lid, curLesson.title);
@@ -3089,7 +3090,7 @@ async function coursePage() {
     });
     $("[data-dp-go], [data-dp-close]", pop)?.focus();
   };
-  const expandRow = async (row, scroll) => {
+  const expandRow = async (row, opts) => {
     const blk = access?.blocks?.[row.dataset.lesson];
     if (blk) { // сануулгын хязгаар хэтэрсэн: орж болохгүй
       $(".drip-pop")?.remove();
@@ -3103,28 +3104,105 @@ async function coursePage() {
     }
     if (isLocked(row)) { await paywall(row); return; } // төлөөгүй: шууд «Та төлбөрөө төлнө үү» цонх
     if (row.classList.contains("is-drip")) { dripPrompt(row); return; }
-    const was = row.classList.contains("open");
-    collapseAll();
-    if (was) return;
-    const lid = row.dataset.lesson, p = access?.progress?.[lid], rk = access?.ranks?.[lid];
-    const status = p?.completed_at ? `<span class="st-chip ok">✓ Дууссан · ${fmtDate(p.completed_at)}</span>` : p?.viewed_at ? `<span class="st-chip">Үзэж эхэлсэн · ${fmtDate(p.viewed_at)}</span>` : `<span class="st-chip">Шинэ хичээл</span>`;
-    const facts = [status, rk ? `<span class="st-chip ${rk.disqualified ? "bad" : rk.points >= 75 ? "ok" : ""}" title="${esc((rk.reasons || []).join(", "))}">${rk.disqualified ? "⛔ Оноо тооцогдоогүй" : `+${rk.points} оноо нэгдсэн цолд`}</span>` : ""].join("");
-    row.classList.add("open");
-    if (!canOpen(row)) { // түгжээтэй: шалтгаан ба нээх товч
-      const why = row.classList.contains("is-drip") ? esc($(".lesson-state", row)?.textContent || "Түгжээтэй") : "Энэ хичээл төлбөртэй";
-      row.insertAdjacentHTML("beforeend", `<div class="lesson-more"><div class="lm-facts">${facts}<span class="st-chip bad">🔒 ${why}</span></div>${row.classList.contains("is-drip") ? "" : `<div class="lm-acts"><button type="button" class="btn btn-gold btn-sm" data-more-play>🔒 Нээх</button></div>`}</div>`);
-      return;
-    }
-    row.insertAdjacentHTML("beforeend", `<div class="lesson-more"><div class="lm-facts">${facts}</div><div class="lm-body"><div class="loader"></div></div></div>`);
-    const m = lessonModalEl(); m.classList.add("inline"); $(".lm-body", row).replaceChildren(m);
-    try { await play(lid); } catch (err) { toast(err.message, true); collapseAll(); return; }
-    if (scroll) row.scrollIntoView({ block: "start", behavior: "smooth" });
+    await openStage(row, opts && typeof opts === "object" ? opts : {});
   };
+
+  /* ---- Хичээл үзэх горим (олон улсын цахим сургалтын загвар): өргөн агуулга + хөтөлбөрийн самбар ----
+     Том дэлгэц: хөтөлбөр баруун талд (хумьж болно). Таблет, утас: «Хичээлүүд» товчоор гулсаж гарна. */
+  const stage = $("#lessonStage");
+  let stageLid = null, pushed = false, railWas = true;
+  const rowById = (lid) => $(`.lesson[data-lesson="${CSS.escape(lid)}"]`);
+  const wideLP = () => matchMedia("(min-width:1100px)").matches;
+  function stageOn() { return !!stage && !stage.hidden; }
+  const factsHTML = (lid) => {
+    if (!Auth.token) return "";
+    const p = access?.progress?.[lid], rk = access?.ranks?.[lid];
+    return [p?.completed_at ? `<span class="st-chip ok">✓ Дууссан · ${fmtDate(p.completed_at)}</span>` : p?.viewed_at ? `<span class="st-chip">Үзэж эхэлсэн · ${fmtDate(p.viewed_at)}</span>` : `<span class="st-chip">Шинэ хичээл</span>`,
+      rk ? `<span class="st-chip ${rk.disqualified ? "bad" : rk.points >= 75 ? "ok" : ""}" title="${esc((rk.reasons || []).join(", "))}">${rk.disqualified ? "⛔ Оноо тооцогдоогүй" : `+${rk.points} оноо нэгдсэн цолд`}</span>` : ""].join("");
+  };
+  const tocItem = (r) => {
+    const lid = r.dataset.lesson, cur = lid === stageLid;
+    const [k, ic, note] = access?.blocks?.[lid] ? ["blocked", "⛔", "Хаагдсан"] : isLocked(r) ? ["locked", "🔒", +r.dataset.price > 0 ? money(+r.dataset.price) : "Багцаар нээгдэнэ"]
+      : r.classList.contains("is-drip") ? ["drip", "⏳", $(".lesson-state", r)?.textContent || "Түгжээтэй"] : r.classList.contains("is-done") ? ["done", "✓", ""] : ["open", "", ""];
+    return `<li><button type="button" class="lp-li ${k} ${cur ? "cur" : ""}" data-lp-go="${esc(lid)}"${cur ? ' aria-current="true"' : ""}><span class="lp-ic" aria-hidden="true">${cur ? "▶" : ic}</span><span class="lp-lt"><b>${esc($(".lesson-num", r)?.textContent || "")}</b>${esc(rowTitle(r))}${note ? `<small>${esc(note)}</small>` : ""}</span></button></li>`;
+  };
+  function drawStage() {
+    if (!stageOn()) return;
+    const r = stageLid && rowById(stageLid), rows = lessonRows(), doneN = rows.filter((x) => x.classList.contains("is-done")).length;
+    $("#lpTitle").textContent = r ? `${$(".lesson-num", r)?.textContent || ""} · ${rowTitle(r)}` : "";
+    const pg = $("#lpProg"), tot = rows.length;
+    pg.hidden = !Auth.token || !tot;
+    if (!pg.hidden) { $("i", pg).style.width = Math.round(doneN / tot * 100) + "%"; $("small", pg).textContent = `${doneN}/${tot} дууссан`; }
+    const groups = $$(".lesson-group");
+    const list = groups.length ? groups.map((g) => { const rs = $$(".lesson[data-lesson]", g), d = rs.filter((x) => x.classList.contains("is-done")).length;
+      return `<details class="lp-sec" open><summary><span>${esc(g.dataset.section || "Бусад хичээлүүд")}</span><small>${d}/${rs.length}</small></summary><ol>${rs.map(tocItem).join("")}</ol></details>`; }).join("")
+      : `<ol>${rows.map(tocItem).join("")}</ol>`;
+    const toc = $("#lpToc"), keep = $(".lp-toc-body", toc)?.scrollTop;
+    toc.innerHTML = `<div class="lp-toc-head"><b>Сургалтын хөтөлбөр</b><small>${doneN}/${tot} дууссан</small><button type="button" class="icon-btn lp-toc-x" data-lp-toc-close aria-label="Хаах">✕</button></div><div class="lp-toc-body">${list}</div>`;
+    const body = $(".lp-toc-body", toc), cur = $(".lp-li.cur", body);
+    if (keep != null) body.scrollTop = keep; else if (cur) body.scrollTop = Math.max(0, cur.offsetTop - body.clientHeight / 3);
+    $("#lessonFacts").innerHTML = stageLid ? factsHTML(stageLid) : "";
+    stage.style.setProperty("--nav-h", ($(".nav")?.offsetHeight || 64) + "px");
+    stage.style.setProperty("--lp-top-h", ($(".lp-top", stage)?.offsetHeight || 60) + "px");
+    syncTocBtn();
+  }
+  const syncTocBtn = () => { const b = $("[data-lp-toc]", stage); if (b) b.setAttribute("aria-expanded", String(wideLP() ? !stage.classList.contains("toc-hidden") : stage.classList.contains("toc-open"))); };
+  const closeToc = () => { stage?.classList.remove("toc-open"); syncTocBtn(); };
+  const toggleToc = () => {
+    if (wideLP()) { const hide = !stage.classList.contains("toc-hidden"); stage.classList.toggle("toc-hidden", hide); try { localStorage.setItem("sg_lp_toc", hide ? "0" : "1"); } catch {} }
+    else stage.classList.toggle("toc-open");
+    syncTocBtn();
+  };
+  async function openStage(row, { push = true } = {}) {
+    const lid = row.dataset.lesson, m = lessonModalEl(), first = !stageOn();
+    if (!first && lid === stageLid && m.classList.contains("open")) { closeToc(); return; }
+    $(".drip-pop")?.remove();
+    if (first) {
+      railWas = document.documentElement.classList.contains("rail-collapsed");
+      document.documentElement.classList.add("lp-focus", "rail-collapsed"); // өргөн харагдахын тулд чатыг түр хумина
+      try { stage.classList.toggle("toc-hidden", localStorage.getItem("sg_lp_toc") === "0"); } catch {}
+      root.classList.add("lp-on"); stage.hidden = false;
+    } else if (m.classList.contains("open")) { delete m.dataset.wasOpen; closeModal(m); } // өөр хичээл рүү: өмнөхийн хяналт play()-д зогсоно
+    stageLid = lid;
+    $$(".lesson.open").forEach((r) => r.classList.remove("open")); row.classList.add("open");
+    if (m.parentElement !== $("#lpMain")) { m.classList.add("inline"); $("#lpMain").replaceChildren(m); }
+    const url = location.pathname + location.search + "#l=" + lid;
+    if (first && push) { history.pushState({ lp: lid }, "", url); pushed = true; } else history.replaceState({ lp: lid }, "", url);
+    closeToc(); drawStage(); scrollTo({ top: 0 });
+    try { await play(lid); } catch (err) { toast(err.message, true); if (first) exitStage(); return; }
+    drawStage();
+  }
+  function exitStage({ fromPop } = {}) {
+    if (!stageOn()) return;
+    const m = lessonModalEl(), lid = stageLid;
+    stage.hidden = true; root.classList.remove("lp-on"); closeToc(); stageLid = null;
+    document.documentElement.classList.remove("lp-focus"); if (!railWas) document.documentElement.classList.remove("rail-collapsed");
+    if (m.classList.contains("open")) closeModal(m); // ажиглагч: хяналт зогсоож, дүгнэлт асууна
+    dockModal(); $$(".lesson.open").forEach((r) => r.classList.remove("open"));
+    if (!fromPop) { if (pushed) history.back(); else history.replaceState(null, "", location.pathname + location.search); }
+    pushed = false;
+    const r = lid && rowById(lid);
+    if (r) { r.scrollIntoView({ block: "center" }); r.classList.add("lp-was"); setTimeout(() => r.classList.remove("lp-was"), 1800); }
+  }
+  stage?.addEventListener("click", (e) => {
+    const go = e.target.closest("[data-lp-go]");
+    if (go) { closeToc(); const r = rowById(go.dataset.lpGo); if (r) expandRow(r); return; }
+    if (e.target.closest("[data-lp-exit]")) return exitStage();
+    if (e.target.closest("[data-lp-toc-close]")) return closeToc();
+    if (e.target.closest("[data-lp-toc]")) return toggleToc();
+  });
+  addEventListener("keydown", (e) => { if (e.key === "Escape" && stage?.classList.contains("toc-open")) closeToc(); });
+  addEventListener("resize", () => { if (stageOn()) { if (wideLP()) closeToc(); syncTocBtn(); } });
+  addEventListener("popstate", () => { // хөтчийн «буцах»: хөтөлбөр рүү эсвэл өмнөх хичээл рүү
+    const lid = new URLSearchParams(location.hash.slice(1)).get("l");
+    if (!lid) { pushed = false; exitStage({ fromPop: true }); return; }
+    const r = rowById(lid); if (r && lid !== stageLid) expandRow(r, { push: false });
+  });
   const play = async (lid) => {
     const l = await api(`/api/courses/${id}/lessons/${lid}`);
     $("#lessonTitle").textContent = l.title;
     const nav = $("#lessonNav");
-    if (nav) { nav.innerHTML = navHTML(lid); nav.hidden = lessonRows().length < 2; nav.onclick = async (e) => { const b = e.target.closest("[data-nav]"); if (!b || b.disabled) return; const li = lessonRows().find((r) => r.dataset.lesson === b.dataset.nav); if (!li) return; if (isLocked(li)) { paywall(li); return; } if (li.classList.contains("is-drip")) { dripPrompt(li); return; } if (lessonModalEl().classList.contains("inline") && canOpen(li)) { await expandRow(li, true); return; } $("[data-play]", li)?.click(); $(".lesson-modal")?.scrollTo?.({ top: 0, behavior: "smooth" }); }; }
+    if (nav) { nav.innerHTML = navHTML(lid); nav.hidden = lessonRows().length < 2; nav.onclick = async (e) => { const b = e.target.closest("[data-nav]"); if (!b || b.disabled) return; const li = lessonRows().find((r) => r.dataset.lesson === b.dataset.nav); if (li) await expandRow(li); }; }
     const done = $("#lessonDone"), p = access?.progress?.[lid];
     if (done) {
       done.hidden = !Auth.token;
@@ -3200,8 +3278,11 @@ async function coursePage() {
   // Нүүр хуудаснаас #l=<хичээл> холбоосоор ирвэл тухайн хичээлийг шууд нээнэ (эрхгүй бол мөрийг тодруулна).
   const want = new URLSearchParams(location.hash.slice(1)).get("l");
   if (want) {
-    const li = $(`.lesson[data-lesson="${CSS.escape(want)}"]`);
-    if (li) { li.scrollIntoView({ block: "center" }); play(want).catch((err) => { if (err.status === 402 && Auth.token) return paywall(li); li.animate([{ boxShadow: "0 0 0 4px rgba(31,60,143,.35)" }, { boxShadow: "0 0 0 0 transparent" }], { duration: 1600 }); }); }
+    const li = rowById(want);
+    if (li) ready.then(() => {
+      if (!Auth.token && isLocked(li)) { li.scrollIntoView({ block: "center" }); li.animate([{ boxShadow: "0 0 0 4px rgba(31,60,143,.35)" }, { boxShadow: "0 0 0 0 transparent" }], { duration: 1600 }); return; }
+      expandRow(li, { push: false });
+    });
   }
 
   document.addEventListener("click", async (e) => {

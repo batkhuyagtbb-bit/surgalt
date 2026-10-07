@@ -2790,3 +2790,98 @@ html.dv-locked,html.dv-locked body{overflow:hidden}
 }
 @media (max-width:520px){.st-ch{padding:12px}.st-ch-main strong{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.st-ch-rank{width:auto;padding:5px 8px}.st-ch-ico{width:38px;height:38px}.st-cbody{padding:0 10px 12px}}
 @media (prefers-reduced-motion:reduce){.st-cbody{animation:none}.st-ch-chev{transition:none}}
+
+/* ===== Хичээл үзэх горим (олон улсын цахим сургалтын загвар) =====
+   Компьютер (≥1100px): өргөн агуулга + баруун талд хөтөлбөр (хумьж болно).
+   Таблет, утас: агуулга бүтэн өргөнөөр, хөтөлбөр «Хичээлүүд» товчоор гулсаж гарна. */
+.course-page.lp-on>:not(#lessonStage){display:none!important}
+.course-page.lp-on~.footer{display:none}
+.lp{--nav-h:64px;--lp-top-h:60px;padding-top:var(--nav-h);min-height:100svh;background:var(--ink)}
+.lp[hidden]{display:none}
+.lp-top{position:sticky;top:var(--nav-h);z-index:30;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:10px clamp(12px,2.4vw,28px);background:var(--surface);border-bottom:1px solid var(--line);box-shadow:0 1px 0 rgba(19,27,49,.02),0 8px 20px -18px rgba(19,27,49,.35)}
+.lp-back,.lp-toc-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 14px 0 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font:inherit;font-size:.88rem;font-weight:700;color:var(--brand);cursor:pointer;transition:background .15s,border-color .15s}
+.lp-toc-btn{padding:0 14px 0 12px;color:var(--text)}
+.lp-back:hover,.lp-toc-btn:hover{background:var(--surface-2);border-color:var(--line-2)}
+.lp-toc-btn[aria-expanded="true"]{background:var(--brand-soft);border-color:var(--brand-tint);color:var(--brand)}
+.lp-back:focus-visible,.lp-toc-btn:focus-visible,.lp-li:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.lp-crumb{display:grid;min-width:0;line-height:1.25}
+.lp-crumb small{font-size:.74rem;font-weight:600;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lp-crumb b{font-size:1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lp-prog{display:grid;gap:5px;width:170px}
+.lp-prog[hidden]{display:none}
+.lp-prog .meter{height:6px}
+.lp-prog .meter i{background:var(--teal)}
+.lp-prog small{font-size:.74rem;font-weight:700;color:var(--muted)}
+.lp-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;align-items:start}
+.lp.toc-hidden .lp-grid{grid-template-columns:minmax(0,1fr)}
+.lp.toc-hidden .lp-toc{display:none}
+.lp-main{min-width:0;padding:clamp(16px,2.4vw,32px) clamp(12px,3vw,44px) 56px}
+.lp .modal.inline .modal-card{max-width:1200px;margin:0 auto;padding:clamp(18px,2.6vw,36px);border:1px solid var(--line);border-radius:20px;background:var(--surface);box-shadow:var(--shadow)}
+.lp .modal.inline .modal-x{display:none}
+.lp #player{border-radius:16px;overflow:hidden}
+.lp #lessonTitle{max-width:880px;margin:18px auto 8px;font-size:clamp(1.35rem,2.3vw,1.9rem);line-height:1.25;letter-spacing:-.01em}
+.lp .lm-facts{max-width:880px;margin:0 auto 18px}
+.lp .lm-facts:empty{display:none}
+.lp .lesson-content{font-size:1.04rem;line-height:1.75}
+.lp .lesson-content>*,.lp .lesson-content.pre,.lp .discuss,.lp .lesson-nav,.lp .lesson-done,.lp .watch-badge{max-width:880px;margin-left:auto;margin-right:auto}
+.lp .lesson-content>.rb-video,.lp .lesson-content>.rb-doc,.lp .lesson-content>.rb-fig,.lp .lesson-content>.rb-embed,.lp .lesson-content>.book3d{max-width:none}
+.lp .watch-badge{display:flex;flex-wrap:wrap;max-width:min(880px,100%)}
+/* Хөтөлбөрийн самбар */
+.lp-toc{position:sticky;top:calc(var(--nav-h) + var(--lp-top-h));height:calc(100svh - var(--nav-h) - var(--lp-top-h));display:flex;flex-direction:column;background:var(--surface);border-left:1px solid var(--line)}
+.lp-toc-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.lp-toc-head b{font-size:.95rem}
+.lp-toc-head small{font-size:.76rem;font-weight:700;color:var(--teal)}
+.lp-toc-x{display:none;margin-left:auto}
+.lp-toc-body{position:relative;flex:1;overflow:auto;overscroll-behavior:contain;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+.lp-toc ol{list-style:none;margin:0;padding:4px 0}
+.lp-sec{border-bottom:1px solid var(--line)}
+.lp-sec summary{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:var(--surface-2);font-size:.84rem;font-weight:800;color:var(--text);cursor:pointer;list-style:none}
+.lp-sec summary::-webkit-details-marker{display:none}
+.lp-sec summary::after{content:"";width:8px;height:8px;margin-left:4px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-2px);transition:transform .2s;flex:none}
+.lp-sec:not([open]) summary::after{transform:rotate(-45deg)}
+.lp-sec summary span{flex:1;min-width:0}
+.lp-sec summary small{font-size:.74rem;font-weight:700;color:var(--muted)}
+.lp-li{display:grid;grid-template-columns:24px minmax(0,1fr);gap:10px;align-items:start;width:100%;min-height:48px;padding:11px 16px 11px 13px;border:0;border-left:3px solid transparent;background:none;font:inherit;text-align:left;color:var(--text);cursor:pointer;transition:background .12s}
+.lp-li:hover{background:var(--surface-2)}
+.lp-li.cur{background:var(--brand-soft);border-left-color:var(--brand)}
+.lp-ic{display:grid;place-items:center;width:22px;height:22px;margin-top:1px;border-radius:50%;border:1.5px solid var(--line-2);font-size:.7rem;font-weight:800;color:var(--muted)}
+.lp-li.done .lp-ic{background:var(--teal);border-color:var(--teal);color:#fff}
+.lp-li.cur .lp-ic{background:var(--brand);border-color:var(--brand);color:#fff;font-size:.6rem}
+.lp-li.locked .lp-ic,.lp-li.drip .lp-ic,.lp-li.blocked .lp-ic{border:0;font-size:.86rem}
+.lp-lt{font-size:.88rem;line-height:1.38;overflow-wrap:anywhere}
+.lp-lt b{margin-right:6px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.lp-li.cur .lp-lt{font-weight:700}
+.lp-lt small{display:block;margin-top:3px;font-size:.74rem;color:var(--muted)}
+.lp-li.locked .lp-lt small{color:var(--accent-ink);font-weight:700}
+.lp-li.blocked .lp-lt small{color:var(--coral);font-weight:700}
+.lp-li.drip .lp-lt,.lp-li.locked .lp-lt{color:var(--text-2)}
+.lp-scrim{display:none}
+.lesson.lp-was{animation:lp-was 1.8s ease-out}
+@keyframes lp-was{0%,40%{box-shadow:0 0 0 3px var(--brand-tint)}100%{box-shadow:0 0 0 0 transparent}}
+/* Үзэх горимд баруун ирмэгийн чатын хавтас хөтөлбөрийг халхлахгүй — чат дээд цэсний дүрсээр нээгдэнэ */
+html.lp-focus .rail-tab{display:none!important}
+/* Таблет ба утас: хөтөлбөр гулсдаг самбар */
+@media (max-width:1099px){
+  .lp-grid,.lp.toc-hidden .lp-grid{grid-template-columns:minmax(0,1fr)}
+  .lp-toc,.lp.toc-hidden .lp-toc{position:fixed;top:0;right:0;bottom:0;z-index:960;display:flex;width:min(380px,88vw);height:auto;border-left:0;box-shadow:var(--shadow-lg);transform:translateX(104%);transition:transform .26s cubic-bezier(.2,.8,.2,1);visibility:hidden}
+  .lp.toc-open .lp-toc{transform:none;visibility:visible}
+  .lp-toc-head{padding-top:calc(14px + env(safe-area-inset-top))}
+  .lp-toc-x{display:inline-grid}
+  .lp-scrim{display:block;position:fixed;inset:0;z-index:959;background:rgba(19,27,49,.45);opacity:0;pointer-events:none;transition:opacity .2s}
+  .lp.toc-open .lp-scrim{opacity:1;pointer-events:auto}
+  .lp-prog{width:130px}
+  .lp-main{padding:16px clamp(10px,2.4vw,24px) 40px}
+}
+@media (max-width:700px){
+  .lp-top{grid-template-columns:auto minmax(0,1fr) auto;gap:10px;padding:8px 10px}
+  .lp-back,.lp-toc-btn{width:42px;height:42px;padding:0}
+  .lp-back span,.lp-toc-btn span{display:none}
+  .lp-crumb b{font-size:.94rem}
+  .lp-prog{grid-column:1/-1;grid-row:2;width:auto;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px}
+  .lp-main{padding:10px 6px 32px}
+  .lp .modal.inline .modal-card{padding:14px 12px 18px;border-radius:14px}
+  .lp #player{border-radius:12px}
+  .lp #lessonTitle{margin-top:12px}
+  .lp .lesson-content{font-size:1rem;line-height:1.7}
+}
+@media (prefers-reduced-motion:reduce){.lp-toc{transition:none}.lesson.lp-was{animation:none}}

@@ -1,6 +1,19 @@
 {{$c := .D.Course}}{{$t := .D.Teacher}}{{$paid := sub $c.LessonCount $c.FreeLessonCount}}
 {{template "head" (dict "Title" (printf "%s — %s" $c.Title $t.DisplayName) "Desc" $c.Description "Image" $t.AvatarURL "Page" "course")}}
 <main class="course-page" data-course="{{$c.ID}}" data-price="{{$c.Price}}" data-drip="{{if $c.Drip}}1{{else}}0{{end}}" data-mode="{{if $c.Price}}bundle{{else if gt $paid 0}}lessons{{else}}free{{end}}">
+  <section class="lp" id="lessonStage" hidden aria-label="Хичээл үзэх">
+    <header class="lp-top">
+      <button type="button" class="lp-back" data-lp-exit aria-label="Хөтөлбөр рүү буцах"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>Хөтөлбөр</span></button>
+      <div class="lp-crumb"><small>{{$c.Title}}</small><b id="lpTitle"></b></div>
+      <div class="lp-prog" id="lpProg" hidden><span class="meter"><i></i></span><small></small></div>
+      <button type="button" class="lp-toc-btn" data-lp-toc aria-controls="lpToc" aria-expanded="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg><span>Хичээлүүд</span></button>
+    </header>
+    <div class="lp-grid">
+      <div class="lp-main" id="lpMain"></div>
+      <aside class="lp-toc" id="lpToc" aria-label="Сургалтын хөтөлбөр"></aside>
+    </div>
+    <div class="lp-scrim" data-lp-toc-close></div>
+  </section>
   <section class="hero hero-course" style="--h:{{hue $c.Title}}">
     <div class="hero-inner">
       <div class="hero-left">
@@ -59,6 +72,7 @@
     <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
     <div class="player" id="player"></div>
     <h3 id="lessonTitle"></h3>
+    <div class="lm-facts" id="lessonFacts"></div>
     <div class="lesson-content pre" id="lessonContent"></div>
     <section class="discuss" id="lessonDiscuss" hidden aria-label="Хэлэлцүүлэг"></section>
     <nav class="lesson-nav" id="lessonNav" hidden aria-label="Өмнөх, дараагийн хичээл"></nav>
