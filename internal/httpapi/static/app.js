@@ -2130,8 +2130,10 @@ async function homePage() {
   }
 
   if (h.meetings.length) parts.push(sec("my-live", "Шууд хичээл", `<ul class="items">${h.meetings.map((m) => `
-      <li><div class="item live"><span class="item-ico">${icon("live", 20)}</span><span class="grow"><strong>${esc(m.title)}</strong><small>${fmtDate(m.starts_at)} · ${m.duration_min} мин · ${esc(m.course_title)}</small></span><span class="chip chip-teal">${until(m.starts_at)}</span>
-      ${m.meet_url ? `<a class="btn btn-accent btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">Нэгдэх</a>` : `<a class="btn btn-ghost btn-sm" href="/c/${esc(m.course_id)}">Сургалт</a>`}</div></li>`).join("")}</ul>`));
+      <li><div class="item live"><span class="item-ico">${icon("live", 20)}</span><span class="grow"><strong>${esc(m.title)}</strong><small>${fmtDate(m.starts_at)} · ${m.duration_min} мин · ${esc(m.course_title)}${m.price ? ` · ${m.bought ? "✓ худалдаж авсан" : money(m.price)}` : ""}</small></span><span class="chip chip-amber">${until(m.starts_at)}</span>
+      ${m.meet_url ? `<a class="btn btn-accent btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">Нэгдэх</a>`
+        : m.price ? `<a class="btn btn-gold btn-sm" href="/c/${esc(m.course_id)}#meet=${esc(m.id)}">Худалдаж авах · ${money(m.price)}</a>`
+        : `<a class="btn btn-ghost btn-sm" href="/c/${esc(m.course_id)}">Сургалт</a>`}</div></li>`).join("")}</ul>`));
   else parts.push(`<span id="my-live"></span>`);
 
   parts.push(sec("my-courses", "Миний сургалтууд", h.courses.length ? `<div class="course-grid">${h.courses.map(courseCard).join("")}</div>`
@@ -2276,14 +2278,31 @@ async function coursePage() {
   };
   if (Auth.token) refreshAccess().then((a) => { if (!a) return; if (a.all) unlockAll(); a.lessons.forEach(unlockLesson); if (mode === "free" && a.enrolled) buy.textContent = "✓ Та элссэн — үзэж эхлэх"; });
   else if (drip) $$(".lesson:not(.is-free)").forEach((li) => { const lbl = $(".lesson-state", li); if (lbl && +li.dataset.unlock && li.dataset.always !== "1") { lbl.hidden = false; lbl.textContent = `⏱ Өмнөхийг үзснээс ${humanHours(li.dataset.unlock)}-ийн дараа`; } });
-  // Товлосон шууд хичээлүүд (Google Meet)
-  api(`/api/courses/${id}/meetings`).then((d) => {
+  // Товлосон шууд хичээлүүд (Google Meet): үнэгүй нь сургалтын дүрмээр, төлбөртэйг тусад нь худалдаж авна.
+  const meetsHTML = (d) => `<div class="section-head reveal in" id="meetHead"><span class="eyebrow">Шууд хичээл</span></div><div class="meet-list" id="meetList">${d.meetings.map((m) => `
+      <div class="meet-item" id="meet-${esc(m.id)}"><time>${fmtDate(m.starts_at)}</time><span class="grow" style="flex:1">${esc(m.title)} · ${m.duration_min} мин
+        ${m.price ? `<span class="chip chip-amber">${m.bought ? "✓ Худалдаж авсан" : money(m.price)}${m.members_free && !m.bought ? " · элссэн бол үнэгүй" : ""}</span>` : ""}</span>
+      ${m.meet_url ? `<a class="btn btn-accent btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">Нэгдэх</a>`
+        : m.price ? `<button class="btn btn-gold btn-sm" data-meet-buy="${esc(m.id)}" data-title="${esc(m.title)}">Худалдаж авах · ${money(m.price)}</button>`
+        : `<span class="chip">🔒 Сургалтад элссэн хүмүүст</span>`}</div>`).join("")}</div>`;
+  const loadMeets = () => api(`/api/courses/${id}/meetings`).then((d) => {
+    $("#meetHead")?.remove(); $("#meetList")?.remove();
     if (!d.meetings.length) return;
-    const sec = $(".lessons").parentElement;
-    sec.insertAdjacentHTML("afterbegin", `<div class="section-head reveal in"><span class="eyebrow">Шууд хичээл</span></div><div class="meet-list">${d.meetings.map((m) => `
-      <div class="meet-item"><time>${fmtDate(m.starts_at)}</time><span class="grow" style="flex:1">${esc(m.title)} · ${m.duration_min} мин</span>
-      ${m.meet_url ? `<a class="btn btn-accent btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">Нэгдэх</a>` : `<span class="chip">🔒 Худалдан авсан хүмүүст</span>`}</div>`).join("")}</div>`);
+    $(".lessons").parentElement.insertAdjacentHTML("afterbegin", meetsHTML(d));
+    const want = /#meet=([\w-]+)/.exec(location.hash)?.[1], el = want && $("#meet-" + want);
+    if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("meet-focus"); }
   }).catch(() => {});
+  loadMeets();
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-meet-buy]"); if (!b) return;
+    if (needLogin()) return;
+    b.disabled = true;
+    try {
+      const d = await api(`/api/meetings/${b.dataset.meetBuy}/buy`, { method: "POST" });
+      if (d.unlocked) { await loadMeets(); return; }
+      pay(d.order, d.payment, "Шууд хичээл: " + b.dataset.title, async () => { toast("🎉 Шууд хичээл нээгдлээ!"); celebrate(); await loadMeets(); });
+    } catch (err) { toast(err.message, true); } finally { b.disabled = false; }
+  });
 
   const needLogin = () => { if (Auth.token) return false; location.href = "/login?next=" + encodeURIComponent(location.pathname); return true; };
 

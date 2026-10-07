@@ -53,7 +53,9 @@ type PublicLink struct {
 // PublicMeeting нь товлосон шууд хичээлийн НЭЭЛТТЭЙ хэсэг. Meet холбоос энд хэзээ ч орохгүй:
 // энэ өгөгдөл кэшлэгдэж, нэвтрээгүй хүнд ч очдог.
 type PublicMeeting struct {
+	ID          string    `json:"id"`
 	Title       string    `json:"title"`
+	Price       int64     `json:"price,omitempty"` // төлбөртэй шууд хичээл (₮)
 	CourseID    string    `json:"course_id"`
 	CourseTitle string    `json:"course_title"`
 	StartsAt    time.Time `json:"starts_at"`
@@ -163,7 +165,7 @@ func (s *Server) publicMeetings(ctx context.Context, courses []store.Course) ([]
 		return nil, err
 	}
 	for _, m := range ms {
-		out = append(out, PublicMeeting{Title: m.Title, CourseID: m.CourseID, CourseTitle: titles[m.CourseID], StartsAt: m.StartsAt, DurationMin: m.DurationMin})
+		out = append(out, PublicMeeting{ID: m.ID, Title: m.Title, Price: m.Price, CourseID: m.CourseID, CourseTitle: titles[m.CourseID], StartsAt: m.StartsAt, DurationMin: m.DurationMin})
 	}
 	return out, nil
 }

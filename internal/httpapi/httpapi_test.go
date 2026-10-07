@@ -2801,3 +2801,107 @@ func TestIntegratedRankAllCourses(t *testing.T) {
 		t.Fatalf("Миний хэсгийн цол (%v) олгосон нийт оноотой (%v) ижил, 2 сургалт нэгтгэсэн байх ёстой: %v", rk["points"], total, rk)
 	}
 }
+
+// Төлбөртэй шууд хичээл: багш үнэ тавина; Meet холбоос зөвхөн багш болон худалдаж авсан хүнд
+// (үнэгүй сургалтад элссэн ч), "элссэн хүнд үнэгүй" сонголттой бол элссэн хүнд.
+func TestPaidMeeting(t *testing.T) {
+	srv, st := newTestServer(t)
+	defer srv.Close()
+	ctx := context.Background()
+	tt, tid := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Шууд","price":0,"published":true}`)
+	cid := c["id"].(string)
+	soon := time.Now().Add(2 * time.Hour)
+	const url = "https://meet.google.com/abc-defg-hij"
+	m := &store.Meeting{TeacherID: tid, CourseID: cid, Title: "Давтлага", StartsAt: soon, DurationMin: 60, MeetURL: url}
+	solo := &store.Meeting{TeacherID: tid, Title: "Уулзалт", StartsAt: soon, DurationMin: 30, MeetURL: "https://meet.google.com/solo"}
+	for _, x := range []*store.Meeting{m, solo} {
+		if err := st.CreateMeeting(ctx, x); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Үнэ: сургалтгүй уулзалтад болохгүй, өөр багш өөрчилж чадахгүй, сөрөг үнэгүй.
+	if code, _ := call(t, srv, "PUT", "/api/me/meetings/"+solo.ID, tt, `{"price":5000}`); code != 400 {
+		t.Fatalf("сургалтгүй төлбөртэй шууд хичээл: %d", code)
+	}
+	t2, _ := register(t, srv, "other", "teacher")
+	if code, _ := call(t, srv, "PUT", "/api/me/meetings/"+m.ID, t2, `{"price":5000}`); code != 404 {
+		t.Fatalf("өөр багш: %d", code)
+	}
+	if code, _ := call(t, srv, "PUT", "/api/me/meetings/"+m.ID, tt, `{"price":-1}`); code != 400 {
+		t.Fatal("сөрөг үнэ")
+	}
+	if code, r := call(t, srv, "PUT", "/api/me/meetings/"+m.ID, tt, `{"price":15000}`); code != 200 || r["price"].(float64) != 15000 {
+		t.Fatalf("үнэ тавих: %d %v", code, r)
+	}
+	// Үнэгүй сургалтад элссэн ч, зочинд ч холбоос харагдахгүй; үнэ харагдана.
+	s1, _ := register(t, srv, "stud", "student")
+	call(t, srv, "POST", "/api/courses/"+cid+"/enroll", s1, "")
+	first := func(tok string) map[string]any {
+		_, d := call(t, srv, "GET", "/api/courses/"+cid+"/meetings", tok, "")
+		return d["meetings"].([]any)[0].(map[string]any)
+	}
+	if mm := first(s1); mm["meet_url"] != nil || mm["access"] != false || mm["price"].(float64) != 15000 {
+		t.Fatalf("худалдаж аваагүй хүнд холбоос задарлаа: %v", mm)
+	}
+	if mm := first(""); mm["meet_url"] != nil {
+		t.Fatalf("зочинд холбоос задарлаа: %v", mm)
+	}
+	if mm := first(tt); mm["meet_url"] != url {
+		t.Fatalf("багш өөрийн холбоосыг харна: %v", mm)
+	}
+	_, home := call(t, srv, "GET", "/api/me/home", s1, "")
+	if hm := home["meetings"].([]any)[0].(map[string]any); hm["meet_url"] != nil || hm["price"].(float64) != 15000 {
+		t.Fatalf("нүүр самбарт холбоос задарлаа: %v", hm)
+	}
+	// Худалдаж авах → нэг л захиалга → төлбөр → холбоос нээгдэнэ.
+	code, b := call(t, srv, "POST", "/api/meetings/"+m.ID+"/buy", s1, "")
+	if code != 201 || b["order"].(map[string]any)["amount"].(float64) != 15000 || b["order"].(map[string]any)["kind"] != "meeting" {
+		t.Fatalf("захиалга: %d %v", code, b)
+	}
+	oid := b["order"].(map[string]any)["id"].(string)
+	if _, b2 := call(t, srv, "POST", "/api/meetings/"+m.ID+"/buy", s1, ""); b2["order"].(map[string]any)["id"] != oid {
+		t.Fatalf("давхар захиалга: %v", b2)
+	}
+	if code, _ := call(t, srv, "POST", "/api/orders/"+oid+"/dev-pay", s1, ""); code != 200 {
+		t.Fatalf("төлбөр: %d", code)
+	}
+	if mm := first(s1); mm["meet_url"] != url || mm["access"] != true || mm["bought"] != true {
+		t.Fatalf("төлсний дараа холбоос нээгдэх ёстой: %v", mm)
+	}
+	if _, b := call(t, srv, "POST", "/api/meetings/"+m.ID+"/buy", s1, ""); b["unlocked"] != true || b["meet_url"] != url {
+		t.Fatalf("худалдаж авсан бол шууд нээлттэй: %v", b)
+	}
+	_, home = call(t, srv, "GET", "/api/me/home", s1, "")
+	if hm := home["meetings"].([]any)[0].(map[string]any); hm["meet_url"] != url || hm["bought"] != true {
+		t.Fatalf("нүүр самбарт нээгдэх ёстой: %v", hm)
+	}
+	// Багш: худалдаж авсан хүний тоо, борлуулалтын мэдэгдэл; сурагчид бүртгэгдсэн мэдэгдэл.
+	_, mine := callList(t, srv, "GET", "/api/me/meetings", tt)
+	for _, x := range mine {
+		if mm := x.(map[string]any); mm["id"] == m.ID && mm["buyers"].(float64) != 1 {
+			t.Fatalf("худалдаж авсан тоо: %v", mm)
+		}
+	}
+	_, tn := callList(t, srv, "GET", "/api/me/notifications", tt)
+	_, sn := callList(t, srv, "GET", "/api/me/notifications", s1)
+	if !strings.Contains(fmt.Sprint(tn), "Шууд хичээл зарагдлаа") || !strings.Contains(fmt.Sprint(sn), "Шууд хичээлд бүртгэгдлээ") {
+		t.Fatalf("мэдэгдэл: %v | %v", tn, sn)
+	}
+	// "Элссэн хүнд үнэгүй": өөр элссэн сурагч худалдаж авалгүй нэгдэнэ; элсээгүй хүн худалдаж авах ёстой.
+	call(t, srv, "PUT", "/api/me/meetings/"+m.ID, tt, `{"price":15000,"members_free":true}`)
+	s2, _ := register(t, srv, "stud2", "student")
+	if mm := first(s2); mm["meet_url"] != nil {
+		t.Fatalf("элсээгүй хүнд холбоос: %v", mm)
+	}
+	call(t, srv, "POST", "/api/courses/"+cid+"/enroll", s2, "")
+	if mm := first(s2); mm["meet_url"] != url {
+		t.Fatalf("элссэн хүнд үнэгүй байх ёстой: %v", mm)
+	}
+	// Үнэгүй болговол: үнэгүй сургалтын шууд хичээл хүн бүрт нээлттэй, худалдан авалт хэрэггүй.
+	call(t, srv, "PUT", "/api/me/meetings/"+m.ID, tt, `{"price":0}`)
+	s3, _ := register(t, srv, "stud3", "student")
+	if code, b := call(t, srv, "POST", "/api/meetings/"+m.ID+"/buy", s3, ""); code != 200 || b["unlocked"] != true {
+		t.Fatalf("үнэгүй шууд хичээл нээлттэй: %d %v", code, b)
+	}
+}

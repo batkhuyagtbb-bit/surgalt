@@ -212,6 +212,9 @@ func (s *Server) notifyPeers(ctx context.Context, conv *store.Conversation, m *s
 	}
 }
 
+// mnLoc — Улаанбаатарын цаг (UTC+8, зуны цаг байхгүй): мэдэгдэлд цагийг хэрэглэгчийн цагаар бичнэ.
+var mnLoc = time.FixedZone("ULAT", 8*3600)
+
 // notifyPaid нь төлбөр баталгаажсаны дараа багш болон худалдан авагчид мэдэгдэнэ.
 func (s *Server) notifyPaid(ctx context.Context, o *store.Order) {
 	if o.Kind == store.OrderKindStorage {
@@ -230,6 +233,20 @@ func (s *Server) notifyPaid(ctx context.Context, o *store.Order) {
 		s.notify(ctx,
 			&store.Notification{UserID: o.TeacherID, Type: NotifPurchase, Count: 1, Title: fmt.Sprintf("📚 Ном зарагдлаа · %s", money(o.Amount)), Body: buyer + " — " + o.Title, Link: "/me#books"},
 			&store.Notification{UserID: o.UserID, Type: NotifPurchase, Count: 1, Title: "✅ Номыг худалдаж авлаа — бүтнээр нь уншина уу", Body: o.Title, Link: "/b/" + o.BookID})
+		return
+	}
+	if o.Kind == store.OrderKindMeeting {
+		buyer := "Суралцагч"
+		if u, err := s.store.UserByID(ctx, o.UserID); err == nil {
+			buyer = u.DisplayName
+		}
+		when := ""
+		if m, err := s.store.MeetingByID(ctx, o.MeetingID); err == nil {
+			when = " · " + m.StartsAt.In(mnLoc).Format("01/02 15:04")
+		}
+		s.notify(ctx,
+			&store.Notification{UserID: o.TeacherID, Type: NotifPurchase, Count: 1, Title: fmt.Sprintf("📹 Шууд хичээл зарагдлаа · %s", money(o.Amount)), Body: buyer + " — " + o.Title, Link: "/me#live"},
+			&store.Notification{UserID: o.UserID, Type: NotifPurchase, Count: 1, Title: "✅ Шууд хичээлд бүртгэгдлээ — эхлэх цагт «Нэгдэх» дарна уу", Body: o.Title + when, Link: "/c/" + o.CourseID + "#meet=" + o.MeetingID})
 		return
 	}
 	title := o.Title

@@ -28,6 +28,7 @@ type Memory struct {
 	identities  map[string]string // provider:subject -> user id
 	applied     map[string]bool   // хэрэгжсэн багтаамжийн захиалга
 	meetings    []*Meeting
+	meetAcc     map[[2]string]string          // (user, meeting) → багш: худалдаж авсан шууд хичээл
 	lessonAcc   map[[2]string]string          // (user, lesson) -> course
 	pendingL    map[[2]string]string          // (user, lesson) -> order
 	notifs      map[string][]*Notification    // user -> шинээс хуучин биш, нэмэгдэх дарааллаар
@@ -354,6 +355,11 @@ func (m *Memory) MarkOrderPaid(_ context.Context, orderID string, amount int64) 
 		}
 	case OrderKindBook:
 		m.books.grant(o.UserID, o.BookID, o.ID, o.Amount)
+	case OrderKindMeeting:
+		if m.meetAcc == nil {
+			m.meetAcc = map[[2]string]string{}
+		}
+		m.meetAcc[[2]string{o.UserID, o.MeetingID}] = o.TeacherID
 	case OrderKindStorage:
 		if !m.applied[o.ID] {
 			m.applied[o.ID] = true
@@ -530,6 +536,71 @@ func (m *Memory) CreateMeeting(_ context.Context, mt *Meeting) error {
 	c := *mt
 	m.meetings = append(m.meetings, &c)
 	return nil
+}
+
+func (m *Memory) MeetingByID(_ context.Context, id string) (*Meeting, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, mt := range m.meetings {
+		if mt.ID == id {
+			c := *mt
+			return &c, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
+func (m *Memory) SetMeetingPrice(_ context.Context, id string, price int64, membersFree bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, mt := range m.meetings {
+		if mt.ID == id {
+			mt.Price, mt.MembersFree = price, membersFree
+			return nil
+		}
+	}
+	return ErrNotFound
+}
+
+func (m *Memory) CreateOrGetPendingMeetingOrder(_ context.Context, userID string, mt *Meeting, title string) (*Order, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, o := range m.orders {
+		if o.Kind == OrderKindMeeting && o.UserID == userID && o.MeetingID == mt.ID && o.Status == OrderPending {
+			o.Amount = mt.Price
+			oc := *o
+			return &oc, nil
+		}
+	}
+	o := &Order{ID: m.next(), Kind: OrderKindMeeting, Title: title, UserID: userID, CourseID: mt.CourseID, MeetingID: mt.ID,
+		TeacherID: mt.TeacherID, Amount: mt.Price, Status: OrderPending, CreatedAt: time.Now()}
+	m.orders[o.ID] = o
+	oc := *o
+	return &oc, nil
+}
+
+func (m *Memory) MeetingAccess(_ context.Context, userID string) (map[string]bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := map[string]bool{}
+	for k := range m.meetAcc {
+		if k[0] == userID {
+			out[k[1]] = true
+		}
+	}
+	return out, nil
+}
+
+func (m *Memory) MeetingBuyers(_ context.Context, teacherID string) (map[string]int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := map[string]int{}
+	for k, t := range m.meetAcc {
+		if t == teacherID {
+			out[k[1]]++
+		}
+	}
+	return out, nil
 }
 
 func (m *Memory) Meetings(_ context.Context, teacherID, courseID string, from time.Time, limit int) ([]Meeting, error) {

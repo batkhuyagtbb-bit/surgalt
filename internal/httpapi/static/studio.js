@@ -138,7 +138,7 @@ async function overview() {
         <div class="ov-stack">
           ${panel(`<div class="panel-head"><h2>${ico("clock")}Дараагийн хичээл</h2></div>${next ? `
             <p class="next-when">${fmtDate(next.starts_at)} <span class="chip chip-amber">${until(next.starts_at)}</span></p>
-            <h3 class="next-title">${esc(next.title)}</h3><p class="muted small">${next.duration_min} мин${titleOf[next.course_id] ? " · " + esc(titleOf[next.course_id]) : ""}</p>
+            <h3 class="next-title">${esc(next.title)}</h3><p class="muted small">${next.duration_min} мин${titleOf[next.course_id] ? " · " + esc(titleOf[next.course_id]) : ""}${next.price ? ` · <span class="chip chip-amber">${money(next.price)} · ${next.buyers || 0} худалдаж авсан</span>` : ""}</p>
             <div class="hero-cta" style="margin-top:12px"><a class="btn btn-gold btn-sm" href="${esc(next.meet_url)}" target="_blank" rel="noopener">${ico("live", 16)}Live эхлүүлэх</a><a class="btn btn-ghost btn-sm" href="#live">Хуваарь</a></div>`
             : `<div class="empty" style="padding:22px">Товлосон хичээл алга<br><a class="btn btn-gold btn-sm" style="margin-top:10px" href="#live">Шууд хичээл товлох</a></div>`}`, 3)}
           ${panel(`<div class="panel-head"><h2>${ico("files")}Файлын сан</h2><a class="link" href="#files">Удирдах ${ico("chevron", 14)}</a></div>
@@ -185,7 +185,7 @@ async function overview() {
     $("#agenda").innerHTML = list.map((m) => { const end = new Date(new Date(m.starts_at).getTime() + m.duration_min * 60000); return `
       <div class="slot"><div class="slot-time"><b>${fmtTime(m.starts_at)}</b><small>${fmtTime(end)}</small></div>
         <div class="slot-body"><div class="slot-top"><span class="chip chip-gold">Live</span>${titleOf[m.course_id] ? `<span class="muted small">${esc(titleOf[m.course_id])}</span>` : ""}<span class="chip chip-amber" style="margin-left:auto">${until(m.starts_at)}</span></div>
-        <strong>${esc(m.title)}</strong><small class="muted">${m.duration_min} мин</small>
+        <strong>${esc(m.title)}</strong><small class="muted">${m.duration_min} мин${m.price ? ` · ${money(m.price)} · ${m.buyers || 0} худалдаж авсан` : ""}</small>
         <div class="slot-actions"><a class="btn btn-sm btn-danger" href="${esc(m.meet_url)}" target="_blank" rel="noopener">${ico("live", 15)}Live</a>${m.course_id ? `<a class="btn btn-sm btn-ghost" href="#course=${esc(m.course_id)}">${ico("courses", 15)}Сургалт</a>` : ""}</div></div></div>`; }).join("") ||
       `<p class="muted small" style="padding:18px 4px;margin:0">Энэ өдөр товлосон хичээл алга.</p>`;
   };
@@ -1349,18 +1349,43 @@ async function live() {
       <div class="form-row"><label>Эхлэх цаг<input name="start" type="datetime-local" value="${local}" required></label>
       <label>Үргэлжлэх (мин)<input name="dur" type="number" min="10" max="480" value="60"></label></div>
       <label>Сургалт (элссэн суралцагчид харна)<select name="course"><option value="">— Ерөнхий —</option>${list.map((c) => `<option value="${c.id}">${esc(c.title)}</option>`).join("")}</select></label>
+      <div class="form-row"><label>Үнэ (₮, 0 = үнэгүй)<input name="price" type="number" min="0" step="500" value="0"><small class="muted">Төлбөртэй бол зөвхөн худалдаж авсан хүн Meet холбоосыг харна. Сургалттай холбоно.</small></label>
+        <label class="check" style="align-self:center"><input type="checkbox" name="members_free"> Сургалтад элссэн суралцагчдад үнэгүй</label></div>
       <button class="btn btn-gold" ${me.meet_connected ? "" : "disabled"}>Товлох</button></form>`, 1) +
-    panel(`<h2>Удахгүй болох</h2><div class="meet-list">${meetings.map((m) => `<div class="meet-item"><time>${fmtDate(m.starts_at)}</time><span style="flex:1">${esc(m.title)} · ${m.duration_min} мин</span><a class="btn btn-teal btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">📹 Нээх</a></div>`).join("") || `<div class="empty">Товлосон хичээл алга</div>`}</div>`, 2);
+    panel(`<h2>Удахгүй болох</h2><div class="meet-list" id="meetMine">${meetings.map((m) => `<div class="meet-item"><time>${fmtDate(m.starts_at)}</time><span style="flex:1">${esc(m.title)} · ${m.duration_min} мин
+        ${m.price ? `<span class="chip chip-amber">${money(m.price)}${m.members_free ? " · элссэнд үнэгүй" : ""}</span> <span class="muted small">${m.buyers || 0} худалдаж авсан</span>` : `<span class="chip">Үнэгүй</span>`}</span>
+        ${m.course_id ? `<button class="btn btn-ghost btn-sm" data-meet-price="${esc(m.id)}">${ico("money", 15)}Үнэ</button>` : ""}<a class="btn btn-glass btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">${ico("live", 15)}Нээх</a></div>`).join("") || `<div class="empty">Товлосон хичээл алга</div>`}</div>`, 2);
   $("#meetOn")?.addEventListener("click", async () => { try { const d = await api("/api/me/meet/connect", { method: "POST" }); location.href = d.url; } catch (e) { toast(e.message, true); } });
   $("#meetOff")?.addEventListener("click", async () => { await api("/api/me/meet", { method: "DELETE" }); live(); });
   const f = $("#meetForm");
   f.onsubmit = async (e) => {
     e.preventDefault();
     try {
-      await api("/api/me/meetings", { method: "POST", body: { title: f.title.value, starts_at: new Date(f.start.value).toISOString(), duration_min: +f.dur.value, course_id: f.course.value } });
+      await api("/api/me/meetings", { method: "POST", body: { title: f.title.value, starts_at: new Date(f.start.value).toISOString(), duration_min: +f.dur.value, course_id: f.course.value,
+        price: +f.price.value || 0, members_free: f.members_free.checked } });
       toast("📹 Meet үүслээ"); live();
     } catch (err) { toast(err.message, true); }
   };
+  // Үнэ засах: аль хэдийн худалдаж авсан хүмүүсийн эрх хэвээр.
+  $("#meetMine")?.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-meet-price]"); if (!b) return;
+    const m = meetings.find((x) => x.id === b.dataset.meetPrice); if (!m) return;
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="mpModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+      <h3 class="h3">Шууд хичээлийн үнэ</h3><p class="muted small">${esc(m.title)} · ${fmtDate(m.starts_at)}</p>
+      <form class="form" id="mpForm"><label>Үнэ (₮, 0 = үнэгүй)<input name="price" type="number" min="0" step="500" value="${m.price || 0}"></label>
+        <label class="check"><input type="checkbox" name="members_free" ${m.members_free ? "checked" : ""}> Сургалтад элссэн суралцагчдад үнэгүй</label>
+        <p class="muted small" style="margin:0">Аль хэдийн худалдаж авсан ${m.buyers || 0} хүний эрх хэвээр үлдэнэ.</p><p class="form-error" role="alert"></p>
+        <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`);
+    const md = $("#mpModal"), f2 = $("#mpForm", md);
+    SG.openModal(md);
+    const close = () => { SG.closeModal(md); setTimeout(() => md.remove(), 300); };
+    md.addEventListener("click", (ev) => { if (ev.target === md || ev.target.closest("[data-close]")) { ev.preventDefault(); close(); } });
+    f2.onsubmit = async (ev) => {
+      ev.preventDefault();
+      try { await api(`/api/me/meetings/${m.id}`, { method: "PUT", body: { price: +f2.price.value || 0, members_free: f2.members_free.checked } }); toast("Үнэ хадгалагдлаа ✓"); close(); live(); }
+      catch (err) { $(".form-error", f2).textContent = err.message; }
+    };
+  });
 }
 
 /* ---------- Чат (inbox) ---------- */

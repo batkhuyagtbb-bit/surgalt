@@ -216,6 +216,9 @@ type HomeMeeting struct {
 	StartsAt    time.Time `json:"starts_at"`
 	DurationMin int       `json:"duration_min"`
 	MeetURL     string    `json:"meet_url,omitempty"`
+	Price       int64     `json:"price,omitempty"` // төлбөртэй шууд хичээл
+	MembersFree bool      `json:"members_free,omitempty"`
+	Bought      bool      `json:"bought,omitempty"`
 }
 
 type HomeChat struct {
@@ -412,21 +415,44 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Шууд хичээлүүд: холбоос нь handleCourseMeetings-тэй ижил дүрмээр (элссэн эсвэл үнэгүй сургалт).
+	// Шууд хичээлүүд: холбоос нь handleCourseMeetings-тэй ижил дүрмээр (meetingOpen): үнэгүй нь элссэн
+	// эсвэл үнэгүй сургалтад, төлбөртэй нь худалдаж авсан хүнд.
+	bought, _ := s.store.MeetingAccess(ctx, c.UID)
+	listed := map[string]bool{}
 	if len(courseIDs) > 0 {
 		ms, err := s.store.MeetingsByCourses(ctx, courseIDs, time.Now(), homeMaxMeetings)
 		if s.storeErr(w, r, err) {
 			return
 		}
-		for _, m := range ms {
+		for i := range ms {
+			m := &ms[i]
 			cr := courses[m.CourseID]
-			hm := HomeMeeting{ID: m.ID, Title: m.Title, CourseID: m.CourseID, CourseTitle: cr.Title, StartsAt: m.StartsAt, DurationMin: m.DurationMin}
-			if cr.Price == 0 || isEnrolled[cr.ID] {
+			hm := HomeMeeting{ID: m.ID, Title: m.Title, CourseID: m.CourseID, CourseTitle: cr.Title, StartsAt: m.StartsAt, DurationMin: m.DurationMin,
+				Price: m.Price, MembersFree: m.MembersFree, Bought: bought[m.ID]}
+			if meetingOpen(m, &cr, c.UID, isEnrolled[cr.ID], bought) {
 				hm.MeetURL = m.MeetURL
 			}
+			listed[m.ID] = true
 			out.Meetings = append(out.Meetings, hm)
 		}
 	}
+	// Сургалтад элсээгүй ч худалдаж авсан төлбөртэй шууд хичээлүүд.
+	for id := range bought {
+		if listed[id] {
+			continue
+		}
+		m, err := s.store.MeetingByID(ctx, id)
+		if err != nil || m.StartsAt.Add(time.Duration(m.DurationMin)*time.Minute).Before(time.Now()) {
+			continue
+		}
+		title := ""
+		if cr, err := s.store.CourseByID(ctx, m.CourseID); err == nil {
+			title = cr.Title
+		}
+		out.Meetings = append(out.Meetings, HomeMeeting{ID: m.ID, Title: m.Title, CourseID: m.CourseID, CourseTitle: title, StartsAt: m.StartsAt,
+			DurationMin: m.DurationMin, MeetURL: m.MeetURL, Price: m.Price, Bought: true})
+	}
+	sort.SliceStable(out.Meetings, func(i, j int) bool { return out.Meetings[i].StartsAt.Before(out.Meetings[j].StartsAt) })
 
 	for _, cv := range convs {
 		switch cv.Kind {

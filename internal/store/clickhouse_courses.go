@@ -591,7 +591,7 @@ func (c *ClickHouse) CourseStudents(ctx context.Context, courseID string) ([]Cou
 
 // ---- захиалга ----
 
-const orderCols = `id, kind, storage_mb, months, user_id, course_id, lesson_id, book_id, teacher_id, title, amount, status,
+const orderCols = `id, kind, storage_mb, months, user_id, course_id, lesson_id, book_id, meeting_id, teacher_id, title, amount, status,
 	created_at, paid_at, applied`
 
 type orderRow struct {
@@ -604,7 +604,7 @@ func scanOrder(r driver.Rows) (orderRow, error) {
 	var months int32
 	var status string
 	var paid *time.Time
-	err := r.Scan(&o.ID, &o.Kind, &o.StorageMB, &months, &o.UserID, &o.CourseID, &o.LessonID, &o.BookID, &o.TeacherID,
+	err := r.Scan(&o.ID, &o.Kind, &o.StorageMB, &months, &o.UserID, &o.CourseID, &o.LessonID, &o.BookID, &o.MeetingID, &o.TeacherID,
 		&o.Title, &o.Amount, &status, &o.CreatedAt, &paid, &o.applied)
 	o.Months, o.Status, o.PaidAt = int(months), OrderStatus(status), paid
 	return o, err
@@ -612,8 +612,8 @@ func scanOrder(r driver.Rows) (orderRow, error) {
 
 func (c *ClickHouse) writeOrder(ctx context.Context, o *Order, applied bool) error {
 	return c.insert(ctx, "orders", []string{"id", "kind", "storage_mb", "months", "user_id", "course_id", "lesson_id", "book_id",
-		"teacher_id", "title", "amount", "status", "created_at", "paid_at", "applied", "ver"},
-		o.ID, o.Kind, o.StorageMB, int32(o.Months), o.UserID, o.CourseID, o.LessonID, o.BookID, o.TeacherID, o.Title, o.Amount,
+		"meeting_id", "teacher_id", "title", "amount", "status", "created_at", "paid_at", "applied", "ver"},
+		o.ID, o.Kind, o.StorageMB, int32(o.Months), o.UserID, o.CourseID, o.LessonID, o.BookID, o.MeetingID, o.TeacherID, o.Title, o.Amount,
 		string(o.Status), o.CreatedAt.UTC(), nullTime(o.PaidAt), applied, ver())
 }
 
@@ -747,6 +747,10 @@ func (c *ClickHouse) MarkOrderPaid(ctx context.Context, orderID string, amount i
 		}
 	case OrderKindBook:
 		if err := c.grantBook(ctx, o.UserID, o.BookID, o.Amount); err != nil {
+			return nil, err
+		}
+	case OrderKindMeeting:
+		if err := c.grantMeeting(ctx, &o); err != nil {
 			return nil, err
 		}
 	default:

@@ -93,8 +93,8 @@ func (s *Server) handleMeetDisconnect(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// createMeet нь багшийн нэрийн өмнөөс Meet үүсгэж хадгална.
-func (s *Server) createMeet(ctx context.Context, teacherID, courseID, title string, start time.Time, durMin int) (*store.Meeting, error) {
+// createMeet нь багшийн нэрийн өмнөөс Meet үүсгэж хадгална. price > 0 бол төлбөртэй шууд хичээл.
+func (s *Server) createMeet(ctx context.Context, teacherID, courseID, title string, start time.Time, durMin int, price int64, membersFree bool) (*store.Meeting, error) {
 	u, err := s.store.UserByID(ctx, teacherID)
 	if err != nil {
 		return nil, err
@@ -111,7 +111,7 @@ func (s *Server) createMeet(ctx context.Context, teacherID, courseID, title stri
 		return nil, err
 	}
 	m := &store.Meeting{TeacherID: teacherID, CourseID: courseID, Title: title, StartsAt: start, DurationMin: durMin,
-		MeetURL: mt.MeetURL, EventID: mt.EventID}
+		MeetURL: mt.MeetURL, EventID: mt.EventID, Price: price, MembersFree: membersFree}
 	return m, s.store.CreateMeeting(ctx, m)
 }
 
@@ -125,7 +125,34 @@ func (s *Server) meetErr(w http.ResponseWriter, r *http.Request, err error) {
 	}
 }
 
-// handleCreateMeeting: {title, starts_at (RFC3339), duration_min, course_id?}
+// meetingPriceErr — шууд хичээлийн үнийн шалгалт. Төлбөртэй бол сургалттай холбоотой байх ёстой
+// (суралцагчид сургалтын хуудаснаас худалдаж авна).
+func meetingPriceErr(price int64, courseID string) string {
+	switch {
+	case price < 0 || price > maxPrice:
+		return "үнэ 0-100,000,000₮"
+	case price > 0 && courseID == "":
+		return "төлбөртэй шууд хичээлийг сургалттай холбоно уу — суралцагчид сургалтын хуудаснаас худалдаж авна"
+	}
+	return ""
+}
+
+// meetingOpen — Meet холбоосыг харах (нэгдэх) эрх. Багш үргэлж; төлбөртэй бол худалдаж авсан
+// (эсвэл "элссэн хүнд үнэгүй" үед элссэн) хүн; үнэгүй бол сургалтын дүрэм: үнэгүй нийтлэгдсэн
+// сургалт эсвэл элссэн хүн.
+func meetingOpen(m *store.Meeting, course *store.Course, uid string, enrolled bool, bought map[string]bool) bool {
+	switch {
+	case uid != "" && uid == m.TeacherID:
+		return true
+	case m.Price > 0:
+		return uid != "" && (bought[m.ID] || (m.MembersFree && enrolled))
+	case course == nil:
+		return false
+	}
+	return (course.Price == 0 && course.Published) || enrolled
+}
+
+// handleCreateMeeting: {title, starts_at (RFC3339), duration_min, course_id?, price?, members_free?}
 func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireTeacher(w, r)
 	if !ok || !s.meetEnabled(w) {
@@ -136,11 +163,17 @@ func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
 		StartsAt    time.Time `json:"starts_at"`
 		DurationMin int       `json:"duration_min"`
 		CourseID    string    `json:"course_id"`
+		Price       int64     `json:"price"`
+		MembersFree bool      `json:"members_free"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
 	in.Title = strings.TrimSpace(in.Title)
+	if msg := meetingPriceErr(in.Price, in.CourseID); msg != "" {
+		writeErr(w, http.StatusBadRequest, msg)
+		return
+	}
 	switch {
 	case in.Title == "" || utf8.RuneCountInString(in.Title) > 200:
 		writeErr(w, http.StatusBadRequest, "гарчиг 1-200 тэмдэгт")
@@ -162,7 +195,7 @@ func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	m, err := s.createMeet(r.Context(), c.UID, in.CourseID, in.Title, in.StartsAt, in.DurationMin)
+	m, err := s.createMeet(r.Context(), c.UID, in.CourseID, in.Title, in.StartsAt, in.DurationMin, in.Price, in.MembersFree)
 	if err != nil {
 		s.meetErr(w, r, err)
 		return
@@ -182,7 +215,81 @@ func (s *Server) handleMyMeetings(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
+	if buyers, err := s.store.MeetingBuyers(r.Context(), c.UID); err == nil {
+		for i := range ms {
+			ms[i].Buyers = buyers[ms[i].ID]
+		}
+	}
 	writeJSON(w, http.StatusOK, ms)
+}
+
+// handleMeetingPrice: PUT /api/me/meetings/{id} {price, members_free} — багш үнийг өөрчилнө.
+// Аль хэдийн худалдаж авсан хүмүүсийн эрх хэвээр; хүлээгдэж буй захиалга дараагийн удаа шинэ үнээр.
+func (s *Server) handleMeetingPrice(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireTeacher(w, r)
+	if !ok {
+		return
+	}
+	m, err := s.store.MeetingByID(r.Context(), r.PathValue("id"))
+	if err != nil || m.TeacherID != c.UID {
+		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		return
+	}
+	var in struct {
+		Price       int64 `json:"price"`
+		MembersFree bool  `json:"members_free"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if msg := meetingPriceErr(in.Price, m.CourseID); msg != "" {
+		writeErr(w, http.StatusBadRequest, msg)
+		return
+	}
+	if err := s.store.SetMeetingPrice(r.Context(), m.ID, in.Price, in.MembersFree); s.storeErr(w, r, err) {
+		return
+	}
+	m.Price, m.MembersFree = in.Price, in.MembersFree
+	s.profiles.Delete(c.Name) // профайл дээрх үнэ шууд шинэчлэгдэнэ
+	writeJSON(w, http.StatusOK, m)
+}
+
+// handleBuyMeeting: POST /api/meetings/{id}/buy — төлбөртэй шууд хичээлд бүртгүүлэх захиалга.
+func (s *Server) handleBuyMeeting(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	m, err := s.store.MeetingByID(r.Context(), r.PathValue("id"))
+	if err != nil || m.CourseID == "" {
+		writeErr(w, http.StatusNotFound, "шууд хичээл олдсонгүй")
+		return
+	}
+	course, err := s.store.CourseByID(r.Context(), m.CourseID)
+	if err != nil || (!course.Published && course.TeacherID != c.UID) {
+		writeErr(w, http.StatusNotFound, "шууд хичээл олдсонгүй")
+		return
+	}
+	enrolled, _ := s.store.IsEnrolled(r.Context(), c.UID, course.ID)
+	bought, _ := s.store.MeetingAccess(r.Context(), c.UID)
+	if meetingOpen(m, course, c.UID, enrolled, bought) {
+		writeJSON(w, http.StatusOK, map[string]any{"unlocked": true, "meet_url": m.MeetURL})
+		return
+	}
+	switch {
+	case m.Price <= 0:
+		writeErr(w, http.StatusBadRequest, "энэ шууд хичээлд сургалтад элссэн суралцагчид нэгдэнэ")
+		return
+	case m.StartsAt.Add(time.Duration(m.DurationMin) * time.Minute).Before(time.Now()):
+		writeErr(w, http.StatusGone, "шууд хичээл дууссан байна")
+		return
+	}
+	o, err := s.store.CreateOrGetPendingMeetingOrder(r.Context(), c.UID, m, "Шууд хичээл: "+m.Title+" ("+course.Title+")")
+	if s.storeErr(w, r, err) {
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"unlocked": false, "order": o,
+		"payment": map[string]any{"amount": o.Amount, "currency": "MNT", "dev_pay": s.cfg.DevPayments}})
 }
 
 // handleCourseMeetings: товлосон шууд хичээлүүд. Meet холбоос зөвхөн элссэн/багш/үнэгүй сургалтад.
@@ -195,23 +302,31 @@ func (s *Server) handleCourseMeetings(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	access := course.Price == 0 && course.Published
-	if c, ok := s.principal(r); ok && !c.IsGuest() && !access {
-		access = c.UID == course.TeacherID
-		if !access {
-			access, _ = s.store.IsEnrolled(r.Context(), c.UID, course.ID)
-		}
+	uid, enrolled, bought := "", false, map[string]bool{}
+	if c, ok := s.principal(r); ok && !c.IsGuest() {
+		uid = c.UID
+		enrolled, _ = s.store.IsEnrolled(r.Context(), uid, course.ID)
+		bought, _ = s.store.MeetingAccess(r.Context(), uid)
 	}
+	access := uid == course.TeacherID || (course.Price == 0 && course.Published) || enrolled // сургалтын (үнэгүй) шууд хичээлд
 	if !course.Published && !access {
 		writeErr(w, http.StatusNotFound, "олдсонгүй")
 		return
 	}
-	if !access {
-		for i := range ms {
+	type courseMeeting struct {
+		store.Meeting
+		Access bool `json:"access"` // энэ хүн нэгдэх эрхтэй (холбоос харагдана)
+		Bought bool `json:"bought,omitempty"`
+	}
+	out := make([]courseMeeting, len(ms))
+	for i := range ms {
+		open := meetingOpen(&ms[i], course, uid, enrolled, bought)
+		if !open {
 			ms[i].MeetURL = ""
 		}
+		out[i] = courseMeeting{Meeting: ms[i], Access: open, Bought: bought[ms[i].ID]}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"meetings": ms, "access": access})
+	writeJSON(w, http.StatusOK, map[string]any{"meetings": out, "access": access})
 }
 
 // handleChatMeet: багш чатаас нэг товчоор Meet үүсгэж, холбоосыг ярианд автоматаар илгээнэ.
@@ -224,7 +339,7 @@ func (s *Server) handleChatMeet(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, "зөвхөн багш Meet үүсгэнэ")
 		return
 	}
-	m, err := s.createMeet(r.Context(), conv.TeacherID, "", "Уулзалт: "+conv.VisitorName, time.Now(), 60)
+	m, err := s.createMeet(r.Context(), conv.TeacherID, "", "Уулзалт: "+conv.VisitorName, time.Now(), 60, 0, false)
 	if err != nil {
 		s.meetErr(w, r, err)
 		return

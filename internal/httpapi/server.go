@@ -199,6 +199,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /auth/google-meet/callback", s.handleMeetCallback)
 	mux.HandleFunc("GET /api/me/meetings", s.handleMyMeetings)
 	mux.HandleFunc("POST /api/me/meetings", s.handleCreateMeeting)
+	mux.HandleFunc("PUT /api/me/meetings/{id}", s.handleMeetingPrice)
+	mux.HandleFunc("POST /api/meetings/{id}/buy", s.handleBuyMeeting)
 	mux.HandleFunc("GET /api/courses/{id}/meetings", s.handleCourseMeetings)
 	mux.HandleFunc("POST /api/chat/{id}/meet", s.handleChatMeet)
 

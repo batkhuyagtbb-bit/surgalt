@@ -91,9 +91,9 @@
           <span class="composer-input">Шинэ сургалт, хичээл нэмэх…</span><span class="btn btn-gold btn-sm">{{icon "plus" 16}}Нэмэх</span></a>
 
         {{if .D.Meetings}}{{with index .D.Meetings 0}}
-        <a class="card pf-next" href="/c/{{.CourseID}}"><span class="item-ico">{{icon "live" 20}}</span>
+        <a class="card pf-next" href="/c/{{.CourseID}}#meet={{.ID}}"><span class="item-ico">{{icon "live" 20}}</span>
           <span class="grow"><span class="eyebrow">Удахгүй шууд хичээл</span><strong>{{.Title}}</strong><small class="muted"><time datetime="{{rfc .StartsAt}}" data-dt>{{.StartsAt.Format "01/02 15:04"}}</time> · {{.DurationMin}} мин · {{.CourseTitle}}</small></span>
-          <span class="chip chip-gold">Сургалт руу</span></a>
+          {{if .Price}}<span class="chip chip-amber">{{money .Price}}</span>{{else}}<span class="chip chip-gold">Сургалт руу</span>{{end}}</a>
         {{end}}{{end}}
 
         {{if .D.Courses}}
@@ -157,12 +157,12 @@
         {{if .D.Meetings}}
         <div class="meet-list">
           {{range .D.Meetings}}
-          <a class="meet-item" href="/c/{{.CourseID}}"><time datetime="{{rfc .StartsAt}}" data-dt>{{.StartsAt.Format "01/02 15:04"}}</time>
+          <a class="meet-item" href="/c/{{.CourseID}}#meet={{.ID}}"><time datetime="{{rfc .StartsAt}}" data-dt>{{.StartsAt.Format "01/02 15:04"}}</time>
             <span class="grow"><strong>{{.Title}}</strong> · {{.DurationMin}} мин<br><span class="muted small">{{.CourseTitle}}</span></span>
-            <span class="chip chip-gold">Сургалт руу</span></a>
+            {{if .Price}}<span class="chip chip-amber">{{money .Price}}</span>{{else}}<span class="chip chip-gold">Сургалт руу</span>{{end}}</a>
           {{end}}
         </div>
-        <p class="muted small">Сургалтад элссэн суралцагчид Google Meet-ээр нэгдэнэ.</p>
+        <p class="muted small">Үнэгүй шууд хичээлд сургалтад элссэн суралцагчид, төлбөртэйд худалдаж авсан хүн Google Meet-ээр нэгдэнэ.</p>
         {{else}}
         <div class="empty">Одоогоор товлосон шууд хичээл алга</div>
         {{end}}

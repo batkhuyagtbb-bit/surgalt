@@ -2369,3 +2369,6 @@ html.has-rail.rail-collapsed .rail-tab .rail-tab-dot{background:var(--accent);bo
 .course-rank .cr-bad{color:var(--coral)}
 .lesson-rank{background:var(--brand-soft);color:var(--brand)}
 .lesson-rank.high{background:var(--teal-soft);color:var(--teal)}
+/* Төлбөртэй шууд хичээл: холбоосоор ирэхэд тухайн мөрийг тодруулна */
+.meet-item .chip{margin-left:6px;vertical-align:1px}
+.meet-item.meet-focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}

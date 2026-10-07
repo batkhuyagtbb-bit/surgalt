@@ -82,8 +82,14 @@ type Meeting struct {
 	StartsAt    time.Time `json:"starts_at"`
 	DurationMin int       `json:"duration_min"`
 	MeetURL     string    `json:"meet_url,omitempty"`
+	// Price — шууд хичээлийн үнэ (₮). 0 = үнэгүй (сургалтын дүрмээр: үнэгүй сургалт эсвэл элссэн хүн);
+	// >0 бол багц биш, тусдаа худалдаж авсан хүн л Meet холбоос харна.
+	Price int64 `json:"price"`
+	// MembersFree — төлбөртэй ч сургалтад элссэн (багц авсан) суралцагчдад үнэгүй.
+	MembersFree bool      `json:"members_free,omitempty"`
 	EventID     string    `json:"-"`
 	CreatedAt   time.Time `json:"created_at"`
+	Buyers      int       `json:"buyers,omitempty"` // зөвхөн багшид: худалдаж авсан хүний тоо (хадгалагдахгүй)
 }
 
 // StorageQuota нь үнэгүй хэмжээ + хүчинтэй худалдан авсан багтаамж.
@@ -342,6 +348,7 @@ const (
 	OrderKindStorage = "storage" // файлын сангийн багтаамж
 	OrderKindLate    = "late"    // хугацаа хоцорсон шалгалт/даалгаврын төлбөр (late_pass + fee_pass)
 	OrderKindFee     = "fee"     // шалгалт/даалгаврын оролцооны төлбөр (fee_pass)
+	OrderKindMeeting = "meeting" // төлбөртэй шууд хичээл (Google Meet)
 )
 
 // StorageMonth — багтаамжийн нэг сарын үргэлжлэх хугацаа.
@@ -356,6 +363,7 @@ type Order struct {
 	CourseID  string      `json:"course_id,omitempty"`
 	LessonID  string      `json:"lesson_id,omitempty"`
 	BookID    string      `json:"book_id,omitempty"`
+	MeetingID string      `json:"meeting_id,omitempty"`
 	TeacherID string      `json:"teacher_id,omitempty"`
 	Title     string      `json:"title,omitempty"`
 	Amount    int64       `json:"amount"`
@@ -494,6 +502,15 @@ type Store interface {
 	Notifications(ctx context.Context, userID string, limit int) ([]Notification, int64, error)
 	MarkNotificationsRead(ctx context.Context, userID string) error
 	CreateMeeting(ctx context.Context, m *Meeting) error
+	MeetingByID(ctx context.Context, id string) (*Meeting, error)
+	// SetMeetingPrice — шууд хичээлийн үнэ, элссэн хүнд үнэгүй эсэхийг өөрчилнө.
+	SetMeetingPrice(ctx context.Context, id string, price int64, membersFree bool) error
+	// CreateOrGetPendingMeetingOrder — хэрэглэгч+шууд хичээл дээр хүлээгдэж буй нэг л захиалга.
+	CreateOrGetPendingMeetingOrder(ctx context.Context, userID string, m *Meeting, title string) (*Order, error)
+	// MeetingAccess — хэрэглэгчийн худалдаж авсан шууд хичээлүүд (id → true).
+	MeetingAccess(ctx context.Context, userID string) (map[string]bool, error)
+	// MeetingBuyers — багшийн шууд хичээл бүрийг худалдаж авсан хүний тоо.
+	MeetingBuyers(ctx context.Context, teacherID string) (map[string]int, error)
 	// Meetings нь from-оос хойшхи уулзалтууд (courseID хоосон бол багшийн бүх).
 	Meetings(ctx context.Context, teacherID, courseID string, from time.Time, limit int) ([]Meeting, error)
 	// Гадаад нэвтрэлт (Google, Facebook ...): provider+subject -> хэрэглэгч.

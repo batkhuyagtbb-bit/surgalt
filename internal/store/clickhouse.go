@@ -157,6 +157,9 @@ var chMigrations = []string{
 	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS max_warnings Int32 DEFAULT 0",
 	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS block_hours Int32 DEFAULT 0",
 	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS block_minutes Int32 DEFAULT 0",
+	"ALTER TABLE meetings ADD COLUMN IF NOT EXISTS price Int64 DEFAULT 0",
+	"ALTER TABLE meetings ADD COLUMN IF NOT EXISTS members_free Bool DEFAULT false",
+	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS meeting_id String DEFAULT ''",
 }
 
 var chTables = []chTable{
@@ -182,7 +185,8 @@ var chTables = []chTable{
 	{"notification_reads", `(user_id String, upto String, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY user_id`},
 	{"meetings", `(id String, teacher_id String, course_id String, title String, starts_at ` + tsType + `,
-		duration_min Int32, meet_url String, event_id String, created_at ` + tsType + `, ver UInt64,
+		duration_min Int32, meet_url String, event_id String, created_at ` + tsType + `, price Int64 DEFAULT 0,
+		members_free Bool DEFAULT false, ver UInt64,
 		INDEX ix_teacher teacher_id TYPE bloom_filter GRANULARITY 1)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
 	{"courses", `(id String, teacher_id String, title String, description String, price Int64,
@@ -214,7 +218,7 @@ var chTables = []chTable{
 		created_at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, lesson_id)`},
 	{"orders", `(id String, kind String, storage_mb Int64, months Int32, user_id String, course_id String,
-		lesson_id String, book_id String, teacher_id String, title String, amount Int64, status String,
+		lesson_id String, book_id String, meeting_id String DEFAULT '', teacher_id String, title String, amount Int64, status String,
 		created_at ` + tsType + `, paid_at Nullable(` + tsType + `), applied Bool DEFAULT false, ver UInt64,
 		INDEX ix_user user_id TYPE bloom_filter GRANULARITY 1,
 		INDEX ix_teacher teacher_id TYPE bloom_filter GRANULARITY 1)
@@ -273,6 +277,9 @@ var chTables = []chTable{
 	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
 	{"book_access", `(user_id String, book_id String, created_at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, book_id)`},
+	{"meeting_access", `(user_id String, meeting_id String, course_id String, teacher_id String, created_at ` + tsType + `, ver UInt64,
+		INDEX ix_teacher teacher_id TYPE bloom_filter GRANULARITY 1)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, meeting_id)`},
 	{"book_events", `(id String, book_id String, teacher_id String, user_id String, user_name String,
 		type String, detail String, ip String, at ` + tsType + `)
 	ENGINE = MergeTree ORDER BY (teacher_id, at, id)`},
@@ -684,20 +691,89 @@ func (c *ClickHouse) MarkNotificationsRead(ctx context.Context, userID string) e
 
 // ---- уулзалт ----
 
-const meetingCols = "id, teacher_id, course_id, title, starts_at, duration_min, meet_url, event_id, created_at"
+const meetingCols = "id, teacher_id, course_id, title, starts_at, duration_min, meet_url, event_id, created_at, price, members_free"
 
 func scanMeeting(r driver.Rows) (Meeting, error) {
 	var m Meeting
 	var dur int32
-	err := r.Scan(&m.ID, &m.TeacherID, &m.CourseID, &m.Title, &m.StartsAt, &dur, &m.MeetURL, &m.EventID, &m.CreatedAt)
+	err := r.Scan(&m.ID, &m.TeacherID, &m.CourseID, &m.Title, &m.StartsAt, &dur, &m.MeetURL, &m.EventID, &m.CreatedAt, &m.Price, &m.MembersFree)
 	m.DurationMin = int(dur)
 	return m, err
 }
 
+func (c *ClickHouse) writeMeeting(ctx context.Context, m *Meeting) error {
+	return c.insert(ctx, "meetings", []string{"id", "teacher_id", "course_id", "title", "starts_at", "duration_min", "meet_url", "event_id", "created_at", "price", "members_free", "ver"},
+		m.ID, m.TeacherID, m.CourseID, m.Title, m.StartsAt.UTC(), int32(m.DurationMin), m.MeetURL, m.EventID, m.CreatedAt.UTC(), m.Price, m.MembersFree, ver())
+}
+
 func (c *ClickHouse) CreateMeeting(ctx context.Context, m *Meeting) error {
 	m.ID, m.CreatedAt = NewID(), time.Now()
-	return c.insert(ctx, "meetings", []string{"id", "teacher_id", "course_id", "title", "starts_at", "duration_min", "meet_url", "event_id", "created_at", "ver"},
-		m.ID, m.TeacherID, m.CourseID, m.Title, m.StartsAt.UTC(), int32(m.DurationMin), m.MeetURL, m.EventID, m.CreatedAt.UTC(), ver())
+	return c.writeMeeting(ctx, m)
+}
+
+func (c *ClickHouse) MeetingByID(ctx context.Context, id string) (*Meeting, error) {
+	var out *Meeting
+	err := c.query(ctx, "SELECT "+meetingCols+" FROM meetings FINAL WHERE id = ? LIMIT 1", []any{id}, func(r driver.Rows) error {
+		m, err := scanMeeting(r)
+		out = &m
+		return err
+	})
+	if err == nil && out == nil {
+		err = ErrNotFound
+	}
+	return out, err
+}
+
+func (c *ClickHouse) SetMeetingPrice(ctx context.Context, id string, price int64, membersFree bool) error {
+	unlock, err := c.lock(ctx, "meeting:"+id)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	m, err := c.MeetingByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	m.Price, m.MembersFree = price, membersFree
+	return c.writeMeeting(ctx, m)
+}
+
+func (c *ClickHouse) CreateOrGetPendingMeetingOrder(ctx context.Context, userID string, m *Meeting, title string) (*Order, error) {
+	return c.pendingOrder(ctx, userID+":m:"+m.ID, "user_id = ? AND meeting_id = ? AND kind = ?", []any{userID, m.ID, OrderKindMeeting},
+		&Order{Kind: OrderKindMeeting, Title: title, UserID: userID, CourseID: m.CourseID, MeetingID: m.ID, TeacherID: m.TeacherID, Amount: m.Price})
+}
+
+// grantMeeting — захиалга төлөгдөхөд шууд хичээлд нэгдэх эрх (MarkOrderPaid-ийн түгжээн дотор, нэг л удаа).
+func (c *ClickHouse) grantMeeting(ctx context.Context, o *Order) error {
+	return c.insert(ctx, "meeting_access", []string{"user_id", "meeting_id", "course_id", "teacher_id", "created_at", "ver"},
+		o.UserID, o.MeetingID, o.CourseID, o.TeacherID, time.Now().UTC(), ver())
+}
+
+func (c *ClickHouse) MeetingAccess(ctx context.Context, userID string) (map[string]bool, error) {
+	out := map[string]bool{}
+	err := c.query(ctx, "SELECT meeting_id FROM meeting_access FINAL WHERE user_id = ?", []any{userID}, func(r driver.Rows) error {
+		var id string
+		if err := r.Scan(&id); err != nil {
+			return err
+		}
+		out[id] = true
+		return nil
+	})
+	return out, err
+}
+
+func (c *ClickHouse) MeetingBuyers(ctx context.Context, teacherID string) (map[string]int, error) {
+	out := map[string]int{}
+	err := c.query(ctx, "SELECT meeting_id, toInt64(count()) FROM meeting_access FINAL WHERE teacher_id = ? GROUP BY meeting_id", []any{teacherID}, func(r driver.Rows) error {
+		var id string
+		var n int64
+		if err := r.Scan(&id, &n); err != nil {
+			return err
+		}
+		out[id] = int(n)
+		return nil
+	})
+	return out, err
 }
 
 func (c *ClickHouse) Meetings(ctx context.Context, teacherID, courseID string, from time.Time, limit int) ([]Meeting, error) {
