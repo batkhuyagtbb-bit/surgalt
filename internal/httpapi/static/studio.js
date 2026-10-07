@@ -753,7 +753,7 @@ async function courseEditor(id) {
           <p class="muted">${ico(c.published ? "globe" : "lock", 15)}${c.published ? "Нийтлэгдсэн сургалт" : "Ноорог — зөвхөн танд харагдана"} · <b>${roster.length}</b> суралцагч · <b>${lessons.length}</b> хичээл · <b>${free()}</b> үнэгүй · <b>${c.views || 0}</b> үзэлт</p></div>
           <div class="hero-cta" style="margin:0">${c.published ? `<a class="btn btn-glass" href="/c/${esc(c.id)}" target="_blank" rel="noopener">${ico("ext", 18)}Харах</a>` : `<button class="btn btn-gold" id="gpPublish">${ico("globe", 18)}Нийтлэх</button>`}
           <button class="btn btn-glass" id="gpSettings">${ico("gear", 18)}Тохиргоо</button></div></div></section>
-      <div class="gp-body">
+      <div class="gp-body ${view === "journal" ? "gp-wide" : ""}">
         <div class="gp-feed">
           <section class="card composer-box" id="composer">
             <button class="composer" id="composerOpen">${avatar(me, "avatar-sm")}<span class="composer-input">Шинэ хичээл нийтлэх…</span></button>
@@ -761,8 +761,9 @@ async function courseEditor(id) {
             <div id="composerBody" hidden>${editorHTML(null)}</div></section>
           ${lessons.length || pending.length ? `<div class="view-tabs" role="tablist">
             <button role="tab" data-view="outline" aria-selected="${view === "outline"}">${ico("list", 16)}Хөтөлбөр</button>
-            <button role="tab" data-view="posts" aria-selected="${view === "posts"}">${ico("book", 16)}Нийтлэлүүд</button></div>` : ""}
-          <div id="gpView">${view === "outline" && (lessons.length || pending.length) ? outlineHTML() : feedHTML()}</div>
+            <button role="tab" data-view="posts" aria-selected="${view === "posts"}">${ico("book", 16)}Нийтлэлүүд</button>
+            <button role="tab" data-view="journal" aria-selected="${view === "journal"}">${ico("users", 16)}Журнал</button></div>` : ""}
+          <div id="gpView">${view === "journal" && lessons.length ? `<div class="jr" id="journal"><div class="loader"></div></div>` : view === "outline" && (lessons.length || pending.length) ? outlineHTML() : feedHTML()}</div>
         </div>
         <aside class="gp-side">
           <section class="card"><div class="card-head"><h2>Тухай</h2><button class="icon-btn" id="gpSettings2" aria-label="Сургалтын тохиргоо">${ico("edit", 18)}</button></div>
@@ -784,6 +785,85 @@ async function courseEditor(id) {
         <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`;
     hydrateBooks(main);
     const cf = $("#composerForm"); if (cf) mountBlockEditor(cf, lessonBlocks(null));
+    if (view === "journal" && $("#journal")) loadJournal();
+  };
+
+  /* ---------- Журнал: суралцагч × хичээл (сургуулийн журнал шиг) — нүд, нэр дээр дарахад дэлгэрэнгүй ---------- */
+  let jr = null;
+  const dur2 = (s) => !s ? "0" : s < 60 ? s + " сек" : s < 3600 ? Math.round(s / 60) + " мин" : Math.floor(s / 3600) + " ц " + Math.round((s % 3600) / 60) + " мин";
+  const jrCell = (l, x) => { // нүдний текст, ангилал
+    if (!x) return ["", ""];
+    if (l.kind === "exam" && x.exam) return [x.exam.best >= 0 ? x.exam.best + "%" : "—", x.exam.passed ? "ok" : "bad"];
+    if (l.kind === "assignment" && x.asg) return [x.asg.score != null ? String(x.asg.score) : "✓", x.asg.score != null ? (x.asg.score >= x.asg.max * 0.6 ? "ok" : "bad") : "wait"];
+    if (x.disq) return ["⛔", "disq"];
+    if (x.viewed) return [String(x.pts), x.done ? "ok" : "part"];
+    return ["", ""];
+  };
+  const loadJournal = async () => {
+    const box = $("#journal"); if (!box) return;
+    try { jr = await api(`/api/me/courses/${c.id}/journal`); } catch (e) { box.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
+    drawJournal();
+  };
+  const drawJournal = (q = "") => {
+    const box = $("#journal"); if (!box || !jr) return;
+    const L = jr.lessons, S = jr.students.filter((s) => !q || s.name.toLowerCase().includes(q.toLowerCase())), C = jr.cells;
+    const secs = []; for (const l of L) { const k = l.section || ""; const last = secs[secs.length - 1]; if (last && last.name === k) last.n++; else secs.push({ name: k, n: 1 }); }
+    const hasSecs = secs.some((x) => x.name);
+    const head = `<thead>${hasSecs ? `<tr class="jr-secs"><th class="jr-name" rowspan="2">Суралцагч</th>${secs.map((x) => `<th colspan="${x.n}" title="${esc(x.name || "Бүлэггүй")}">${esc(x.name || "—")}</th>`).join("")}<th rowspan="2">Дууссан</th><th rowspan="2">Дундаж</th><th rowspan="2">Цол</th></tr>` : ""}
+      <tr>${hasSecs ? "" : `<th class="jr-name">Суралцагч</th>`}${L.map((l) => `<th class="jr-l ${l.hidden ? "is-hidden" : ""}" title="${esc(l.title)}${l.hidden ? " (хаалттай)" : ""}">${String(l.position).padStart(2, "0")}${l.kind === "exam" ? "<i>📝</i>" : l.kind === "assignment" ? "<i>📎</i>" : ""}</th>`).join("")}${hasSecs ? "" : "<th>Дууссан</th><th>Дундаж</th><th>Цол</th>"}</tr></thead>`;
+    const body = S.map((s) => `<tr data-uid="${esc(s.user_id)}"><th class="jr-name" data-jr-student><span class="jr-who">${esc(s.name)}</span><small>${s.enrolled ? (s.username ? "@" + esc(s.username) : "") : "элсээгүй · үнэгүй хичээл"}</small></th>
+      ${L.map((l) => { const [t, k] = jrCell(l, C[s.user_id]?.[l.id]); return `<td class="jr-c ${k}" data-lid="${esc(l.id)}">${t}</td>`; }).join("")}
+      <td class="jr-sum">${s.done}/${L.filter((l) => !l.hidden).length}</td><td class="jr-sum">${s.avg || "—"}</td><td class="jr-rank" title="${s.rank.points} оноо">${esc(s.rank.insignia || "")} ${esc(s.rank.name)}</td></tr>`).join("");
+    const foot = `<tfoot><tr><th class="jr-name">Дууссан</th>${L.map((l) => { const n = S.filter((s) => { const x = C[s.user_id]?.[l.id]; return l.kind === "exam" ? x?.exam?.passed : l.kind === "assignment" ? x?.asg : x?.done; }).length; return `<td>${S.length ? n + "/" + S.length : ""}</td>`; }).join("")}<td colspan="3"></td></tr></tfoot>`;
+    box.innerHTML = `<div class="jr-head"><div><h2>Журнал</h2><span class="muted small">${jr.students.length} суралцагч · ${L.length} хичээл · нүд дээр дарж дэлгэрэнгүйг харна</span></div>
+        <label class="rail-search jr-search">${ico("search", 15)}<input type="search" placeholder="Нэрээр шүүх…" value="${esc(q)}" aria-label="Нэрээр шүүх"></label>
+        <button class="btn btn-glass btn-sm" data-jr-csv>${ico("files", 15)}Excel</button></div>
+      <div class="jr-legend"><span class="jr-c ok">68</span>дууссан<span class="jr-c part">24</span>үзэж байна<span class="jr-c bad">40%</span>тэнцээгүй<span class="jr-c wait">✓</span>дүгнээгүй<span class="jr-c disq">⛔</span>хуулах оролдлого</div>
+      ${S.length ? `<div class="jr-wrap"><table class="jr-t">${head}<tbody>${body}</tbody>${foot}</table></div>` : `<div class="empty">${q ? "Хайлтад тохирох суралцагч алга." : "Одоогоор суралцагч алга."}</div>`}`;
+    const inp = $(".jr-search input", box); inp.oninput = () => { const p = inp.selectionStart; drawJournal(inp.value); const i2 = $(".jr-search input"); i2.focus(); i2.setSelectionRange(p, p); };
+  };
+  const jrCellModal = (uid, lid) => {
+    const s = jr.students.find((x) => x.user_id === uid), l = jr.lessons.find((x) => x.id === lid), x = jr.cells[uid]?.[lid] || {};
+    const rows = [];
+    rows.push(["Төлөв", x.disq ? "⛔ Хуулах оролдлого — оноо тооцогдоогүй" : x.done ? "✓ Дууссан" : x.viewed ? "Үзэж байна" : "Үзээгүй"]);
+    if (x.viewed) rows.push(["Нэгдсэн цолд нэмсэн оноо", x.disq ? "0" : "+" + x.pts]);
+    if (x.viewed) rows.push(["Идэвхтэй хугацаа", `${dur2(x.active)}${x.total ? ` (нийт ${dur2(x.total)}, ${x.sessions || 0} удаа)` : ""}`]);
+    if (x.q_n) rows.push(["Асуулга", `${x.q_ok}/${x.q_n} зөв`]);
+    if (x.has_video) rows.push(["Видео үзэлт", x.video + "%"]);
+    if (x.viewed) rows.push(["Дүгнэлт", x.refl ? "✍️ Бичсэн" : "Бичээгүй"]);
+    if (x.tabs) rows.push(["Таб солилт", x.tabs + " удаа"]);
+    if (x.exam) rows.push(["Шалгалт", `Шилдэг ${x.exam.best}% · ${x.exam.passed ? "✓ тэнцсэн" : "тэнцээгүй"} · ${x.exam.tries} оролдлого${x.exam.terminated ? ` · ⛔ ${x.exam.terminated} хаагдсан` : ""}`]);
+    if (x.asg) rows.push(["Даалгавар", `${x.asg.score != null ? `Дүн ${x.asg.score}/${x.asg.max}` : "Илгээсэн — дүгнээгүй"}${x.asg.late ? " · хоцорсон" : ""} · ${fmtDate(x.asg.at)}${x.asg.feedback ? ` · «${esc(x.asg.feedback)}»` : ""}`]);
+    if (x.last) rows.push(["Сүүлд", fmtDate(x.last)]);
+    jrModal(`<span class="eyebrow">${String(l.position).padStart(2, "0")} · ${esc(l.title)}</span><h3 class="h3">${esc(s.name)}</h3>
+      <dl class="jr-dl">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
+      ${x.reasons?.length ? `<p class="muted small" style="margin:10px 0 0">Үндэслэл: ${x.reasons.map(esc).join(", ")}</p>` : ""}
+      ${l.kind === "assignment" && x.asg ? `<div class="hero-cta" style="margin:14px 0 0"><button class="btn btn-gold btn-sm" data-jr-grade="${esc(l.id)}">${ico("users", 15)}Дүгнэх</button></div>` : ""}`);
+  };
+  const jrStudentModal = (uid) => {
+    const s = jr.students.find((x) => x.user_id === uid), row = jr.cells[uid] || {};
+    jrModal(`<span class="eyebrow">Суралцагч</span><h3 class="h3">${esc(s.name)}</h3>
+      <div class="an-tiles"><div class="an-tile"><small>Цол</small><b>${esc(s.rank.insignia || "")} ${esc(s.rank.name)}</b><span class="muted small">${s.rank.points} оноо</span></div>
+        <div class="an-tile"><small>Дууссан</small><b>${s.done}/${jr.lessons.filter((l) => !l.hidden).length}</b></div>
+        <div class="an-tile"><small>Дундаж оноо</small><b>${s.avg || "—"}</b></div>
+        <div class="an-tile"><small>Идэвхтэй</small><b>${dur2(s.active)}</b>${s.last ? `<span class="muted small">сүүлд ${fmtDate(s.last)}</span>` : ""}</div></div>
+      <table class="tbl"><thead><tr><th>Хичээл</th><th>Төлөв</th><th>Оноо / дүн</th></tr></thead><tbody>${jr.lessons.map((l) => { const x = row[l.id], [t, k] = jrCell(l, x);
+        return `<tr><td>${String(l.position).padStart(2, "0")} · ${esc(l.title)}</td><td>${!x ? `<span class="muted">Үзээгүй</span>` : x.disq ? "⛔ Хуулах оролдлого" : x.done || x.exam?.passed ? "✓ Дууссан" : x.asg ? "Илгээсэн" : "Үзэж байна"}</td><td><span class="jr-c ${k}">${t || "—"}</span></td></tr>`; }).join("")}</tbody></table>`);
+  };
+  const jrModal = (html) => {
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="jrModal"><div class="modal-card" style="width:min(640px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}</div></div>`);
+    const m = $("#jrModal"); SG.openModal(m);
+    m.addEventListener("click", (e) => {
+      const g = e.target.closest("[data-jr-grade]"); if (g) { SG.closeModal(m); setTimeout(() => m.remove(), 300); return gradeModal(g.dataset.jrGrade); }
+      if (e.target === m || e.target.closest("[data-close]")) { SG.closeModal(m); setTimeout(() => m.remove(), 300); }
+    });
+  };
+  const jrCSV = () => {
+    const L = jr.lessons, cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [["Суралцагч", ...L.map((l) => `${String(l.position).padStart(2, "0")} ${l.title}`), "Дууссан", "Дундаж", "Цол", "Оноо"].map(cell).join(",")];
+    for (const s of jr.students) lines.push([s.name, ...L.map((l) => jrCell(l, jr.cells[s.user_id]?.[l.id])[0]), `${s.done}/${L.filter((l) => !l.hidden).length}`, s.avg || "", s.rank.name, s.rank.points].map(cell).join(","));
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
+    a.download = `zhurnal-${c.title.replace(/[\\/:*?"<>|]+/g, "_")}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   };
 
   // Даалгаврын хариунууд: багш оноо, тайлбар өгнө.
@@ -943,6 +1023,12 @@ async function courseEditor(id) {
     const sec = t.closest(".sec, .ol-sec");
     if (t.closest("[data-sec-add]") && sec) return kindMenu(t.closest("[data-sec-add]"), sec.dataset.sec);
     if (t.closest("[data-grade]")) { const lid = t.closest("[data-lid]")?.dataset.lid; if (lid) return gradeModal(lid); }
+    if (jr && t.closest("#journal")) {
+      const td = t.closest("td.jr-c[data-lid]"), nm = t.closest("[data-jr-student]");
+      if (td) return jrCellModal(td.closest("tr").dataset.uid, td.dataset.lid);
+      if (nm) return jrStudentModal(nm.closest("tr").dataset.uid);
+      if (t.closest("[data-jr-csv]")) return jrCSV();
+    }
     const tab = t.closest("[data-view]");
     if (tab) { view = tab.dataset.view; try { localStorage.setItem("sg_course_view", view); } catch {} return render(); }
     if (t.closest("#olAddSec")) {

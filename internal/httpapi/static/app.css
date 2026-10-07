@@ -2581,3 +2581,44 @@ html.dv-locked,html.dv-locked body{overflow:hidden}
 .exam-submit .btn{min-width:min(360px,100%)}
 @media (max-width:560px){.exam-nav{padding:8px 12px}.exam-nav-legend{display:none}.exam-submit .btn{width:100%}}
 @media (prefers-reduced-motion:reduce){.exam-q.q-flash{animation:none}}
+
+/* Сургалтын журнал: суралцагч × хичээл (сургуулийн журнал шиг) */
+.gp-body.gp-wide{grid-template-columns:minmax(0,1fr)}
+.gp-body.gp-wide .gp-side{display:none}
+.jr{display:grid;gap:12px;min-width:0}
+.jr-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.jr-head>div{flex:1;min-width:200px;display:grid;gap:2px}
+.jr-head h2{margin:0;font-size:1.2rem}
+.jr-search{width:min(240px,100%);margin:0}
+.jr-legend{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:.78rem;color:var(--muted)}
+.jr-legend .jr-c{display:inline-grid;place-items:center;min-width:34px;height:22px;padding:0 6px;margin-left:8px;border-radius:6px;cursor:default}
+.jr-legend .jr-c:first-child{margin-left:0}
+.jr-wrap{max-height:72vh;overflow:auto;border:1px solid var(--line);border-radius:var(--radius);background:#fff}
+.jr-t{min-width:100%;border-collapse:separate;border-spacing:0;font:500 .84rem/1.25 var(--sans);color:var(--text)}
+.jr-t th,.jr-t td{height:38px;padding:4px 6px;border-right:1px solid #e9edf4;border-bottom:1px solid #e9edf4;text-align:center;white-space:nowrap}
+.jr-t thead th{position:sticky;top:0;z-index:2;height:32px;background:#f3f5fa;color:var(--muted);font-size:.74rem;font-weight:700}
+.jr-t thead tr+tr th{top:32px}
+.jr-t thead .jr-secs th{color:var(--brand);font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.jr-t .jr-name{position:sticky;left:0;z-index:1;min-width:190px;max-width:240px;background:#fff;text-align:left;cursor:pointer;box-shadow:1px 0 0 #e3e7ef}
+.jr-t thead .jr-name,.jr-t tfoot .jr-name{z-index:3;background:#f3f5fa;cursor:default}
+.jr-name .jr-who{display:block;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.jr-name small{display:block;color:var(--muted);font-size:.72rem;font-weight:500}
+.jr-t tbody .jr-name:hover .jr-who{color:var(--brand);text-decoration:underline}
+.jr-l{min-width:46px}
+.jr-l i{margin-left:2px;font-size:.7rem;font-style:normal}
+.jr-l.is-hidden{opacity:.45}
+.jr-c{min-width:46px;font-weight:700;font-variant-numeric:tabular-nums;cursor:pointer}
+.jr-t td.jr-c:hover{box-shadow:inset 0 0 0 2px var(--brand-tint)}
+.jr-c.ok{background:var(--teal-soft);color:var(--teal)}
+.jr-c.part{background:var(--accent-soft);color:var(--accent-ink)}
+.jr-c.bad,.jr-c.disq{background:var(--coral-soft);color:var(--coral)}
+.jr-c.wait{background:var(--brand-soft);color:var(--brand)}
+.jr-sum{font-weight:700;font-variant-numeric:tabular-nums}
+.jr-t td.jr-rank{text-align:left;font-weight:700;color:var(--brand)}
+.jr-t tfoot th,.jr-t tfoot td{position:sticky;bottom:0;background:#f8f9fc;color:var(--muted);font-size:.74rem;font-weight:700}
+.jr-dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 16px;margin:12px 0 0}
+.jr-dl dt{color:var(--muted);font-size:.84rem;font-weight:600}
+.jr-dl dd{margin:0;font-weight:600}
+@media (max-width:560px){.jr-t .jr-name{min-width:130px;max-width:150px}}
+.pf.manage .gp-body.gp-wide,.gp-body.gp-wide{grid-template-columns:minmax(0,1fr)}
+.gp-body.gp-wide .composer-box{max-width:760px}

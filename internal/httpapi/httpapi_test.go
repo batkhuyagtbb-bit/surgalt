@@ -3067,3 +3067,41 @@ func TestHiddenLessons(t *testing.T) {
 		t.Fatalf("нээсний дараа 3 хичээл: %v", pc["lessons"])
 	}
 }
+
+// Сургалтын журнал: суралцагч × хичээл — оноо, дууссан, асуулга; багш өөрөө, бусад багш харагдахгүй.
+func TestCourseJournal(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Журнал","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l1 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true,"blocks":[{"id":"q001","type":"quiz","quiz":{"question":"?","options":["a","b"],"correct":[0]}}]}`)
+	_, l2 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Хоёр","is_free":true}`)
+	lid1, lid2 := l1["id"].(string), l2["id"].(string)
+	s1, uid := register(t, srv, "stud", "student")
+	call(t, srv, "POST", "/api/courses/"+cid+"/enroll", s1, "")
+	_, ss := call(t, srv, "POST", "/api/activity/start", s1, `{"course_id":"`+cid+`","lesson_id":"`+lid1+`","kind":"lesson"}`)
+	call(t, srv, "POST", "/api/activity/beat", s1, `{"session_id":"`+ss["session_id"].(string)+`","active":4}`)
+	call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lid1+"/quiz/q001", s1, `{"answer":[0],"ms":3000}`)
+	call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lid1+"/complete", s1, "")
+	t2, _ := register(t, srv, "other", "teacher")
+	if code, _ := call(t, srv, "GET", "/api/me/courses/"+cid+"/journal", t2, ""); code != 404 && code != 403 {
+		t.Fatalf("өөр багш журнал харах ёсгүй: %d", code)
+	}
+	code, j := call(t, srv, "GET", "/api/me/courses/"+cid+"/journal", tt, "")
+	if code != 200 || len(j["lessons"].([]any)) != 2 {
+		t.Fatalf("журнал: %d %v", code, j)
+	}
+	sts := j["students"].([]any)
+	if len(sts) != 1 || sts[0].(map[string]any)["user_id"] != uid || sts[0].(map[string]any)["done"].(float64) != 1 {
+		t.Fatalf("суралцагч 1 (багшгүй), 1 дууссан: %v", sts)
+	}
+	row := j["cells"].(map[string]any)[uid].(map[string]any)
+	c1 := row[lid1].(map[string]any)
+	if c1["done"] != true || c1["q_ok"].(float64) != 1 || c1["q_n"].(float64) != 1 || c1["pts"].(float64) <= 0 {
+		t.Fatalf("1-р хичээлийн нүд: %v", c1)
+	}
+	if _, ok := row[lid2]; ok {
+		t.Fatalf("үзээгүй хичээлд нүд байх ёсгүй: %v", row[lid2])
+	}
+}
