@@ -92,7 +92,7 @@ async function overview() {
   const [sales, courses, storage, meetings, home] = await Promise.all([
     api("/api/me/sales?limit=8"), api("/api/me/courses"), api("/api/me/storage"), api("/api/me/meetings").catch(() => []), api("/api/me/home")]);
   me = home.user; Auth.set(Auth.token, me);
-  const tp = home.teacher, ins = tp.insights;
+  const tp = home.teacher;
   const views = courses.reduce((n, c) => n + (c.views || 0), 0);
   const titleOf = Object.fromEntries(courses.map((c) => [c.id, c.title]));
   const now = new Date(), hr = now.getHours();
@@ -108,83 +108,79 @@ async function overview() {
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(now); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i); return d; });
   const perDay = (d) => meetings.filter((m) => dayKey(m.starts_at) === dayKey(d));
   const next = meetings[0];
-  const todo = ins.tips.filter((t) => !t.done).slice(0, 3);
-  const info = (k, v) => `<div class="info"><dt>${k}</dt><dd>${v ? esc(v) : "—"}</dd></div>`;
-  const tile = (icon, tone, id, label, sub, href) => `<a class="stat-tile" href="${href}"><span class="stat-ico ${tone}">${ico(icon)}</span><b id="${id}">0</b><strong>${label}</strong><small>${sub}</small></a>`;
+  const pct = storage.quota ? Math.round(storage.used / storage.quota * 100) : 0;
+  const kpi = (ic, id, label, sub, href) => `<a class="anx-kpi ovx-kpi" href="${href}"><span class="anx-ic">${ico(ic, 18)}</span><small>${label}</small><b id="${id}">0</b><div class="anx-sub">${sub}</div></a>`;
+  // Ухаалаг зөвлөмж: одоо байгаа өгөгдлөөс хамгийн чухал 4 алхам (ноорог, хоосон сургалт, ойрын шууд хичээл, сан, борлуулалт).
+  const soon = meetings.find((m) => new Date(m.starts_at) - now < 24 * 3600e3 && new Date(m.starts_at).getTime() + m.duration_min * 60000 > now);
+  const drafts = courses.filter((c) => !c.published), empty = courses.filter((c) => !c.lesson_count);
+  const todo = [
+    soon && { ic: "live", tone: "amber", t: `${until(soon.starts_at)} шууд хичээл`, s: `«${soon.title}» · ${fmtTime(soon.starts_at)}`, href: "#live" },
+    drafts.length && { ic: "lock", tone: "", t: `${drafts.length} сургалт ноорог хэвээр`, s: "Нийтэлбэл профайл дээр харагдаж, худалдаалагдана", href: drafts.length === 1 ? `#course=${drafts[0].id}` : "#courses" },
+    empty[0] && { ic: "plus", tone: "", t: `«${empty[0].title}» сургалтад хичээл алга`, s: "Эхний хичээлээ нийтлээрэй", href: `#course=${empty[0].id}` },
+    pct >= 80 && { ic: "files", tone: "bad", t: `Файлын сан ${pct}% дүүрсэн`, s: "Илүүдэл файлаа цэвэрлэх эсвэл багтаамж нэмэх", href: "#files" },
+    !sales.count && courses.length && { ic: "money", tone: "", t: "Анхны борлуулалтаа хүлээж байна", s: "Үнэгүй хичээл нэмж, профайлынхаа холбоосыг түгээгээрэй", href: "#courses" },
+    tp.students && { ic: "chart", tone: "", t: `${tp.students} суралцагчийн идэвх`, s: "Анхаарал, зөрчил, суралцсан оноог хянах", href: "#students" },
+  ].filter(Boolean).slice(0, 4);
 
-  main.innerHTML = `<div class="ov">
-    <div class="ov-main">
-      <section class="banner">
-        <div class="grow"><span class="banner-hi">${hello},</span><h1>${esc(me.display_name)}</h1>
-          <div class="banner-chips">
-            <span>${ico("cal", 15)}${fmtDay(now, true)}</span>
-            <span>${ico("courses", 15)}${tp.published}/${tp.courses} сургалт нийтлэгдсэн</span>
-            ${me.headline ? `<span>${ico("profile", 15)}${esc(me.headline)}</span>` : ""}
-          </div></div>
-        <div class="banner-clock"><b id="clock">--:--</b><span>${WEEKDAYS[now.getDay()]} гараг</span></div>
-      </section>
-
-      <div class="stat-tiles">
-        ${tile("money", "t-indigo", "kSum", "Нийт орлого", sales.count + " борлуулалт", "#ov-sales")}
-        ${tile("users", "t-amber", "kStu", "Суралцагч", "элссэн хүмүүс", "#students")}
-        ${tile("eye", "t-teal", "kPv", "Профайл үзэлт", "нээлттэй хуудас", "/t/" + esc(me.username))}
-        ${tile("book", "t-pink", "kCv", "Сургалт үзэлт", courses.length + " сургалт", "#courses")}
+  main.innerHTML = `<div class="ovx">
+    <section class="ovx-hero">
+      <div class="ovx-hello"><span>${hello},</span><h1>${esc(me.display_name)}</h1>
+        <p>${ico("cal", 15)}${fmtDay(now, true)} · ${WEEKDAYS[now.getDay()]} гараг<span class="ovx-dot"></span>${ico("courses", 15)}${tp.published}/${tp.courses} сургалт нийтлэгдсэн</p></div>
+      <div class="ovx-clock" aria-label="Цаг"><b id="clock">--:--</b></div>
+      <div class="ovx-quick">
+        <a class="ovx-q" href="#courses" data-quick="new-course">${ico("plus", 17)}Шинэ сургалт</a>
+        <a class="ovx-q" href="#live">${ico("live", 17)}Шууд хичээл товлох</a>
+        <a class="ovx-q" href="#students">${ico("chart", 17)}Хяналт ба статистик</a>
+        <button type="button" class="ovx-q" id="copyLink">${ico("link", 17)}Профайлын холбоос хуулах</button>
       </div>
+    </section>
 
-      ${panel(`<div class="panel-head"><h2>${ico("courses")}Миний сургалтууд</h2><a class="link" href="#courses">Бүгдийг харах ${ico("chevron", 14)}</a></div>
-        <div class="group-grid">${courses.slice(0, 6).map((c) => `
-          <a class="group" href="#course=${esc(c.id)}" style="--h:${hueOfName(c.title)}"><div class="group-art"><span class="chip">${c.published ? "Нийтлэгдсэн" : "Ноорог"}</span><b>${esc(c.title.trim()[0] || "?")}</b></div>
-          <div class="group-body"><strong>${esc(c.title)}</strong><small>${ico("book", 14)}${c.lesson_count} хичээл · ${ico("eye", 14)}${c.views || 0} · ${money(c.price)}</small></div></a>`).join("")}
-          <a class="group group-new" href="#courses">${ico("plus", 26)}<strong>Шинэ сургалт</strong></a></div>`, 1)}
-
-      <div class="ov-split">
-        ${panel(`<div class="panel-head"><h2>${ico("cal")}Шууд хичээлийн хуваарь</h2><a class="link" href="#live">Товлох ${ico("chevron", 14)}</a></div>
-          <div class="days" id="days">${days.map((d, i) => { const n = perDay(d).length; return `<button class="day ${i ? "" : "active"}" data-i="${i}"><small>${WEEKDAYS_SHORT[d.getDay()]}</small><b>${String(d.getDate()).padStart(2, "0")}</b>${n ? `<i>${n}</i>` : ""}</button>`; }).join("")}</div>
-          <div class="agenda" id="agenda"></div>`, 2)}
-        <div class="ov-stack">
-          ${panel(`<div class="panel-head"><h2>${ico("clock")}Дараагийн хичээл</h2></div>${next ? `
-            <p class="next-when">${fmtDate(next.starts_at)} <span class="chip chip-amber">${until(next.starts_at)}</span></p>
-            <h3 class="next-title">${esc(next.title)}</h3><p class="muted small">${next.duration_min} мин${titleOf[next.course_id] ? " · " + esc(titleOf[next.course_id]) : ""}${next.price ? ` · <span class="chip chip-amber">${money(next.price)} · ${next.buyers || 0} худалдаж авсан</span>` : ""}</p>
-            <div class="hero-cta" style="margin-top:12px"><a class="btn btn-gold btn-sm" href="${esc(next.meet_url)}" target="_blank" rel="noopener">${ico("live", 16)}Live эхлүүлэх</a><a class="btn btn-ghost btn-sm" href="#live">Хуваарь</a></div>`
-            : `<div class="empty" style="padding:22px">Товлосон хичээл алга<br><a class="btn btn-gold btn-sm" style="margin-top:10px" href="#live">Шууд хичээл товлох</a></div>`}`, 3)}
-          ${panel(`<div class="panel-head"><h2>${ico("files")}Файлын сан</h2><a class="link" href="#files">Удирдах ${ico("chevron", 14)}</a></div>
-            <div class="meter"><i id="sMeter"></i></div><p class="muted small" style="margin:.6em 0 0">${fmtSize(storage.used)} / ${fmtSize(storage.quota)} ашигласан</p>`, 4)}
-        </div>
-      </div>
-
-      ${panel(`<div class="panel-head" id="ov-sales"><h2>${ico("money")}Сүүлийн борлуулалт</h2></div>${sales.recent.length ? `<table class="table"><thead><tr><th>Сургалт</th><th>Худалдан авагч</th><th>Дүн</th><th>Огноо</th></tr></thead><tbody>
-        ${sales.recent.map((x) => `<tr><td>${esc(x.course_title)}</td><td>@${esc(x.buyer_username)}</td><td><strong>${money(x.amount)}</strong></td><td class="muted">${fmtDate(x.paid_at)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">Анхны борлуулалтаа хүлээж байна ✨</div>`}`, 5)}
+    <div class="anx-kpis">
+      ${kpi("money", "kSum", "Нийт орлого", `${sales.count} борлуулалт`, "#ov-sales")}
+      ${kpi("users", "kStu", "Суралцагч", "элссэн, хичээл авсан", "#students")}
+      ${kpi("eye", "kPv", "Профайл үзэлт", "нээлттэй хуудас", "/t/" + esc(me.username))}
+      ${kpi("book", "kCv", "Сургалт үзэлт", `${courses.length} сургалт`, "#courses")}
     </div>
 
-    <aside class="ov-side">
-      ${isStudio ? `<section class="idcard">
-        <div class="idcard-top">
-          <div class="idcard-avatar">${me.avatar_url ? `<img src="${esc(me.avatar_url)}" alt="">` : esc(initialsOf(me.display_name))}</div>
-          <strong>${esc(me.display_name)}</strong><small>@${esc(me.username)}</small><span class="idcard-role">БАГШ</span>
-          <div class="idcard-actions">
-            <a href="#profile">${ico("profile")}<span>Профайл</span></a>
-            <a href="/t/${esc(me.username)}" target="_blank" rel="noopener">${ico("ext")}<span>Нээлттэй</span></a>
-            <button id="idLogout" class="danger">${ico("out")}<span>Гарах</span></button>
-          </div>
-        </div>
-        <dl class="idcard-info"><p class="info-title">Хувийн мэдээлэл</p>
-          ${info("Нэр", me.display_name)}${info("Мэргэжил", me.headline)}${info("Чиглэл", (me.subjects || []).join(", "))}${info("Байршил", me.location)}${info("И-мэйл", me.email)}
-        </dl>
-      </section>` : ""}
-      ${panel(`<div class="strength">${ringHTML(ins.score)}<div><strong>Профайлын бүрдэл</strong><p class="muted small" style="margin:.2em 0 0">${esc(ins.level)} · ${ins.tips.filter((t) => t.done).length}/${ins.tips.length} алхам</p></div></div>
-        ${todo.length ? `<ul class="tips">${todo.map((t) => `<li><a class="tip" href="${esc(t.link)}"><i>✓</i><span><strong>${esc(t.title)}</strong><small>${esc(t.hint)}</small></span></a></li>`).join("")}</ul>` : `<p class="muted small" style="margin:14px 0 0">Профайл тань бүрэн бүрдсэн байна 🎉</p>`}`, 2)}
-      ${isStudio ? panel(`<div class="qr-side"><div class="qr-frame"><img src="/t/${esc(me.username)}/qr.png?size=512" width="132" height="132" alt="Профайлын QR"></div>
-        <strong>Профайлаа түгээ</strong><p class="muted small" style="word-break:break-all;margin:0">${esc(location.host)}/t/${esc(me.username)}</p>
-        <div class="hero-cta" style="margin-top:6px;justify-content:center"><a class="btn btn-gold btn-sm" href="/t/${esc(me.username)}/qr.png?size=1024&download=1">QR татах</a><button class="btn btn-ghost btn-sm" id="copyLink">Хуулах</button></div></div>`, 3) : ""}
-    </aside></div>`;
+    <div class="ovx-grid">
+      <div class="ovx-col">
+      <section class="anx-card ovx-courses"><div class="anx-card-head"><h3>${ico("courses", 18)}Миний сургалтууд <span class="chip">${courses.length}</span></h3><a class="link" href="#courses">Бүгдийг удирдах ${ico("chevron", 14)}</a></div>
+        ${courses.length ? `<div class="ovx-clist">${courses.slice(0, 7).map((c) => `<a class="ovx-course" href="#course=${esc(c.id)}">
+          <span class="ovx-cv" aria-hidden="true">${esc(c.title.trim()[0] || "?")}</span>
+          <span class="ovx-cmain"><strong>${esc(c.title)}</strong><small>${c.lesson_count} хичээл · ${c.views || 0} үзэлт · ${c.price ? money(c.price) : "хичээлээр / үнэгүй"}</small></span>
+          <span class="chip ${c.published ? "chip-teal" : ""}">${c.published ? "Нийтлэгдсэн" : "Ноорог"}</span><span class="ovx-go" aria-hidden="true">${ico("chevron", 16)}</span></a>`).join("")}</div>
+          ${courses.length > 7 ? `<a class="link ovx-more" href="#courses">Бусад ${courses.length - 7} сургалт ${ico("chevron", 14)}</a>` : ""}`
+        : `<div class="anx-empty">${ico("courses", 28)}<p>Анхны сургалтаа үүсгээд хичээлээ нийтэлж эхлээрэй.</p><a class="btn btn-gold btn-sm" href="#courses" data-quick="new-course">${ico("plus", 16)}Шинэ сургалт</a></div>`}
+      </section>
+        <section class="anx-card" id="ov-sales"><div class="anx-card-head"><h3>${ico("money", 18)}Сүүлийн борлуулалт</h3>${sales.count ? `<span class="muted small">нийт ${sales.count} борлуулалт</span>` : ""}</div>
+      ${sales.recent.length ? `<div class="an-table-wrap"><table class="tbl"><thead><tr><th>Сургалт / хичээл</th><th>Худалдан авагч</th><th>Дүн</th><th>Огноо</th></tr></thead><tbody>
+      ${sales.recent.map((x) => `<tr><td>${esc(x.course_title)}</td><td>@${esc(x.buyer_username)}</td><td><strong>${money(x.amount)}</strong></td><td class="muted">${fmtDate(x.paid_at)}</td></tr>`).join("")}</tbody></table></div>`
+        : `<div class="anx-empty">${ico("money", 28)}<p>Анхны борлуулалтаа хүлээж байна ✨</p></div>`}</section>
+      </div>
+      <div class="ovx-col">
+        <section class="anx-card"><div class="anx-card-head"><h3>${ico("target", 18)}Анхаарах зүйлс</h3></div>
+          ${todo.length ? `<ul class="ovx-todo">${todo.map((x) => `<li><a href="${esc(x.href)}" class="${x.tone}"><span class="ovx-ti">${ico(x.ic, 17)}</span><span><strong>${esc(x.t)}</strong><small>${esc(x.s)}</small></span>${ico("chevron", 15)}</a></li>`).join("")}</ul>`
+            : `<p class="muted small" style="margin:0">Бүх зүйл хэвийн байна ✓</p>`}</section>
+        <section class="anx-card"><div class="anx-card-head"><h3>${ico("cal", 18)}Шууд хичээлийн хуваарь</h3><a class="link" href="#live">Товлох ${ico("chevron", 14)}</a></div>
+          ${next ? `<div class="ovx-next"><small>Дараагийнх · ${fmtDate(next.starts_at)}</small><strong>${esc(next.title)}</strong><span class="muted small">${next.duration_min} мин${titleOf[next.course_id] ? " · " + esc(titleOf[next.course_id]) : ""}</span>
+            <div class="ovx-next-acts"><span class="chip chip-amber">${until(next.starts_at)}</span><a class="btn btn-gold btn-sm" href="${esc(next.meet_url)}" target="_blank" rel="noopener">${ico("live", 15)}Live эхлүүлэх</a></div></div>` : ""}
+          <p class="ovx-days-h">Ойрын 7 хоног · өдөр дээр дарж хуваарийг харна</p>
+          <div class="days ovx-days" id="days">${days.map((d, i) => { const n = perDay(d).length; return `<button class="day" data-i="${i}"><small>${WEEKDAYS_SHORT[d.getDay()]}</small><b>${String(d.getDate()).padStart(2, "0")}</b>${n ? `<i>${n}</i>` : ""}</button>`; }).join("")}</div>
+          <div class="agenda" id="agenda"></div></section>
+        <section class="anx-card"><div class="anx-card-head"><h3>${ico("files", 18)}Файлын сан</h3><a class="link" href="#files">Удирдах ${ico("chevron", 14)}</a></div>
+          <div class="anx-meter ovx-store"><i id="sMeter" style="width:0;background:${pct >= 80 ? "var(--coral)" : "var(--brand)"}"></i></div>
+          <p class="muted small" style="margin:.6em 0 0">${fmtSize(storage.used)} / ${fmtSize(storage.quota)} ашигласан · ${pct}%</p></section>
+      </div>
+    </div>
+
+  </div>`;
 
   // Хавтанд багтахын тулд том дүнг товчилно (1,250,000₮ -> 1.25 сая₮).
   const short = (n) => (n >= 1e9 ? +(n / 1e9).toFixed(2) + " тэрбум₮" : n >= 1e6 ? +(n / 1e6).toFixed(2) + " сая₮" : n ? money(n) : "0₮");
   countUp($("#kSum"), sales.total_amount, short);
   countUp($("#kStu"), tp.students); countUp($("#kPv"), me.profile_views || 0); countUp($("#kCv"), views);
-  requestAnimationFrame(() => { const m = $("#sMeter"); if (m) m.style.width = Math.min(100, (storage.used / storage.quota) * 100) + "%"; });
-  if ($("#copyLink")) $("#copyLink").onclick = () => navigator.clipboard.writeText(`${location.origin}/t/${me.username}`).then(() => toast("Хуулагдлаа ✓"), () => toast(`${location.origin}/t/${me.username}`));
-  if ($("#idLogout")) $("#idLogout").onclick = logout;
+  requestAnimationFrame(() => { const m = $("#sMeter"); if (m) m.style.width = Math.min(100, pct) + "%"; });
+  $("#copyLink").onclick = () => navigator.clipboard.writeText(`${location.origin}/t/${me.username}`).then(() => toast("Профайлын холбоос хуулагдлаа ✓"), () => toast(`${location.origin}/t/${me.username}`));
 
   const agenda = (i) => {
     const list = perDay(days[i]);
@@ -195,8 +191,13 @@ async function overview() {
         <div class="slot-actions"><a class="btn btn-sm btn-danger" href="${esc(m.meet_url)}" target="_blank" rel="noopener">${ico("live", 15)}Live</a>${m.course_id ? `<a class="btn btn-sm btn-ghost" href="#course=${esc(m.course_id)}">${ico("courses", 15)}Сургалт</a>` : ""}</div></div></div>`; }).join("") ||
       `<p class="muted small" style="padding:18px 4px;margin:0">Энэ өдөр товлосон хичээл алга.</p>`;
   };
-  $("#days").onclick = (e) => { const b = e.target.closest(".day"); if (!b) return; $$(".day", $("#days")).forEach((x) => x.classList.toggle("active", x === b)); agenda(+b.dataset.i); };
-  agenda(0);
+  $("#days").onclick = (e) => {
+    const b = e.target.closest(".day"); if (!b) return;
+    const on = !b.classList.contains("active"); // дахин дарвал хумигдана
+    $$(".day", $("#days")).forEach((x) => x.classList.toggle("active", on && x === b));
+    if (on) agenda(+b.dataset.i); else $("#agenda").innerHTML = "";
+  };
+  if (!next) agenda(0); // товлосон хичээлгүй бол өнөөдрийг харуулна
 
   const tick = () => { const c = $("#clock"); if (c) { const d = new Date(); c.innerHTML = `${fmtTime(d)}<small>:${String(d.getSeconds()).padStart(2, "0")}</small>`; } };
   tick(); const iv = setInterval(tick, 1000);

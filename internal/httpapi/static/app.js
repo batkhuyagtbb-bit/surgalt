@@ -2573,11 +2573,6 @@ function profileOwner(root, h) {
     document.body.append(sc);
   } else root._fromHash() || root._showTab("courses");
 
-  const ins = h.teacher.insights, next = ins.tips.find((t) => !t.done);
-  $("#ownerCard").innerHTML = `<div class="owner-strength">${ringHTML(ins.score, "ring-sm")}<div class="grow"><strong>Профайлын бүрдэл · ${esc(ins.level)}</strong>
-    <span class="muted small">${next ? "Дараагийн алхам: " + esc(next.title) : "Бүрэн бүрдсэн байна 🎉"}</span></div></div>
-    ${next ? `<p class="muted small" style="margin:10px 0 0">${esc(next.hint)}</p>` : ""}`;
-
   // PUT нь бүх талбарыг солидог тул одоогийн утгууд дээр өөрчлөлтөө давхарлаж илгээнэ.
   const save = async (patch) => {
     const u = await api("/api/me");
