@@ -57,6 +57,12 @@ const ICON = {
   up: '<path d="m6 15 6-6 6 6"/>',
   down: '<path d="m6 9 6 6 6-6"/>',
 };
+Object.assign(ICON, {
+  chart: '<path d="M3 3v18h18"/><path d="M7 16v-4M12 16V8M17 16v-7"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
+  pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  alert: '<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5h.01"/>',
+});
 const ico = (n, size = 20) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n] || ""}</svg>`;
 
 Live.connect(Auth.token);
@@ -1553,6 +1559,13 @@ const studentRow = (r) => {
     ${total > 1 ? `<span class="chip">${total} сургалт</span>` : ""}${lessons ? `<span class="chip chip-gold">${lessons} хичээл</span>` : ""}
     <button class="btn btn-gold btn-sm" data-chat-student>${ico("chat", 16)}Чат</button></div>`;
 };
+// Хяналтын самбарын нарийн баганад: зураг, нэр, товч мэдээлэл, чатын товч (дарахад дэлгэрэнгүй).
+const studentMini = (r) => {
+  const lessons = r.courses.reduce((n, c) => n + c.lessons.length, 0);
+  return `<div class="anx-person student" data-uid="${esc(r.user.id)}" data-conv="${esc(r.conv_id || "")}" data-an-detail="${esc(r.user.id)}" role="button" tabindex="0">${avatar(r.user, "avatar-sm")}
+    <span class="grow"><strong>${esc(r.user.display_name)}</strong><small>${r.courses.length} сургалт${lessons ? ` · ${lessons} хичээл авсан` : ""}</small></span>
+    <button class="icon-btn" data-chat-student title="Чатлах" aria-label="${esc(r.user.display_name)}-тэй чатлах">${ico("chat", 17)}</button></div>`;
+};
 // Суралцагчтай чат: өмнө нь яриа байвал нээнэ, үгүй бол шинээр эхлүүлнэ.
 async function chatWithStudent(el) {
   const b = el.querySelector("[data-chat-student]"); if (b) b.disabled = true;
@@ -1635,40 +1648,74 @@ async function students() {
     }).join("")}</div></div>`;
   };
   const qs = () => `course=${encodeURIComponent(st.course)}&days=${st.days}`;
+  // Өдөр бүрийн идэвх: тэнхлэгтэй давхар багана (идэвхтэй — хар хөх, идэвхгүй — улбар шар).
+  const chart2 = (daily) => {
+    const tot = (d) => d.active_sec + d.inactive_sec, max = Math.max(0, ...daily.map(tot));
+    if (!max) return `<div class="anx-empty">${ico("chart", 28)}<p>Энэ хугацаанд хичээл үзсэн идэвх бүртгэгдээгүй байна.</p></div>`;
+    const top = [30, 60, 120, 300, 600, 1200, 1800, 3600, 7200, 10800, 18000, 36000, 86400].find((x) => x >= max) || max;
+    const sumA = daily.reduce((a, d) => a + d.active_sec, 0), best = daily.reduce((m, d) => (tot(d) > tot(m) ? d : m), daily[0]);
+    const lbl = (day) => (day || "").slice(5).replace("-", "/"), mid = daily[Math.floor((daily.length - 1) / 2)];
+    return `<div class="anx-chart-sum"><span><b>${dur(sumA)}</b>идэвхтэй</span><span><b>${dur(Math.round(sumA / daily.length))}</b>өдрийн дундаж</span><span><b>${lbl(best.day)}</b>хамгийн идэвхтэй өдөр</span></div>
+      <div class="anx-chart" role="img" aria-label="Өдөр бүрийн идэвхтэй ба идэвхгүй хугацаа">
+        <div class="anx-y" aria-hidden="true"><span>${dur(top)}</span><span>${dur(Math.round(top / 2))}</span><span>0</span></div>
+        <div class="anx-plot"><div class="anx-cols">${daily.map((d) => `<div class="anx-col" title="${esc(d.day)}: идэвхтэй ${dur(d.active_sec)}, идэвхгүй ${dur(d.inactive_sec)}"><i class="ia" style="height:${d.inactive_sec / top * 100}%"></i><i class="ac" style="height:${d.active_sec / top * 100}%"></i></div>`).join("")}</div></div>
+        <div class="anx-x" aria-hidden="true"><span>${lbl(daily[0]?.day)}</span><span>${lbl(mid?.day)}</span><span>${lbl(daily[daily.length - 1]?.day)}</span></div></div>`;
+  };
   const render = () => {
-    const t = data.totals, list = data.students;
-    main.innerHTML = panel(`<div class="panel-head"><h2>${ico("users")}Хяналт ба статистик</h2>
-        <div class="an-filters"><select id="anCourse" aria-label="Сургалт"><option value="">Бүх сургалт</option>${courseList.map((c) => `<option value="${esc(c.id)}" ${c.id === st.course ? "selected" : ""}>${esc(c.title)}</option>`).join("")}</select>
-          <select id="anDays" aria-label="Хугацаа">${[7, 30, 90].map((d) => `<option value="${d}" ${d === st.days ? "selected" : ""}>Сүүлийн ${d} хоног</option>`).join("")}</select>
-          <a class="btn btn-glass btn-sm" id="anCsv" href="#" title="Excel-д нээгдэх тайлан">${ico("files", 15)}Excel</a><button class="btn btn-glass btn-sm" id="anPdf">${ico("book", 15)}PDF</button></div></div>
-      <div class="an-tiles">
-        <div class="an-tile"><small>Суралцагч</small><b>${t.students}</b>${t.live ? `<span class="an-live">● ${t.live} одоо үзэж байна</span>` : ""}</div>
-        <div class="an-tile"><small>Идэвхтэй хугацаа</small><b>${dur(t.active_sec)}</b><span class="muted small">нийт ${dur(t.total_sec)}-аас</span></div>
-        <div class="an-tile"><small>Идэвхтэй хувь</small><b>${t.active_pct}%</b></div>
-        <div class="an-tile"><small>Анхаарлын индекс</small><b>${t.attention}%</b></div>
-        <div class="an-tile ${t.violations ? "warn" : ""}"><small>Зөрчил</small><b>${t.violations}</b></div>
-        <div class="an-tile"><small>Шалгалт</small><b>${t.exams}</b></div>
-        <div class="an-tile learn"><small>Суралцсан оноо</small><b>${t.learn_score}%</b><span class="muted small">бодит хариулт, дүгнэлт, тогтмол байдал</span></div>
-        <div class="an-tile"><small>Асуулга дуусгасан</small><b>${t.quiz_mastered}/${t.quiz_lessons}</b><span class="muted small">суралцагч×хичээл: бүх асуултад зөв</span></div>
-        <div class="an-tile"><small>Бичсэн дүгнэлт</small><b>${t.reflections}</b></div>
-        <div class="an-tile"><small>Дээд цол</small><b>${t.top_rank?.lessons ? esc(t.top_rank.name) : "—"}</b><span class="muted small">${Object.entries(t.rank_dist || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${esc(k)} ${v}`).join(" · ") || "цол олгогдоогүй"}${t.cheated_lessons ? ` · ⛔ ${t.cheated_lessons} хичээлд хуулсан` : ""}</span></div></div>
-      ${chart(data.daily)}`) +
-      panel(`<div class="panel-head"><h2>Суралцагч бүрээр</h2><label class="rail-search" style="width:min(260px,100%)">${ico("search", 16)}<input type="search" id="anSearch" placeholder="Нэрээр хайх…" aria-label="Хайх"></label></div>
-      <p class="muted small" style="margin:-4px 0 10px">Сурагч дээр дарж дэлгэрэнгүйг (бичсэн дүгнэлт, асуултын хариулт, видео үзэлтийн зураглал) харна уу.</p>
-      <div class="an-table-wrap"><table class="tbl an-table"><thead><tr><th>Суралцагч</th><th>Идэвхтэй</th><th>Анхаарал</th><th>🧠 Суралцсан</th><th>Зөрчил</th><th>Шалгалт</th><th>Төлөв</th><th></th></tr></thead><tbody>
-      ${list.map((x) => `<tr class="an-row" data-uid="${esc(x.user_id)}"><td><b>${esc(x.name)}</b>${x.live ? ` <span class="an-live">●</span>` : ""}<br><small class="muted">${x.lessons} хичээл · ${fmtDate(x.last_at)}</small><br><span class="an-rank ${x.rank?.cheated ? "bad" : x.rank?.level >= 4 ? "rank-shine" : ""}" title="${x.rank?.points || 0} оноо">🎖 ${esc(x.rank?.name || "Шинэ цэрэг")} ${esc(x.rank?.insignia || "")}${x.rank?.cheated ? ` · ⛔${x.rank.cheated}` : ""}</span></td>
-        <td>${dur(x.active_sec)}<br><small class="muted">нийт ${dur(x.total_sec)}</small></td><td>${bar(x.attention)}</td>
-        <td>${bar(x.learn_score)}<br><small class="muted">${learnHint(x)}</small></td>
-        <td>${x.violations ? `<b class="an-bad">${x.violations}</b><br><small class="muted">${["tab_switch", "copy", "auto_block"].filter((k) => x.counts[k]).map((k) => `${esc(labels[k] || k)}: ${x.counts[k]}`).join(", ")}</small>` : "0"}</td>
-        <td>${x.exam_best >= 0 ? `${x.exam_best}%${x.terminated ? `<br><small class="an-bad">${x.terminated} хаагдсан</small>` : ""}` : `<span class="muted">—</span>`}</td>
-        <td><span class="an-risk ${RISK[x.risk][1]}">${RISK[x.risk][0]}</span></td>
-        <td class="an-acts"><button class="icon-btn" data-detail title="Дэлгэрэнгүй" aria-label="Дэлгэрэнгүй">${ico("eye", 17)}</button><button class="icon-btn" data-remind title="Сануулга илгээх" aria-label="Сануулга илгээх">${ico("chat", 17)}</button></td></tr>`).join("") || `<tr><td colspan="8" class="muted">Энэ хугацаанд хичээл үзсэн суралцагч алга.</td></tr>`}
-      </tbody></table></div>`, 1) +
-      panel(`<div class="panel-head"><h2>Сүүлийн үйл явдал</h2><span class="muted small">зөрчил, сануулга, шалгалт</span></div>
-        <div id="anFeed"></div>`, 2) +
-      panel(`<div class="panel-head"><h2>Бүх суралцагчид</h2><span class="chip">${rows.length}</span></div>
-        <p class="muted small" style="margin:-6px 0 14px">Таны сургалтад элссэн эсвэл хичээл худалдаж авсан хүмүүс. "Чат" дарахад баруун талд яриа нээгдэнэ.</p>
-        <div class="items" id="stuList">${rows.map(studentRow).join("") || `<div class="empty">Одоогоор суралцагч алга. Профайлаа түгээж, үнэгүй хичээл нийтлээрэй.</div>`}</div>`, 3);
+    const t = data.totals, list = data.students, course = courseList.find((c) => c.id === st.course);
+    const pct = (v) => Math.max(0, Math.min(100, +v || 0));
+    const meter = (v) => `<span class="anx-meter"><i style="width:${pct(v)}%;background:${v >= 70 ? "var(--teal)" : v >= 40 ? "var(--accent)" : "var(--coral)"}"></i></span>`;
+    const kpi = (ic, label, value, sub) => `<div class="anx-kpi"><span class="anx-ic">${ico(ic, 18)}</span><small>${label}</small><b>${value}</b><div class="anx-sub">${sub || ""}</div></div>`;
+    const stat = (label, value, cls = "") => `<div class="anx-stat ${cls}"><small>${label}</small><b>${value}</b></div>`;
+    const risk = { ok: 0, watch: 0, risk: 0 }; list.forEach((x) => (risk[x.risk] = (risk[x.risk] || 0) + 1));
+    const ranks = Object.entries(t.rank_dist || {}).sort((a, b) => b[1] - a[1]).slice(0, 4), rankMax = Math.max(1, ...ranks.map(([, v]) => v));
+    const initials = (n) => (n || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+    main.innerHTML = `<div class="anx">
+      <header class="anx-head">
+        <div class="anx-title"><h2>${ico("chart", 22)}Хяналт ба статистик</h2><p>${course ? esc(course.title) : "Бүх сургалт"} · сүүлийн ${st.days} хоног${t.live ? ` · <span class="an-live">● ${t.live} одоо үзэж байна</span>` : ""}</p></div>
+        <div class="anx-tools">
+          <select id="anCourse" aria-label="Сургалт"><option value="">Бүх сургалт</option>${courseList.map((c) => `<option value="${esc(c.id)}" ${c.id === st.course ? "selected" : ""}>${esc(c.title)}</option>`).join("")}</select>
+          <div class="anx-seg" role="group" aria-label="Хугацаа">${[7, 30, 90].map((d) => `<button type="button" data-an-days="${d}" aria-pressed="${d === st.days}">${d} хоног</button>`).join("")}</div>
+          <a class="btn btn-glass btn-sm" id="anCsv" href="#" title="Excel-д нээгдэх тайлан">${ico("files", 15)}Excel</a><button class="btn btn-glass btn-sm" id="anPdf" title="Хэвлэх / PDF">${ico("book", 15)}PDF</button>
+        </div>
+      </header>
+      <div class="anx-kpis">
+        ${kpi("users", "Суралцагч", t.students, t.live ? `<span class="an-live">● ${t.live} одоо үзэж байна</span>` : `${rows.length} хүн элссэн / хичээл авсан`)}
+        ${kpi("clock", "Идэвхтэй хугацаа", dur(t.active_sec), `нийт ${dur(t.total_sec)}-аас · ${t.active_pct}%`)}
+        ${kpi("eye", "Анхаарлын индекс", t.attention + "%", meter(t.attention))}
+        ${kpi("target", "Суралцсан оноо", t.learn_score + "%", meter(t.learn_score))}
+      </div>
+      <div class="anx-stats">
+        ${stat("Идэвхтэй хувь", t.active_pct + "%")}${stat("Зөрчил", t.violations, t.violations ? "bad" : "")}${stat("Шалгалт", t.exams)}
+        ${stat("Асуулга дуусгасан", `${t.quiz_mastered}<em>/${t.quiz_lessons}</em>`)}${stat("Бичсэн дүгнэлт", t.reflections)}${stat("Дээд цол", t.top_rank?.lessons ? esc(t.top_rank.name) : "—")}
+      </div>
+      <div class="anx-grid">
+        <section class="anx-card anx-wide"><div class="anx-card-head"><h3>${ico("pulse", 18)}Өдөр бүрийн идэвх</h3><div class="an-legend"><span><i style="background:var(--brand)"></i>Идэвхтэй</span><span><i style="background:var(--accent)"></i>Идэвхгүй, өөр цонхонд</span></div></div>${chart2(data.daily || [])}</section>
+        <section class="anx-card"><div class="anx-card-head"><h3>${ico("alert", 18)}Эрсдэлийн тойм</h3></div>
+          ${list.length ? `<div class="anx-riskbar">${["ok", "watch", "risk"].map((k) => (risk[k] ? `<i class="${k}" style="flex:${risk[k]}" title="${RISK[k][0]}: ${risk[k]}"></i>` : "")).join("")}</div>` : ""}
+          <ul class="anx-risks">${[["ok", "Идэвхтэй, анхааралтай"], ["watch", "Идэвх, анхаарал буурсан"], ["risk", "Зөрчил ихтэй эсвэл идэвхгүй"]].map(([k, hint]) => `<li><span class="an-risk ${k}">${RISK[k][0]}</span><small>${hint}</small><b>${risk[k] || 0}</b></li>`).join("")}</ul>
+          <h4 class="anx-sub-h">Цолын тархалт</h4>
+          ${ranks.length ? `<ul class="anx-ranks">${ranks.map(([k, v]) => `<li><span>${esc(k)}</span><i style="width:${v / rankMax * 100}%"></i><b>${v}</b></li>`).join("")}</ul>` : `<p class="muted small">Цол олгогдоогүй байна.</p>`}
+          ${t.cheated_lessons ? `<p class="anx-warn">⛔ ${t.cheated_lessons} хичээлд хуулах оролдлого — оноо тооцогдоогүй</p>` : ""}</section>
+      </div>
+      <section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Суралцагч бүрээр <span class="chip">${list.length}</span></h3><label class="rail-search anx-search">${ico("search", 16)}<input type="search" id="anSearch" placeholder="Нэрээр хайх…" aria-label="Хайх" value="${esc(st.q || "")}"></label></div>
+        <p class="muted small anx-hint">Мөр дээр дарж дэлгэрэнгүйг (бичсэн дүгнэлт, асуултын хариулт, видео үзэлтийн зураглал) харна.</p>
+        <div class="an-table-wrap"><table class="tbl an-table anx-table"><thead><tr><th>Суралцагч</th><th>Идэвхтэй</th><th>Анхаарал</th><th>Суралцсан</th><th>Зөрчил</th><th>Шалгалт</th><th>Төлөв</th><th><span class="sr-only">Үйлдэл</span></th></tr></thead><tbody>
+        ${list.map((x) => `<tr class="an-row" data-uid="${esc(x.user_id)}"><td><div class="anx-who"><span class="anx-av" style="--h:${hueOfName(x.name)}">${esc(initials(x.name))}</span><div><b>${esc(x.name)}</b>${x.live ? ` <span class="an-live">●</span>` : ""}<small class="muted">${x.lessons} хичээл · ${fmtDate(x.last_at)}</small><span class="an-rank ${x.rank?.cheated ? "bad" : ""}" title="${x.rank?.points || 0} оноо">🎖 ${esc(x.rank?.name || "Шинэ цэрэг")}${x.rank?.cheated ? ` · ⛔${x.rank.cheated}` : ""}</span></div></div></td>
+          <td data-label="Идэвхтэй"><b>${dur(x.active_sec)}</b><small class="muted">нийт ${dur(x.total_sec)}</small></td><td data-label="Анхаарал">${bar(x.attention)}</td>
+          <td data-label="Суралцсан">${bar(x.learn_score)}<small class="muted">${learnHint(x)}</small></td>
+          <td data-label="Зөрчил">${x.violations ? `<b class="an-bad">${x.violations}</b><small class="muted">${["tab_switch", "copy", "auto_block"].filter((k) => x.counts[k]).map((k) => `${esc(labels[k] || k)}: ${x.counts[k]}`).join(", ")}</small>` : `<span class="muted">0</span>`}</td>
+          <td data-label="Шалгалт">${x.exam_best >= 0 ? `<b>${x.exam_best}%</b>${x.terminated ? `<small class="an-bad">${x.terminated} хаагдсан</small>` : ""}` : `<span class="muted">—</span>`}</td>
+          <td data-label="Төлөв"><span class="an-risk ${RISK[x.risk][1]}">${RISK[x.risk][0]}</span></td>
+          <td class="anx-acts"><div><button class="icon-btn" data-detail title="Дэлгэрэнгүй" aria-label="Дэлгэрэнгүй">${ico("eye", 17)}</button><button class="icon-btn" data-remind title="Сануулга илгээх" aria-label="Сануулга илгээх">${ico("chat", 17)}</button></div></td></tr>`).join("") || `<tr><td colspan="8"><div class="anx-empty">${ico("users", 26)}<p>Энэ хугацаанд хичээл үзсэн суралцагч алга.</p></div></td></tr>`}
+        </tbody></table></div></section>
+      <div class="anx-grid">
+        <section class="anx-card anx-wide"><div class="anx-card-head"><h3>${ico("clock", 18)}Сүүлийн үйл явдал</h3><span class="muted small">зөрчил, сануулга, шалгалт</span></div><div id="anFeed"></div></section>
+        <section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Бүх суралцагчид <span class="chip">${rows.length}</span></h3></div>
+          <p class="muted small anx-hint">Элссэн эсвэл хичээл худалдаж авсан хүмүүс. «Чат» дарахад баруун талд яриа нээгдэнэ.</p>
+          <div class="anx-roster" id="stuList">${rows.map(studentMini).join("") || `<div class="anx-empty">${ico("users", 26)}<p>Одоогоор суралцагч алга. Профайлаа түгээж, үнэгүй хичээл нийтлээрэй.</p></div>`}</div></section>
+      </div></div>`;
+    if (st.q) onInput({ target: $("#anSearch") });
     $("#anCsv").href = "#";
     mountFeed();
   };
@@ -1756,11 +1803,13 @@ async function students() {
     const tr = e.target.closest("tr[data-uid]");
     if (e.target.closest("#anCsv")) { e.preventDefault(); return download(`/api/me/analytics/export?${qs()}`, "angi-tailan.csv"); }
     if (e.target.closest("#anPdf")) return classReport();
+    const dd = e.target.closest("[data-an-days]"); if (dd) { st.days = +dd.dataset.anDays; load(); return; }
+    const pd = e.target.closest("[data-an-detail]"); if (pd && !e.target.closest("[data-chat-student]")) return detail(pd.dataset.anDetail);
     if (tr && e.target.closest("[data-remind]")) return remind(tr.dataset.uid, $("b", tr).textContent);
     if (tr) return detail(tr.dataset.uid); // мөр хаана ч дарсан дэлгэрэнгүй нээнэ
   };
   const onChange = (e) => { if (e.target.id === "anCourse") { st.course = e.target.value; load(); } if (e.target.id === "anDays") { st.days = +e.target.value; load(); } };
-  const onInput = (e) => { if (e.target.id !== "anSearch") return; const q = e.target.value.trim().toLowerCase(); $$(".an-table tbody tr[data-uid]").forEach((tr) => (tr.hidden = !!q && !tr.textContent.toLowerCase().includes(q))); };
+  function onInput(e) { if (e.target?.id !== "anSearch") return; st.q = e.target.value; const q = st.q.trim().toLowerCase(); $$(".an-table tbody tr[data-uid]").forEach((tr) => (tr.hidden = !!q && !tr.textContent.toLowerCase().includes(q))); }
   main.addEventListener("click", onClick); main.addEventListener("change", onChange); main.addEventListener("input", onInput);
   timer = setInterval(() => { if (!document.hidden && !$(".modal.open")) load().catch(() => {}); }, 30000); // бодит хугацаанд ойрхон
   cleanup = () => { clearInterval(timer); main.removeEventListener("click", onClick); main.removeEventListener("change", onChange); main.removeEventListener("input", onInput); };

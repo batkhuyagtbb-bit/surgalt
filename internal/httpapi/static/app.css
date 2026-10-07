@@ -2919,3 +2919,125 @@ html.lp-focus .rail-tab{display:none!important}
 .em-tip em{display:inline-flex;align-items:center;gap:2px;font-style:normal;font-size:.82rem;font-weight:800;color:var(--brand);white-space:nowrap}
 .em-short{display:none}
 @media (max-width:560px){.em-long{display:none}.em-short{display:inline}.em-head{margin-right:30px}.em-tab{font-size:.8rem;padding:0 8px}.em-tip{grid-template-columns:22px minmax(0,1fr);}.em-tip em{grid-column:2}}
+
+/* ===== Хяналт ба статистик — мэргэжлийн самбар ===== */
+.anx{display:grid;gap:16px}
+.anx-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:4px 2px 2px}
+.anx-title h2{display:flex;align-items:center;gap:10px;margin:0;font-size:1.35rem;letter-spacing:-.01em}
+.anx-title h2 svg{color:var(--brand)}
+.anx-title p{margin:4px 0 0;color:var(--muted);font-size:.86rem}
+.anx-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.anx-tools select{width:auto;max-width:240px;height:38px;padding:0 34px 0 12px;font-size:.88rem}
+.anx-seg{display:inline-flex;padding:3px;border:1px solid var(--line);border-radius:11px;background:var(--surface-2)}
+.anx-seg button{height:30px;padding:0 12px;border:0;border-radius:8px;background:none;font:inherit;font-size:.82rem;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap}
+.anx-seg button[aria-pressed="true"]{background:var(--surface);color:var(--brand);box-shadow:var(--shadow-sm)}
+.anx-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.anx-kpi{position:relative;display:grid;align-content:start;gap:4px;min-height:128px;padding:16px 18px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--shadow-sm)}
+.anx-kpi small{font-size:.74rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.anx-kpi b{font-size:1.85rem;line-height:1.1;letter-spacing:-.02em;color:var(--text);font-variant-numeric:tabular-nums}
+.anx-ic{position:absolute;top:14px;right:14px;display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:var(--brand-soft);color:var(--brand)}
+.anx-sub{margin-top:auto;font-size:.8rem;color:var(--muted)}
+.anx-meter{display:block;height:6px;margin-top:6px;border-radius:999px;background:var(--ink-2);overflow:hidden}
+.anx-meter i{display:block;height:100%;border-radius:999px}
+.anx-stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden}
+.anx-stat{display:grid;gap:3px;padding:12px 16px;border-left:1px solid var(--line)}
+.anx-stat:first-child{border-left:0}
+.anx-stat small{font-size:.74rem;font-weight:600;color:var(--muted)}
+.anx-stat b{font-size:1.1rem;color:var(--text);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anx-stat b em{font-style:normal;font-size:.85rem;color:var(--muted)}
+.anx-stat.bad b{color:var(--coral)}
+.anx-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px;align-items:start}
+.anx-card{min-width:0;padding:18px 20px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--shadow-sm)}
+.anx-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.anx-card-head h3{display:flex;align-items:center;gap:8px;margin:0;font-size:1.02rem}
+.anx-card-head h3 svg{color:var(--brand)}
+.anx-card-head .chip{font-size:.74rem}
+.anx-card-head .an-legend{margin:0}
+.anx-hint{margin:-6px 0 12px}
+.anx-search{width:min(260px,100%)}
+/* График */
+.anx-chart-sum{display:flex;gap:22px;flex-wrap:wrap;margin:0 0 14px}
+.anx-chart-sum span{display:grid;font-size:.76rem;color:var(--muted)}
+.anx-chart-sum b{font-size:1.05rem;color:var(--text)}
+.anx-chart{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:200px auto;column-gap:10px}
+.anx-y{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;font-size:.7rem;color:var(--muted);white-space:nowrap;transform:translateY(-.5em)}
+.anx-y span:last-child{transform:translateY(.5em)}
+.anx-plot{position:relative;border-left:1px solid var(--line);border-bottom:1px solid var(--line-2);background:linear-gradient(to bottom,var(--line) 1px,transparent 1px) 0 0/100% 50%}
+.anx-cols{position:absolute;inset:0 4px 0 4px;display:flex;align-items:stretch;gap:3px}
+.anx-col{flex:1;max-width:28px;margin:0 auto;display:flex;flex-direction:column;justify-content:flex-end;min-width:2px;border-radius:5px 5px 0 0;overflow:hidden;cursor:default}
+.anx-col:hover{background:var(--brand-soft)}
+.anx-col i{display:block;width:100%;flex:none}
+.anx-col .ac{background:var(--brand)}
+.anx-col .ia{background:var(--accent);opacity:.8}
+.anx-x{grid-column:2;display:flex;justify-content:space-between;padding-top:6px;font-size:.72rem;color:var(--muted)}
+.anx-empty{display:grid;justify-items:center;gap:6px;padding:28px 12px;text-align:center;color:var(--muted)}
+.anx-empty svg{color:var(--line-2)}
+.anx-empty p{margin:0;font-size:.88rem}
+/* Эрсдэл, цол */
+.anx-riskbar{display:flex;height:10px;gap:3px;margin:2px 0 14px;border-radius:999px;overflow:hidden}
+.anx-riskbar i{display:block;min-width:6px}
+.anx-riskbar .ok{background:var(--teal)}.anx-riskbar .watch{background:var(--accent)}.anx-riskbar .risk{background:var(--coral)}
+.anx-risks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.anx-risks li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px}
+.anx-risks small{font-size:.78rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anx-risks b{font-size:1.05rem;font-variant-numeric:tabular-nums}
+.anx-sub-h{margin:18px 0 8px;font-size:.78rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.anx-ranks{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.anx-ranks li{display:grid;grid-template-columns:110px minmax(0,1fr) auto;align-items:center;gap:8px;font-size:.84rem}
+.anx-ranks span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anx-ranks i{display:block;height:8px;border-radius:999px;background:var(--brand);min-width:4px}
+.anx-warn{margin:14px 0 0;padding:8px 10px;border-radius:10px;background:var(--coral-soft);color:var(--coral);font-size:.8rem;font-weight:700}
+/* Хүснэгт */
+.anx-table th{white-space:nowrap}
+.anx-table td{vertical-align:top}
+.anx-table td small{display:block;margin-top:2px;max-width:220px}
+.anx-table .an-row{cursor:pointer}
+.anx-table .an-row:hover td{background:var(--surface-2)}
+.anx-who{display:flex;gap:10px;align-items:flex-start;min-width:170px}
+.anx-who>div{display:grid;gap:1px}
+.anx-av{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:hsl(var(--h,220) 45% 92%);color:hsl(var(--h,220) 45% 32%);font-size:.78rem;font-weight:800}
+.anx-acts{width:1%;white-space:nowrap}
+.anx-acts>div{display:flex;gap:4px}
+.anx-roster{max-height:420px;overflow:auto;margin:0 -6px}
+.anx-person{display:flex;align-items:center;gap:10px;padding:9px 6px;border-radius:12px;cursor:pointer}
+.anx-person:hover{background:var(--surface-2)}
+.anx-person+.anx-person{border-top:1px solid var(--line)}
+.anx-person .grow{flex:1;display:grid;min-width:0}
+.anx-person strong{font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anx-person small{font-size:.76rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anx-card .ev-feed td:first-child{white-space:nowrap}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#anFeed+.ev-feed,.anx-card .ev-feed{max-height:420px}
+/* Таблет, утас */
+@media (max-width:1180px){.anx-grid{grid-template-columns:minmax(0,1fr)}.anx-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.anx-stat:nth-child(3n+1){border-left:0}.anx-stat:nth-child(n+4){border-top:1px solid var(--line)}}
+@media (max-width:900px){.anx-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){
+  .anx-head{align-items:stretch}.anx-tools{width:100%}.anx-tools select{flex:1 1 100%;max-width:none}.anx-seg{flex:1}.anx-seg button{flex:1}
+  .anx-kpi{min-height:0;padding:14px}.anx-kpi b{font-size:1.45rem}.anx-ic{width:30px;height:30px;top:12px;right:12px}
+  .anx-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.anx-stat:nth-child(3n+1){border-left:1px solid var(--line)}.anx-stat:nth-child(2n+1){border-left:0}.anx-stat:nth-child(n+3){border-top:1px solid var(--line)}
+  .anx-card{padding:14px}.anx-chart{grid-template-rows:160px auto}
+}
+@media (max-width:380px){.anx-kpis{grid-template-columns:minmax(0,1fr)}}
+/* Утсан дээр: хүснэгтүүд карт мөр болно */
+@media (max-width:640px){
+  .anx-ic{display:none}
+  .anx-table thead{display:none}
+  .anx-table,.anx-table tbody{display:block}
+  .anx-table tr.an-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;padding:14px 4px;border-bottom:1px solid var(--line)}
+  .anx-table tr.an-row:last-child{border-bottom:0}
+  .anx-table td{display:block;padding:0!important;border:0!important;background:none!important}
+  .anx-table td:first-child{grid-column:1/-1}
+  .anx-table td[data-label]::before{content:attr(data-label);display:block;margin-bottom:3px;font-size:.68rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .anx-table td small{max-width:none}
+  .anx-table td.anx-acts{grid-column:1/-1;width:auto}
+  .anx-table td.anx-acts>div{justify-content:flex-end}
+  .anx-card .an-table-wrap{overflow:visible}
+  .anx-card .ev-feed thead{display:none}
+  .anx-card .ev-feed table,.anx-card .ev-feed tbody{display:block}
+  .anx-card .ev-feed tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:10px 2px;border-bottom:1px solid var(--line)}
+  .anx-card .ev-feed td{display:block;padding:0!important;border:0!important}
+  .anx-card .ev-feed td:nth-child(1){grid-column:2;grid-row:1;font-size:.74rem;color:var(--muted)}
+  .anx-card .ev-feed td:nth-child(2){grid-column:1;grid-row:1;font-weight:700}
+  .anx-card .ev-feed td:nth-child(3),.anx-card .ev-feed td:nth-child(4){grid-column:1/-1}
+  .anx-card .ev-feed td:nth-child(4){font-size:.8rem}
+}
