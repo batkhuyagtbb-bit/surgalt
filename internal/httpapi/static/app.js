@@ -1216,14 +1216,24 @@ const Flipbook = {
     this.close();
     const el = document.createElement("div");
     el.className = "flipbook";
-    el.innerHTML = `<div class="fb-bar"><strong>${esc(title || "Баримт")}</strong>${opts.nodl ? `<span class="chip">🔒 Зөвхөн унших</span>` : `<a class="btn btn-ghost btn-sm" href="${esc(url)}" target="_blank" rel="noopener">⬇</a>`}<button class="icon-btn" data-fb-close aria-label="Хаах">✕</button></div>
+    el.innerHTML = `<div class="fb-bar"><strong>${esc(title || "Баримт")}</strong>
+        <div class="fb-zoom" role="group" aria-label="Томруулах"><button class="icon-btn" data-z="-" title="Жижигрүүлэх (−)" aria-label="Жижигрүүлэх">−</button><button class="fb-zv" data-z="0" title="Анхны хэмжээ (0)">100%</button><button class="icon-btn" data-z="+" title="Томруулах (+)" aria-label="Томруулах">+</button></div>
+        ${opts.nodl ? `<span class="chip">🔒 Зөвхөн унших</span>` : `<a class="btn btn-ghost btn-sm" href="${esc(url)}" target="_blank" rel="noopener">⬇</a>`}<button class="icon-btn" data-fb-close aria-label="Хаах">✕</button></div>
       <div class="fb-stage"><div class="loader"></div></div>
-      <div class="fb-nav"><button class="btn btn-glass btn-sm" data-fb-prev>←</button><input type="range" min="0" value="0"><span class="fb-count"></span><button class="btn btn-glass btn-sm" data-fb-next>→</button></div>`;
+      <div class="fb-nav"><button class="btn btn-glass btn-sm" data-fb-prev>←</button><input type="range" min="0" value="0"><span class="fb-count"></span><button class="btn btn-glass btn-sm" data-fb-next>→</button><span class="fb-hint">Давхар дарах, Ctrl + дугуй эсвэл хоёр хуруугаар томруулна</span></div>`;
     document.body.append(el);
-    this.el = el;
+    this.el = el; this.zoom = 1; this.pan = { x: 0, y: 0 };
     requestAnimationFrame(() => el.classList.add("open"));
     el.querySelector("[data-fb-close]").onclick = () => this.close();
-    this.key = (e) => { if (e.key === "ArrowRight") this.go(this.cur + 1); if (e.key === "ArrowLeft") this.go(this.cur - 1); if (e.key === "Escape") this.close(); };
+    el.addEventListener("click", (e) => { const z = e.target.closest("[data-z]"); if (z) this.setZoom(z.dataset.z === "+" ? this.zoom * 1.25 : z.dataset.z === "-" ? this.zoom / 1.25 : 1); });
+    this.key = (e) => {
+      if (e.key === "ArrowRight") this.go(this.cur + 1);
+      else if (e.key === "ArrowLeft") this.go(this.cur - 1);
+      else if (e.key === "+" || e.key === "=") this.setZoom(this.zoom * 1.25);
+      else if (e.key === "-") this.setZoom(this.zoom / 1.25);
+      else if (e.key === "0") this.setZoom(1);
+      else if (e.key === "Escape") this.close();
+    };
     addEventListener("keydown", this.key);
     try {
       const lib = await pdfLib();
@@ -1244,16 +1254,22 @@ const Flipbook = {
     // Хуудас бүр нэг "навч"; хоёр талтай горимд навч нэг бүр 2 хуудас (урд/ард).
     const per = this.single ? 1 : 2;
     this.leaves = Math.ceil(n / per);
-    stage.innerHTML = `<div class="fb-book ${this.single ? "single" : ""}" style="width:${pw * cols}px;height:${ph}px"></div>`;
+    stage.innerHTML = `<div class="fb-pan"><div class="fb-book ${this.single ? "single" : ""}" style="width:${pw * cols}px;height:${ph}px"></div></div>`;
     const book = $(".fb-book", stage);
-    this.pw = pw; this.ph = ph; this.book = book; this.rendered = new Set();
+    this.pw = pw; this.ph = ph; this.book = book; this.rq = new Map(); this.busy = new Set(); this.again = new Set();
     for (let i = 0; i < this.leaves; i++) {
       const f = i * per + 1, b = per === 2 ? f + 1 : 0;
       const leaf = document.createElement("div");
       leaf.className = "leaf";
       leaf.innerHTML = `<div class="face front" data-p="${f}"><div class="page-loading">${f}</div><span class="pnum">${f}</span></div>` +
         (b && b <= n ? `<div class="face back" data-p="${b}"><div class="page-loading">${b}</div><span class="pnum">${b}</span></div>` : `<div class="face back"></div>`);
-      leaf.addEventListener("click", (e) => { e.stopPropagation(); this.go(leaf.classList.contains("flipped") ? i : i + 1); });
+      leaf.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (this.zoom > 1 || this.dragged) return; // томруулсан эсвэл чирсэн бол хуудас эргүүлэхгүй
+        if (this.clickT) { clearTimeout(this.clickT); this.clickT = 0; return; } // давхар дарах → томруулна
+        const to = leaf.classList.contains("flipped") ? i : i + 1;
+        this.clickT = setTimeout(() => { this.clickT = 0; this.go(to); }, 240);
+      });
       book.append(leaf);
     }
     this.leafEls = $$(".leaf", book);
@@ -1261,12 +1277,88 @@ const Flipbook = {
     range.max = this.leaves; range.oninput = () => this.go(+range.value, true);
     $("[data-fb-prev]", el).onclick = () => this.go(this.cur - 1);
     $("[data-fb-next]", el).onclick = () => this.go(this.cur + 1);
-    // Шудрах (swipe)
-    let x0 = null;
-    stage.onpointerdown = (e) => (x0 = e.clientX);
-    stage.onpointerup = (e) => { if (x0 != null && Math.abs(e.clientX - x0) > 40) this.go(this.cur + (e.clientX < x0 ? 1 : -1)); x0 = null; };
+    this.bindGestures(stage);
     this.cur = 0;
     this.go(0, true);
+    this.applyZoom();
+  },
+  // Томруулах: Ctrl/⌘ + дугуй (trackpad чимхэлт), давхар дарах, хоёр хуруугаар чимхэх, товч; томруулсан үед чирж/гүйлгэж харна.
+  // Томруулж дуусахад харагдаж буй хуудсыг өндөр нягтралтайгаар дахин зурна (бичиг бүдгэрэхгүй).
+  setZoom(z, cx, cy) {
+    if (!this.el) return;
+    const old = this.zoom; z = Math.min(4, Math.max(1, z));
+    if (cx != null) { // хулгана/хурууны цэг дээр төвлөрч томруулна
+      const r = $(".fb-stage", this.el).getBoundingClientRect(), ox = cx - r.left - r.width / 2, oy = cy - r.top - r.height / 2;
+      this.pan.x = ox - (ox - this.pan.x) * (z / old); this.pan.y = oy - (oy - this.pan.y) * (z / old);
+    }
+    if (z <= 1) this.pan = { x: 0, y: 0 };
+    this.zoom = z; this.applyZoom();
+    clearTimeout(this.zt); this.zt = setTimeout(() => this.sharpen(), 250);
+  },
+  applyZoom() {
+    const pan = this.el && $(".fb-pan", this.el); if (!pan) return;
+    const st = $(".fb-stage", this.el), bk = this.book; // хуудсыг дэлгэцнээс бүрэн гаргахгүй
+    if (st && bk) {
+      const mx = Math.max(0, (bk.offsetWidth * this.zoom - st.clientWidth) / 2 + 40), my = Math.max(0, (bk.offsetHeight * this.zoom - st.clientHeight) / 2 + 40);
+      this.pan.x = Math.max(-mx, Math.min(mx, this.pan.x)); this.pan.y = Math.max(-my, Math.min(my, this.pan.y));
+    }
+    pan.style.transform = `translate(${this.pan.x}px, ${this.pan.y}px) scale(${this.zoom})`;
+    this.el.classList.toggle("zoomed", this.zoom > 1);
+    const zv = $(".fb-zv", this.el); if (zv) zv.textContent = Math.round(this.zoom * 100) + "%";
+  },
+  bindGestures(stage) {
+    const pts = new Map();
+    let start = null, pinch = null, gz = 1;
+    stage.addEventListener("wheel", (e) => {
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); this.setZoom(this.zoom * Math.exp(-e.deltaY / 300), e.clientX, e.clientY); }
+      else if (this.zoom > 1) { e.preventDefault(); this.pan.x -= e.deltaX; this.pan.y -= e.deltaY; this.applyZoom(); }
+    }, { passive: false });
+    // Safari (macOS) trackpad-ийн чимхэлт
+    stage.addEventListener("gesturestart", (e) => { e.preventDefault(); gz = this.zoom; });
+    stage.addEventListener("gesturechange", (e) => { e.preventDefault(); this.setZoom(gz * e.scale, e.clientX, e.clientY); });
+    stage.addEventListener("dblclick", (e) => {
+      e.preventDefault(); clearTimeout(this.clickT); this.clickT = 0;
+      this.setZoom(this.zoom > 1 ? 1 : 2, e.clientX, e.clientY);
+    });
+    stage.addEventListener("pointerdown", (e) => {
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: this.zoom }; start = null; return; }
+      start = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y, moved: false };
+      this.dragged = false;
+    });
+    stage.addEventListener("pointermove", (e) => {
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && pts.size === 2) {
+        const [a, b] = [...pts.values()];
+        this.dragged = true;
+        this.setZoom(pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d, (a.x + b.x) / 2, (a.y + b.y) / 2);
+        return;
+      }
+      if (!start) return;
+      const dx = e.clientX - start.x, dy = e.clientY - start.y;
+      if (Math.abs(dx) + Math.abs(dy) > 6) { start.moved = true; this.dragged = true; }
+      if (this.zoom > 1 && start.moved) { this.pan.x = start.px + dx; this.pan.y = start.py + dy; this.applyZoom(); }
+    });
+    const end = (e) => {
+      pts.delete(e.pointerId);
+      if (pts.size < 2) pinch = null;
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      if (this.zoom <= 1 && start.moved && Math.abs(dx) > 40) this.go(this.cur + (dx < 0 ? 1 : -1)); // шудрах
+      start = null;
+    };
+    stage.addEventListener("pointerup", end); stage.addEventListener("pointercancel", end);
+  },
+  // Харагдаж буй хуудсууд (нэг эсвэл хоёр) — томруулсан хэмжээнд тохирох нягтралаар.
+  sharpen() {
+    if (!this.el || !this.doc) return;
+    const k = this.cur, n = this.doc.numPages;
+    (this.single ? [k + 1] : [k * 2, k * 2 + 1]).filter((p) => p >= 1 && p <= n).forEach((p) => this.render(p, true));
+  },
+  quality(sharp) {
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    return sharp ? Math.min(dpr * Math.max(1, this.zoom), 4096 / this.pw) : dpr; // зураг хэт томрохгүй (≤4096px)
   },
   go(k, instant) {
     if (!this.leafEls) return;
@@ -1291,25 +1383,34 @@ const Flipbook = {
     const per = this.single ? 1 : 2, n = this.doc.numPages;
     const from = this.single ? k + 1 : Math.max(1, k * 2), to = Math.min(n, this.single ? k + 1 : k * 2 + 1);
     $(".fb-count", this.el).textContent = `${from}${to !== from ? "–" + to : ""} / ${n}`;
-    // Ойролцоох хуудсуудыг л зурна (том PDF ч хурдан).
+    // Ойролцоох хуудсуудыг л зурна (том PDF ч хурдан); томруулсан бол харагдаж буйг тодруулна.
     for (let p = Math.max(1, k * per - 3); p <= Math.min(n, k * per + 5); p++) this.render(p);
+    if (this.zoom > 1) { clearTimeout(this.zt); this.zt = setTimeout(() => this.sharpen(), 250); }
   },
-  async render(p) {
-    if (this.rendered.has(p)) return;
-    this.rendered.add(p);
-    const face = $(`.face[data-p="${p}"]`, this.el);
-    if (!face) return;
-    const pg = await this.doc.getPage(p);
-    const base = pg.getViewport({ scale: 1 });
-    const vp = pg.getViewport({ scale: (this.pw / base.width) * Math.min(2, devicePixelRatio || 1) });
-    const cv = document.createElement("canvas"); cv.width = vp.width; cv.height = vp.height;
-    await pg.render({ canvasContext: cv.getContext("2d"), viewport: vp }).promise;
-    $(".page-loading", face)?.replaceWith(cv);
+  async render(p, sharp) {
+    const need = this.quality(sharp);
+    if ((this.rq.get(p) || 0) >= need - 0.01) return;
+    if (this.busy.has(p)) { if (sharp) this.again.add(p); return; } // зурж байгаа бол дараа нь дахин шалгана
+    this.busy.add(p);
+    try {
+      const face = this.el && $(`.face[data-p="${p}"]`, this.el);
+      if (!face || !this.doc) return;
+      const pg = await this.doc.getPage(p);
+      const base = pg.getViewport({ scale: 1 });
+      const vp = pg.getViewport({ scale: (this.pw / base.width) * need });
+      const cv = document.createElement("canvas"); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      await pg.render({ canvasContext: cv.getContext("2d"), viewport: vp }).promise;
+      if (!this.el) return;
+      const old = face.querySelector("canvas, .page-loading");
+      old ? old.replaceWith(cv) : face.prepend(cv);
+      this.rq.set(p, need);
+    } catch {} finally { this.busy.delete(p); if (this.again.delete(p)) this.render(p, true); }
   },
   close() {
     if (!this.el) return;
     const el = this.el; this.el = null; this.leafEls = null;
     removeEventListener("keydown", this.key);
+    clearTimeout(this.zt); clearTimeout(this.clickT); this.clickT = 0;
     el.classList.remove("open");
     setTimeout(() => el.remove(), 400);
     this.doc?.destroy(); this.doc = null;

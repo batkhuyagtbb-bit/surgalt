@@ -2372,3 +2372,15 @@ html.has-rail.rail-collapsed .rail-tab .rail-tab-dot{background:var(--accent);bo
 /* Төлбөртэй шууд хичээл: холбоосоор ирэхэд тухайн мөрийг тодруулна */
 .meet-item .chip{margin-left:6px;vertical-align:1px}
 .meet-item.meet-focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+/* Ном шиг уншигч (хичээлийн PDF): томруулах, чирж харах */
+.fb-stage{touch-action:none;user-select:none}
+.fb-pan{perspective:2600px;transform-origin:center center;transition:transform .12s ease-out;will-change:transform}
+.flipbook.zoomed .fb-stage{cursor:grab}
+.flipbook.zoomed .fb-stage:active{cursor:grabbing}
+.fb-zoom{display:inline-flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);flex:none}
+.fb-zoom .icon-btn{width:32px;height:32px;font-size:1.15rem;font-weight:700;color:var(--text-2)}
+.fb-zv{min-width:58px;height:32px;padding:0 6px;border:0;border-radius:999px;background:none;font:700 .84rem var(--sans);color:var(--text-2);cursor:pointer;font-variant-numeric:tabular-nums}
+.fb-zv:hover{background:var(--state);color:var(--brand)}
+.fb-hint{font-size:.78rem;color:var(--muted)}
+@media (max-width:760px){.fb-hint{display:none}.fb-zv{min-width:48px}}
