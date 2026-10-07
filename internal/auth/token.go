@@ -61,6 +61,13 @@ func (s *Signer) sign(c Claims) (string, error) {
 	return p + "." + b64.EncodeToString(mac.Sum(nil)), nil
 }
 
+// MAC нь богино, хугацаагүй гарын үсэг (төлбөрийн холбоос г.м); purpose-оор зориулалтыг тусгаарлана.
+func (s *Signer) MAC(purpose, msg string) string {
+	mac := hmac.New(sha256.New, append([]byte(purpose+":"), s.key...))
+	mac.Write([]byte(msg))
+	return b64.EncodeToString(mac.Sum(nil)[:16])
+}
+
 func (s *Signer) SignUser(uid, role, name string) (string, error) {
 	return s.sign(Claims{UID: uid, Role: role, Name: name, Exp: time.Now().Add(s.ttl).Unix()})
 }

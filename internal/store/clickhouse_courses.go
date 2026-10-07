@@ -842,3 +842,31 @@ func (c *ClickHouse) TeacherSales(ctx context.Context, teacherID string, limit i
 	}
 	return sum, nil
 }
+
+func (c *ClickHouse) SaveInvoice(ctx context.Context, inv *PaymentInvoice) error {
+	if inv.CreatedAt.IsZero() {
+		inv.CreatedAt = time.Now()
+	}
+	return c.insert(ctx, "payment_invoices", []string{"order_id", "provider", "invoice_id", "amount", "qr_text", "urls", "created_at", "ver"},
+		inv.OrderID, inv.Provider, inv.InvoiceID, inv.Amount, inv.QRText, inv.URLs, inv.CreatedAt.UTC(), ver())
+}
+
+func (c *ClickHouse) InvoiceByOrder(ctx context.Context, orderID string) (*PaymentInvoice, error) {
+	var inv *PaymentInvoice
+	err := c.query(ctx, "SELECT order_id, provider, invoice_id, amount, qr_text, urls, created_at FROM payment_invoices FINAL WHERE order_id = ? LIMIT 1",
+		[]any{orderID}, func(r driver.Rows) error {
+			var x PaymentInvoice
+			if err := r.Scan(&x.OrderID, &x.Provider, &x.InvoiceID, &x.Amount, &x.QRText, &x.URLs, &x.CreatedAt); err != nil {
+				return err
+			}
+			inv = &x
+			return nil
+		})
+	if err != nil {
+		return nil, err
+	}
+	if inv == nil {
+		return nil, ErrNotFound
+	}
+	return inv, nil
+}

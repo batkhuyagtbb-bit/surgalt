@@ -556,7 +556,7 @@ func (s *Server) handleBuyLesson(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"unlocked": false, "order": o,
-		"payment": map[string]any{"amount": o.Amount, "currency": "MNT", "dev_pay": s.cfg.DevPayments},
+		"payment": s.paymentInfo(r, o),
 	})
 }
 
@@ -860,7 +860,7 @@ func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"enrolled": false,
 		"order":    order,
-		"payment":  map[string]any{"amount": order.Amount, "currency": "MNT", "dev_pay": s.cfg.DevPayments},
+		"payment":  s.paymentInfo(r, order),
 	})
 }
 
@@ -877,6 +877,7 @@ func (s *Server) handleGetOrder(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "олдсонгүй")
 		return
 	}
+	o = s.syncPayment(r.Context(), o, false) // QPay-ээс төлөгдсөн эсэхийг шалгана (callback ирээгүй ч)
 	writeJSON(w, http.StatusOK, o)
 }
 
@@ -886,15 +887,21 @@ func (s *Server) handleDevPay(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "олдсонгүй")
 		return
 	}
-	c, ok := s.requireUser(w, r)
-	if !ok {
-		return
+	id := r.PathValue("id")
+	byQR := constantEq(r.URL.Query().Get("t"), s.payMAC(id)) // демо QR-ыг утсаар уншуулсан: нэвтрэлтгүй
+	uid := ""
+	if !byQR {
+		c, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		uid = c.UID
 	}
-	o, err := s.store.OrderByID(r.Context(), r.PathValue("id"))
+	o, err := s.store.OrderByID(r.Context(), id)
 	if s.storeErr(w, r, err) {
 		return
 	}
-	if o.UserID != c.UID {
+	if !byQR && o.UserID != uid {
 		writeErr(w, http.StatusNotFound, "олдсонгүй")
 		return
 	}

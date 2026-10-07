@@ -375,6 +375,17 @@ type Order struct {
 	PaidAt    *time.Time  `json:"paid_at,omitempty"`
 }
 
+// PaymentInvoice — төлбөрийн үйлчилгээ (QPay)-нд захиалгад үүсгэсэн нэхэмжлэх: QR-ын текст, банкны апп-уудын холбоос.
+type PaymentInvoice struct {
+	OrderID   string    `json:"order_id"`
+	Provider  string    `json:"provider"` // "qpay"
+	InvoiceID string    `json:"invoice_id"`
+	Amount    int64     `json:"amount"`
+	QRText    string    `json:"qr_text"`
+	URLs      string    `json:"urls"` // банкны апп-уудын холбоос (JSON)
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Sale struct {
 	OrderID       string    `json:"order_id"`
 	CourseID      string    `json:"course_id"`
@@ -578,6 +589,9 @@ type Store interface {
 	OrderByID(ctx context.Context, id string) (*Order, error)
 	// MarkOrderPaid нь идемпотент: дахин дуудахад алдаагүй, элсэлт/багтаамж давхардахгүй.
 	MarkOrderPaid(ctx context.Context, orderID string, amount int64) (*Order, error)
+	// SaveInvoice / InvoiceByOrder — захиалгын сүүлийн нэхэмжлэх (QR); байхгүй бол ErrNotFound.
+	SaveInvoice(ctx context.Context, inv *PaymentInvoice) error
+	InvoiceByOrder(ctx context.Context, orderID string) (*PaymentInvoice, error)
 	TeacherSales(ctx context.Context, teacherID string, limit int) (*SalesSummary, error)
 	// CourseStudents нь сургалтын суралцагчид (элссэн + дангаар хичээл авсан), шинээс хуучин.
 	CourseStudents(ctx context.Context, courseID string) ([]CourseStudent, error)

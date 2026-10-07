@@ -1335,9 +1335,8 @@ async function files() {
   $("#buyPlan").onclick = async () => {
     try {
       const d = await api("/api/me/storage/purchase", { method: "POST", body: { mb: +$(".plan.sel").dataset.mb, months: +$("#months").value } });
-      if (d.payment.dev_pay && confirm(`Захиалга: ${money(d.order.amount)}\n(Демо) Төлсөн гэж баталгаажуулах уу?`)) {
-        await api(`/api/orders/${d.order.id}/dev-pay`, { method: "POST" }); toast("💾 Багтаамж нэмэгдлээ"); celebrate(); files();
-      } else toast(`Захиалга үүслээ: ${money(d.order.amount)}. Төлбөр баталгаажмагц нэмэгдэнэ.`);
+      const p = plans.plans.find((x) => x.mb == $(".plan.sel").dataset.mb);
+      window.SG.pay(d.order, d.payment, `Файлын сан · ${p?.label || ""} · ${$("#months").value} сар`, () => { toast("💾 Багтаамж нэмэгдлээ"); celebrate(); files(); }, { name: "Багтаамж" });
     } catch (e) { toast(e.message, true); }
   };
 

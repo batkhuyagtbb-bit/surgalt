@@ -66,17 +66,6 @@
   </div>
 </div>
 
-<div class="modal" id="payModal" aria-hidden="true">
-  <div class="modal-card">
-    <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
-    <span class="eyebrow">Төлбөр</span>
-    <h3 class="h3">Захиалга үүслээ</h3>
-    <p class="price-big" id="payAmount"></p>
-    <p class="muted small" id="payNote">Төлбөр баталгаажмагц бүх хичээл автоматаар нээгдэнэ.</p>
-    <button class="btn btn-gold btn-block" id="devPayBtn" hidden>Төлсөн гэж баталгаажуулах (демо)</button>
-  </div>
-</div>
-
 <footer class="footer"><span class="slogan">Сур, сур, бас дахин сур</span><a href="/t/{{$t.Username}}">← {{$t.DisplayName}}-ийн профайл</a></footer>
 {{template "chat" $t}}
 {{template "foot" (dict "Page" "course")}}

@@ -289,7 +289,7 @@ func (s *Server) handleBuyMeeting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"unlocked": false, "order": o,
-		"payment": map[string]any{"amount": o.Amount, "currency": "MNT", "dev_pay": s.cfg.DevPayments}})
+		"payment": s.paymentInfo(r, o)})
 }
 
 // handleCourseMeetings: товлосон шууд хичээлүүд. Meet холбоос зөвхөн элссэн/багш/үнэгүй сургалтад.

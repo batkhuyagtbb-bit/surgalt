@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Төлбөр — surgalt.mn</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="/static/app.css?v={{v}}">
+</head>
+<body class="pp-body">
+<main class="pp">
+  <div class="pp-card">
+    <span class="wordmark">surgalt<b>.mn</b></span>
+    <span class="pp-demo">Демо төлбөр · туршилтын горим</span>
+    <p class="pp-what">{{.Order.Title}}</p>
+    <p class="pp-amount">{{money .Order.Amount}}</p>
+    <div id="ppState">
+    {{if .Paid}}<p class="pp-ok"><b>✓</b> Төлбөр амжилттай төлөгдлөө.<br>Компьютер дээрх хуудас өөрөө нээгдэнэ.</p>
+    {{else}}<button class="btn btn-gold btn-block btn-lg" id="ppPay">Төлөх</button>
+    <p class="pp-note">Туршилтын горим тул жинхэнэ мөнгө шилжихгүй. Жинхэнэ орчинд банкны апп-аараа QPay QR уншуулж төлнө.</p>{{end}}
+    </div>
+  </div>
+</main>
+<script>
+(() => {
+  const b = document.getElementById("ppPay"); if (!b) return;
+  b.onclick = async () => {
+    b.disabled = true; b.textContent = "Төлж байна…";
+    try {
+      const r = await fetch("/api/orders/{{.Order.ID}}/dev-pay?t={{.Token}}", { method: "POST" });
+      if (!r.ok) throw new Error();
+      document.getElementById("ppState").innerHTML = '<p class="pp-ok"><b>✓</b> Төлбөр амжилттай төлөгдлөө.<br>Компьютер дээрх хуудас өөрөө нээгдэнэ.</p>';
+    } catch { b.disabled = false; b.textContent = "Дахин оролдох"; }
+  };
+})();
+</script>
+</body>
+</html>

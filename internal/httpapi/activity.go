@@ -28,6 +28,7 @@ var eventInfo = map[string]eventMeta{
 	"devtools":        {"Хөгжүүлэгчийн хэрэгсэл нээсэн", true, true},
 	"download":        {"Файл татах оролдлого", true, true},
 	"idle":            {"2 минутаас дээш хөдөлгөөнгүй", false, false},
+	"cursor_out":      {"Курсор хичээлийн цонхноос гарсан", false, false},
 	"ping_missed":     {"Идэвхийн шалгалтад хариу өгөөгүй", true, false},
 	"auto_block":      {"Хичээл автоматаар зогссон", true, false},
 	"teacher_unblock": {"Багш дахин нээсэн", false, false},

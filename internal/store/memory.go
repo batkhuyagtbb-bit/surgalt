@@ -41,6 +41,7 @@ type Memory struct {
 	learn       learnMem                   // шалгалт, сесс, лог (memory_learning.go)
 	engage      engageMem                  // идэвхийн нэмэлт (memory_engagement.go)
 	books       bookMem                    // ном (memory_books.go)
+	invoices    map[string]*PaymentInvoice // order → сүүлийн нэхэмжлэх
 }
 
 func NewMemory() *Memory {
@@ -49,7 +50,30 @@ func NewMemory() *Memory {
 		courses: map[string]*Course{}, lessons: map[string][]*Lesson{}, orders: map[string]*Order{},
 		pending: map[[2]string]string{}, enrollments: map[[2]string]time.Time{},
 		convs: map[string]*Conversation{}, convByKey: map[string]string{}, messages: map[string][]*Message{}, identities: map[string]string{}, applied: map[string]bool{}, notifs: map[string][]*Notification{}, progress: map[[2]string]*LessonProgress{}, lessonAcc: map[[2]string]string{}, pendingL: map[[2]string]string{},
+		invoices: map[string]*PaymentInvoice{},
 	}
+}
+
+func (m *Memory) SaveInvoice(_ context.Context, inv *PaymentInvoice) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if inv.CreatedAt.IsZero() {
+		inv.CreatedAt = time.Now()
+	}
+	cp := *inv
+	m.invoices[inv.OrderID] = &cp
+	return nil
+}
+
+func (m *Memory) InvoiceByOrder(_ context.Context, orderID string) (*PaymentInvoice, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	inv, ok := m.invoices[orderID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	cp := *inv
+	return &cp, nil
 }
 
 func (m *Memory) Close() {}

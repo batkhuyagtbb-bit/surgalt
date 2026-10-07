@@ -773,16 +773,80 @@ function lockedControls(v, isFree, note, maxFn = () => 0) {
   };
 }
 
+/* ---------- Унших туслах: курсор байгаа мөрийг тодруулна (хичээлийн текст дээр, hover үед) ---------- */
+function readingRuler(box) {
+  if (!box || box._ruler || !matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  const band = document.createElement("div"); band.className = "read-line"; band.setAttribute("aria-hidden", "true");
+  box._ruler = band; box.classList.add("has-read-line");
+  let raf = 0, px = 0, py = 0, inside = false;
+  const caretAt = (x, y) => {
+    if (document.caretPositionFromPoint) { const c = document.caretPositionFromPoint(x, y); return c && [c.offsetNode, c.offset]; }
+    const r = document.caretRangeFromPoint?.(x, y); return r && [r.startContainer, r.startOffset];
+  };
+  const hide = () => band.classList.remove("on");
+  const update = () => {
+    raf = 0;
+    if (!inside) return hide();
+    const c = caretAt(px, py), t = c?.[0];
+    if (!t || t.nodeType !== 3 || !t.length || !box.contains(t) || t.parentElement.closest("button, input, textarea, select, .doc-view, .rb-embed, .player")) return hide();
+    const i = Math.min(c[1], t.length - 1), rg = document.createRange();
+    rg.setStart(t, i); rg.setEnd(t, i + 1);
+    const r = rg.getBoundingClientRect();
+    if (!r.height || py < r.top - 3 || py > r.bottom + 3) return hide(); // мөрийн хоорондох зай, хоосон хэсэг
+    const blk = t.parentElement.closest("p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, pre, figcaption, .rb-text, .lesson-content") || box;
+    const host = box.getBoundingClientRect(), b = blk.getBoundingClientRect();
+    if (!band.isConnected) box.prepend(band);
+    band.style.cssText = `top:${r.top - host.top - box.clientTop - 3}px;height:${r.height + 6}px;left:${Math.max(0, b.left - host.left - box.clientLeft - 8)}px;width:${Math.min(host.width, b.width + 16)}px`;
+    band.classList.add("on");
+  };
+  const queue = () => { if (!raf) raf = requestAnimationFrame(update); };
+  box.addEventListener("pointermove", (e) => { if (e.pointerType === "touch") return; px = e.clientX; py = e.clientY; inside = true; queue(); }, { passive: true });
+  box.addEventListener("pointerleave", () => { inside = false; hide(); });
+  addEventListener("scroll", () => { if (inside) queue(); }, { passive: true, capture: true });
+}
+
 /* ---------- Хичээл үзэх үеийн анхаарал: өөр таб, цонх руу шилжвэл сануулга, 3 дахь удаад зогсоно ---------- */
 const WATCH_MAX_WARN = 3;
-function watchAlert(html, btn, onClose) {
+// tone: "danger" (таб солих — улаан, сэгсрэлт, дохио), "stop" (хичээл зогссон), "info" (идэвхийн шалгалт).
+function watchAlert(html, btn, onClose, tone = "info") {
   $(".watch-alert")?.remove();
   const el = document.createElement("div");
-  el.className = "watch-alert"; el.setAttribute("role", "alertdialog"); el.setAttribute("aria-modal", "true");
-  el.innerHTML = `<div class="watch-card">${html}<button class="btn btn-gold btn-block">${btn}</button></div>`;
+  el.className = `watch-alert wa-${tone}`; el.setAttribute("role", "alertdialog"); el.setAttribute("aria-modal", "true");
+  el.innerHTML = `<div class="watch-card">${html}<button class="btn ${tone === "info" ? "btn-gold" : "wa-btn"} btn-block">${btn}</button></div>`;
   document.body.append(el);
+  if (tone !== "info") alarm(tone);
   const b = $("button", el); b.focus();
   b.onclick = () => { el.remove(); onClose?.(); };
+  return el;
+}
+// Анхааруулгын дохио: богино хоёр аялгуу (WebAudio) + утсан дээр чичиргээ.
+let alarmCtx = null;
+function alarm(kind) {
+  navigator.vibrate?.(kind === "stop" ? [260, 90, 260, 90, 260] : [140, 70, 140]);
+  try {
+    alarmCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = alarmCtx, t0 = ctx.currentTime + 0.02;
+    ctx.resume?.();
+    const notes = kind === "stop" ? [[523, 0], [392, 0.2], [262, 0.4]] : [[988, 0], [740, 0.16], [988, 0.32]];
+    for (const [f, dt] of notes) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + dt);
+      g.gain.exponentialRampToValueAtTime(0.22, t0 + dt + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.15);
+      o.connect(g).connect(ctx.destination); o.start(t0 + dt); o.stop(t0 + dt + 0.17);
+    }
+  } catch {}
+}
+// Курсор хичээлийн цонхноос гарахад: тусдаа шар сануулга (хичээл зогсохгүй, багшид тэмдэглэгдэнэ).
+function cursorAlert(n) {
+  $(".cursor-alert")?.remove();
+  const el = document.createElement("div");
+  el.className = "cursor-alert"; el.setAttribute("role", "status");
+  el.innerHTML = `<span class="ca-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3l14 7.5-6.2 1.6L9.6 18z" fill="currentColor" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
+    <span class="ca-txt"><b>Курсор хичээлийн цонхноос гарлаа</b><small>Курсороо хичээл дээрээ байлгаарай · ${n} дахь удаа — багшид тэмдэглэгдэнэ</small></span>`;
+  document.body.append(el);
+  return el;
 }
 // watchLesson нь хичээлийн цонх нээлттэй байх хугацааг хянаж, хаагдахад зогсоох функц буцаана.
 // Өөр таб/цонх руу шилжвэл сануулга (3 дахь удаад зогсоно), 5 минут тутам "Та үзэж байна уу?" (30 сек),
@@ -833,10 +897,14 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
       move(); wmTimer = setInterval(move, 6000);
     }).catch(() => badge.remove());
   const pauseMedia = () => { $$("video, audio", modal).forEach((v) => v.pause()); modal._ytPause?.(); };
-  const leave = () => { if (away || stopped) return; tick(); away = true; awayAt = Date.now(); pauseMedia(); };
+  // Өөр таб руу гарсан үед хуудасны гарчиг анивчина: «⚠️ Хичээл рүүгээ буцна уу!»
+  const title0 = document.title; let flashT = 0;
+  const flashOn = () => { if (owner || flashT) return; let f = false; flashT = setInterval(() => { document.title = (f = !f) ? "⚠️ Хичээл рүүгээ буцна уу!" : title0; }, 900); };
+  const flashOff = () => { clearInterval(flashT); flashT = 0; document.title = title0; };
+  const leave = () => { if (away || stopped) return; tick(); away = true; awayAt = Date.now(); pauseMedia(); flashOn(); };
   const back = () => {
     if (!away || stopped) return;
-    tick(); away = false;
+    tick(); away = false; flashOff();
     const sec = Math.max(1, Math.round((Date.now() - awayAt) / 1000));
     if (owner) return; // багш өөрийн хичээлийг шалгаж байна
     if (Date.now() - awayAt < 3000) { // санамсаргүй богино шилжилт (мэдэгдэл, дуудлага) — тоолохгүй, зөөлөн сануулна
@@ -846,18 +914,25 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
     events.push({ type: "tab_switch", detail: `${sec} сек өөр цонхонд байсан (сануулга ${warns}/${WATCH_MAX_WARN})` });
     if (warns >= WATCH_MAX_WARN) return stop(`${WATCH_MAX_WARN} удаа хичээлээс гарсан`, `Та ${WATCH_MAX_WARN} удаа хичээлээс гарсан тул хичээл зогслоо.`);
     send();
-    watchAlert(`<span class="watch-ico">⚠️</span><h3>Та хичээлээс гарсан байна</h3>
+    const left = WATCH_MAX_WARN - warns;
+    watchAlert(`<span class="wa-ico" aria-hidden="true"><i>!</i></span>
+      <span class="wa-eyebrow">Анхааруулга ${warns}/${WATCH_MAX_WARN}</span>
+      <h3>Та хичээлээс гарлаа!</h3>
       <p>Хичээл үзэж байхдаа өөр таб, цонх руу шилжихгүй байна уу. Видео түр зогслоо.</p>
-      <p class="watch-count">Сануулга <b>${warns}/${WATCH_MAX_WARN}</b> · ${WATCH_MAX_WARN}-р удаад хичээл зогсоно</p>`, "Ойлголоо, үргэлжлүүлэх");
+      <div class="wa-meter" aria-label="Сануулга ${warns}/${WATCH_MAX_WARN}">${Array.from({ length: WATCH_MAX_WARN }, (_, i) => `<i class="${i < warns ? "used" : ""} ${i === WATCH_MAX_WARN - 1 ? "last" : ""}">${i === WATCH_MAX_WARN - 1 ? "⛔" : i + 1}</i>`).join("")}</div>
+      <p class="wa-left">${left === 1 ? "Дахиад гарвал хичээл <b>хаагдаж</b>, багшид мэдэгдэнэ!" : `Дахиад <b>${left}</b> удаа гарвал хичээл хаагдана`}</p>
+      <p class="wa-away">⏱ ${sec} секунд өөр цонхонд байсан · багшид тэмдэглэгдлээ</p>`, "Ойлголоо, хичээл рүүгээ буцах", null, "danger");
   };
   const stop = (detail, msg) => {
     stopped = true;
     events.push({ type: "auto_block", detail });
     send("auto_block"); cleanup(true);
     onStop?.();
-    watchAlert(`<span class="watch-ico">⛔</span><h3>Анхаарал идэвхгүй тул хичээл зогслоо</h3>
+    watchAlert(`<span class="wa-ico" aria-hidden="true"><i>⛔</i></span>
+      <span class="wa-eyebrow">Хичээл хаагдлаа</span>
+      <h3>Анхаарал идэвхгүй тул хичээл зогслоо</h3>
       <p>${msg} Энэ тухай багшид мэдэгдсэн. Идэвхгүй байсан хугацаа суралцсан цагт тооцогдохгүй.</p>
-      <p class="muted small">Дахин үзэхдээ хичээлээ анхааралтай, бусад цонхоо хаагаад үзээрэй.</p>`, "Ойлголоо");
+      <p class="wa-away">Дахин үзэхдээ бусад цонхоо хаагаад, анхааралтай үзээрэй.</p>`, "Ойлголоо", null, "stop");
   };
   // 5 минут тутам идэвхийн шалгалт: 30 секундэд хариулахгүй бол хичээл зогсоно.
   const ping = () => {
@@ -879,6 +954,21 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
   const onFocus = () => { if (!document.hidden) back(); };
   const onInput = () => { lastInput = Date.now(); idleLogged = false; };
   const inputs = ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"];
+  // Курсор хичээлийн цонхноос 2.5 сек+ гарвал тусдаа (шар) сануулга; буцаж ороход алга болж, хугацааг нь тэмдэглэнэ.
+  const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;
+  let outT = 0, outAt = 0, outs = 0, ca = null;
+  const overlayOpen = () => $(".watch-alert") || $(".dv-full") || $$(".modal.open").some((m) => m !== modal);
+  const cursorBack = () => {
+    clearTimeout(outT); if (!ca) return;
+    events.push({ type: "cursor_out", detail: `${Math.max(1, Math.round((Date.now() - outAt) / 1000))} сек курсор хичээлийн цонхноос гадуур (${outs} дахь удаа)` });
+    const el = ca; ca = null; el.classList.add("out"); setTimeout(() => el.remove(), 250); card.classList.remove("cursor-out");
+  };
+  const onLeaveCard = (e) => {
+    if (!fine || owner || stopped || e.pointerType === "touch" || (e.relatedTarget && card.contains(e.relatedTarget))) return;
+    clearTimeout(outT); outAt = Date.now();
+    outT = setTimeout(() => { if (stopped || away || owner || ca || overlayOpen() || card.matches(":hover")) return; outs++; ca = cursorAlert(outs); card.classList.add("cursor-out"); }, 2500);
+  };
+  card.addEventListener("pointerleave", onLeaveCard); card.addEventListener("pointerenter", cursorBack);
   document.addEventListener("visibilitychange", onVis);
   addEventListener("blur", onBlur); addEventListener("focus", onFocus);
   inputs.forEach((n) => addEventListener(n, onInput, { passive: true }));
@@ -904,6 +994,8 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
     document.removeEventListener("visibilitychange", onVis);
     removeEventListener("blur", onBlur); removeEventListener("focus", onFocus);
     inputs.forEach((n) => removeEventListener(n, onInput));
+    card.removeEventListener("pointerleave", onLeaveCard); card.removeEventListener("pointerenter", cursorBack);
+    clearTimeout(outT); ca?.remove(); ca = null; card.classList.remove("cursor-out"); flashOff();
     badge.remove(); wm.remove();
     if (!fromStop) send("closed");
   };
@@ -1029,7 +1121,7 @@ async function examCard(box, { courseId, lessonId, title, onFinish }) {
       ${info.attempts.length ? `<table class="tbl"><thead><tr><th>Огноо</th><th>Оноо</th><th>Төлөв</th></tr></thead><tbody>${info.attempts.map((a) => `<tr><td>${fmtDate(a.started_at)}</td><td>${a.status === "active" ? "—" : a.pct + "%" + (a.passed ? " ✓" : "")}</td><td>${a.status === "terminated" ? `⛔ Хаагдсан · ${esc(a.reason || "")}` : a.status === "submitted" ? (a.passed ? "Тэнцсэн" : "Тэнцээгүй") : a.status === "expired" ? "Хугацаа хэтэрсэн" : "Үргэлжилж байна"}</td></tr>`).join("")}</tbody></table>` : ""}
       ${dueNotice(due)}
       ${due.closed || due.not_started ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж шалгалтаа нээх</button>` : active || info.left !== 0 ? `<button class="btn btn-gold btn-lg" data-exam-start>${active ? "▶ Шалгалтаа үргэлжлүүлэх" : "▶ Шалгалт эхлүүлэх"}</button>` : `<p class="muted">Оролдлогын тоо дууссан.</p>`}`;
-    bindLatePay(card, base, "Шалгалтын төлбөр", draw);
+    bindLatePay(card, base, title ? `«${title}» — шалгалтын төлбөр` : "Шалгалтын төлбөр", draw);
     const b = $("[data-exam-start]", card);
     if (b) b.onclick = async () => {
       if (!active && !confirm("Шалгалт эхлүүлэх үү? Эхэлсний дараа өөр цонх руу шилжвэл шалгалт хаагдана.")) return;
@@ -1056,13 +1148,15 @@ function dueNotice(due) {
   if (due.late) return `<div class="exam-rules">⏰ Хугацаа өнгөрсөн ч төлбөргүй үргэлжлүүлж болно (хоцорсон гэж тэмдэглэгдэнэ).</div>`;
   return "";
 }
+// Төлбөртэй шалгалт/даалгавар: хичээлийг нээмэгц «Та төлбөрөө төлнө үү» цонх (QR) нэг удаа өөрөө гарна; хаасан ч товч нь үлдэнэ.
 function bindLatePay(card, base, label, after) {
   const b = $("[data-late-pay]", card); if (!b) return;
   b.onclick = async () => {
     b.disabled = true;
-    try { const d = await api(`${base}/late-pay`, { method: "POST" }); if (d.unlocked) return after(); window.SG_pay?.(d.order, d.payment, label, () => { toast("✓ Нээгдлээ"); after(); }); }
+    try { const d = await api(`${base}/late-pay`, { method: "POST" }); if (d.unlocked) return after(); window.SG_pay?.(d.order, d.payment, label, () => { toast("✓ Нээгдлээ"); after(); }, { name: label }); }
     catch (e) { toast(e.message, true); } finally { b.disabled = false; }
   };
+  if (!card.dataset.payShown) { card.dataset.payShown = "1"; b.click(); }
 }
 
 // Даалгавар: нөхцөл (блокууд дээр), хугацаа, хариу илгээх (текст + файл), багшийн дүн.
@@ -1158,7 +1252,15 @@ function runExam({ base, courseId, lessonId, title, data, onClose }) {
       body: JSON.stringify({ sessionId: sid, active: dt, events, end, attemptId: att.id }) }).catch(() => {}); };
   beat = setInterval(() => beatNow(), 15000);
   // Хатуу хамгаалалт
-  const violate = (type, label) => { if (finished) return; beatNow([{ type, detail: "Шалгалтын үеэр: " + label }]); submit(type, `⛔ Шалгалт хаагдлаа: ${label}.`); };
+  // Зөрчил: шалгалт шууд хаагдана; суралцагч буцаж ирэхэд анхаарал татахуйц (улаан, дохиотой) цонх гарна.
+  const stopAlert = (label) => {
+    const show = () => watchAlert(`<span class="wa-ico" aria-hidden="true"><i>⛔</i></span><span class="wa-eyebrow">Шалгалт хаагдлаа</span>
+      <h3>Шалгалтын үеэр ${esc(label)}!</h3><p>Дүрмийн дагуу шалгалт тань тэр мөчийн хариултаар дүгнэгдэж хаагдлаа. Энэ тухай багшид мэдэгдсэн — багш дахин нээж өгч болно.</p>`, "Ойлголоо", null, "stop");
+    if (!document.hidden) return show();
+    const once = () => { if (document.hidden) return; document.removeEventListener("visibilitychange", once); show(); };
+    document.addEventListener("visibilitychange", once);
+  };
+  const violate = (type, label) => { if (finished) return; beatNow([{ type, detail: "Шалгалтын үеэр: " + label }]); submit(type, `⛔ Шалгалт хаагдлаа: ${label}.`); stopAlert(label); };
   const onVis = () => { if (document.hidden) violate("tab_switch", "өөр таб руу шилжсэн"); };
   const onBlur = () => setTimeout(() => { if (!finished && !document.hasFocus() && document.activeElement?.tagName !== "IFRAME") violate("tab_switch", "өөр цонх руу шилжсэн"); }, 0);
   const onCopy = (e) => { e.preventDefault(); violate("copy", "хуулах оролдлого хийсэн"); };
@@ -2063,16 +2165,8 @@ function bookPage() {
     try {
       const d = await api(`/api/books/${id}/buy`, { method: "POST" });
       if (d.unlocked) { await refresh(); return read(); }
-      $("#payAmount").textContent = money(d.order.amount);
-      const dev = $("#devPayBtn"); dev.hidden = !d.payment.dev_pay;
-      const done = async () => { closeModal($("#payModal")); toast("🎉 Ном нээгдлээ!"); celebrate(); await refresh(); read(); };
-      dev.onclick = async () => { dev.disabled = true; try { await api(`/api/orders/${d.order.id}/dev-pay`, { method: "POST" }); done(); } catch (e) { toast(e.message, true); } finally { dev.disabled = false; } };
-      openModal($("#payModal"));
-      const poll = setInterval(async () => {
-        if (!$("#payModal").classList.contains("open")) return clearInterval(poll);
-        const o = await api(`/api/orders/${d.order.id}`).catch(() => null);
-        if (o?.status === "paid") { clearInterval(poll); done(); }
-      }, 4000);
+      BookReader.close?.(); // уншигч нээлттэй бол төлбөрийн цонх дээр нь гарна
+      payWindow(d.order, d.payment, `«${title}» ном`, async () => { toast("🎉 Ном нээгдлээ!"); celebrate(); await refresh(); read(); }, { name: "Энэ ном" });
     } catch (e) { toast(e.message, true); }
   };
   const read = () => BookReader.open({ id, title, pages: access.full ? pages : Math.min(access.preview_pages || 3, pages), full: access.full || pages <= (access.preview_pages || 3),
@@ -2823,30 +2917,43 @@ async function coursePage() {
     try {
       const d = await api(`/api/meetings/${b.dataset.meetBuy}/buy`, { method: "POST" });
       if (d.unlocked) { await loadMeets(); return; }
-      pay(d.order, d.payment, "Шууд хичээл: " + b.dataset.title, async () => { toast("🎉 Шууд хичээл нээгдлээ!"); celebrate(); await loadMeets(); });
+      pay(d.order, d.payment, "Шууд хичээл: " + b.dataset.title, async () => { toast("🎉 Шууд хичээл нээгдлээ!"); celebrate(); await loadMeets(); }, { name: "Шууд хичээл" });
     } catch (err) { toast(err.message, true); } finally { b.disabled = false; }
   });
 
   const needLogin = () => { if (Auth.token) return false; location.href = "/login?next=" + encodeURIComponent(location.pathname); return true; };
 
-  // Төлбөр: захиалга → модал → (демо товч эсвэл webhook-ийг хүлээнэ)
-  const pay = (order, payment, label, onPaid) => {
-    $("#payAmount").textContent = money(order.amount);
-    $("#payNote").textContent = label + " — төлбөр баталгаажмагц автоматаар нээгдэнэ.";
-    const dev = $("#devPayBtn");
-    dev.hidden = !payment.dev_pay;
-    dev.onclick = async () => {
-      dev.disabled = true;
-      try { await api(`/api/orders/${order.id}/dev-pay`, { method: "POST" }); closeModal($("#payModal")); onPaid(); }
-      catch (e) { toast(e.message, true); } finally { dev.disabled = false; }
-    };
-    openModal($("#payModal"));
-    const poll = setInterval(async () => {
-      if (!$("#payModal").classList.contains("open")) return clearInterval(poll);
-      const o = await api(`/api/orders/${order.id}`).catch(() => null);
-      if (o?.status === "paid") { clearInterval(poll); closeModal($("#payModal")); onPaid(); }
-    }, 4000);
-  };  window.SG_pay = pay; // шалгалт, даалгаврын хоцролтын төлбөрт ч ижил цонх
+  // Төлбөр: захиалга → «Та төлбөрөө төлнө үү» цонх (QR) → төлөгдмөгц автоматаар нээнэ.
+  const pay = (order, payment, label, onPaid, extra) => payWindow(order, payment, label, onPaid, extra);
+  const courseTitle = $(".course-page h1")?.textContent.trim() || "Сургалт";
+  // Багцын сонголт: хичээл дангаар төлөх цонхонд «Бүх хичээл багцаар» гэж сольж болно.
+  const bundleOpt = (lid) => bundle > 0 && !all ? {
+    name: "Бүх хичээл багцаар", sub: `${lessonRows().length} хичээл бүгд нээгдэнэ`, amount: bundle, label: `«${courseTitle}» — бүх хичээл`,
+    start: () => api(`/api/courses/${id}/enroll`, { method: "POST" }),
+    onPaid: async () => { unlockAll(); toast("🎉 Бүх хичээл нээгдлээ!"); celebrate(); await refreshAccess(); const li = lid && $(`.lesson[data-lesson="${CSS.escape(lid)}"]`); if (li) expandRow(li, true); },
+  } : null;
+  // Төлбөртэй (худалдаж аваагүй) хичээл дээр дарах → шууд төлбөрийн цонх.
+  const paywall = async (li) => {
+    if (needLogin()) return;
+    const lid = li.dataset.lesson, price = +li.dataset.price;
+    try {
+      if (price > 0) {
+        const d = await api(`/api/courses/${id}/lessons/${lid}/buy`, { method: "POST" });
+        if (d.unlocked) { unlockLesson(lid); return expandRow(li, true); }
+        pay(d.order, d.payment, `«${rowTitle(li)}» хичээл`, async () => { unlockLesson(lid); toast("🎉 Хичээл нээгдлээ!"); celebrate(); await refreshAccess(); expandRow(li, true); },
+          { name: "Энэ хичээл", sub: "дангаар", alt: bundleOpt(lid) });
+        return;
+      }
+      if (bundle > 0) { // зөвхөн багцаар нээгддэг хичээл
+        const o = bundleOpt(lid), d = await o.start();
+        if (d.enrolled) { unlockAll(); return expandRow(li, true); }
+        pay(d.order, d.payment, o.label, o.onPaid, { name: o.name, sub: o.sub });
+        return;
+      }
+      toast("Энэ хичээл одоогоор нээгдээгүй байна");
+    } catch (err) { toast(err.message, true); }
+  };
+  const isLocked = (li) => li.classList.contains("is-locked") && !li.classList.contains("unlocked");
 
 
   buy.addEventListener("click", async () => {
@@ -2856,7 +2963,7 @@ async function coursePage() {
     try {
       const d = await api(`/api/courses/${id}/enroll`, { method: "POST" });
       if (d.enrolled) { if (bundle) unlockAll(); else buy.textContent = "✓ Та элссэн — үзэж эхлэх"; toast("🎉 Амжилттай!"); celebrate(); return; }
-      pay(d.order, d.payment, "Бүх хичээл багцаар", () => { unlockAll(); toast("🎉 Бүх хичээл нээгдлээ!"); celebrate(); });
+      pay(d.order, d.payment, `«${courseTitle}» — бүх хичээл`, () => { unlockAll(); toast("🎉 Бүх хичээл нээгдлээ!"); celebrate(); refreshAccess(); }, { name: "Бүх хичээл багцаар" });
     } catch (e) { toast(e.message, true); } finally { buy.disabled = false; }
   });
 
@@ -2960,6 +3067,7 @@ async function coursePage() {
       pop.onclick = (e) => { if (e.target === pop || e.target.closest(".dp-x, [data-dp-close]")) pop.remove(); };
       return;
     }
+    if (isLocked(row)) { await paywall(row); return; } // төлөөгүй: шууд «Та төлбөрөө төлнө үү» цонх
     if (row.classList.contains("is-drip")) { dripPrompt(row); return; }
     const was = row.classList.contains("open");
     collapseAll();
@@ -2982,7 +3090,7 @@ async function coursePage() {
     const l = await api(`/api/courses/${id}/lessons/${lid}`);
     $("#lessonTitle").textContent = l.title;
     const nav = $("#lessonNav");
-    if (nav) { nav.innerHTML = navHTML(lid); nav.hidden = lessonRows().length < 2; nav.onclick = async (e) => { const b = e.target.closest("[data-nav]"); if (!b || b.disabled) return; const li = lessonRows().find((r) => r.dataset.lesson === b.dataset.nav); if (!li) return; if (li.classList.contains("is-drip")) { dripPrompt(li); return; } if (lessonModalEl().classList.contains("inline") && canOpen(li)) { await expandRow(li, true); return; } $("[data-play]", li)?.click(); $(".lesson-modal")?.scrollTo?.({ top: 0, behavior: "smooth" }); }; }
+    if (nav) { nav.innerHTML = navHTML(lid); nav.hidden = lessonRows().length < 2; nav.onclick = async (e) => { const b = e.target.closest("[data-nav]"); if (!b || b.disabled) return; const li = lessonRows().find((r) => r.dataset.lesson === b.dataset.nav); if (!li) return; if (isLocked(li)) { paywall(li); return; } if (li.classList.contains("is-drip")) { dripPrompt(li); return; } if (lessonModalEl().classList.contains("inline") && canOpen(li)) { await expandRow(li, true); return; } $("[data-play]", li)?.click(); $(".lesson-modal")?.scrollTo?.({ top: 0, behavior: "smooth" }); }; }
     const done = $("#lessonDone"), p = access?.progress?.[lid];
     if (done) {
       done.hidden = !Auth.token;
@@ -2997,7 +3105,7 @@ async function coursePage() {
       body.classList.remove("pre"); body.innerHTML = blocksHTML(l.blocks);
       mountQuizzes(body, `/api/courses/${id}/lessons/${lid}`, access?.progress?.[lid]?.quiz || {});
     } else { body.classList.add("pre"); body.textContent = l.content || ""; }
-    hydrateBooks(player); hydrateBooks(body);
+    hydrateBooks(player); hydrateBooks(body); readingRuler(body);
     const modal = $("#lessonModal");
     const isOwner = !!Auth.user?.username && $(".teacher-chip")?.getAttribute("href") === "/t/" + Auth.user.username;
     if (l.exam) { // шалгалт: асуултууд зөвхөн "эхлүүлэх"-ээр ирнэ
@@ -3059,7 +3167,7 @@ async function coursePage() {
   const want = new URLSearchParams(location.hash.slice(1)).get("l");
   if (want) {
     const li = $(`.lesson[data-lesson="${CSS.escape(want)}"]`);
-    if (li) { li.scrollIntoView({ block: "center" }); play(want).catch(() => li.animate([{ boxShadow: "0 0 0 4px rgba(31,60,143,.35)" }, { boxShadow: "0 0 0 0 transparent" }], { duration: 1600 })); }
+    if (li) { li.scrollIntoView({ block: "center" }); play(want).catch((err) => { if (err.status === 402 && Auth.token) return paywall(li); li.animate([{ boxShadow: "0 0 0 4px rgba(31,60,143,.35)" }, { boxShadow: "0 0 0 0 transparent" }], { duration: 1600 }); }); }
   }
 
   document.addEventListener("click", async (e) => {
@@ -3071,25 +3179,100 @@ async function coursePage() {
     const b = e.target.closest("[data-play]");
     if (b && !e.target.closest(".lesson-more") && canOpen(b.closest(".lesson"))) { await expandRow(b.closest(".lesson")); return; }
     if (!b) return;
-    const li = b.closest(".lesson"), lid = li.dataset.lesson, price = +li.dataset.price;
+    const li = b.closest(".lesson"), lid = li.dataset.lesson;
     if (access?.blocks?.[lid]) { await expandRow(li); return; }
+    if (isLocked(li)) { b.disabled = true; try { await paywall(li); } finally { b.disabled = false; } return; } // хичээл, багц, шалгалт, даалгавар — төлбөрийн цонх
     if (li.classList.contains("is-drip")) { dripPrompt(li); return; }
-    if (!li.classList.contains("is-locked")) { try { await play(lid); } catch (err) { toast(err.message, true); } return; }
-    if (!price) { // зөвхөн багцаар
-      li.animate([{ transform: "translateX(0)" }, { transform: "translateX(-8px)" }, { transform: "translateX(8px)" }, { transform: "translateX(0)" }], { duration: 350 });
-      toast("Энэ хичээл сургалтын багцад багтсан");
-      buy.animate([{ transform: "scale(1)" }, { transform: "scale(1.08)" }, { transform: "scale(1)" }], { duration: 500 });
-      return;
-    }
-    if (needLogin()) return;
-    b.disabled = true;
-    try {
-      const d = await api(`/api/courses/${id}/lessons/${lid}/buy`, { method: "POST" });
-      if (d.unlocked) { unlockLesson(lid); await play(lid); return; }
-      pay(d.order, d.payment, $(".lesson-title", li).textContent, async () => { unlockLesson(lid); toast("🎉 Хичээл нээгдлээ!"); celebrate(); await play(lid).catch(() => {}); });
-    } catch (err) { toast(err.message, true); } finally { b.disabled = false; }
+    try { await play(lid); } catch (err) { toast(err.message, true); }
   });
 }
+
+/* ---------- Төлбөрийн цонх: «Та төлбөрөө төлнө үү» — QR (QPay эсвэл демо), банкны апп, төлөгдмөгц автоматаар нээнэ ---------- */
+// payWindow(order, payment, label, onPaid, { name, sub, alt }) — alt: өөр сонголт (жишээ нь бүх хичээл багцаар):
+//   { name, sub, amount, label, start: async () => ({ order, payment } | { unlocked | enrolled }), onPaid }
+function payWindow(order, payment, label, onPaid, extra = {}) {
+  $("#payWin")?.remove();
+  const el = document.createElement("div");
+  el.className = "modal pay-win"; el.id = "payWin"; el.setAttribute("aria-hidden", "true");
+  document.body.append(el);
+  const opts = [{ name: extra.name || "Энэ хичээл", sub: extra.sub || "", amount: order.amount, label, onPaid, d: { order, payment } }];
+  if (extra.alt) opts.push({ ...extra.alt, d: null });
+  const mobile = matchMedia("(max-width: 700px), (pointer: coarse)").matches;
+  let sel = 0, timer = 0, gone = false, busy = false;
+  const shut = () => { gone = true; clearTimeout(timer); document.removeEventListener("visibilitychange", onVis); closeModal(el); setTimeout(() => el.remove(), 300); };
+  const stage = (o) => {
+    if (busy || !o.d) return `<div class="pw-load"><span class="loader"></span></div>`;
+    const p = o.d.payment || {}, ord = o.d.order;
+    if (p.error) return `<div class="pw-empty"><b>⚠️ ${esc(p.error)}</b><small>Цонхоо хаагаад дахин дарна уу.</small></div>`;
+    if (!p.qr) return `<div class="pw-empty"><b>Онлайн төлбөр (QPay) хараахан тохируулагдаагүй байна.</b><small>Багштайгаа холбогдоно уу · захиалга #${esc(ord.id.slice(-6).toUpperCase())} · ${money(ord.amount)}</small></div>`;
+    const qpay = p.provider === "qpay";
+    return `<div class="pw-body"><figure class="pw-qr"><span class="pw-qr-frame"><img src="${p.qr}" alt="Төлбөрийн QR код" width="200" height="200"></span><figcaption>${qpay ? "QPay · бүх банкны апп" : "Демо QR · туршилтын горим"}</figcaption></figure>
+      <div class="pw-side"><p class="pw-amount">${money(ord.amount)}</p>
+      <ol class="pw-steps"><li><span>${qpay ? "Банкны апп-аа нээгээд <b>QR уншуулах</b>-ыг сонгоно" : "Утасныхаа камераар QR-ыг уншуулна"}</span></li><li><span>${qpay ? "Дүнг шалгаад төлбөрөө баталгаажуулна" : "Нээгдсэн хуудсанд <b>«Төлөх»</b> дарна"}</span></li><li><span>Энэ цонх өөрөө шинэчлэгдэж <b>шууд нээгдэнэ</b></span></li></ol>
+      <p class="pw-status" role="status"><i></i>Төлбөр хүлээж байна… <button type="button" class="pw-recheck" data-pw-check>Шалгах</button></p></div></div>
+      ${qpay && p.urls?.length ? `<div class="pw-banks ${mobile ? "open" : ""}"><button type="button" class="pw-banks-t" data-pw-banks aria-expanded="${mobile}">📱 Утсан дээрээ байна уу? Банкны апп-аар шууд төлөх</button>
+        <div class="pw-bank-list">${p.urls.map((u) => `<a class="pw-bank" href="${esc(u.link)}" rel="noopener">${u.logo ? `<img src="${esc(u.logo)}" alt="" loading="lazy">` : ""}<span>${esc(u.description || u.name)}</span></a>`).join("")}</div></div>` : ""}
+      ${!qpay && mobile && p.pay_url ? `<a class="btn btn-glass btn-sm pw-here" href="${esc(p.pay_url)}" target="_blank" rel="noopener">Энэ утсан дээр төлөх</a>` : ""}`;
+  };
+  const draw = () => {
+    const o = opts[sel];
+    el.innerHTML = `<div class="modal-card pw-card" role="dialog" aria-modal="true" aria-labelledby="pwTitle"><button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
+      <span class="eyebrow">Төлбөр</span><h3 class="h3" id="pwTitle">Та төлбөрөө төлнө үү</h3><p class="pw-what">${esc(o.label || "")}</p>
+      ${opts.length > 1 ? `<div class="pw-opts" role="radiogroup" aria-label="Юуг төлөх вэ">${opts.map((x, i) => `<button type="button" role="radio" aria-checked="${i === sel}" class="pw-opt ${i === sel ? "on" : ""}" data-pw-opt="${i}"><b>${esc(x.name)}</b><span>${money(x.amount)}</span>${x.sub ? `<small>${esc(x.sub)}</small>` : ""}</button>`).join("")}</div>` : ""}
+      <div class="pw-stage">${stage(o)}</div>
+      ${o.d?.payment?.dev_pay && !busy ? `<button type="button" class="btn btn-glass btn-block btn-sm pw-dev" data-pw-dev>Төлсөн гэж баталгаажуулах (демо)</button>` : ""}
+      <p class="pw-foot">🔒 Төлбөр орсон даруйд автоматаар нээгдэнэ. Цонхоо хаасан ч төлбөр тань хүчинтэй.</p></div>`;
+  };
+  const paid = (o) => {
+    if (gone) return; gone = true; clearTimeout(timer); document.removeEventListener("visibilitychange", onVis);
+    const st = $(".pw-stage", el); if (st) st.innerHTML = `<div class="pw-done"><span class="pw-check" aria-hidden="true">✓</span><b>Төлбөр амжилттай!</b><small>${esc(o.label || "")} нээгдлээ</small></div>`;
+    $(".pw-dev", el)?.remove(); $(".pw-opts", el)?.remove();
+    setTimeout(() => { closeModal(el); setTimeout(() => el.remove(), 300); o.onPaid?.(); }, 1400);
+  };
+  const poll = async (now) => {
+    clearTimeout(timer);
+    const o = opts[sel]; if (gone || !o.d?.order || !o.d.payment?.provider) return;
+    if (!now) { timer = setTimeout(() => poll(true), 3000); return; }
+    const r = await api(`/api/orders/${o.d.order.id}`).catch(() => null);
+    if (gone || opts[sel] !== o) return;
+    if (r?.status === "paid") return paid(o);
+    timer = setTimeout(() => poll(true), 3000);
+  };
+  const onVis = () => { if (!document.hidden) poll(true); }; // утсаар төлөөд буцаж ирэхэд шууд шалгана
+  document.addEventListener("visibilitychange", onVis);
+  el.addEventListener("click", async (e) => {
+    if (e.target === el || e.target.closest("[data-close]")) return shut();
+    const ch = e.target.closest("[data-pw-opt]");
+    if (ch) {
+      const i = +ch.dataset.pwOpt; if (i === sel || busy) return;
+      sel = i; clearTimeout(timer);
+      const o = opts[i];
+      if (!o.d) {
+        busy = true; draw();
+        try {
+          const d = await o.start();
+          if (d.unlocked || d.enrolled) { busy = false; return paid(o); }
+          o.d = d;
+        } catch (err) { toast(err.message, true); sel = 0; }
+        busy = false;
+      }
+      draw(); poll(); return;
+    }
+    const dev = e.target.closest("[data-pw-dev]");
+    if (dev) {
+      const o = opts[sel]; dev.disabled = true;
+      try { await api(`/api/orders/${o.d.order.id}/dev-pay`, { method: "POST" }); paid(o); } catch (err) { toast(err.message, true); dev.disabled = false; }
+      return;
+    }
+    if (e.target.closest("[data-pw-check]")) { const s = $(".pw-status", el); s?.classList.add("checking"); await poll(true); s?.classList.remove("checking"); return; }
+    const bk = e.target.closest("[data-pw-banks]");
+    if (bk) { const w = bk.closest(".pw-banks"); w.classList.toggle("open"); bk.setAttribute("aria-expanded", w.classList.contains("open")); }
+  });
+  draw(); openModal(el); poll();
+  $(".modal-x", el)?.focus();
+  return { close: shut };
+}
+window.SG_pay = payWindow; // шалгалт, даалгаврын төлбөр, шууд хичээл, ном, багтаамж — бүгд ижил цонх
 
 function celebrate() {
   if (reduce) return;
@@ -3248,7 +3431,7 @@ function loginPage() {
 }
 
 /* ---------- эхлүүлэх ---------- */
-window.SG = { icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
+window.SG = { pay: payWindow, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх

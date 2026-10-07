@@ -479,7 +479,7 @@ func (s *Server) handleBuyBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"unlocked": false, "order": o,
-		"payment": map[string]any{"amount": o.Amount, "currency": "MNT", "dev_pay": s.cfg.DevPayments}})
+		"payment": s.paymentInfo(r, o)})
 }
 
 // handleBookInterest: POST /api/books/{id}/interest — "Сонирхож байна".

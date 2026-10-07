@@ -25,6 +25,7 @@ import (
 	"surgalt/internal/httpapi"
 	"surgalt/internal/meet"
 	"surgalt/internal/oauth"
+	"surgalt/internal/qpay"
 	"surgalt/internal/store"
 )
 
@@ -191,6 +192,13 @@ func run(log *slog.Logger) error {
 		oauth.Credentials{ClientID: os.Getenv("INSTAGRAM_CLIENT_ID"), ClientSecret: os.Getenv("INSTAGRAM_CLIENT_SECRET")},
 	)
 	srv.Meet = meet.New(base, os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"))
+	// QPay QR төлбөр: гурван утга бүгд байвал идэвхжинэ (sandbox: QPAY_URL=https://merchant-sandbox.qpay.mn/v2).
+	if u, p, code := os.Getenv("QPAY_USERNAME"), os.Getenv("QPAY_PASSWORD"), os.Getenv("QPAY_INVOICE_CODE"); u != "" && p != "" && code != "" {
+		srv.QPay = qpay.New(env("QPAY_URL", qpay.DefaultURL), u, p, code)
+		log.Info("QPay төлбөр идэвхтэй", "url", srv.QPay.BaseURL, "callback", strings.TrimRight(base, "/")+"/api/payments/qpay")
+	} else if envBool("DEV_PAYMENTS") {
+		log.Info("QPay тохируулаагүй — демо QR төлбөр (DEV_PAYMENTS)")
+	}
 	active := map[string]bool{}
 	for _, p := range srv.OAuth.List() {
 		active[p.Name] = true
@@ -221,6 +229,9 @@ func run(log *slog.Logger) error {
 	if envBool("SEED_DEMO") {
 		if err := seedDemo(ctx, st, fstore); err != nil {
 			log.Warn("seed", "err", err)
+		}
+		if err := seedRulesDemo(ctx, st); err != nil { // байгаа санд ч нэмэгдэнэ (нэг л удаа)
+			log.Warn("seed жишээ сургалт", "err", err)
 		}
 	}
 

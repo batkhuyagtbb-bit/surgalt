@@ -18,6 +18,7 @@ import (
 	"surgalt/internal/files"
 	"surgalt/internal/meet"
 	"surgalt/internal/oauth"
+	"surgalt/internal/qpay"
 	"surgalt/internal/ratelimit"
 	"surgalt/internal/store"
 )
@@ -55,6 +56,8 @@ type Server struct {
 	OAuth *oauth.Registry
 	// Meet нь Google Meet автомат уулзалт (nil бол идэвхгүй).
 	Meet *meet.Client
+	// QPay нь QR төлбөр (nil бол идэвхгүй; DEV_PAYMENTS үед демо QR).
+	QPay *qpay.Client
 
 	// Publish нь шинэ мессежийг бусад серверүүдэд хүргэнэ.
 	// nil бол зөвхөн локал hub (ClickHouse store нэг сервер хуулбартай ажилладаг).
@@ -183,6 +186,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/orders/{id}", s.handleGetOrder)
 	mux.HandleFunc("POST /api/orders/{id}/dev-pay", s.handleDevPay)
 	mux.HandleFunc("POST /api/payments/webhook", s.handlePaymentWebhook)
+	mux.HandleFunc("GET /api/payments/qpay", s.handleQPayCallback)
+	mux.HandleFunc("POST /api/payments/qpay", s.handleQPayCallback)
+	mux.HandleFunc("GET /pay/{id}", s.handlePayPage)
 
 	// Багшийн файлын сан (багш бүр тусдаа хавтастай)
 	mux.HandleFunc("POST /api/me/files", s.handleUpload)
