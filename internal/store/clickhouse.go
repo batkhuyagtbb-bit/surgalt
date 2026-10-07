@@ -157,6 +157,7 @@ var chMigrations = []string{
 	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS max_warnings Int32 DEFAULT 0",
 	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS block_hours Int32 DEFAULT 0",
 	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS block_minutes Int32 DEFAULT 0",
+	"ALTER TABLE lessons ADD COLUMN IF NOT EXISTS hidden Bool DEFAULT false",
 	"ALTER TABLE meetings ADD COLUMN IF NOT EXISTS price Int64 DEFAULT 0",
 	"ALTER TABLE meetings ADD COLUMN IF NOT EXISTS members_free Bool DEFAULT false",
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS meeting_id String DEFAULT ''",
@@ -198,7 +199,8 @@ var chTables = []chTable{
 	{"lessons", `(id String, course_id String, title String, content String, video_url String,
 		is_free Bool, price Int64, unlock_after_h Int32, always_open Bool, format String, mode String,
 		section String, blocks String, active_min Int32, exam String, position Int32,
-		created_at ` + tsType + `, ver UInt64, deleted Bool DEFAULT false, assignment String DEFAULT '', discussion Bool DEFAULT true, unlock_rule String DEFAULT '')
+		created_at ` + tsType + `, ver UInt64, deleted Bool DEFAULT false, assignment String DEFAULT '', discussion Bool DEFAULT true, unlock_rule String DEFAULT '',
+		hidden Bool DEFAULT false)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (course_id, id)`},
 	{"comments", `(id String, course_id String, lesson_id String, teacher_id String, user_id String, user_name String,
 		parent_id String, body String, created_at ` + tsType + `, deleted Bool DEFAULT false, ver UInt64)

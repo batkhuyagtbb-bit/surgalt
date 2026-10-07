@@ -3012,3 +3012,58 @@ func TestBlockDefault30Min(t *testing.T) {
 		t.Fatalf("30 минутын дараа нээгдэх ёстой: %v", d)
 	}
 }
+
+// Хаалттай (бэлтгэж дуусаагүй) хичээл: суралцагчид жагсаалт, тоо, хайлт, шууд холбоос, дарааллаас бүрэн
+// нуугдана; багш харж, засна; засахад төлөв хадгалагдана; нээхэд шууд харагдана.
+func TestHiddenLessons(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Нуух туршилт","price":0,"published":true,"drip":true}`)
+	cid := c["id"].(string)
+	mk := func(title string) string {
+		_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"`+title+`","is_free":true}`)
+		return l["id"].(string)
+	}
+	l1, l2, l3 := mk("Нэгдүгээр"), mk("Бэлтгэгдээгүйзэбра"), mk("Гуравдугаар")
+	if code, r := call(t, srv, "PUT", "/api/courses/"+cid+"/lessons/"+l2+"/visibility", tt, `{"hidden":true}`); code != 200 || r["hidden"] != true {
+		t.Fatalf("хаах: %d %v", code, r)
+	}
+	s1, _ := register(t, srv, "stud", "student")
+	if code, _ := call(t, srv, "PUT", "/api/courses/"+cid+"/lessons/"+l2+"/visibility", s1, `{"hidden":false}`); code != 403 && code != 404 {
+		t.Fatalf("суралцагч өөрчилж болохгүй: %d", code)
+	}
+	_, pc := call(t, srv, "GET", "/api/courses/"+cid, "", "")
+	if ls := pc["lessons"].([]any); len(ls) != 2 || strings.Contains(fmt.Sprint(ls), l2) || pc["course"].(map[string]any)["lesson_count"].(float64) != 2 {
+		t.Fatalf("нийтэд хаалттай хичээл харагдах ёсгүй: %v", pc["lessons"])
+	}
+	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+l2, s1, ""); code != 404 {
+		t.Fatalf("шууд холбоосоор ч нээгдэх ёсгүй: %d", code)
+	}
+	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+l2, tt, ""); code != 200 {
+		t.Fatalf("багш өөрөө харна: %d", code)
+	}
+	// Дараалал: хаалттай хичээлийг алгасаж, 1-р хичээлийг үзмэгц 3-р нээгдэнэ.
+	call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+l1, s1, "")
+	if code, r := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+l3, s1, ""); code != 200 {
+		t.Fatalf("хаалттай хичээл дарааллыг хаах ёсгүй: %d %v", code, r)
+	}
+	_, acc := call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
+	if _, ok := acc["states"].(map[string]any)[l2]; ok || acc["total"].(float64) != 2 {
+		t.Fatalf("access-д хаалттай хичээл байх ёсгүй: %v", acc["states"])
+	}
+	if _, sr := call(t, srv, "GET", "/api/search?q=Бэлтгэгдээгүйзэбра", "", ""); strings.Contains(fmt.Sprint(sr), l2) || strings.Contains(fmt.Sprint(sr), "Бэлтгэгдээгүйзэбра") {
+		t.Fatalf("хайлтад хаалттай хичээл гарах ёсгүй: %v", sr)
+	}
+	// Багш засахад хаалттай хэвээр.
+	call(t, srv, "PUT", "/api/courses/"+cid+"/lessons/"+l2, tt, `{"title":"Бэлтгэгдээгүйзэбра 2","is_free":true}`)
+	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+l2, s1, ""); code != 404 {
+		t.Fatalf("засахад нээгдэх ёсгүй: %d", code)
+	}
+	// Нээхэд суралцагчид шууд харагдана.
+	call(t, srv, "PUT", "/api/courses/"+cid+"/lessons/"+l2+"/visibility", tt, `{"hidden":false}`)
+	_, pc = call(t, srv, "GET", "/api/courses/"+cid, "", "")
+	if len(pc["lessons"].([]any)) != 3 || pc["course"].(map[string]any)["lesson_count"].(float64) != 3 {
+		t.Fatalf("нээсний дараа 3 хичээл: %v", pc["lessons"])
+	}
+}

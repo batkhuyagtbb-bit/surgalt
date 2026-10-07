@@ -50,6 +50,7 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 		if err != nil {
 			continue
 		}
+		lessons = visibleLessons(lessons, false)
 		progress, err := s.store.LessonProgress(ctx, uid, c.ID)
 		if err != nil {
 			continue
@@ -136,6 +137,7 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 			if err != nil {
 				continue
 			}
+			lessons = visibleLessons(lessons, false)
 			progress, err := s.store.LessonProgress(ctx, uid, c.ID)
 			if err != nil {
 				continue

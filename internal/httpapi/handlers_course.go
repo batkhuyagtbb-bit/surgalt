@@ -133,6 +133,7 @@ func (s *Server) ownCourse(w http.ResponseWriter, r *http.Request, uid string) (
 }
 
 type lessonInput struct {
+	Hidden       bool              `json:"hidden"` // шинээр үүсгэхэд: бэлтгэж дуусаагүй — суралцагчдад харагдахгүй
 	Title        string            `json:"title"`
 	Content      string            `json:"content"`
 	VideoURL     string            `json:"video_url"`
@@ -200,7 +201,7 @@ func (in *lessonInput) validate(teacherID string, course *store.Course) string {
 
 func lessonFromInput(in lessonInput, courseID string) *store.Lesson {
 	return &store.Lesson{CourseID: courseID, Title: in.Title, Content: in.Content, VideoURL: in.VideoURL, IsFree: in.IsFree, Price: in.Price,
-		UnlockAfterH: in.UnlockAfterH, AlwaysOpen: in.AlwaysOpen, Format: in.Format, Mode: in.Mode, Section: in.Section, Blocks: in.Blocks, ActiveMin: in.ActiveMin, Exam: in.Exam, Assignment: in.Assignment, Discussion: in.Discussion, UnlockRule: in.UnlockRule}
+		UnlockAfterH: in.UnlockAfterH, AlwaysOpen: in.AlwaysOpen, Format: in.Format, Mode: in.Mode, Section: in.Section, Blocks: in.Blocks, ActiveMin: in.ActiveMin, Exam: in.Exam, Assignment: in.Assignment, Discussion: in.Discussion, UnlockRule: in.UnlockRule, Hidden: in.Hidden}
 }
 
 func (s *Server) handleCreateLesson(w http.ResponseWriter, r *http.Request) {
@@ -477,6 +478,10 @@ func (s *Server) handleCompleteLesson(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
+	if hiddenFrom(l, course, c.UID) {
+		s.apiErr(w, r, errLessonHidden)
+		return
+	}
 	has, err := s.lessonAccess(r.Context(), c.UID, course, l)
 	if s.storeErr(w, r, err) {
 		return
@@ -527,6 +532,10 @@ func (s *Server) handleBuyLesson(w http.ResponseWriter, r *http.Request) {
 	}
 	l, err := s.store.LessonByID(r.Context(), course.ID, r.PathValue("lid"))
 	if s.storeErr(w, r, err) {
+		return
+	}
+	if hiddenFrom(l, course, c.UID) {
+		s.apiErr(w, r, errLessonHidden)
 		return
 	}
 	has, err := s.lessonAccess(r.Context(), c.UID, course, l)
@@ -655,6 +664,7 @@ func (s *Server) handleCourseAccess(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
+	lessons = visibleLessons(lessons, owner) // хаалттай хичээл суралцагчид огт харагдахгүй
 	progress, err := s.store.LessonProgress(r.Context(), c.UID, course.ID)
 	if s.storeErr(w, r, err) {
 		return
@@ -719,9 +729,11 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
-		if !found {
-			writeErr(w, http.StatusNotFound, "хичээл олдсонгүй")
-			return
+		if !found { // нийтийн жагсаалтад байхгүй (устгасан эсвэл хаалттай) — багш л цааш (хаалттай хичээлээ ч үзнэ)
+			if p, ok := s.principal(r); !ok || p.IsGuest() || p.UID != pc.Data.Course.TeacherID {
+				writeErr(w, http.StatusNotFound, "хичээл олдсонгүй")
+				return
+			}
 		}
 	} else if err != store.ErrNotFound {
 		s.storeErr(w, r, err)
@@ -743,6 +755,10 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
+	if hiddenFrom(l, course, c.UID) {
+		s.apiErr(w, r, errLessonHidden)
+		return
+	}
 	has, err := s.lessonAccess(r.Context(), c.UID, course, l)
 	if s.storeErr(w, r, err) {
 		return
@@ -757,6 +773,7 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 		if s.storeErr(w, r, err) {
 			return
 		}
+		lessons = visibleLessons(lessons, false) // хаалттай хичээл дараалалд тооцогдохгүй
 		progress, err := s.store.LessonProgress(r.Context(), c.UID, course.ID)
 		if s.storeErr(w, r, err) {
 			return

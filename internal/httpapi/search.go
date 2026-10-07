@@ -98,6 +98,9 @@ func (s *Server) buildSearch(ctx context.Context) ([]*searchDoc, error) {
 			return nil, err
 		}
 		for _, l := range ls {
+			if l.Hidden { // багш хаасан (бэлтгэж дуусаагүй) хичээл хайлтад гарахгүй
+				continue
+			}
 			lessons[l.CourseID] = append(lessons[l.CourseID], l)
 		}
 	}

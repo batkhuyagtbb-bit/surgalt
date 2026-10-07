@@ -685,7 +685,7 @@ async function courseEditor(id) {
             <label><input type="radio" name="mode" value="paid" ${l?.is_free ? "" : "checked"}><span>${ico("lock", 15)}Төлбөртэй</span></label></div>
           <label class="pe-price" ${l?.is_free ? "hidden" : ""}><input name="price" type="number" min="0" step="500" value="${l ? l.price || 0 : c.price ? 0 : 10000}" aria-label="Үнэ"><span>₮</span></label></div>
         <span class="grow"></span>
-        ${l ? `<button type="button" class="btn btn-ghost btn-sm" data-cancel>Болих</button>` : ""}
+        ${l ? `<button type="button" class="btn btn-ghost btn-sm" data-cancel>Болих</button>` : `<label class="check small pe-hidden" title="Бэлтгэж дуусаагүй бол хаалттай үүсгээд, бэлэн болмогц хөтөлбөрөөс нээнэ"><input type="checkbox" name="hidden_new"> Хаалттай (бэлтгэж дуусаагүй)</label>`}
         <button class="btn btn-gold">${l ? "Хадгалах" : kind === "exam" ? "Шалгалт нийтлэх" : kind === "assignment" ? "Даалгавар нийтлэх" : "Хичээл нийтлэх"}</button></div>
       <p class="muted small pe-hint">${c.price ? "Үнэ 0 бол зөвхөн сургалтын багцаар нээгдэнэ." : "Энэ сургалт багц үнэгүй тул төлбөртэй хичээл бүр өөрийн үнэтэй байна."}</p>
       <p class="form-error" role="alert"></p></form>`; };
@@ -697,14 +697,14 @@ async function courseEditor(id) {
     return `${img ? `<div class="post-media"><img src="${esc(img.url)}" alt="" loading="lazy"></div>` : ""}
       <button class="post-attach" data-open-media>${ico("book", 22)}<span><strong>Агуулгыг суралцагчийн нүдээр харах</strong><small class="muted">${parts}</small></span>${ico("chevron", 18)}</button><div class="post-media post-preview" hidden></div>`;
   };
-  const postHTML = (l) => `<article class="post" data-lid="${esc(l.id)}">
+  const postHTML = (l) => `<article class="post ${l.hidden ? "is-hidden" : ""}" data-lid="${esc(l.id)}">
       <header class="post-head">${avatar(me, "avatar-sm")}<div class="grow"><strong>${esc(me.display_name)}</strong>
         <small class="muted">Хичээл ${String(l.position).padStart(2, "0")} · ${fmtDate(l.created_at)} · ${audience(l)}${c.drip ? (l.always_open ? ` · <span class="aud">${ico("globe", 14)}Дарааллаас гадуур</span>` : l.position > 1 ? ` · <span class="aud">⏱ ${window.SG_humanHours(l.unlock_after_h)}</span>` : "") : ""}</small></div>
         <button class="icon-btn" data-edit-post aria-label="Хичээл засах" title="Засах">${ico("edit", 18)}</button></header>
-      <div class="post-body"><h3>${esc(l.title)}</h3>${l.exam || l.assignment ? `<p style="margin:0 0 8px;display:flex;gap:6px;flex-wrap:wrap">${kindBadge(l)}</p>` : ""}${l.format || l.mode ? `<p style="margin:0 0 8px;display:flex;gap:6px;flex-wrap:wrap">${l.format ? `<span class="kind">${esc(kindName(l.format))}</span>` : ""}${l.mode ? `<span class="kind">${esc(kindName(l.mode))}</span>` : ""}</p>` : ""}${l.content ? `<p class="post-text">${SG.linkify(l.content)}</p>` : ""}</div>
+      <div class="post-body">${l.hidden ? `<p class="post-hidden">${ico("lock", 15)}Хаалттай — бэлтгэж дуусаагүй, суралцагчдад харагдахгүй</p>` : ""}<h3>${esc(l.title)}</h3>${l.exam || l.assignment ? `<p style="margin:0 0 8px;display:flex;gap:6px;flex-wrap:wrap">${kindBadge(l)}</p>` : ""}${l.format || l.mode ? `<p style="margin:0 0 8px;display:flex;gap:6px;flex-wrap:wrap">${l.format ? `<span class="kind">${esc(kindName(l.format))}</span>` : ""}${l.mode ? `<span class="kind">${esc(kindName(l.mode))}</span>` : ""}</p>` : ""}${l.content ? `<p class="post-text">${SG.linkify(l.content)}</p>` : ""}</div>
       ${l.blocks?.length ? blocksPostHTML(l) : l.video_url ? (isImage(l.video_url) ? `<div class="post-media"><img src="${esc(l.video_url)}" alt="" loading="lazy"></div>`
         : `<button class="post-attach" data-open-media>${ico(/\.pdf$/i.test(stripSig(l.video_url)) ? "book" : "live", 22)}<span><strong>${esc(mediaLabel(l.video_url))}</strong><small class="muted">Дарж нээнэ</small></span>${ico("chevron", 18)}</button><div class="post-media" hidden></div>`) : ""}
-      <footer class="post-foot"><button data-edit-post>${ico("edit", 16)}Засах</button>${l.assignment ? `<button data-grade>${ico("users", 16)}Хариунуудыг дүгнэх</button>` : ""}<button data-toggle-free>${ico(l.is_free ? "lock" : "globe", 16)}${l.is_free ? "Төлбөртэй болгох" : "Үнэгүй болгох"}</button>
+      <footer class="post-foot"><button data-edit-post>${ico("edit", 16)}Засах</button><button data-toggle-hidden>${ico(l.hidden ? "eye" : "lock", 16)}${l.hidden ? "Суралцагчдад нээх" : "Хаах"}</button>${l.assignment ? `<button data-grade>${ico("users", 16)}Хариунуудыг дүгнэх</button>` : ""}<button data-toggle-free>${ico(l.is_free ? "lock" : "globe", 16)}${l.is_free ? "Төлбөртэй болгох" : "Үнэгүй болгох"}</button>
         ${c.drip ? `<button data-toggle-always title="Дарааллаас үл хамааран нээлттэй эсэх">${ico(l.always_open ? "lock" : "globe", 16)}${l.always_open ? "Дараалалд оруулах" : "Шууд нээлттэй болгох"}</button>` : ""}
         ${c.published ? `<a href="/c/${esc(c.id)}#l=${esc(l.id)}" target="_blank" rel="noopener">${ico("eye", 16)}Суралцагчийн нүдээр</a>` : ""}${l.discussion && !l.exam && c.published ? `<a href="/c/${esc(c.id)}#l=${esc(l.id)}" target="_blank" rel="noopener">${ico("chat", 16)}Хэлэлцүүлэг${commentCounts[l.id] ? ` (${commentCounts[l.id]})` : ""}</a>` : ""}
         <button data-del-post class="post-del" title="Хичээлийг файлуудтай нь хамт устгах">${ico("x", 16)}Устгах</button></footer></article>`;
@@ -723,10 +723,14 @@ async function courseEditor(id) {
         ${g.items.map(postHTML).join("")}</section>`).join("");
   };
   // Хөтөлбөр: бүлгийн нэрийг шууд бичнэ, хичээлийг чирж (эсвэл ↑↓ товчоор) бүлэг хооронд зөөнө.
-  const rowHTML = (l, n) => `<li class="ol-row" data-lid="${esc(l.id)}">
+  // Хичээлийг суралцагчдад нээх / хаах (бэлтгэж дуусаагүй) шилжүүлэгч.
+  const visHTML = (l) => `<label class="ol-vis ${l.hidden ? "off" : ""}" title="${l.hidden ? "Хаалттай — суралцагчдад харагдахгүй. Бэлэн болмогц нээнэ үү." : "Нээлттэй — суралцагчдад харагдана. Бэлтгэж дуусаагүй бол хаана уу."}">
+      <input type="checkbox" data-vis ${l.hidden ? "" : "checked"} aria-label="«${esc(l.title)}» хичээлийг суралцагчдад харуулах"><span class="switch" aria-hidden="true"></span><em>${l.hidden ? "Хаалттай" : "Нээлттэй"}</em></label>`;
+  const rowHTML = (l, n) => `<li class="ol-row ${l.hidden ? "is-hidden" : ""}" data-lid="${esc(l.id)}">
       <button type="button" class="ol-handle" data-drag="row" aria-label="«${esc(l.title)}» хичээлийг зөөх (↑↓ товч)" title="Чирж зөөх">${ico("grip", 18)}</button>
       <span class="ol-num">${String(n).padStart(2, "0")}</span>
       <span class="ol-title"><strong>${esc(l.title)}</strong><small>${[l.format && kindName(l.format), l.mode && kindName(l.mode)].filter(Boolean).map((k) => `<span class="kind">${esc(k)}</span>`).join("")}${audience(l)}${c.drip && !l.always_open && n > 1 ? ruleBadge(l) : ""}${kindBadge(l)}${l.active_min ? `<span class="aud">🕒 ${l.active_min} мин идэвхтэй</span>` : ""}</small></span>
+      ${visHTML(l)}
       <button type="button" class="icon-btn" data-edit-post aria-label="Засах" title="Засах">${ico("edit", 17)}</button>
       <button type="button" class="icon-btn ol-del" data-del-post aria-label="Устгах" title="Устгах">${ico("x", 17)}</button></li>`;
   const outlineHTML = () => {
@@ -735,7 +739,7 @@ async function courseEditor(id) {
         <header class="ol-sec-head"><button type="button" class="ol-handle" data-drag="sec" aria-label="Бүлгийг зөөх" title="Бүлгийг чирж зөөх">${ico("grip", 18)}</button>
           <span class="lg-num">${String(i + 1).padStart(2, "0")}</span>
           <input class="ol-sec-name" value="${esc(g.name)}" maxlength="80" placeholder="${g.name || !g.items.length ? "Бүлгийн нэрээ бичнэ үү…" : "Бүлэггүй хичээлүүд — нэр бичвэл бүлэг болно"}" aria-label="Бүлгийн нэр">
-          <small class="muted">${g.items.length} хичээл</small>
+          <small class="muted">${g.items.length} хичээл${g.items.some((l) => l.hidden) ? ` · <b class="ol-hidden-n">${g.items.filter((l) => l.hidden).length} хаалттай</b>` : ""}</small>
           <button type="button" class="btn btn-glass btn-sm" data-sec-add>${ico("plus", 15)}Хичээл</button>
           ${g.name ? `<button type="button" class="icon-btn" data-sec-del aria-label="Бүлгийг задлах" title="Бүлгийг задлах (хичээлүүд үлдэнэ)">${ico("x", 16)}</button>` : ""}</header>
         <ol class="ol-list">${g.items.map((l) => rowHTML(l, ++n)).join("")}</ol></section>`).join("")}</div>
@@ -817,7 +821,7 @@ async function courseEditor(id) {
     return { title: f.title.value, content: blocksSummary(blocks), video_url: "", blocks, active_min: +f.active_min.value || 0, exam, assignment, is_free: isFree, price: isFree ? 0 : +f.price.value || 0,
       unlock_after_h: f.unlock_after_h ? +f.unlock_after_h.value || 0 : l?.unlock_after_h || 0, always_open: f.always_open ? f.always_open.checked : !!l?.always_open,
       format: f.format.value, mode: f.mode_kind.value, section: sectionOf(f), discussion: f.discussion.checked,
-      unlock_rule: f.querySelector("input[name=unlock_rule]:checked")?.value ?? l?.unlock_rule ?? "" };
+      unlock_rule: f.querySelector("input[name=unlock_rule]:checked")?.value ?? l?.unlock_rule ?? "", hidden: !l && !!f.hidden_new?.checked };
   };
   const sectionOf = (f) => (f.section_pick.value === "__new" ? f.section_new.value : f.section_pick.value).trim();
   const lessonPut = (l, patch) => api(`/api/courses/${c.id}/lessons/${l.id}`, { method: "PUT", body: { title: l.title, content: l.content, video_url: stripSig(l.video_url), is_free: l.is_free, price: l.price || 0, unlock_after_h: l.unlock_after_h || 0, always_open: !!l.always_open, format: l.format || "", mode: l.mode || "", section: l.section || "", blocks: (l.blocks || []).map((b) => (b.url ? { ...b, url: stripQ(b.url) } : b.quiz?.image ? { ...b, quiz: { ...b.quiz, image: stripQ(b.quiz.image) } } : b)), active_min: l.active_min || 0, exam: l.exam || null, assignment: l.assignment || null, discussion: !!l.discussion, unlock_rule: l.unlock_rule || "", ...patch } });
@@ -978,6 +982,7 @@ async function courseEditor(id) {
       if (!box.hidden && !box.innerHTML) { box.innerHTML = SG.blocksHTML(lessonBlocks(l)); hydrateBooks(box); SG.mountQuizzes(box, `/api/courses/${c.id}/lessons/${l.id}`); }
       return;
     }
+    if (t.closest("[data-toggle-hidden]") && l) return setHidden(l, !l.hidden);
     if (t.closest("[data-toggle-always]") && l) {
       try { await lessonPut(l, { always_open: !l.always_open }); toast(l.always_open ? "Хичээл дараалалд орлоо" : "Хичээл дарааллаас үл хамааран нээлттэй боллоо ✓"); await reload(); } catch (err) { toast(err.message, true); }
       return;
@@ -989,7 +994,18 @@ async function courseEditor(id) {
         toast(toFree ? "Хичээл үнэгүй боллоо ✓" : "Хичээл төлбөртэй боллоо ✓"); await reload(); } catch (err) { toast(err.message, true); }
     }
   };
+  const setHidden = async (l, hidden, ctl) => {
+    if (ctl) ctl.disabled = true;
+    try {
+      await api(`/api/courses/${c.id}/lessons/${l.id}/visibility`, { method: "PUT", body: { hidden } });
+      l.hidden = hidden;
+      toast(hidden ? "Хичээл хаагдлаа — суралцагчдад харагдахгүй" : "Хичээл нээгдлээ — суралцагчдад харагдана ✓");
+      render();
+    } catch (err) { if (ctl) ctl.checked = !hidden; toast(err.message, true); } finally { if (ctl) ctl.disabled = false; }
+  };
   const onChange = (e) => {
+    const vis = e.target.closest("[data-vis]");
+    if (vis) { const l = lessons.find((x) => x.id === vis.closest("[data-lid]")?.dataset.lid); if (l) setHidden(l, !vis.checked, vis); return; }
     const f = e.target.closest(".post-editor");
     if (!f) return;
     if (e.target.name === "mode") $(".pe-price", f).hidden = f.mode.value === "free";

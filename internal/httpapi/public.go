@@ -255,6 +255,7 @@ func (s *Server) publicCourse(ctx context.Context, id string) (*Rendered[PublicC
 		if err != nil {
 			return nil, err
 		}
+		lessons = visibleLessons(lessons, false) // нийтэд (кэштэй хуудас) хаалттай хичээл огт орохгүй
 		pls := make([]PublicLesson, len(lessons))
 		for i, l := range lessons {
 			pls[i] = PublicLesson{ID: l.ID, Title: l.Title, IsFree: l.IsFree, Price: l.Price, Position: l.Position, UnlockAfterH: l.UnlockAfterH, AlwaysOpen: l.AlwaysOpen, Format: l.Format, Mode: l.Mode, Section: l.Section, ActiveMin: l.ActiveMin, Exam: l.Exam, Assignment: l.Assignment, Discussion: l.Discussion, UnlockRule: l.UnlockRule}

@@ -162,9 +162,12 @@ type Lesson struct {
 	// UnlockRule — энэ хичээл ямар нөхцөлөөр нээгдэх (дараалалтай сургалтад, багш гараар сонгоно):
 	// "" автомат, "view" өмнөхийг үзмэгц, "complete" өмнөхийг дуусгамагц, "active" өмнөхийн идэвхтэй минут
 	// гүйцмэгц, "quiz" өмнөхийн асуултууд бүгд зөв, "exam" өмнөх шалгалтад тэнцмэгц, "manual" багш гараар нээнэ.
-	UnlockRule string    `json:"unlock_rule,omitempty"`
-	Position   int       `json:"position"`
-	CreatedAt  time.Time `json:"created_at"`
+	UnlockRule string `json:"unlock_rule,omitempty"`
+	// Hidden — багш бэлтгэж дуусаагүй тул хаасан: суралцагчдад огт харагдахгүй (жагсаалт, хайлт, тоо,
+	// дараалал, цол, шууд холбоос). Багш өөрөө харж, засна.
+	Hidden    bool      `json:"hidden,omitempty"`
+	Position  int       `json:"position"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Block — хичээлийн агуулгын нэг хэсэг. Text нь text төрөлд хэлбэржүүлсэн текст (аюулгүй
@@ -532,6 +535,8 @@ type Store interface {
 	LessonByID(ctx context.Context, courseID, lessonID string) (*Lesson, error)
 	// UpdateLesson нь гарчиг, агуулга, медиа, үнэгүй/төлбөртэй, үнэ, дараалсан нээлтийн тохиргоог шинэчилнэ.
 	UpdateLesson(ctx context.Context, l *Lesson) error
+	// SetLessonHidden — хичээлийг суралцагчдад нээх (false) / хаах (true).
+	SetLessonHidden(ctx context.Context, courseID, lessonID string, hidden bool) error
 	// DeleteLesson нь хичээлийг устгана (явц, худалдан авалтын түүх хэвээр үлдэнэ).
 	DeleteLesson(ctx context.Context, courseID, lessonID string) error
 	// ReorderLessons нь хичээлүүдийн дараалал (1..n) ба бүлгийг нэг дор шинэчилнэ. items нь сургалтын бүх хичээлийг агуулна.

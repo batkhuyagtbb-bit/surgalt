@@ -2542,3 +2542,22 @@ html.dv-locked,html.dv-locked body{overflow:hidden}
   .lg-list{padding:4px 4px 8px}
 }
 .fb-count{white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* Хичээлийг суралцагчдад нээх / хаах (бэлтгэж дуусаагүй) — хөтөлбөр, нийтлэл дээр */
+.ol-vis{position:relative;flex:none;display:inline-flex;align-items:center;gap:8px;margin-right:4px;cursor:pointer;font-size:.8rem;font-weight:700;color:var(--brand);user-select:none}
+.ol-vis input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.ol-vis .switch{width:38px;height:22px}
+.ol-vis .switch::after{top:3px;left:3px;width:16px;height:16px}
+.ol-vis input:checked+.switch{background:var(--brand)}
+.ol-vis input:checked+.switch::after{transform:translateX(16px)}
+.ol-vis input:focus-visible+.switch{outline:3px solid var(--brand-glow);outline-offset:2px}
+.ol-vis input:disabled+.switch{opacity:.6}
+.ol-vis.off{color:var(--muted)}
+.ol-vis em{min-width:64px;font-style:normal}
+.ol-row.is-hidden{background:repeating-linear-gradient(135deg,var(--surface) 0 10px,var(--surface-2) 10px 20px)}
+.ol-row.is-hidden .ol-title,.ol-row.is-hidden .ol-num{opacity:.55}
+.ol-hidden-n{color:var(--accent-ink);font-weight:700}
+.post.is-hidden{border-style:dashed;border-color:var(--line-2)}
+.post-hidden{display:inline-flex;align-items:center;gap:6px;margin:0 0 8px;padding:5px 10px;border-radius:999px;background:var(--ink-2);color:var(--text-2);font-weight:700;font-size:.8rem}
+.pe-hidden{font-size:.86rem;font-weight:600;color:var(--text-2);white-space:nowrap}
+@media (max-width:560px){.ol-vis em{display:none}}

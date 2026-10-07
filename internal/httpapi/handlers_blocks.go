@@ -147,6 +147,10 @@ func (s *Server) handleAnswerQuiz(w http.ResponseWriter, r *http.Request) {
 	if logged && !p.IsGuest() {
 		uid = p.UID
 	}
+	if hiddenFrom(l, course, uid) {
+		s.apiErr(w, r, errLessonHidden)
+		return
+	}
 	if !course.Published && course.TeacherID != uid {
 		writeErr(w, http.StatusNotFound, "олдсонгүй")
 		return

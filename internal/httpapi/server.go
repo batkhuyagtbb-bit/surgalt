@@ -134,6 +134,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/courses/{id}/enroll", s.handleEnroll)
 	mux.HandleFunc("PUT /api/courses/{id}/lessons/{lid}", s.handleUpdateLesson)
 	mux.HandleFunc("DELETE /api/courses/{id}/lessons/{lid}", s.handleDeleteLesson)
+	mux.HandleFunc("PUT /api/courses/{id}/lessons/{lid}/visibility", s.handleLessonVisibility)
 	mux.HandleFunc("PUT /api/courses/{id}/lesson-order", s.handleReorderLessons)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/buy", s.handleBuyLesson)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/complete", s.handleCompleteLesson)

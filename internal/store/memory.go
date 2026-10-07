@@ -154,6 +154,9 @@ func (m *Memory) courseCopyLocked(c *Course) Course {
 	cc := *c
 	cc.LessonCount, cc.FreeLessonCount = 0, 0
 	for _, l := range m.lessons[c.ID] {
+		if l.Hidden { // хаалттай хичээл суралцагчдад тоологдохгүй
+			continue
+		}
 		cc.LessonCount++
 		if l.IsFree {
 			cc.FreeLessonCount++
@@ -685,6 +688,18 @@ func (m *Memory) UpdateLesson(_ context.Context, l *Lesson) error {
 			cur.UnlockAfterH, cur.AlwaysOpen, cur.Format, cur.Mode, cur.Section, cur.Blocks = l.UnlockAfterH, l.AlwaysOpen, l.Format, l.Mode, l.Section, l.Blocks
 			cur.ActiveMin, cur.Exam, cur.Assignment, cur.Discussion, cur.UnlockRule = l.ActiveMin, l.Exam, l.Assignment, l.Discussion, l.UnlockRule
 			*l = *cur
+			return nil
+		}
+	}
+	return ErrNotFound
+}
+
+func (m *Memory) SetLessonHidden(_ context.Context, courseID, lessonID string, hidden bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, cur := range m.lessons[courseID] {
+		if cur.ID == lessonID {
+			cur.Hidden = hidden
 			return nil
 		}
 	}

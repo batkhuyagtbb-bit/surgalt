@@ -55,6 +55,9 @@ func (s *Server) LessonFor(ctx context.Context, uid, cid, lid string) (*store.Co
 	if err != nil {
 		return nil, nil, err
 	}
+	if hiddenFrom(l, course, uid) {
+		return nil, nil, errLessonHidden
+	}
 	has, err := s.lessonAccess(ctx, uid, course, l)
 	if err != nil {
 		return nil, nil, err
@@ -71,6 +74,7 @@ func (s *Server) LessonFor(ctx context.Context, uid, cid, lid string) (*store.Co
 		if err != nil {
 			return nil, nil, err
 		}
+		lessons = visibleLessons(lessons, false)
 		progress, err := s.store.LessonProgress(ctx, uid, course.ID)
 		if err != nil {
 			return nil, nil, err
