@@ -45,7 +45,6 @@
       <button class="pf-tab" data-tab="students" data-owner-tab hidden>Суралцагчид</button>
       <button class="pf-tab" data-tab="files" data-owner-tab hidden>Файлын сан</button>
       <button class="pf-tab" data-tab="about" data-visitor-tab>Тухай</button>
-      <button class="pf-tab" data-tab="settings" data-owner-tab hidden>Тохиргоо</button>
       <button class="pf-tab" data-tab="qr" data-visitor-tab>QR</button>
       <span class="pf-ink" aria-hidden="true"></span>
     </nav>
@@ -175,7 +174,6 @@
       <div class="pf-panel pf-manage" data-panel="m-books" hidden></div>
       <div class="pf-panel pf-manage" data-panel="m-files" hidden></div>
       <div class="pf-panel pf-manage" data-panel="m-students" hidden></div>
-      <div class="pf-panel pf-manage" data-panel="m-settings" hidden></div>
 
       <div class="pf-panel" data-panel="qr" id="qr" hidden>
         <section class="card qr-card">
@@ -208,24 +206,48 @@
 <div class="modal" id="editModal" aria-hidden="true">
   <div class="modal-card edit-modal">
     <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
-    <h3 class="h3">Профайл засах</h3>
-    <form class="form" id="editForm">
-      <label>Нэр<input name="display_name" required maxlength="80"></label>
-      <label>Мэргэжил / гарчиг<input name="headline" maxlength="120" placeholder="Математикийн багш · 12 жилийн туршлага"></label>
-      <label>Танилцуулга<textarea name="bio" maxlength="4000" rows="5" placeholder="Туршлага, заах арга барил, суралцагчдын амжилт…"></textarea></label>
-      <div class="form-row">
-        <label>Заадаг чиглэлүүд<input name="subjects" placeholder="Таслалаар: Математик, ЭЕШ бэлтгэл"></label>
-        <label>Байршил<input name="location" maxlength="60" placeholder="Улаанбаатар"></label>
+    <div class="em-head"><span class="em-ring" id="emRing"></span><div><h3 class="h3">Профайл засах</h3><p class="muted small" id="emLevel">Мэдээллээ бүрдүүлэх тусам суралцагчид танд илүү итгэнэ.</p></div></div>
+    <div class="em-tabs" role="tablist" aria-label="Профайл засах хэсгүүд">
+      <button type="button" class="em-tab on" role="tab" aria-selected="true" data-em="info">Мэдээлэл</button>
+      <button type="button" class="em-tab" role="tab" aria-selected="false" data-em="link"><span class="em-long">Профайлын холбоос</span><span class="em-short">Холбоос</span></button>
+      <button type="button" class="em-tab" role="tab" aria-selected="false" data-em="tips">Зөвлөмж <i id="emTipN" hidden></i></button>
+    </div>
+    <section class="em-pane" data-em-pane="info">
+      <div class="em-photos">
+        <button type="button" class="btn btn-glass btn-sm" data-upload="avatar">{{icon "camera"}}Профайл зураг солих</button>
+        <button type="button" class="btn btn-glass btn-sm" data-upload="cover">{{icon "camera"}}Нүүр зураг солих</button>
+        <span class="muted small">WebP болж, автоматаар багасна</span>
       </div>
-      <div class="form-row">
-        <label>Вэб сайт<input name="link_website" maxlength="300" inputmode="url" placeholder="https://"></label>
-        <label>Facebook<input name="link_facebook" maxlength="300" inputmode="url" placeholder="facebook.com/…"></label>
-        <label>Instagram<input name="link_instagram" maxlength="300" inputmode="url" placeholder="instagram.com/…"></label>
-        <label>YouTube<input name="link_youtube" maxlength="300" inputmode="url" placeholder="youtube.com/@…"></label>
-      </div>
-      <p class="form-error" id="editErr" role="alert"></p>
-      <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div>
-    </form>
+      <form class="form" id="editForm">
+        <label>Нэр<input name="display_name" required maxlength="80"></label>
+        <label>Мэргэжил / гарчиг<input name="headline" maxlength="120" placeholder="Математикийн багш · 12 жилийн туршлага"></label>
+        <label><span class="em-lbl">Танилцуулга <small class="muted" id="bioCount"></small></span><textarea name="bio" maxlength="4000" rows="5" placeholder="Туршлага, заах арга барил, суралцагчдын амжилт…"></textarea></label>
+        <div class="form-row">
+          <label><span class="em-lbl">Заадаг чиглэлүүд <small class="muted">таслалаар, 8 хүртэл</small></span><input name="subjects" placeholder="Математик, ЭЕШ бэлтгэл, Геометр"></label>
+          <label>Байршил<input name="location" maxlength="60" placeholder="Улаанбаатар"></label>
+        </div>
+        <div class="tags" id="subjPreview"></div>
+        <fieldset class="em-links"><legend>Сошиал холбоос</legend><div class="form-row">
+          <label>Вэб сайт<input name="link_website" maxlength="300" inputmode="url" placeholder="https://"></label>
+          <label>Facebook<input name="link_facebook" maxlength="300" inputmode="url" placeholder="facebook.com/…"></label>
+          <label>Instagram<input name="link_instagram" maxlength="300" inputmode="url" placeholder="instagram.com/…"></label>
+          <label>YouTube<input name="link_youtube" maxlength="300" inputmode="url" placeholder="youtube.com/@…"></label>
+        </div></fieldset>
+        <p class="form-error" id="editErr" role="alert"></p>
+        <div class="hero-cta em-actions"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div>
+      </form>
+    </section>
+    <section class="em-pane" data-em-pane="link" hidden>
+      <p class="muted small">Бүртгүүлэхэд автоматаар үүссэн. Суралцагчдад санахад амар нэрээр сольж болно. Солибол хуучин холбоос болон хэвлэсэн QR код ажиллахгүй болно.</p>
+      <form class="link-form" id="unForm" novalidate>
+        <label class="link-field"><span id="unHost"></span><input name="username" maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Профайлын холбоос"></label>
+        <button class="btn btn-gold" disabled>Солих</button><button type="button" class="btn btn-ghost" id="unCopy">{{icon "link"}}Хуулах</button>
+      </form>
+      <p class="link-hint" id="unHint">3–32 тэмдэгт: a–z, 0–9, доогуур зураас.</p>
+    </section>
+    <section class="em-pane" data-em-pane="tips" hidden>
+      <ul class="em-tips" id="emTips"></ul>
+    </section>
   </div>
 </div>
 <input type="file" id="pfFile" accept="image/*" hidden>

@@ -2885,3 +2885,37 @@ html.lp-focus .rail-tab{display:none!important}
   .lp .lesson-content{font-size:1rem;line-height:1.7}
 }
 @media (prefers-reduced-motion:reduce){.lp-toc{transition:none}.lesson.lp-was{animation:none}}
+
+/* ===== «Профайл засах» — мэдээлэл, профайлын холбоос, зөвлөмж нэг цонхонд ===== */
+.edit-modal{width:min(720px,100%)}
+.em-head{display:flex;align-items:center;gap:14px;margin:0 36px 14px 0}
+.em-head .h3{margin:0}
+.em-head p{margin:2px 0 0}
+.em-ring:empty{display:none}
+.em-ring .ring{width:54px;height:54px}
+.em-tabs{display:flex;gap:4px;padding:4px;margin:0 0 16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);overflow-x:auto}
+.em-tab{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 12px;border:0;border-radius:9px;background:none;font:inherit;font-size:.88rem;font-weight:700;color:var(--muted);white-space:nowrap;cursor:pointer}
+.em-tab:hover{color:var(--text)}
+.em-tab.on{background:var(--surface);color:var(--brand);box-shadow:var(--shadow-sm)}
+.em-tab i{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--accent);color:var(--text);font-style:normal;font-size:.72rem;font-weight:800}
+.em-photos{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.em-photos .btn svg{width:16px;height:16px}
+#bioCount.ok{color:var(--teal)}
+.em-lbl{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.em-lbl small{font-weight:600;font-size:.76rem}
+#subjPreview{margin-top:-6px}
+#subjPreview:empty{display:none}
+.em-links{margin:0}
+.em-actions{margin:4px 0 0!important;justify-content:flex-end}
+.em-pane .link-form{margin-top:12px}
+.em-tips{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.em-tip{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface);font:inherit;text-align:left;color:var(--text);cursor:pointer;transition:border-color .15s,background .15s}
+.em-tip:hover:not([disabled]){border-color:var(--brand-tint);background:var(--brand-soft)}
+.em-tip i{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:2px dashed var(--line-2);color:transparent;font-style:normal;font-weight:800;font-size:.8rem}
+.em-tip.done{cursor:default;opacity:.7}
+.em-tip.done i{border:0;background:var(--teal);color:#fff}
+.em-tip strong{display:block;font-size:.92rem}
+.em-tip small{display:block;margin-top:2px;font-size:.8rem;color:var(--muted);line-height:1.4}
+.em-tip em{display:inline-flex;align-items:center;gap:2px;font-style:normal;font-size:.82rem;font-weight:800;color:var(--brand);white-space:nowrap}
+.em-short{display:none}
+@media (max-width:560px){.em-long{display:none}.em-short{display:inline}.em-head{margin-right:30px}.em-tab{font-size:.8rem;padding:0 8px}.em-tip{grid-template-columns:22px minmax(0,1fr);}.em-tip em{grid-column:2}}

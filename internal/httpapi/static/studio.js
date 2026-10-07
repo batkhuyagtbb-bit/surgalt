@@ -66,7 +66,7 @@ const setDrawer = () => {};
 let searchCourses = null;
 let cleanup = null;
 
-const views = { overview, courses, books, course: (id) => courseEditor(id), files, live, chat: (id) => chat(id), profile, learning, students };
+const views = { overview, courses, books, course: (id) => courseEditor(id), files, live, chat: (id) => chat(id), learning, students };
 
 /* Профайл хуудаснаас дуудагдана: тухайн хэсгийг өгсөн контейнерт рендерлэнэ. */
 window.Studio = {
@@ -1544,117 +1544,6 @@ async function chat(openId) {
 }
 
 /* ---------- Профайл ---------- */
-const LINKS = [["website", "Вэб сайт", "https://example.mn"], ["facebook", "Facebook", "facebook.com/таны-хуудас"], ["instagram", "Instagram", "instagram.com/таны-нэр"], ["youtube", "YouTube", "youtube.com/@таны-суваг"]];
-async function profile() {
-  const insights = teacher ? await api("/api/me/profile/insights") : null;
-  const tipsHTML = (ins) => `<div class="strength">${ringHTML(ins.score)}<div><h2 style="margin:0">Ухаалаг профайл · ${esc(ins.level)}</h2>
-      <p class="muted" style="margin:.3em 0 0">Доорх алхмуудыг гүйцээх тусам суралцагчид танд илүү итгэж, худалдан авах магадлал өснө.</p></div></div>
-    <ul class="tips tips-grid">${ins.tips.map((t) => `<li><${t.done ? "div" : `a href="${esc(t.link)}"`} class="tip ${t.done ? "done" : ""}" data-tip="${esc(t.key)}"><i>✓</i><span><strong>${esc(t.title)}</strong><small>${esc(t.hint)}</small></span>${t.done ? "" : `<span class="chip chip-gold">Хийх</span>`}</${t.done ? "div" : "a"}></li>`).join("")}</ul>`;
-  const linkPanel = teacher ? panel(`<div class="panel-head"><h2>Профайлын холбоос</h2><a class="btn btn-ghost btn-sm" id="unOpen" href="/t/${esc(me.username)}" target="_blank" rel="noopener">${ico("ext", 16)}Нээх</a></div>
-      <p class="muted small" style="margin:-6px 0 14px">Бүртгүүлэхэд автоматаар үүссэн. Суралцагчдад санахад амар нэрээр сольж болно.</p>
-      <form class="link-form" id="unForm" novalidate>
-        <label class="link-field"><span>${esc(location.host)}/t/</span><input name="username" value="${esc(me.username)}" maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Профайлын холбоос"></label>
-        <button class="btn btn-gold" disabled>Солих</button><button type="button" class="btn btn-ghost" id="unCopy">Хуулах</button>
-      </form>
-      <p class="link-hint" id="unHint">3–32 тэмдэгт: a–z, 0–9, доогуур зураас.</p>`, 1) : "";
-  main.innerHTML = (teacher ? panel(`<div id="insBox">${tipsHTML(insights)}</div>`) : "") + linkPanel +
-    panel(`<div class="panel-head"><h2>${teacher ? "Нээлттэй профайл" : "Миний мэдээлэл"}</h2>${teacher ? `<a class="btn btn-gold btn-sm" href="/t/${esc(me.username)}">${ico("ext", 16)}Профайл дээрээ шууд засах</a>` : ""}</div>
-    ${teacher ? `<p class="muted small" style="margin:-6px 0 14px">Нүүр зураг болон профайл зургаа нээлттэй профайл дээрээ камерын товчоор солино.</p>` : ""}
-    <form class="form" id="pf">
-      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap" id="avBox">${avatar(me, "avatar-xl")}${teacher ? `<div style="display:grid;gap:8px">
-        <button type="button" class="btn btn-glass btn-sm" id="avUp">Зураг оруулах</button><span class="muted small">WebP болж, 1000px хүртэл автоматаар багасна</span></div>
-        <input type="file" id="avIn" accept="image/*" hidden>` : ""}</div>
-      <label>Нэр<input name="display_name" required maxlength="80" value="${esc(me.display_name)}"></label>
-      ${teacher ? `<label>Мэргэжил / гарчиг<input name="headline" maxlength="120" value="${esc(me.headline)}" placeholder="Математикийн багш · 12 жилийн туршлага"></label>
-      <label>Танилцуулга <small class="muted" id="bioCount"></small><textarea name="bio" maxlength="4000" rows="6" placeholder="Туршлага, заах арга барил, суралцагчдын амжилт…">${esc(me.bio)}</textarea></label>
-      <div class="form-row">
-        <label>Заадаг чиглэлүүд <small class="muted">таслалаар тусгаарлана, 8 хүртэл</small><input name="subjects" value="${esc((me.subjects || []).join(", "))}" placeholder="Математик, ЭЕШ бэлтгэл, Геометр"></label>
-        <label>Байршил<input name="location" maxlength="60" value="${esc(me.location || "")}" placeholder="Улаанбаатар"></label>
-      </div>
-      <div class="tags" id="subjPreview" style="margin-top:-4px"></div>
-      <fieldset><legend>Сошиал холбоос</legend><div class="form-row">${LINKS.map(([k, label, ph]) => `<label>${label}<input name="link_${k}" maxlength="300" inputmode="url" value="${esc((me.links || {})[k] || "")}" placeholder="${ph}"></label>`).join("")}</div></fieldset>` : ""}
-      <input type="hidden" name="avatar_url" value="${esc(me.avatar_url)}"><input type="hidden" name="cover_url" value="${esc(me.cover_url || "")}">
-      <p class="form-error" id="pfErr" role="alert"></p>
-      <button class="btn btn-gold" style="justify-self:start">Хадгалах</button></form>`, 2);
-  const f = $("#pf");
-  if (teacher) usernameForm();
-  const subjects = () => (f.subjects ? f.subjects.value.split(/[,،\n]/).map((x) => x.trim()).filter(Boolean) : me.subjects || []);
-  if (teacher) {
-    const preview = () => ($("#subjPreview").innerHTML = subjects().map((x) => `<span class="tag">${esc(x)}</span>`).join(""));
-    const count = () => { const n = [...f.bio.value.trim()].length; $("#bioCount").textContent = n >= 120 ? `${n} тэмдэгт ✓` : `${n}/120 — дор хаяж 120 тэмдэгт бичвэл сайн`; };
-    f.subjects.addEventListener("input", preview); f.bio.addEventListener("input", count); preview(); count();
-    $("#avUp").onclick = () => $("#avIn").click();
-    $("#avIn").onchange = async () => {
-      const fd = new FormData(); fd.append("file", $("#avIn").files[0]);
-      try {
-        const info = await api("/api/me/files?visibility=public", { method: "POST", body: fd });
-        f.avatar_url.value = info.path;
-        $("#avBox .avatar").innerHTML = `<img src="${esc(info.path)}" alt="">`;
-        toast("Зураг бэлэн — Хадгалах дарна уу");
-      } catch (e) { toast(e.message, true); }
-    };
-  }
-  f.onsubmit = async (e) => {
-    e.preventDefault();
-    $("#pfErr").textContent = "";
-    const body = teacher
-      ? { display_name: f.display_name.value, headline: f.headline.value, bio: f.bio.value, avatar_url: f.avatar_url.value, cover_url: f.cover_url.value, subjects: subjects(), location: f.location.value,
-          links: Object.fromEntries(LINKS.map(([k]) => [k, f["link_" + k].value.trim()]).filter(([, v]) => v)) }
-      : { display_name: f.display_name.value, headline: me.headline || "", bio: me.bio || "", avatar_url: me.avatar_url || "", cover_url: me.cover_url || "", subjects: me.subjects || [], location: me.location || "", links: me.links || {} };
-    try {
-      me = await api("/api/me/profile", { method: "PUT", body });
-      Auth.set(Auth.token, me);
-      toast("Профайл шинэчлэгдлээ ✓");
-      if (teacher) {
-        LINKS.forEach(([k]) => (f["link_" + k].value = (me.links || {})[k] || "")); // серверийн цэгцэлсэн хэлбэр
-        const before = insights.score, ins = await api("/api/me/profile/insights");
-        $("#insBox").innerHTML = tipsHTML(ins); insights.score = ins.score;
-        if (ins.score === 100 && before < 100) celebrate();
-      }
-    } catch (err) { $("#pfErr").textContent = err.message; toast(err.message, true); }
-  };
-}
-
-/* Профайлын холбоос солих: бичих зуур шалгаж, чөлөөтэй эсэхийг урьдчилан харуулна. */
-function usernameForm() {
-  const f = $("#unForm"), input = f.username, btn = $("button.btn-gold", f), hint = $("#unHint");
-  let timer = 0, seq = 0;
-  const say = (text, tone = "") => { hint.textContent = text; hint.className = "link-hint " + tone; };
-  const check = () => {
-    const v = (input.value = input.value.toLowerCase().replace(/\s+/g, "_"));
-    clearTimeout(timer); btn.disabled = true;
-    if (v === me.username) return say("Одоогийн холбоос.");
-    if (!/^[a-z0-9_]{3,32}$/.test(v)) return say("3–32 тэмдэгт: зөвхөн a–z, 0–9, доогуур зураас.", v ? "bad" : "");
-    say("Шалгаж байна…");
-    const my = ++seq;
-    // Багшийн нэртэй давхцвал энд мэдэгдэнэ; суралцагчийн нэртэй давхцлыг сервер хадгалах үед шалгана.
-    timer = setTimeout(async () => {
-      const res = await api("/api/teachers/" + encodeURIComponent(v), { raw: true, token: null }).catch(() => null);
-      if (my !== seq) return;
-      if (res?.status === 200) return say("Энэ холбоос эзэнтэй байна.", "bad");
-      say(`Чөлөөтэй: ${location.host}/t/${v}`, "ok"); btn.disabled = false;
-    }, 350);
-  };
-  input.addEventListener("input", check);
-  $("#unCopy").onclick = () => { const url = `${location.origin}/t/${me.username}`; navigator.clipboard.writeText(url).then(() => toast("Хуулагдлаа ✓"), () => toast(url)); };
-  f.onsubmit = async (e) => {
-    e.preventDefault();
-    const v = input.value.trim();
-    if (btn.disabled || v === me.username) return;
-    if (!confirm(`Холбоосыг /t/${v} болгох уу?\n\nХуучин холбоос (/t/${me.username}) болон өмнө нь хэвлэсэн QR код ажиллахгүй болно.`)) return;
-    btn.disabled = true;
-    try {
-      const d = await api("/api/me/username", { method: "PUT", body: { username: v } });
-      Auth.set(d.token, d.user); me = d.user; searchCourses = null;
-      Live.connect(d.token);
-      $("#sideFoot a")?.setAttribute("href", "/t/" + me.username);
-      toast("Хуудас шинэ холбоосоор нээгдэнэ"); setTimeout(() => location.replace("/t/" + me.username + "#settings"), 900); return;
-      toast("Профайлын холбоос солигдлоо ✓");
-      await profile();
-    } catch (err) { say(err.message, "bad"); toast(err.message, true); }
-  };
-}
-
 /* ---------- Суралцагчид: хэн элссэн, юу авсан, шууд чат ---------- */
 const studentRow = (r) => {
   const total = r.courses.length, lessons = r.courses.reduce((n, c) => n + c.lessons.length, 0);

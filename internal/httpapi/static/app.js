@@ -2444,7 +2444,7 @@ function profilePage() {
   const tabs = $("#pfTabs"), ink = $(".pf-ink", tabs), tabBtns = $$(".pf-tab", tabs), panels = $$(".pf-panel");
   const moveInk = () => { const a = $(".pf-tab.active", tabs); if (a) { ink.style.width = a.offsetWidth + "px"; ink.style.transform = `translateX(${a.offsetLeft}px)`; } };
   // Эзэмшигчийн горимд зарим таб студийн удирдлагын хэсгийг (m-*) харуулна.
-  const MANAGED = { overview: "overview", courses: "courses", books: "books", live: "live", files: "files", settings: "profile", students: "students" };
+  const MANAGED = { overview: "overview", courses: "courses", books: "books", live: "live", files: "files", students: "students" };
   let courseArg = null;
   const showTab = (name, scroll) => {
     const btn = tabBtns.find((b) => b.dataset.tab === name);
@@ -2488,7 +2488,13 @@ function profilePage() {
     courseArg = null;
     const key = [...h.keys()][0] || "";
     const owner = root.classList.contains("is-owner");
-    return key === "profile" || (owner && key === "about") ? showTab("settings") : owner && key === "qr" ? showTab("overview") : showTab(key);
+    if (owner && ["profile", "settings", "edit", "about"].includes(key)) { // тусдаа «Тохиргоо» байхгүй — «Профайл засах» цонх нээгдэнэ
+      const tab = h.get("edit") || "info";
+      setTimeout(() => root._openEdit?.(tab), 0);
+      history.replaceState(null, "", location.pathname + location.search);
+      return showTab("overview") || showTab("courses");
+    }
+    return owner && key === "qr" ? showTab("overview") : showTab(key);
   };
   root._showTab = showTab; root._fromHash = fromHash;
   addEventListener("hashchange", () => fromHash());
@@ -2550,7 +2556,7 @@ function profileOwner(root, h) {
     $$("[data-owner]").forEach((el) => (el.hidden = !owner));
     $$("[data-visitor]").forEach((el) => (el.hidden = owner));
     $$("[data-owner-tab]").forEach((el) => (el.hidden = !owner));
-    $$("[data-visitor-tab]").forEach((el) => (el.hidden = owner)); // эзэмшигчид: Тухай → Тохиргоо, QR → нүүр зураг дээр
+    $$("[data-visitor-tab]").forEach((el) => (el.hidden = owner)); // эзэмшигчид: Тухай → «Профайл засах», QR → нүүр зураг дээр
     $$(".nav a[href='/me']").forEach((el) => (el.hidden = owner)); // энэ хуудас өөрөө тул давхардуулахгүй
     $("#chatFab").hidden = owner; // өөртэйгөө чатлахгүй
     $("#viewAsBar").hidden = owner;
@@ -2604,17 +2610,84 @@ function profileOwner(root, h) {
     } finally { root.classList.remove("uploading"); URL.revokeObjectURL(preview); }
   });
 
+  // «Профайл засах»: мэдээлэл, профайлын холбоос, зөвлөмж — бүгд нэг цонхонд (тусдаа «Тохиргоо» хэсэг байхгүй).
   const modal = $("#editModal"), form = $("#editForm"), err = $("#editErr");
-  $$("[data-edit-profile]").forEach((b) => b.addEventListener("click", async () => {
+  const emTab = (name) => {
+    $$(".em-tab", modal).forEach((t) => { const on = t.dataset.em === name; t.classList.toggle("on", on); t.setAttribute("aria-selected", String(on)); });
+    $$("[data-em-pane]", modal).forEach((p) => (p.hidden = p.dataset.emPane !== name));
+  };
+  $$(".em-tab", modal).forEach((t) => t.addEventListener("click", () => emTab(t.dataset.em)));
+  const subjects = () => form.subjects.value.split(/[,،\n]/).map((x) => x.trim()).filter(Boolean);
+  const preview = () => ($("#subjPreview").innerHTML = subjects().slice(0, 8).map((x) => `<span class="tag">${esc(x)}</span>`).join(""));
+  const count = () => { const n = [...form.bio.value.trim()].length, c = $("#bioCount"); c.textContent = n >= 120 ? `${n} тэмдэгт ✓` : `${n}/120 — дор хаяж 120 тэмдэгт бичвэл сайн`; c.classList.toggle("ok", n >= 120); };
+  form.subjects.addEventListener("input", preview); form.bio.addEventListener("input", count);
+  // Профайлын холбоос: бичих зуур чөлөөтэй эсэхийг шалгана; солимогц шинэ холбоосоор дахин нээгдэнэ.
+  const un = $("#unForm"), unIn = un.username, unBtn = $("button.btn-gold", un), unHint = $("#unHint");
+  let unCur = "", unTimer = 0, unSeq = 0;
+  $("#unHost").textContent = location.host + "/t/";
+  const say = (text, tone = "") => { unHint.textContent = text; unHint.className = "link-hint " + tone; };
+  const unReset = (name) => { unCur = name; unIn.value = name; unBtn.disabled = true; say("Одоогийн холбоос."); };
+  unIn.addEventListener("input", () => {
+    const v = (unIn.value = unIn.value.toLowerCase().replace(/\s+/g, "_"));
+    clearTimeout(unTimer); unBtn.disabled = true;
+    if (v === unCur) return say("Одоогийн холбоос.");
+    if (!/^[a-z0-9_]{3,32}$/.test(v)) return say("3–32 тэмдэгт: зөвхөн a–z, 0–9, доогуур зураас.", v ? "bad" : "");
+    say("Шалгаж байна…");
+    const my = ++unSeq;
+    unTimer = setTimeout(async () => { // багшийн нэртэй давхцвал энд; суралцагчийнхтай давхцлыг сервер хадгалахдаа шалгана
+      const res = await api("/api/teachers/" + encodeURIComponent(v), { raw: true, token: null }).catch(() => null);
+      if (my !== unSeq) return;
+      if (res?.status === 200) return say("Энэ холбоос эзэнтэй байна.", "bad");
+      say(`Чөлөөтэй: ${location.host}/t/${v}`, "ok"); unBtn.disabled = false;
+    }, 350);
+  });
+  $("#unCopy").onclick = () => { const url = `${location.origin}/t/${unCur}`; navigator.clipboard.writeText(url).then(() => toast("Хуулагдлаа ✓"), () => toast(url)); };
+  un.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = unIn.value.trim();
+    if (unBtn.disabled || v === unCur) return;
+    if (!confirm(`Холбоосыг /t/${v} болгох уу?\n\nХуучин холбоос (/t/${unCur}) болон өмнө нь хэвлэсэн QR код ажиллахгүй болно.`)) return;
+    unBtn.disabled = true;
+    try {
+      const d = await api("/api/me/username", { method: "PUT", body: { username: v } });
+      Auth.set(d.token, d.user); Live.connect?.(d.token);
+      toast("Профайлын холбоос солигдлоо — шинэ холбоосоор нээгдэнэ");
+      setTimeout(() => location.replace("/t/" + d.user.username + "#edit=link"), 900);
+    } catch (x) { say(x.message, "bad"); toast(x.message, true); unBtn.disabled = false; }
+  });
+  // Зөвлөмж: дутуу алхмыг нэг товшилтоор гүйцээнэ (талбар руу очих, зураг оруулах, хэсэг рүү шилжих).
+  const FIELD = { bio: "bio", headline: "headline", subjects: "subjects", location: "location", links: "link_website" };
+  const loadTips = async () => {
+    try {
+      const ins = await api("/api/me/profile/insights"), todo = ins.tips.filter((t) => !t.done);
+      $("#emRing").innerHTML = ringHTML(ins.score, "ring-sm");
+      $("#emLevel").textContent = `Профайлын бүрдэл · ${ins.level}${todo.length ? ` · ${todo.length} алхам дутуу` : " · бүрэн бүрдсэн 🎉"}`;
+      const n = $("#emTipN"); n.hidden = !todo.length; n.textContent = todo.length;
+      $("#emTips").innerHTML = [...todo, ...ins.tips.filter((t) => t.done)].map((t) => `<li><button type="button" class="em-tip ${t.done ? "done" : ""}" data-tip="${esc(t.key)}" data-link="${esc(t.link)}" ${t.done ? "disabled" : ""}>
+        <i aria-hidden="true">✓</i><span><strong>${esc(t.title)}</strong><small>${esc(t.hint)}</small></span>${t.done ? "" : `<em>Хийх ${icon("next", 14)}</em>`}</button></li>`).join("");
+    } catch {}
+  };
+  $("#emTips").addEventListener("click", (e) => {
+    const b = e.target.closest(".em-tip"); if (!b || b.disabled) return;
+    const key = b.dataset.tip;
+    if (key === "avatar" || key === "cover") { emTab("info"); $(`.em-photos [data-upload="${key}"]`).click(); return; }
+    if (FIELD[key]) { emTab("info"); const el = form[FIELD[key]]; el?.focus(); el?.scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+    closeModal(modal); location.hash = (b.dataset.link || "#courses").replace(/^#/, ""); // сургалт, шууд хичээл зэрэг хэсэг рүү
+  });
+  const openEdit = async (tab = "info") => {
     err.textContent = "";
     try {
       const u = await api("/api/me");
       form.display_name.value = u.display_name; form.headline.value = u.headline || ""; form.bio.value = u.bio || "";
       form.subjects.value = (u.subjects || []).join(", "); form.location.value = u.location || "";
       LINK_KEYS.forEach((k) => (form["link_" + k].value = (u.links || {})[k] || ""));
-      openModal(modal); form.display_name.focus();
+      preview(); count(); unReset(u.username);
+      emTab(["info", "link", "tips"].includes(tab) ? tab : "info"); openModal(modal); loadTips();
+      if (tab === "link") unIn.focus(); else if (tab === "info") form.display_name.focus();
     } catch (e) { toast(e.message, true); }
-  }));
+  };
+  root._openEdit = openEdit;
+  $$("[data-edit-profile]").forEach((b) => b.addEventListener("click", () => openEdit()));
   form.addEventListener("submit", async (e) => {
     e.preventDefault(); err.textContent = "";
     const btn = $("button.btn-gold", form); btn.disabled = true;
@@ -2662,7 +2735,7 @@ async function homePage() {
   const tp = h.teacher;
   const parts = [`<div class="dash-head">${avatarHTML(u, "avatar-md")}<div class="grow"><h1>${hello}, ${esc(u.display_name.split(" ")[0])}</h1>
       <p>${h.courses.length ? `Танд ${h.courses.length} сургалт${h.meetings.length ? `, ${h.meetings.length} шууд хичээл` : ""} байна.` : tp ? "Багшийн самбар болон суралцах хэсэг тань энд байна." : "Багшийнхаа профайлаас анхны сургалтаа сонгоорой."}</p></div>
-      ${tp ? `<a class="btn" href="/t/${esc(u.username)}#overview">Багшлах →</a>` : `<button class="btn" data-student-settings>Тохиргоо</button>`}</div>`,
+      ${tp ? `<a class="btn" href="/t/${esc(u.username)}#overview">Багшлах →</a>` : `<button class="btn" data-student-settings>Профайл засах</button>`}</div>`,
     `<div class="tiles">
       <a class="tile" href="#my-courses"><em>${icon("courses")}</em><b>${h.courses.length}</b><span>Миний сургалт</span></a>
       <a class="tile" href="#my-lessons"><em>${icon("play")}</em><b>${h.lessons.length}</b><span>Авсан хичээл</span></a>
@@ -2803,7 +2876,7 @@ async function homePage() {
   parts.push(`<div class="dash-cols">${teachers}${chats}</div>`);
 
   dash.innerHTML = parts.join("") + (tp ? "" : `<div class="modal" id="stuModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
-      <h3 class="h3">Тохиргоо</h3><form class="form" id="stuForm"><label>Нэр<input name="display_name" required maxlength="80" value="${esc(u.display_name)}"></label>
+      <h3 class="h3">Профайл засах</h3><form class="form" id="stuForm"><label>Нэр<input name="display_name" required maxlength="80" value="${esc(u.display_name)}"></label>
       <p class="muted small" style="margin:0">Имэйл: ${esc(u.email || "")}</p><p class="form-error" role="alert"></p>
       <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`);
   $("[data-student-settings]")?.addEventListener("click", () => openModal($("#stuModal")));
