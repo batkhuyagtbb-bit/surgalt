@@ -1104,8 +1104,10 @@ function runExam({ base, courseId, lessonId, title, data, onClose }) {
   const lessonModal = $("#lessonModal"); if (lessonModal?.classList.contains("open")) closeModal(lessonModal);
   const el = document.createElement("div"); el.className = "exam"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Шалгалт");
   el.innerHTML = `<header class="exam-bar"><strong>📝 ${esc(title)}</strong><span class="exam-prog"></span><span class="exam-timer" aria-live="polite"></span><button class="btn btn-gold btn-sm" data-exam-submit>Илгээх</button></header>
+    <nav class="exam-nav" aria-label="Асуултаар шилжих">${data.questions.map((_, i) => `<button type="button" data-goq="${i}" aria-label="${i + 1}-р асуулт руу очих">${i + 1}</button>`).join("")}
+      <span class="exam-nav-legend" aria-hidden="true"><i class="lg-todo"></i>хариулаагүй<i class="lg-done"></i>хариулсан</span></nav>
     <div class="exam-body"><div class="exam-qs">${data.questions.map((b, i) => quizFormHTML(b, true, i + 1)).join("")}</div>
-      <button class="btn btn-gold btn-lg btn-block" data-exam-submit>Шалгалтаа илгээх</button></div>`;
+      <div class="exam-submit"><button class="btn btn-gold btn-lg" data-exam-submit>Шалгалтаа илгээх</button></div></div>`;
   document.body.append(el); document.documentElement.classList.add("reader-open");
   const body = $(".exam-body", el); bindQuizPicks(body);
   // Хадгалсан хариултыг сэргээнэ (хуудсыг дахин ачаалсан бол).
@@ -1117,8 +1119,30 @@ function runExam({ base, courseId, lessonId, title, data, onClose }) {
     if (a.point) { f.dataset.px = a.point[0]; f.dataset.py = a.point[1]; const pt = $(".rq-pt", f); if (pt) { pt.hidden = false; pt.style.left = a.point[0] + "%"; pt.style.top = a.point[1] + "%"; } }
   });
   const answers = () => { const out = {}; $$(".rb-quiz", el).forEach((f) => { const a = quizAnswer(f); if (a) out[f.dataset.quiz] = a; }); return out; };
-  const progress = () => { const n = Object.keys(answers()).length; $(".exam-prog", el).textContent = `${n}/${data.questions.length} хариулсан`; try { sessionStorage.setItem(key, JSON.stringify(answers())); } catch {} };
+  // Асуултын дугаарын мөр: хариулаагүй (улбар шар) / хариулсан (хар хөх), одоо харж буй нь тодорно; дарахад шилжинэ.
+  const forms = $$(".exam-qs > .rb-quiz", el), navBtns = $$("[data-goq]", el);
+  const todoNums = (a = answers()) => forms.map((f, i) => (a[f.dataset.quiz] ? 0 : i + 1)).filter(Boolean);
+  const progress = () => {
+    const a = answers(), n = Object.keys(a).length;
+    $(".exam-prog", el).textContent = `${n}/${data.questions.length} хариулсан`;
+    forms.forEach((f, i) => navBtns[i]?.classList.toggle("done", !!a[f.dataset.quiz]));
+    try { sessionStorage.setItem(key, JSON.stringify(a)); } catch {}
+  };
   el.addEventListener("change", progress); el.addEventListener("input", progress); progress();
+  const goQ = (i) => {
+    const f = forms[i]; if (!f) return;
+    f.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    f.classList.remove("q-flash"); void f.offsetWidth; f.classList.add("q-flash");
+  };
+  if ("IntersectionObserver" in window) { // гүйлгэхэд одоо харж буй асуултыг тодруулна
+    const seen = new IntersectionObserver((es) => es.forEach((e) => {
+      if (!e.isIntersecting) return;
+      const i = forms.indexOf(e.target);
+      navBtns.forEach((b, k) => b.classList.toggle("cur", k === i));
+      navBtns[i]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }), { root: body, rootMargin: "-20% 0px -70% 0px" });
+    forms.forEach((f) => seen.observe(f));
+  }
   // Цаг
   const deadline = att.deadline_at ? new Date(att.deadline_at).getTime() - (new Date(data.now).getTime() - Date.now()) : 0;
   if (deadline) tick = setInterval(() => {
@@ -1158,7 +1182,8 @@ function runExam({ base, courseId, lessonId, title, data, onClose }) {
     const a = res?.attempt;
     $$(".rb-quiz", el).forEach((f) => { f.classList.add("locked"); $$("input,select", f).forEach((x) => (x.disabled = true)); if (a?.results) { const ok = a.results[f.dataset.quiz]; f.classList.add(ok ? "is-ok" : "is-bad"); } if (res?.reveal?.[f.dataset.quiz]) quizReveal(f, res.reveal[f.dataset.quiz], a.results[f.dataset.quiz]); });
     $(".exam-bar [data-exam-submit]", el).remove();
-    $(".exam-body > [data-exam-submit]", el)?.remove();
+    $(".exam-submit", el)?.remove();
+    if (a?.results) forms.forEach((f, i) => { navBtns[i]?.classList.remove("done"); navBtns[i]?.classList.add(a.results[f.dataset.quiz] ? "ok" : "bad"); });
     const pass = a?.passed;
     $(".exam-body", el).insertAdjacentHTML("afterbegin", `<div class="exam-result ${a?.status === "terminated" ? "bad" : pass ? "ok" : ""}">
       <span class="exam-score">${a ? a.pct + "%" : "—"}</span><div><h3>${a?.status === "terminated" ? "Шалгалт хаагдлаа" : pass ? "🎉 Тэнцлээ!" : "Тэнцсэнгүй"}</h3>
@@ -1169,9 +1194,10 @@ function runExam({ base, courseId, lessonId, title, data, onClose }) {
     $("[data-exam-close]", el).onclick = () => { el.remove(); document.documentElement.classList.remove("reader-open"); onClose?.(); };
   }
   el.addEventListener("click", (e) => {
+    const g = e.target.closest("[data-goq]"); if (g) return goQ(+g.dataset.goq);
     if (!e.target.closest("[data-exam-submit]")) return;
-    const n = Object.keys(answers()).length;
-    if (n < data.questions.length && !confirm(`${data.questions.length - n} асуултад хариулаагүй байна. Илгээх үү?`)) return;
+    const todo = todoNums();
+    if (todo.length && !confirm(`${todo.join(", ")}-р асуултад хариулаагүй байна (${todo.length}). Илгээх үү?`)) return goQ(todo[0] - 1);
     submit("", "");
   });
 }
