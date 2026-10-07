@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"surgalt/internal/files"
+	"surgalt/internal/httpapi"
 	"surgalt/internal/store"
 )
 
@@ -48,6 +49,19 @@ func TestSeedRulesDemo(t *testing.T) {
 	}
 	if len(ls) != 10 || !ls[9].AlwaysOpen || ls[5].Exam == nil {
 		t.Fatalf("хичээлүүд: %d", len(ls))
+	}
+	// Бүх демо хичээлийн хэсгийн ID серверийн шалгалтыг давна (засаад хадгалахад «ID буруу» гарахгүй).
+	for _, c := range cs {
+		ls, _ := st.LessonsByCourse(ctx, c.ID)
+		for _, l := range ls {
+			seen := map[string]bool{}
+			for _, b := range l.Blocks {
+				if !httpapi.ValidBlockID(b.ID) || seen[b.ID] {
+					t.Fatalf("«%s» хичээлд буруу ID: %q", l.Title, b.ID)
+				}
+				seen[b.ID] = true
+			}
+		}
 	}
 	s, _ := st.UserByUsername(ctx, "suragch")
 	if ok, _ := st.IsEnrolled(ctx, s.ID, demo.ID); !ok {

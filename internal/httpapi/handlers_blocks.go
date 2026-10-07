@@ -4,7 +4,9 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"surgalt/internal/files"
@@ -22,6 +24,36 @@ const (
 
 var blockIDRe = regexp.MustCompile(`^[a-z0-9]{4,16}$`)
 
+// ValidBlockID — агуулгын хэсгийн ID зөв эсэх (seed, импорт шалгахад).
+func ValidBlockID(id string) bool { return blockIDRe.MatchString(id) }
+
+// fixBlockID — хуучин өгөгдөл, импортоос ирсэн буруу (богино, том үсэг, тэмдэгттэй) эсвэл давхардсан ID-г
+// зөв ID болгоно. Тогтвортой: ижил дараалалд ижил ID гарна, тиймээс дахин хадгалахад өөрчлөгдөхгүй.
+func fixBlockID(id string, seen map[string]bool) string {
+	if blockIDRe.MatchString(id) && !seen[id] {
+		return id
+	}
+	c := strings.Map(func(r rune) rune {
+		r = unicode.ToLower(r)
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			return r
+		}
+		return -1
+	}, id)
+	for len(c) < 4 {
+		c += "0"
+	}
+	if len(c) > 16 {
+		c = c[:16]
+	}
+	base := c
+	for i := 1; seen[c]; i++ {
+		suf := strconv.Itoa(i)
+		c = base[:min(len(base), 16-len(suf))] + suf
+	}
+	return c
+}
+
 // validateBlocks нь блокуудыг шалгаж, хоосон зайг цэвэрлэнэ. Алдаа бол монгол мессеж буцаана.
 func validateBlocks(bs []store.Block, teacherID string) string {
 	if len(bs) > maxBlocks {
@@ -31,10 +63,8 @@ func validateBlocks(bs []store.Block, teacherID string) string {
 	total := 0
 	for i := range bs {
 		b := &bs[i]
-		b.Parts = nil // сервер тооцоолдог талбар
-		if !blockIDRe.MatchString(b.ID) || seen[b.ID] {
-			return "агуулгын хэсгийн ID буруу"
-		}
+		b.Parts = nil                 // сервер тооцоолдог талбар
+		b.ID = fixBlockID(b.ID, seen) // буруу ID-тай хуучин хичээлийг ч хадгалж болно
 		seen[b.ID] = true
 		if !store.BlockTypes[b.Type] {
 			return "агуулгын төрөл буруу: " + b.Type

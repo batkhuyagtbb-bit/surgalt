@@ -781,15 +781,28 @@ func TestLessonBlocksQuiz(t *testing.T) {
 		t.Fatalf("блоктой хичээл үүссэнгүй: %d %v", code, l)
 	}
 	lid := l["id"].(string)
+	// Буруу/давхардсан ID-г татгалзахгүй, тогтвортой зөв ID болгож хадгална (хуучин өгөгдөлтэй хичээл ч хадгалагдана).
+	fixed := `[{"id":"x1","type":"text","text":"богино id"},{"id":"AB-cd","type":"text","text":"том үсэг"},{"id":"a001","type":"text","text":"a"},{"id":"a001","type":"text","text":"b"}]`
+	code, fl := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Хуучин ID","is_free":true,"blocks":`+fixed+`}`)
+	ids := func(l map[string]any) (out []string) {
+		for _, b := range l["blocks"].([]any) {
+			out = append(out, b.(map[string]any)["id"].(string))
+		}
+		return
+	}
+	if code != 201 || fmt.Sprint(ids(fl)) != "[x100 abcd a001 a0011]" {
+		t.Fatalf("буруу ID засагдах ёстой: %d %v", code, fl)
+	}
+	if code, again := call(t, srv, "PUT", "/api/courses/"+cid+"/lessons/"+fl["id"].(string), tt, `{"title":"Хуучин ID","is_free":true,"blocks":`+fixed+`}`); code != 200 || fmt.Sprint(ids(again)) != "[x100 abcd a001 a0011]" {
+		t.Fatalf("дахин хадгалахад ID тогтвортой: %d %v", code, again)
+	}
 	// Буруу блокууд татгалзагдана.
 	for _, bad := range []string{
-		`[{"id":"x1","type":"text","text":"богино id"}]`,
 		`[{"id":"a001","type":"script","text":"x"}]`,
 		`[{"id":"a001","type":"image","url":"/files/other/private/a.webp"}]`,
 		`[{"id":"a001","type":"quiz","quiz":{"question":"?","options":["a"],"correct":[0]}}]`,
 		`[{"id":"a001","type":"quiz","quiz":{"question":"?","options":["a","b"],"correct":[]}}]`,
 		`[{"id":"a001","type":"quiz","quiz":{"question":"?","options":["a","b"],"correct":[0,1]}}]`,
-		`[{"id":"a001","type":"text","text":"a"},{"id":"a001","type":"text","text":"b"}]`,
 	} {
 		if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"x","is_free":true,"blocks":`+bad+`}`); code != 400 {
 			t.Fatalf("буруу блок зөвшөөрөгдлөө (%d): %s", code, bad)
