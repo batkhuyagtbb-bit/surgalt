@@ -416,7 +416,7 @@ function bell() {
     e.preventDefault(); e.stopPropagation(); b.disabled = true;
     try {
       const r = await api(`/api/me/students/${b.dataset.unblockUser}/unblock`, { method: "POST", body: { lesson_id: b.dataset.unblockLesson } });
-      b.className = "btn btn-sm bell-unblock done"; b.textContent = r.unblocked ? "✓ Дахин нээгдлээ — суралцагчид мэдэгдлээ" : "✓ Аль хэдийн нээлттэй";
+      b.className = "btn btn-sm bell-unblock done"; b.textContent = r.exam ? "✓ Шалгалт дахин нээгдлээ (+1 оролдлого)" : r.unblocked ? "✓ Дахин нээгдлээ — суралцагчид мэдэгдлээ" : "✓ Аль хэдийн нээлттэй";
     } catch (x) { toast(x.message, true); b.disabled = false; }
   });
   const load = async () => {

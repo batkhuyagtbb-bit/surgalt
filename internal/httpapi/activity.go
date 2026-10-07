@@ -30,7 +30,7 @@ var eventInfo = map[string]eventMeta{
 	"idle":            {"2 минутаас дээш хөдөлгөөнгүй", false, false},
 	"ping_missed":     {"Идэвхийн шалгалтад хариу өгөөгүй", true, false},
 	"auto_block":      {"Хичээл автоматаар зогссон", true, false},
-	"teacher_unblock": {"Багш хоригийг цуцалсан", false, false},
+	"teacher_unblock": {"Багш дахин нээсэн", false, false},
 	"face_missing":    {"Камерт царай харагдаагүй", false, true},
 	"eyes_closed":     {"Нүдээ аньсан (нойрмоглосон)", false, false},
 	"look_away":       {"Дэлгэцээс өөр тийш харсан", false, true},

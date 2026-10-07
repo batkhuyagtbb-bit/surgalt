@@ -2596,6 +2596,58 @@ func TestExamTerminatedBlock(t *testing.T) {
 	}
 }
 
+// Багш шалгалтыг гараар дахин нээнэ: хориг дууссан/байхгүй ч (оролдлого дууссан) +1 оролдлого олгож, суралцагчид мэдэгдэнэ.
+func TestTeacherReopenExam(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	other, _ := register(t, srv, "other", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Шалгалт","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Эцсийн шалгалт","is_free":true,"exam":{"pass_pct":50,"attempts":1},"blocks":[{"id":"q001","type":"quiz","quiz":{"question":"?","options":["a","b"],"correct":[0]}}]}`)
+	lid := l["id"].(string)
+	s1, uid := register(t, srv, "stud", "student")
+	_, uid2 := register(t, srv, "stud2", "student")
+	base := "/api/courses/" + cid + "/lessons/" + lid + "/exam"
+	_, a := call(t, srv, "POST", base+"/start", s1, "")
+	aid := a["attempt"].(map[string]any)["id"].(string)
+	if code, r := call(t, srv, "POST", base+"/submit", s1, `{"attempt_id":"`+aid+`","answers":{}}`); code != 200 || r["passed"] == true {
+		t.Fatalf("ердийн журмаар унах: %d %v", code, r)
+	}
+	if code, _ := call(t, srv, "POST", base+"/start", s1, ""); code != http.StatusConflict {
+		t.Fatalf("оролдлого дууссан (409): %d", code)
+	}
+	// Өөр багш, өөр хичээлийг нээж чадахгүй.
+	if code, _ := call(t, srv, "POST", "/api/me/students/"+uid+"/unblock", other, `{"lesson_id":"`+lid+`"}`); code != 404 {
+		t.Fatalf("өөр багшийн шалгалт: %d", code)
+	}
+	// Оролдлого хийгээгүй хэрэглэгчид нээх зүйл алга — мэдэгдэл ч явахгүй.
+	if code, r := call(t, srv, "POST", "/api/me/students/"+uid2+"/unblock", tt, `{"lesson_id":"`+lid+`"}`); code != 200 || r["unblocked"].(float64) != 0 {
+		t.Fatalf("оролдлогогүй суралцагч: %d %v", code, r)
+	}
+	// Хориг байхгүй ч багш гараар нээнэ.
+	code, r := call(t, srv, "POST", "/api/me/students/"+uid+"/unblock", tt, `{"lesson_id":"`+lid+`"}`)
+	if code != 200 || r["unblocked"].(float64) != 1 || r["exam"] != true {
+		t.Fatalf("багш шалгалтыг дахин нээх: %d %v", code, r)
+	}
+	_, ns := call(t, srv, "GET", "/api/me/notifications", s1, "")
+	if !strings.Contains(fmt.Sprint(ns), "шалгалтыг тань дахин нээлээ") || !strings.Contains(fmt.Sprint(ns), "/c/"+cid+"#l="+lid) {
+		t.Fatalf("суралцагчид шалгалт нээгдсэн мэдэгдэл (холбоостой) очно: %v", ns)
+	}
+	_, info := call(t, srv, "GET", base, s1, "")
+	if info["left"].(float64) != 1 {
+		t.Fatalf("нэмэлт 1 оролдлого: %v", info["left"])
+	}
+	if code, r := call(t, srv, "POST", base+"/start", s1, ""); code != 200 && code != 201 {
+		t.Fatalf("нээсний дараа дахин эхэлнэ: %d %v", code, r)
+	}
+	// Шинжилгээнд шалгалтын мөр хичээлийн нэртэй (багш эндээс дахин нээнэ).
+	_, d := call(t, srv, "GET", "/api/me/analytics/students/"+uid, tt, "")
+	if titles, _ := d["lesson_titles"].(map[string]any); titles[lid] != "Эцсийн шалгалт" {
+		t.Fatalf("шалгалтын хичээлийн нэр: %v", d["lesson_titles"])
+	}
+}
+
 // HTML embed блок: хадгалагдана, хэмжээ шалгагдана.
 func TestEmbedBlock(t *testing.T) {
 	srv, _ := newTestServer(t)

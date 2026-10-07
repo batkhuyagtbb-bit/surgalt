@@ -141,25 +141,61 @@ func (s *Server) handleUnblockStudent(w http.ResponseWriter, r *http.Request) {
 		hours[co.ID] = blockMinutes(&co)
 	}
 	bs := s.lessonBlocks(r.Context(), uid, store.ActivityFilter{TeacherID: c.UID, LessonID: in.LessonID}, func(cid string) int { return hours[cid] })
-	if len(bs) == 0 {
+	courseOf, lessonOf := map[string]string{}, map[string]store.Lesson{}
+	for _, co := range courses {
+		ls, _ := s.store.LessonsByCourse(r.Context(), co.ID)
+		for _, l := range ls {
+			courseOf[l.ID], lessonOf[l.ID] = co.ID, l
+		}
+	}
+	targets := make(map[string]bool, len(bs))
+	for lid := range bs {
+		targets[lid] = true
+	}
+	// Шалгалтыг багш гараар нээвэл: хориг автоматаар дууссан ч (эсвэл ердийн журмаар унасан ч) оролдлого нь
+	// дууссан байж болно — үргэлж нэг нэмэлт оролдлого өгнө (teacher_unblock = +1 оролдлого, хоригийг ч цуцална).
+	exam := ""
+	if in.LessonID != "" {
+		l, ok := lessonOf[in.LessonID]
+		if !ok {
+			writeErr(w, http.StatusNotFound, "олдсонгүй")
+			return
+		}
+		if l.Exam != nil {
+			// Нэг ч оролдлого хийгээгүй бол нээх юм алга (дурын хэрэглэгчид мэдэгдэл явуулахаас сэргийлнэ).
+			atts, err := s.store.ExamAttempts(r.Context(), store.ActivityFilter{UserID: uid, LessonID: l.ID})
+			if s.storeErr(w, r, err) {
+				return
+			}
+			if len(atts) > 0 || targets[l.ID] {
+				targets[l.ID], exam = true, l.Title
+			}
+		}
+	}
+	if len(targets) == 0 {
 		writeJSON(w, http.StatusOK, map[string]any{"unblocked": 0})
 		return
 	}
 	name := s.displayName(r.Context(), uid, "")
 	var evs []store.ActivityEvent
-	courseOf := map[string]string{}
-	for _, co := range courses {
-		ls, _ := s.store.LessonsByCourse(r.Context(), co.ID)
-		for _, l := range ls {
-			courseOf[l.ID] = co.ID
+	link := ""
+	for lid := range targets {
+		detail := "багш хоригийг цуцлав"
+		if lessonOf[lid].Exam != nil {
+			detail = "багш шалгалтыг дахин нээв (+1 оролдлого)"
 		}
-	}
-	for lid := range bs {
-		evs = append(evs, store.ActivityEvent{UserID: uid, UserName: name, CourseID: courseOf[lid], LessonID: lid, TeacherID: c.UID, Type: "teacher_unblock", Detail: "багш хоригийг цуцлав", At: time.Now()})
+		evs = append(evs, store.ActivityEvent{UserID: uid, UserName: name, CourseID: courseOf[lid], LessonID: lid, TeacherID: c.UID, Type: "teacher_unblock", Detail: detail, At: time.Now()})
+		if len(targets) == 1 {
+			link = "/c/" + courseOf[lid] + "#l=" + lid
+		}
 	}
 	if err := s.store.AddActivityEvents(r.Context(), evs); s.storeErr(w, r, err) {
 		return
 	}
-	s.notify(r.Context(), &store.Notification{UserID: uid, Type: "unblock", Title: "🔓 Багш хичээлийг тань дахин нээлээ", Body: "Анхааралтай, бусад цонхоо хаагаад үзээрэй."})
-	writeJSON(w, http.StatusOK, map[string]any{"unblocked": len(evs)})
+	n := &store.Notification{UserID: uid, Type: "unblock", Title: "🔓 Багш хичээлийг тань дахин нээлээ", Body: "Анхааралтай, бусад цонхоо хаагаад үзээрэй.", Link: link}
+	if exam != "" {
+		n.Title, n.Body = "🔓 Багш шалгалтыг тань дахин нээлээ", "«"+exam+"» — дахин өгөх боломжтой (нэмэлт оролдлого). Бусад цонхоо хаагаад, анхааралтай өгөөрэй."
+	}
+	s.notify(r.Context(), n)
+	writeJSON(w, http.StatusOK, map[string]any{"unblocked": len(evs), "exam": exam != ""})
 }

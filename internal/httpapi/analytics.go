@@ -621,6 +621,13 @@ func (s *Server) handleStudentAnalytics(w http.ResponseWriter, r *http.Request) 
 		qorder = append(qorder, m.LessonID)
 		titleByLesson[m.LessonID] = m.Title
 	}
+	for _, a := range atts { // шалгалтын мөрөнд хичээлийн нэр (багш эндээс дахин нээнэ)
+		if _, ok := titleByLesson[a.LessonID]; !ok {
+			if l, err := s.store.LessonByID(r.Context(), a.CourseID, a.LessonID); err == nil {
+				titleByLesson[a.LessonID] = l.Title
+			}
+		}
+	}
 	allLogs, _ := s.store.QuizLogs(r.Context(), f, 20000)
 	seen := map[string]bool{}
 	for i := len(allLogs) - 1; i >= 0; i-- {

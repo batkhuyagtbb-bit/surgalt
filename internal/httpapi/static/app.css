@@ -2620,5 +2620,9 @@ html.dv-locked,html.dv-locked body{overflow:hidden}
 .jr-dl dt{color:var(--muted);font-size:.84rem;font-weight:600}
 .jr-dl dd{margin:0;font-weight:600}
 @media (max-width:560px){.jr-t .jr-name{min-width:130px;max-width:150px}}
+/* Шалгалтыг багш гараар дахин нээх (+1 оролдлого) */
+.jr-reopen{flex-direction:column;align-items:flex-start;gap:6px}
+.jr-reopen .btn.done,.an-reopen.done{background:var(--teal);border-color:var(--teal);color:#fff;opacity:1;box-shadow:none;cursor:default}
+.an-reopen{white-space:nowrap}
 .pf.manage .gp-body.gp-wide,.gp-body.gp-wide{grid-template-columns:minmax(0,1fr)}
 .gp-body.gp-wide .composer-box{max-width:760px}

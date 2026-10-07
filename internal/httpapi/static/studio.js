@@ -838,7 +838,8 @@ async function courseEditor(id) {
     jrModal(`<span class="eyebrow">${String(l.position).padStart(2, "0")} · ${esc(l.title)}</span><h3 class="h3">${esc(s.name)}</h3>
       <dl class="jr-dl">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
       ${x.reasons?.length ? `<p class="muted small" style="margin:10px 0 0">Үндэслэл: ${x.reasons.map(esc).join(", ")}</p>` : ""}
-      ${l.kind === "assignment" && x.asg ? `<div class="hero-cta" style="margin:14px 0 0"><button class="btn btn-gold btn-sm" data-jr-grade="${esc(l.id)}">${ico("users", 15)}Дүгнэх</button></div>` : ""}`);
+      ${l.kind === "assignment" && x.asg ? `<div class="hero-cta" style="margin:14px 0 0"><button class="btn btn-gold btn-sm" data-jr-grade="${esc(l.id)}">${ico("users", 15)}Дүгнэх</button></div>` : ""}
+      ${l.kind === "exam" && x.exam ? `<div class="hero-cta jr-reopen" style="margin:14px 0 0"><button class="btn btn-gold btn-sm" data-reopen-exam="${esc(l.id)}" data-reopen-user="${esc(uid)}">🔓 Шалгалтыг дахин нээх (+1 оролдлого)</button><span class="muted small">${x.exam.terminated ? "Хаагдсан шалгалтыг" : "Оролдлого дууссан ч"} дахин өгөх боломж олгоно — суралцагчид мэдэгдэл очно.</span></div>` : ""}`);
   };
   const jrStudentModal = (uid) => {
     const s = jr.students.find((x) => x.user_id === uid), row = jr.cells[uid] || {};
@@ -855,6 +856,7 @@ async function courseEditor(id) {
     const m = $("#jrModal"); SG.openModal(m);
     m.addEventListener("click", (e) => {
       const g = e.target.closest("[data-jr-grade]"); if (g) { SG.closeModal(m); setTimeout(() => m.remove(), 300); return gradeModal(g.dataset.jrGrade); }
+      const ro = e.target.closest("[data-reopen-exam]"); if (ro) return reopenExam(ro, loadJournal);
       if (e.target === m || e.target.closest("[data-close]")) { SG.closeModal(m); setTimeout(() => m.remove(), 300); }
     });
   };
@@ -1129,6 +1131,16 @@ async function courseEditor(id) {
 }
 
 /* Лог хүснэгт: эхлээд 20 мөр, доош гүйлгэхэд дараагийн 20-ыг нэмнэ (ачаалсан жагсаалтаас). */
+// Хаагдсан (эсвэл оролдлого нь дууссан) шалгалтыг багш гараар дахин нээнэ: +1 оролдлого, хориг цуцлагдана.
+async function reopenExam(b, after) {
+  if (b.disabled) return; b.disabled = true;
+  try {
+    const r = await api(`/api/me/students/${b.dataset.reopenUser}/unblock`, { method: "POST", body: { lesson_id: b.dataset.reopenExam } });
+    b.textContent = r.unblocked ? "✓ Нээгдлээ · +1 оролдлого" : "Нээх оролдлого алга"; b.classList.add("done");
+    if (r.unblocked) { toast("🔓 Шалгалт дахин нээгдлээ — суралцагчид мэдэгдэл очлоо"); after?.(); }
+  } catch (e) { b.disabled = false; toast(e.message, true); }
+}
+
 function scrollRows(box, items, rowFn, step = 20) {
   const tb = box.querySelector("tbody"); if (!tb) return;
   let i = 0;
@@ -1794,6 +1806,8 @@ async function students() {
   const detail = async (uid) => {
     const d = await api(`/api/me/analytics/students/${uid}?${qs()}`), x = d.student;
     if (!x) return toast("Мэдээлэл алга");
+    // Шалгалт бүрийн хамгийн сүүлийн (дууссан) оролдлого — "Дахин нээх" товч зөвхөн тэр мөрөнд.
+    const lastTry = new Set(Object.values((d.exams || []).reduce((o, a) => (a.status !== "active" && (!o[a.lesson_id] || a.started_at > o[a.lesson_id].started_at) && (o[a.lesson_id] = a), o), {})).map((a) => a.id));
     const html = `<h3 class="h3">${esc(x.name)}</h3>
       <div class="an-tiles"><div class="an-tile"><small>Идэвхтэй</small><b>${dur(x.active_sec)}</b></div><div class="an-tile"><small>Идэвхтэй хувь</small><b>${x.active_pct}%</b></div>
         <div class="an-tile"><small>Анхаарал</small><b>${x.attention}%</b></div><div class="an-tile ${x.violations ? "warn" : ""}"><small>Зөрчил</small><b>${x.violations}</b></div>
@@ -1817,7 +1831,7 @@ async function students() {
         <table class="tbl"><thead><tr><th>Хичээл</th><th>Зөв / асуулт</th><th>Төлөв</th><th>Оролдлого</th><th>Анх удаад зөв</th><th>Дундаж</th></tr></thead><tbody>${d.quiz_lessons.map((q) => `<tr class="${q.done ? "" : "an-wrongq"}"><td>${esc(q.title)}</td><td>${q.correct}/${q.total}</td><td>${q.done ? `✓ Дууссан${q.done_at ? " · " + fmtDate(q.done_at) : ""}` : `${q.total - q.correct} үлдсэн`}</td><td>${q.attempts}${q.questions ? ` (${(q.attempts / q.questions).toFixed(1)}/асуулт)` : ""}</td><td>${q.questions ? q.first_try + "/" + q.questions : "—"}</td><td>${q.avg_ms ? (q.avg_ms / 1000).toFixed(1) + " сек" : "—"}${q.guesses ? ` · ⚡${q.guesses}` : ""}</td></tr>`).join("")}</tbody></table>` : ""}
       ${d.quiz_logs?.length ? `<h4>Асуултын хариултын лог</h4><div class="bk-log" id="anQuizLog"><table class="tbl"><thead><tr><th>Огноо</th><th>Хичээл</th><th>Асуулт</th><th>Хариулт</th><th>Хугацаа</th></tr></thead><tbody></tbody></table></div>` : ""}
       <h4>Хичээл тус бүрээр</h4><table class="tbl"><thead><tr><th>Хичээл</th><th>Идэвхтэй</th><th>Нийт</th><th>Удаа</th><th>Зөрчил</th></tr></thead><tbody>${d.lessons.map((l) => `<tr><td>${esc(l.title)}</td><td>${dur(l.active_sec)}</td><td>${dur(l.total_sec)}</td><td>${l.sessions}</td><td>${l.violations}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">Алга</td></tr>`}</tbody></table>
-      <h4>Шалгалтууд</h4><table class="tbl"><thead><tr><th>Огноо</th><th>Оноо</th><th>Төлөв</th><th>Зөрчил</th></tr></thead><tbody>${d.exams.map((a) => `<tr><td>${fmtDate(a.started_at)}</td><td>${a.pct}%${a.passed ? " ✓" : ""}</td><td>${a.status === "terminated" ? `<b class="an-bad">Хаагдсан</b> · ${esc(a.reason || "")}` : a.status === "submitted" ? "Өгсөн" : a.status === "expired" ? "Хугацаа хэтэрсэн" : "Явагдаж байна"}</td><td>${a.violations}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">Алга</td></tr>`}</tbody></table>
+      <h4>Шалгалтууд</h4><table class="tbl"><thead><tr><th>Огноо</th><th>Шалгалт</th><th>Оноо</th><th>Төлөв</th><th>Зөрчил</th><th></th></tr></thead><tbody>${d.exams.map((a) => `<tr><td>${fmtDate(a.started_at)}</td><td>${esc(d.lesson_titles?.[a.lesson_id] || "")}</td><td>${a.pct}%${a.passed ? " ✓" : ""}</td><td>${a.status === "terminated" ? `<b class="an-bad">Хаагдсан</b> · ${esc(a.reason || "")}` : a.status === "submitted" ? "Өгсөн" : a.status === "expired" ? "Хугацаа хэтэрсэн" : "Явагдаж байна"}</td><td>${a.violations}</td><td>${lastTry.has(a.id) ? `<button class="btn btn-glass btn-sm an-reopen" data-reopen-exam="${esc(a.lesson_id)}" data-reopen-user="${esc(uid)}" title="Дахин өгөх боломж олгоно (+1 оролдлого), суралцагчид мэдэгдэл очно">🔓 Дахин нээх</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">Алга</td></tr>`}</tbody></table>
       <h4>Лог</h4><div id="anStuFeed"></div>`;
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="anModal"><div class="modal-card" style="width:min(900px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}
       <div class="hero-cta" style="margin:16px 0 0;justify-content:flex-end"><button class="btn btn-glass" data-x="csv">${ico("files", 16)}Excel</button><button class="btn btn-glass" data-x="pdf">${ico("book", 16)}PDF</button><button class="btn btn-gold" data-x="remind">${ico("chat", 16)}Сануулга илгээх</button></div></div></div>`);
@@ -1827,9 +1841,10 @@ async function students() {
     SG.openModal(m);
     m.addEventListener("click", (e) => {
       if (e.target === m || e.target.closest("[data-close]")) { SG.closeModal(m); setTimeout(() => m.remove(), 300); return; }
+      const ro = e.target.closest("[data-reopen-exam]"); if (ro) return reopenExam(ro);
       const b = e.target.closest("[data-x]"); if (!b) return;
       if (b.dataset.x === "csv") download(`/api/me/analytics/export?${qs()}&student=${uid}`, `suragch-${x.name}.csv`);
-      if (b.dataset.x === "pdf") printReport("Суралцагчийн тайлан", `<h1>${esc(x.name)}</h1>${html.replace(/<svg[\s\S]*?<\/svg>/, "").replace('<div id="anStuFeed"></div>', sf.box.querySelector("table").outerHTML).replace(/(id="anQuizLog"[\s\S]*?<tbody>)(<\/tbody>)/, (_, a, b) => a + (d.quiz_logs || []).map(qRow).join("") + b)}`);
+      if (b.dataset.x === "pdf") printReport("Суралцагчийн тайлан", `<h1>${esc(x.name)}</h1>${html.replace(/<svg[\s\S]*?<\/svg>/, "").replace(/<button[^>]*data-reopen-exam[\s\S]*?<\/button>/g, "").replace('<div id="anStuFeed"></div>', sf.box.querySelector("table").outerHTML).replace(/(id="anQuizLog"[\s\S]*?<tbody>)(<\/tbody>)/, (_, a, b) => a + (d.quiz_logs || []).map(qRow).join("") + b)}`);
       if (b.dataset.x === "remind") remind(uid, x.name);
     });
   };
