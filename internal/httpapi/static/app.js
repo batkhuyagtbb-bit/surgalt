@@ -2042,7 +2042,7 @@ async function homePage() {
   const tp = h.teacher;
   const parts = [`<div class="dash-head">${avatarHTML(u, "avatar-md")}<div class="grow"><h1>${hello}, ${esc(u.display_name.split(" ")[0])}</h1>
       <p>${h.courses.length ? `Танд ${h.courses.length} сургалт${h.meetings.length ? `, ${h.meetings.length} шууд хичээл` : ""} байна.` : tp ? "Багшийн самбар болон суралцах хэсэг тань энд байна." : "Багшийнхаа профайлаас анхны сургалтаа сонгоорой."}</p></div>
-      ${tp ? `<a class="btn" href="/t/${esc(u.username)}#overview">Миний профайл →</a>` : `<button class="btn" data-student-settings>Тохиргоо</button>`}</div>`,
+      ${tp ? `<a class="btn" href="/t/${esc(u.username)}#overview">Багшлах →</a>` : `<button class="btn" data-student-settings>Тохиргоо</button>`}</div>`,
     `<div class="tiles">
       <a class="tile" href="#my-courses"><em>${icon("courses")}</em><b>${h.courses.length}</b><span>Миний сургалт</span></a>
       <a class="tile" href="#my-lessons"><em>${icon("play")}</em><b>${h.lessons.length}</b><span>Авсан хичээл</span></a>
