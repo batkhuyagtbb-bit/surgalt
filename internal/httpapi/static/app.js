@@ -30,6 +30,8 @@ const UI_ICONS = {
   doc: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
   sheet: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/>',
   down: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  chev: '<path d="M6 9l6 6 6-6"/>',
+  next: '<path d="M9 6l6 6-6 6"/>',
   expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
 };
 const icon = (n, size = 18) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI_ICONS[n] || ""}</svg>`;
@@ -2707,10 +2709,37 @@ async function homePage() {
     const vids = studied.filter((l) => l.has_video), vPct = vids.length ? Math.round(sum((l) => l.has_video ? l.video_pct : 0) / vids.length) : 0;
     const refl = studied.filter((l) => l.reflected).length, honest = studied.filter((l) => !l.disqualified).length;
     const lessonsTotal = (h.courses || []).reduce((a, c) => a + (c.course.lesson_count || 0), 0);
-    const byTime = [...studied].sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
     const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
     const bar = (v, cls = "") => `<span class="st-bar ${cls}"><i style="width:${Math.max(0, Math.min(100, v))}%"></i></span>`;
     const state = (l) => l.disqualified ? `<span class="st-chip bad">⛔ Тооцогдоогүй</span>` : l.completed ? `<span class="st-chip ok">✓ Дууссан</span>` : `<span class="st-chip">Үзэж байна</span>`;
+    // Сургалт бүрээр бүлэглэнэ: сүүлд судалснаас нь эхэлж, толгой дээр дарахад хичээлүүд нь дэлгэрнэ.
+    const groups = (h.course_ranks || []).filter((c) => c.lessons?.length).map((c) => {
+      const ls = c.lessons, s = (f) => ls.reduce((a, l) => a + (f(l) || 0), 0), vids = ls.filter((l) => l.has_video);
+      return { c, ls, total: (h.courses || []).find((x) => x.course.id === c.course_id)?.course.lesson_count || ls.length,
+        done: ls.filter((l) => l.completed).length, active: s((l) => l.active_sec), qT: s((l) => l.quiz_total), qC: s((l) => l.quiz_correct),
+        vPct: vids.length ? Math.round(s((l) => (l.has_video ? l.video_pct : 0)) / vids.length) : -1, cheat: ls.filter((l) => l.disqualified).length,
+        last: ls.reduce((m, l) => (l.last_at && (!m || new Date(l.last_at) > new Date(m)) ? l.last_at : m), null) };
+    }).sort((a, b) => new Date(b.last || 0) - new Date(a.last || 0));
+    let openSet = new Set(); try { openSet = new Set(JSON.parse(localStorage.getItem("sg_study_open") || "[]")); } catch {}
+    const row = (l) => `<tr><td><a href="/c/${esc(l.course_id)}#l=${esc(l.lesson_id)}"><strong>${esc(l.title)}</strong><small>${l.last_at ? fmtDate(l.last_at) : ""}</small></a></td>
+          <td>${state(l)}</td>
+          <td><b>${dur(l.active_sec)}</b>${l.total_sec ? `<small>${pct(l.active_sec, l.total_sec)}% идэвхтэй${l.tab_switches ? ` · ${l.tab_switches} таб` : ""}</small>` : ""}</td>
+          <td>${l.quiz_total ? `<b>${l.quiz_correct}/${l.quiz_total}</b>${bar(pct(l.quiz_correct, l.quiz_total), l.quiz_correct === l.quiz_total ? "ok" : "")}` : `<span class="muted">—</span>`}</td>
+          <td>${l.has_video ? `<b>${l.video_pct}%</b>${bar(l.video_pct, l.video_pct >= 90 ? "ok" : "")}` : `<span class="muted">—</span>`}</td>
+          <td><span class="st-pts ${l.disqualified ? "bad" : l.points >= 75 ? "ok" : ""}" title="${esc((l.reasons || []).join(", "))}"><b>${l.disqualified ? "0" : "+" + l.points}</b><small>${l.disqualified ? "тооцогдоогүй" : "оноо"}</small></span></td></tr>`;
+    const group = (g) => { const id = g.c.course_id, on = openSet.has(id), rk = g.c.rank || {};
+      return `<div class="st-course ${on ? "open" : ""}" data-cid="${esc(id)}">
+        <button type="button" class="st-ch" aria-expanded="${on}" aria-controls="stc-${esc(id)}">
+          <span class="st-ch-ico" aria-hidden="true">${esc((g.c.title || "?").trim().charAt(0).toUpperCase())}</span>
+          <span class="st-ch-main"><strong>${esc(g.c.title)}</strong><small>${g.done}/${g.total} хичээл дууссан · ${g.ls.length} хичээл судалсан${g.last ? " · сүүлд " + fmtDate(g.last) : ""}</small>${bar(pct(g.done, g.total), g.done && g.done === g.total ? "ok" : "")}</span>
+          <span class="st-ch-stats"><span><b>${dur(g.active)}</b><small>идэвхтэй</small></span><span><b>${g.qT ? pct(g.qC, g.qT) + "%" : "—"}</b><small>асуултад зөв</small></span><span><b>${g.vPct >= 0 ? g.vPct + "%" : "—"}</b><small>видео</small></span><span class="${g.cheat ? "bad" : ""}"><b>${g.ls.length - g.cheat}/${g.ls.length}</b><small>шударга</small></span></span>
+          <span class="st-ch-rank" title="Энэ сургалтын цол"><b>${rk.points || 0}</b><small>${esc(rk.name || "оноо")}</small></span>
+          <span class="st-ch-chev" aria-hidden="true">${icon("chev", 18)}</span>
+        </button>
+        <div class="st-cbody" id="stc-${esc(id)}" ${on ? "" : "hidden"}>
+          <div class="st-table-wrap"><table class="st-table"><thead><tr><th>Хичээл</th><th>Төлөв</th><th>Идэвхтэй</th><th>Асуулга</th><th>Видео</th><th>Нэмсэн оноо</th></tr></thead><tbody>${g.ls.map(row).join("")}</tbody></table></div>
+          <a class="st-go" href="/c/${esc(id)}">Сургалт руу орох ${icon("next", 14)}</a>
+        </div></div>`; };
     parts.push(sec("my-study", "Миний суралцсан байдал", `<div class="study">
       <div class="st-tiles">
         <div class="st-tile"><small>Идэвхтэй суралцсан</small><b>${dur(active)}</b><span>${studied.length} хичээлд · ${sum((l) => l.sessions)} удаа</span></div>
@@ -2720,14 +2749,19 @@ async function homePage() {
         <div class="st-tile"><small>Дүгнэлт бичсэн</small><b>${refl}</b><span>хичээлд</span></div>
         <div class="st-tile"><small>Шударга суралцсан</small><b>${honest}<em>/${studied.length}</em></b><span>хуулах оролдлогогүй</span></div>
       </div>
-      <div class="st-table-wrap"><table class="st-table"><thead><tr><th>Хичээл</th><th>Төлөв</th><th>Идэвхтэй</th><th>Асуулга</th><th>Видео</th><th>Нэмсэн оноо</th></tr></thead><tbody>
-        ${byTime.map((l) => `<tr><td><a href="/c/${esc(l.course_id)}#l=${esc(l.lesson_id)}"><strong>${esc(l.title)}</strong><small>${esc(l.course_title || "")}${l.last_at ? " · " + fmtDate(l.last_at) : ""}</small></a></td>
-          <td>${state(l)}</td>
-          <td><b>${dur(l.active_sec)}</b>${l.total_sec ? `<small>${pct(l.active_sec, l.total_sec)}% идэвхтэй${l.tab_switches ? ` · ${l.tab_switches} таб` : ""}</small>` : ""}</td>
-          <td>${l.quiz_total ? `<b>${l.quiz_correct}/${l.quiz_total}</b>${bar(pct(l.quiz_correct, l.quiz_total), l.quiz_correct === l.quiz_total ? "ok" : "")}` : `<span class="muted">—</span>`}</td>
-          <td>${l.has_video ? `<b>${l.video_pct}%</b>${bar(l.video_pct, l.video_pct >= 90 ? "ok" : "")}` : `<span class="muted">—</span>`}</td>
-          <td><span class="st-pts ${l.disqualified ? "bad" : l.points >= 75 ? "ok" : ""}" title="${esc((l.reasons || []).join(", "))}"><b>${l.disqualified ? "0" : "+" + l.points}</b><small>${l.disqualified ? "тооцогдоогүй" : "оноо"}</small></span></td></tr>`).join("")}
-      </tbody></table></div></div>`));
+      <div class="st-courses-head"><b>Сургалт бүрээр</b><span class="muted small">${groups.length} сургалт · дээр нь дарж хичээл бүрийг харна</span>${groups.length > 1 ? `<button type="button" class="link st-all" data-st-all>${openSet.size >= groups.length ? "Бүгдийг хумих" : "Бүгдийг дэлгэх"}</button>` : ""}</div>
+      <div class="st-courses">${groups.map(group).join("")}</div></div>`));
+    if (!window._stBound) { // нэг л удаа: сургалтын толгой дарахад дэлгэрнэ/хумигдана, нээлттэйг санана
+      window._stBound = true;
+      const save = () => { try { localStorage.setItem("sg_study_open", JSON.stringify([...$$(".st-course.open")].map((x) => x.dataset.cid))); } catch {} };
+      const toggle = (el, on) => { el.classList.toggle("open", on); $(".st-ch", el).setAttribute("aria-expanded", on); $(".st-cbody", el).hidden = !on; };
+      document.addEventListener("click", (e) => {
+        const ch = e.target.closest(".st-ch");
+        if (ch) { const el = ch.closest(".st-course"); toggle(el, !el.classList.contains("open")); save(); return; }
+        const all = e.target.closest("[data-st-all]");
+        if (all) { const els = $$(".st-course"), on = els.some((x) => !x.classList.contains("open")); els.forEach((x) => toggle(x, on)); all.textContent = on ? "Бүгдийг хумих" : "Бүгдийг дэлгэх"; save(); }
+      });
+    }
   }
   if (h.tasks?.length) {
     const label = (t) => ({ open: ["Хийх", "chip-amber"], not_started: [`${fmtDate(t.due.start_at)}-д эхэлнэ`, ""], need_pay: [(t.due.need_late ? "Хоцорсон · " : "Төлбөртэй · ") + money(t.due.fee) + " төлж нээнэ", "chip-amber"], closed: ["Хаалттай", ""], submitted: ["Илгээсэн · дүгнэхийг хүлээж байна", "chip-teal"],
