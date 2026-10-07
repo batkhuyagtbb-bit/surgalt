@@ -9,17 +9,19 @@ import (
 	"surgalt/internal/store"
 )
 
-// Цэргийн цол — идэвхтэй, шударга суралцсаны урамшуулал. Хичээл бүрт нотолгоонд суурилсан оноо (0-100)
-// → тухайн хичээлийн цол; бүх хичээлийн нийлбэр оноо → суралцагчийн нэгдсэн цол. Хуулах оролдлого
-// (copy, screenshot, print, devtools, download, утас) эсвэл автоматаар зогсоосон хичээлд цол олгохгүй.
+// Цэргийн цол — идэвхтэй, шударга суралцсаны урамшуулал. Цолыг хичээл бүрт олгохгүй: хичээлүүдийг
+// нэгтгэж (интеграц) нэг цол олгоно. Хичээл бүр нотолгоонд суурилсан оноо (0-100) НЭМНЭ; бүлгийн бүх
+// хичээлийг дуусгавал бүлгийн, сургалтын бүх хичээлийг дуусгавал сургалтын интеграцын нэмэлт оноо
+// авна. Сургалтын оноо = хичээлүүдийн оноо + интеграц → сургалтын цол; бүх сургалтын нийлбэр → нэгдсэн цол.
+// Хуулах оролдлого (copy, screenshot, print, devtools, download, утас) эсвэл автоматаар зогсоосон
+// хичээлийн оноо тооцогдохгүй бөгөөд тухайн бүлэг, сургалтын интеграцын нэмэлтийг хаана.
 
-// LessonRank — нэг хичээл дэх үнэлгээ.
+// LessonRank — нэг хичээлийн нэгдсэн цолд нэмэх оноо (хичээлд цол олгохгүй).
 type LessonRank struct {
 	LessonID     string   `json:"lesson_id"`
 	Title        string   `json:"title,omitempty"`
-	Points       int      `json:"points"` // 0-100
-	Rank         string   `json:"rank"`
-	Disqualified bool     `json:"disqualified,omitempty"` // хуулах оролдлоготой — цолгүй
+	Points       int      `json:"points"`                 // 0-100: нэгдсэн цолд нэмэх оноо
+	Disqualified bool     `json:"disqualified,omitempty"` // хуулах оролдлоготой — оноо тооцогдохгүй
 	Reasons      []string `json:"reasons,omitempty"`      // юунаас бүрдсэн / юу дутуу
 	// Суралцагчийн өөрийн самбарт: яаж судалсан бэ.
 	CourseID    string     `json:"course_id,omitempty"`
@@ -44,14 +46,34 @@ type RankInfo struct {
 	Name     string `json:"name"`
 	Next     int    `json:"next,omitempty"` // дараагийн цолд хүрэх оноо (0 = дээд цол)
 	NextName string `json:"next_name,omitempty"`
-	Lessons  int    `json:"lessons"`  // үнэлэгдсэн хичээл
-	Honest   int    `json:"honest"`   // хуулах оролдлогогүй хичээл
-	Cheated  int    `json:"cheated"`  // цол олгогдоогүй хичээл
-	Insignia string `json:"insignia"` // ★ тэмдэг (UI-д)
-	Progress int    `json:"progress"` // дараагийн цол хүртэлх хувь
+	Lessons  int    `json:"lessons"` // үнэлэгдсэн хичээл
+	Honest   int    `json:"honest"`  // хуулах оролдлогогүй хичээл
+	Cheated  int    `json:"cheated"` // оноо нь тооцогдоогүй хичээл
+	// Integration — оноо юунаас бүрдсэн: хичээлүүдийн оноо + бүтэн бүлэг/сургалтын нэмэлт.
+	Integration Integration `json:"integration"`
+	Insignia    string      `json:"insignia"` // ★ тэмдэг (UI-д)
+	Progress    int         `json:"progress"` // дараагийн цол хүртэлх хувь
 	// Систем өөрөө оношилж өгөх зөвлөмж: юу дутуу байгаа, дараагийн цолд юу хэрэгтэй.
 	Tips []string `json:"tips,omitempty"`
+	// itips — интеграцын зөвлөмж (бүх сургалтын цолд сургалтын нэрээр нэгтгэнэ).
+	itips []string
 }
+
+// Integration — хичээлүүдийг нэгтгэсэн үнэлгээний задаргаа.
+type Integration struct {
+	LessonPoints int `json:"lesson_points"` // хичээлүүдийн оноо (нийлбэр)
+	Bonus        int `json:"bonus"`         // бүтэн бүлэг, бүтэн сургалтын нэмэлт
+	Sections     int `json:"sections"`      // бүх хичээлийг нь дуусгасан бүлэг
+	SectionsAll  int `json:"sections_all"`  // нийт бүлэг
+	Courses      int `json:"courses"`       // бүх хичээлийг нь дуусгасан сургалт
+	CoursesAll   int `json:"courses_all"`   // үнэлэгдсэн сургалт
+}
+
+// Интеграцын нэмэлт: бүлэг/сургалтын бүх хичээлийг шударгаар дуусгавал хичээл тутамд.
+const (
+	sectionBonusPerLesson = 10
+	courseBonusPerLesson  = 20
+)
 
 type rankStep struct {
 	Points int
@@ -97,25 +119,6 @@ func RankLadder() []RankStep {
 	return out
 }
 
-// lessonRankName — нэг хичээлийн оноогоор олгох цол.
-func lessonRankName(points int, disqualified bool) string {
-	switch {
-	case disqualified:
-		return "Цолгүй"
-	case points >= 90:
-		return "Ахлах түрүүч"
-	case points >= 75:
-		return "Түрүүч"
-	case points >= 55:
-		return "Дэд түрүүч"
-	case points >= 35:
-		return "Ахлах байлдагч"
-	case points > 0:
-		return "Байлдагч"
-	}
-	return "Шинэ цэрэг"
-}
-
 // cheatEvents — цол хасах зөрчлүүд (хуулах, зураг авах, татах, автоматаар зогсоосон).
 var cheatEvents = []string{"copy", "screenshot", "print", "save", "devtools", "download", "auto_block", "context_menu"}
 
@@ -138,13 +141,12 @@ func RankFor(points int) RankInfo {
 	return ri
 }
 
-// lessonPoints — нэг хичээлийн нотолгоог нэгтгэж 0-100 оноо гаргана.
+// lessonPoints — нэг хичээлийн нотолгоог нэгтгэж нэгдсэн цолд нэмэх 0-100 оноо гаргана (цол биш).
 // Үзсэн 5, дууссан 10, идэвхтэй хугацаа 30, дүгнэлт 15 — үргэлж; асуулга 30, видео 10 — байвал.
-// Таб солилт бүр −5 (дээд тал нь −30). Хуулах оролдлого → 0, цолгүй.
+// Таб солилт бүр −5 (дээд тал нь −30). Хуулах оролдлого → 0, оноо тооцогдохгүй.
 func lessonPoints(l *store.Lesson, p *store.LessonProgress, sessions []*store.StudySession, reflected bool, videoCoverage int, hasVideo bool) LessonRank {
 	lr := LessonRank{LessonID: l.ID, Title: l.Title, HasVideo: hasVideo, VideoPct: videoCoverage, Reflected: reflected}
 	if p == nil && len(sessions) == 0 {
-		lr.Rank = lessonRankName(0, false)
 		return lr
 	}
 	active, total, tabs, cheats := 0, 0, 0, 0
@@ -172,7 +174,6 @@ func lessonPoints(l *store.Lesson, p *store.LessonProgress, sessions []*store.St
 	if cheats > 0 {
 		lr.Disqualified = true
 		lr.Reasons = append(lr.Reasons, "хуулах оролдлого / хориг")
-		lr.Rank = lessonRankName(0, true)
 		return lr
 	}
 	earned, possible := 0.0, 0.0
@@ -213,7 +214,6 @@ func lessonPoints(l *store.Lesson, p *store.LessonProgress, sessions []*store.St
 		lr.Reasons = append(lr.Reasons, "таб солилт −"+itoa(int(pen)))
 	}
 	lr.Points = max(0, min(100, int(math.Round(pts))))
-	lr.Rank = lessonRankName(lr.Points, false)
 	return lr
 }
 
@@ -279,10 +279,12 @@ func (e *rankEvidence) coverage(lessonID string) int {
 	return v[0] * 100 / v[1]
 }
 
-// computeRanks — сургалтын хичээл бүрийн цол ба нийлбэр оноо (зөвхөн ямар нэг идэвх бүртгэгдсэн хичээл).
-func computeRanks(lessons []store.Lesson, progress map[string]store.LessonProgress, e *rankEvidence) ([]LessonRank, int) {
+// computeRanks — нэг сургалтын хичээлүүдийг нэгтгэж (интеграц) нэг цол гаргана: хичээл бүрийн оноо
+// (зөвхөн идэвх бүртгэгдсэн хичээл) + бүтэн дуусгасан бүлэг, сургалтын нэмэлт. Хичээлд цол олгохгүй.
+func computeRanks(lessons []store.Lesson, progress map[string]store.LessonProgress, e *rankEvidence) ([]LessonRank, RankInfo) {
 	var out []LessonRank
 	sum := 0
+	disq := map[string]bool{}
 	for i := range lessons {
 		l := &lessons[i]
 		var p *store.LessonProgress
@@ -294,10 +296,108 @@ func computeRanks(lessons []store.Lesson, progress map[string]store.LessonProgre
 		}
 		lr := lessonPoints(l, p, e.sessions[l.ID], e.reflect[l.ID], e.coverage(l.ID), hasVideoBlock(l))
 		sum += lr.Points
+		disq[l.ID] = lr.Disqualified
 		out = append(out, lr)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Points > out[j].Points })
-	return out, sum
+	in, tips := integrate(lessons, progress, disq)
+	in.LessonPoints = sum
+	ri := summarizeRank(out, sum+in.Bonus)
+	ri.Integration, ri.itips = in, tips
+	ri.Tips = append(append([]string{}, tips...), ri.Tips...)
+	return out, ri
+}
+
+// integrate — бүлэг, сургалтын бүх хичээлийг шударгаар (хуулах оролдлогогүй) дуусгасан эсэхээр интеграцын
+// нэмэлт оноо тооцож, дуусахад хамгийн ойр бүлгийг зөвлөнө. Дууссан = MarkLessonCompleted (хичээл,
+// тэнцсэн шалгалт, илгээсэн даалгавар бүгд).
+func integrate(lessons []store.Lesson, progress map[string]store.LessonProgress, disq map[string]bool) (Integration, []string) {
+	var in Integration
+	var tips []string
+	if len(lessons) == 0 {
+		return in, nil
+	}
+	done := func(id string) bool { p, ok := progress[id]; return ok && p.CompletedAt != nil && !disq[id] }
+	type section struct {
+		title    string
+		n, ok    int
+		disabled bool
+	}
+	var order []*section
+	byTitle := map[string]*section{}
+	allOK, anyBad := 0, false
+	for i := range lessons {
+		id := lessons[i].ID
+		if done(id) {
+			allOK++
+		}
+		anyBad = anyBad || disq[id]
+		t := lessons[i].Section
+		if t == "" {
+			continue
+		}
+		sc := byTitle[t]
+		if sc == nil {
+			sc = &section{title: t}
+			byTitle[t] = sc
+			order = append(order, sc)
+		}
+		sc.n++
+		if done(id) {
+			sc.ok++
+		}
+		sc.disabled = sc.disabled || disq[id]
+	}
+	in.SectionsAll, in.CoursesAll = len(order), 1
+	var near *section // дуусахад хамгийн ойр бүлэг
+	for _, sc := range order {
+		switch {
+		case sc.ok == sc.n && !sc.disabled:
+			in.Sections++
+			in.Bonus += sc.n * sectionBonusPerLesson
+		case !sc.disabled && sc.ok > 0 && (near == nil || sc.n-sc.ok < near.n-near.ok):
+			near = sc
+		}
+	}
+	if allOK == len(lessons) && !anyBad {
+		in.Courses = 1
+		in.Bonus += len(lessons) * courseBonusPerLesson
+	}
+	if near != nil {
+		tips = append(tips, "«"+near.title+"» бүлгийн үлдсэн "+itoa(near.n-near.ok)+" хичээлийг дуусгавал бүлгийн интеграц (+"+itoa(near.n*sectionBonusPerLesson)+" оноо)")
+	}
+	if in.Courses == 0 && !anyBad && allOK > 0 {
+		tips = append(tips, "сургалтын бүх "+itoa(len(lessons))+" хичээлийг дуусгавал сургалтын интеграц (+"+itoa(len(lessons)*courseBonusPerLesson)+" оноо)")
+	}
+	return in, tips
+}
+
+// mergeRanks — сургалт бүрийн нэгдсэн цолыг нэгтгэж бүх сургалтын нэг цол гаргана.
+// titles[i] — courses[i]-ийн нэр (интеграцын зөвлөмжид).
+func mergeRanks(rows []LessonRank, courses []RankInfo, titles []string) RankInfo {
+	var in Integration
+	total := 0
+	var itips []string
+	for i, c := range courses {
+		total += c.Points
+		in.LessonPoints += c.Integration.LessonPoints
+		in.Bonus += c.Integration.Bonus
+		in.Sections += c.Integration.Sections
+		in.SectionsAll += c.Integration.SectionsAll
+		in.Courses += c.Integration.Courses
+		in.CoursesAll += c.Integration.CoursesAll
+		if len(c.itips) > 0 && len(itips) < 2 {
+			t := c.itips[0]
+			if i < len(titles) && titles[i] != "" {
+				t = titles[i] + ": " + t
+			}
+			itips = append(itips, t)
+		}
+	}
+	ri := summarizeRank(rows, total)
+	ri.Integration, ri.itips = in, itips
+	ri.Tips = append(append([]string{}, itips...), ri.Tips...)
+	return ri
 }
 
 // summarize — хичээлийн цолуудаас нэгдсэн цол ба автомат оношилгоо.
@@ -322,7 +422,7 @@ func diagnose(ranks []LessonRank, ri RankInfo) []string {
 	}
 	type tip struct{ key, text string }
 	tips := []tip{
-		{"хуулах оролдлого / хориг", "хуулах, зураг авах оролдлого бүү хий — тийм хичээлд цол олгохгүй"},
+		{"хуулах оролдлого / хориг", "хуулах, зураг авах оролдлого бүү хий — тийм хичээлийн оноо тооцогдохгүй, интеграцын нэмэлтийг хаана"},
 		{"асуулга дутуу", "хичээл доторх асуултуудад бүгдэд нь зөв хариул (+30 оноо/хичээл)"},
 		{"идэвхтэй хугацаа дутуу", "хичээлээ идэвхтэй, дуустал үз (+30 оноо/хичээл)"},
 		{"идэвхгүй хугацаа их", "хичээл үзэхдээ өөр цонх руу бүү шилж, анхаарлаа төвлөрүүл (+30 хүртэл)"},
@@ -365,13 +465,13 @@ func (s *Server) autoAward(ctx context.Context, uid, courseID, link string, cour
 		if err := s.store.SetUserRankLevel(ctx, uid, info.Level); err == nil {
 			awarded = true
 			s.notify(ctx, &store.Notification{UserID: uid, Type: "rank", Title: "🎖 Шинэ цол: " + info.Name,
-				Body: "Баяр хүргэе! Систем таны идэвхтэй, шударга суралцсан байдлыг үнэлж «" + info.Name + "» цол олголоо (" + itoa(total) + " оноо).", Link: link})
+				Body: "Баяр хүргэе! Систем таны бүх хичээлийг нэгтгэн идэвхтэй, шударга суралцсан байдлыг үнэлж «" + info.Name + "» цол олголоо (" + itoa(total) + " оноо).", Link: link})
 		}
 	}
 	return info, awarded
 }
 
-// courseRanks — нэг суралцагчийн нэг сургалт дахь цолууд (сесс, дүгнэлт, видеог сангаас ачаална).
+// courseRanks — нэг суралцагчийн нэг сургалт дахь хичээлүүдийн оноо ба нэгдсэн цол (сесс, дүгнэлт, видеог сангаас ачаална).
 func (s *Server) courseRanks(ctx context.Context, userID, courseID string, lessons []store.Lesson, progress map[string]store.LessonProgress) ([]LessonRank, RankInfo) {
 	f := store.ActivityFilter{UserID: userID, CourseID: courseID}
 	e := newRankEvidence()
@@ -390,6 +490,5 @@ func (s *Server) courseRanks(ctx context.Context, userID, courseID string, lesso
 			e.addWatch(&ws[i])
 		}
 	}
-	ranks, sum := computeRanks(lessons, progress, e)
-	return ranks, summarizeRank(ranks, sum)
+	return computeRanks(lessons, progress, e)
 }

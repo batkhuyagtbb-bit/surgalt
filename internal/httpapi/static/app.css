@@ -2352,3 +2352,20 @@ html.has-rail.rail-collapsed .rail-tab .rail-tab-dot{background:var(--accent);bo
   .tiles>.tile b{font-size:1.25rem;line-height:1.1}
   .tiles>.tile span{font-size:.78rem;line-height:1.25}
 }
+
+/* Сургалтын нэгдсэн цол: хичээлүүдийг нэгтгэсэн нэг цол (хичээл бүр зөвхөн оноо нэмнэ) */
+.course-rank{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 14px;align-items:center;padding:16px 18px;max-width:640px}
+.course-rank .cr-sign{grid-row:1 / span 2;display:grid;place-items:center;width:48px;height:48px;border-radius:12px;background:var(--brand);color:var(--accent);font-size:1.25rem;filter:none}
+.course-rank .cr-main{display:grid;line-height:1.25;min-width:0}
+.course-rank .cr-label{font-size:.68rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.course-rank .rank-name{font-size:1.15rem;color:var(--text)}
+.course-rank .cr-pts{justify-self:end;color:var(--muted);font-size:.85rem;white-space:nowrap}
+.course-rank .cr-pts b{font-size:1.35rem;color:var(--brand)}
+.course-rank .cr-sum{grid-column:2 / -1;font-size:.82rem;color:var(--muted)}
+.course-rank .cr-meter{grid-column:1 / -1;height:6px;margin-top:10px;min-width:0}
+.course-rank .cr-next{grid-column:1 / -1;font-size:.8rem;color:var(--muted)}
+.course-rank .cr-next b{color:var(--text)}
+.course-rank .cr-tips{grid-column:1 / -1;flex-basis:auto;margin:6px 0 0}
+.course-rank .cr-bad{color:var(--coral)}
+.lesson-rank{background:var(--brand-soft);color:var(--brand)}
+.lesson-rank.high{background:var(--teal-soft);color:var(--teal)}

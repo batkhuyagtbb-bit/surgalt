@@ -426,6 +426,19 @@ func (c *ClickHouse) SaveRankPoints(ctx context.Context, userID, courseID string
 	return int(total), err
 }
 
+func (c *ClickHouse) RankCourseIDs(ctx context.Context, userID string) ([]string, error) {
+	var out []string
+	err := c.query(ctx, "SELECT course_id FROM rank_points FINAL WHERE user_id = ? AND points > 0 ORDER BY course_id", []any{userID}, func(r driver.Rows) error {
+		var id string
+		if err := r.Scan(&id); err != nil {
+			return err
+		}
+		out = append(out, id)
+		return nil
+	})
+	return out, err
+}
+
 func (c *ClickHouse) UserRankLevel(ctx context.Context, userID string) (int, error) {
 	var lvl int32
 	err := c.query(ctx, "SELECT level FROM rank_levels FINAL WHERE user_id = ? LIMIT 1", []any{userID}, func(r driver.Rows) error { return r.Scan(&lvl) })

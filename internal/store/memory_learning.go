@@ -82,6 +82,20 @@ func (m *Memory) GradeSubmission(_ context.Context, lessonID, userID string, sco
 	return nil
 }
 
+func (m *Memory) RankCourseIDs(_ context.Context, userID string) ([]string, error) {
+	l := &m.learn
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	var out []string
+	for k, v := range l.rankPts {
+		if k[0] == userID && v > 0 {
+			out = append(out, k[1])
+		}
+	}
+	slices.Sort(out)
+	return out, nil
+}
+
 func (m *Memory) SaveRankPoints(_ context.Context, userID, courseID string, points int) (int, error) {
 	l := &m.learn
 	l.mu.Lock()

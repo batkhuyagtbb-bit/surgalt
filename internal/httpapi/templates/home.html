@@ -7,7 +7,7 @@
         <h1 class="home-title display split">Сур, сур, бас дахин сур</h1>
         <p class="lead">Бүх багшийн сургалт, хичээл, номыг нэг дороос хайж олоорой.</p>
       </div>
-    <section class="find find-home" id="find" aria-label="Сургалт хайх">
+    <section class="find find-home" id="find" aria-label="Сургалт хайх" hidden>{{/* Хичээл хайх хэсгийг түр нуусан */}}
       <form class="find-bar" role="search" onsubmit="return false">
         {{icon "search"}}<input type="search" name="q" placeholder="Бүх багшийн сургалт, хичээлээс хайх…" autocomplete="off" aria-label="Хайх үг">
       </form>
@@ -22,7 +22,7 @@
       <ol class="find-list"></ol>
       <nav class="find-pager" aria-label="Хуудас"></nav>
     </section>
-      <div class="find-chips landing" aria-label="Түгээмэл хайлт"><span class="muted small">Түгээмэл:</span>
+      <div class="find-chips landing" aria-label="Түгээмэл хайлт" hidden><span class="muted small">Түгээмэл:</span>
         <button type="button" data-q="Математик">Математик</button><button type="button" data-q="ЭЕШ">ЭЕШ</button><button type="button" data-q="Англи хэл">Англи хэл</button><button type="button" data-q="Геометр">Геометр</button><button type="button" data-q="Логик">Логик</button></div>
       <div class="home-cta landing">
         <a class="btn btn-gold btn-lg" href="/login?role=teacher">Багшаар эхлэх</a>

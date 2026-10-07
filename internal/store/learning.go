@@ -157,6 +157,8 @@ type LearningStore interface {
 	// Цэргийн цол: сургалт бүрийн оноог хадгалж нийлбэрийг буцаана; олгосон түвшинг хэрэглэгчээр хадгална
 	// (систем автоматаар олгож, түвшин дээшлэхэд мэдэгдэнэ).
 	SaveRankPoints(ctx context.Context, userID, courseID string, points int) (total int, err error)
+	// RankCourseIDs — суралцагчийн оноо хадгалагдсан сургалтууд (элсээгүй, зөвхөн үнэгүй хичээл үзсэн ч).
+	RankCourseIDs(ctx context.Context, userID string) ([]string, error)
 	UserRankLevel(ctx context.Context, userID string) (int, error)
 	SetUserRankLevel(ctx context.Context, userID string, level int) error
 	// Даалгаврын хариу: нэг суралцагч нэг даалгаварт нэг (сүүлийн) хариу.

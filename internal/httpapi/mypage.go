@@ -41,6 +41,8 @@ type HomeTask struct {
 // Цолыг системээр дахин тооцож (autoAward) шинэ түвшин олгогдсон бол awarded=true.
 func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCourse) (rank RankInfo, byCourse []HomeCourseRank, tasks []HomeTask, awarded bool) {
 	var all []LessonRank
+	var infos []RankInfo
+	var titles []string
 	now := time.Now()
 	for _, hc := range courses {
 		c := hc.Course
@@ -60,6 +62,7 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 			_, aw := s.autoAward(ctx, uid, c.ID, "/c/"+c.ID, info.Points)
 			awarded = awarded || aw
 			all = append(all, ranks...)
+			infos, titles = append(infos, info), append(titles, c.Title)
 			byCourse = append(byCourse, HomeCourseRank{CourseID: c.ID, Title: c.Title, Rank: info, Lessons: ranks})
 		}
 		for i := range lessons {
@@ -114,6 +117,43 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 			tasks = append(tasks, t)
 		}
 	}
+	// Нэгдсэн цол бүх хичээлийг нэгтгэнэ: элсээгүй ч үнэгүй хичээл үзэж оноо авсан сургалтууд мөн орно
+	// (систем олгосон нийт оноотой ижил байна).
+	seen := make(map[string]bool, len(courses))
+	for _, hc := range courses {
+		seen[hc.Course.ID] = true
+	}
+	if ids, err := s.store.RankCourseIDs(ctx, uid); err == nil {
+		for _, id := range ids {
+			if seen[id] {
+				continue
+			}
+			c, err := s.store.CourseByID(ctx, id)
+			if err != nil {
+				continue
+			}
+			lessons, err := s.store.LessonsByCourse(ctx, c.ID)
+			if err != nil {
+				continue
+			}
+			progress, err := s.store.LessonProgress(ctx, uid, c.ID)
+			if err != nil {
+				continue
+			}
+			ranks, info := s.courseRanksCtx(ctx, uid, c.ID, lessons, progress)
+			if len(ranks) == 0 {
+				continue
+			}
+			for i := range ranks {
+				ranks[i].CourseID, ranks[i].CourseTitle = c.ID, c.Title
+			}
+			_, aw := s.autoAward(ctx, uid, c.ID, "/c/"+c.ID, info.Points)
+			awarded = awarded || aw
+			all = append(all, ranks...)
+			infos, titles = append(infos, info), append(titles, c.Title)
+			byCourse = append(byCourse, HomeCourseRank{CourseID: c.ID, Title: c.Title, Rank: info, Lessons: ranks})
+		}
+	}
 	// Хугацаа ойрхон, дуусаагүй нь эхэнд.
 	sort.SliceStable(tasks, func(i, j int) bool {
 		di, dj := tasks[i].Due.At, tasks[j].Due.At
@@ -127,11 +167,7 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 		}
 		return di.Before(*dj)
 	})
-	total := 0
-	for _, r := range byCourse {
-		total += r.Rank.Points
-	}
-	rank = summarizeRank(all, total)
+	rank = mergeRanks(all, infos, titles)
 	return
 }
 

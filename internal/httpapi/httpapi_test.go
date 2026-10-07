@@ -1654,7 +1654,7 @@ func TestQuizMasteryUnlock(t *testing.T) {
 	}
 }
 
-// Цэргийн цол: шударга идэвхтэй суралцсан хичээлд цол, хуулах оролдлоготой хичээлд цолгүй; нийлбэрээр нэгдсэн цол.
+// Цэргийн цол: хичээл бүр оноо нэмнэ (цол биш), хуулах оролдлоготой хичээлийн оноо тооцогдохгүй; нэгтгэж нэг цол.
 func TestMilitaryRanks(t *testing.T) {
 	if r := RankFor(0); r.Name != "Шинэ цэрэг" || r.Next != 60 {
 		t.Fatalf("эхний цол: %+v", r)
@@ -1669,7 +1669,7 @@ func TestMilitaryRanks(t *testing.T) {
 	l := &store.Lesson{ID: "l1", Title: "Нэг", ActiveMin: 10, Blocks: []store.Block{{ID: "q001", Type: "quiz", Quiz: &store.Quiz{Question: "?"}}, {ID: "v001", Type: "video", URL: "/files/x/private/a.mp4"}}}
 	full := &store.LessonProgress{LessonID: "l1", ViewedAt: now, CompletedAt: &now, Quiz: map[string]bool{"q001": true}, QuizDoneAt: &now}
 	good := []*store.StudySession{{LessonID: "l1", Kind: "lesson", ActiveSec: 700, IdleSec: 60, Counts: map[string]int{}}}
-	if lr := lessonPoints(l, full, good, true, 100, true); lr.Points != 100 || lr.Rank != "Ахлах түрүүч" || lr.Disqualified {
+	if lr := lessonPoints(l, full, good, true, 100, true); lr.Points != 100 || lr.Disqualified {
 		t.Fatalf("төгс хичээл 100 оноо байх ёстой: %+v", lr)
 	}
 	// Таб солилт хасна.
@@ -1677,16 +1677,16 @@ func TestMilitaryRanks(t *testing.T) {
 	if lr := lessonPoints(l, full, tabs, true, 100, true); lr.Points != 90 {
 		t.Fatalf("2 таб солилт −10: %+v", lr)
 	}
-	// Хуулах оролдлого → цолгүй, 0 оноо.
+	// Хуулах оролдлого → 0 оноо, тооцогдохгүй.
 	cheat := []*store.StudySession{{LessonID: "l1", Kind: "lesson", ActiveSec: 700, Counts: map[string]int{"copy": 1}}}
-	if lr := lessonPoints(l, full, cheat, true, 100, true); !lr.Disqualified || lr.Points != 0 || lr.Rank != "Цолгүй" {
+	if lr := lessonPoints(l, full, cheat, true, 100, true); !lr.Disqualified || lr.Points != 0 {
 		t.Fatalf("хуулсан хичээлд цол олгох ёсгүй: %+v", lr)
 	}
 	// Хагас: дуусгаагүй, идэвхтэй хугацаа хагас, асуулга буруу, дүгнэлтгүй, видео 50%.
 	half := &store.LessonProgress{LessonID: "l1", ViewedAt: now, Quiz: map[string]bool{"q001": false}}
 	part := []*store.StudySession{{LessonID: "l1", Kind: "lesson", ActiveSec: 300, Counts: map[string]int{}}}
 	lr := lessonPoints(l, half, part, false, 50, true)
-	if lr.Points != 25 || lr.Rank != "Байлдагч" { // (5 + 15 + 5) / 100
+	if lr.Points != 25 { // (5 + 15 + 5) / 100
 		t.Fatalf("хагас хичээл: %+v", lr)
 	}
 	// Асуулга, видеогүй хичээл: 5+10+30+15 = 60-аас хувилна.
@@ -1720,12 +1720,16 @@ func TestMilitaryRanks(t *testing.T) {
 	if r1["points"].(float64) < 90 || r1["disqualified"] == true {
 		t.Fatalf("1-р хичээл өндөр цолтой байх ёстой: %v", r1)
 	}
-	if r2["disqualified"] != true || r2["rank"] != "Цолгүй" {
-		t.Fatalf("хуулсан хичээл цолгүй байх ёстой: %v", r2)
+	if r2["disqualified"] != true || r2["points"].(float64) != 0 || r1["rank"] != nil || r2["rank"] != nil {
+		t.Fatalf("хичээлд цол олгохгүй, хуулсан хичээлийн оноо тооцогдохгүй: %v %v", r1, r2)
 	}
 	rank := acc["rank"].(map[string]any)
 	if rank["name"] != "Байлдагч" || rank["cheated"].(float64) != 1 || rank["honest"].(float64) != 1 {
 		t.Fatalf("нэгдсэн цол: %v", rank)
+	}
+	// Хуулсан хичээлтэй тул сургалтын интеграцын нэмэлт хаагдсан: оноо = хичээлүүдийн оноо.
+	if in := rank["integration"].(map[string]any); in["bonus"].(float64) != 0 || in["lesson_points"] != rank["points"] {
+		t.Fatalf("интеграц: %v", rank)
 	}
 	if tips, _ := rank["tips"].([]any); len(tips) == 0 || !strings.Contains(fmt.Sprint(tips), "хуулах") {
 		t.Fatalf("оношилгооны зөвлөмж алга: %v", rank["tips"])
@@ -2717,5 +2721,83 @@ func TestAnalyticsEventsPaging(t *testing.T) {
 	}
 	if code, _ := call(t, srv, "GET", "/api/me/analytics/events?before_at=bad", tt, ""); code != 400 {
 		t.Fatal("буруу курсор 400")
+	}
+}
+
+// Нэгдсэн цол: хичээлд цол олгохгүй; бүлэг, сургалтын бүх хичээлийг шударгаар дуусгавал интеграцын нэмэлт.
+func TestRankIntegration(t *testing.T) {
+	now := time.Now()
+	lessons := []store.Lesson{{ID: "a1", Section: "А"}, {ID: "a2", Section: "А"}, {ID: "b1", Section: "Б"}}
+	e := newRankEvidence()
+	for _, l := range lessons {
+		e.addSession(&store.StudySession{LessonID: l.ID, Kind: "lesson", ActiveSec: 600, Counts: map[string]int{}})
+	}
+	done := func(ids ...string) map[string]store.LessonProgress {
+		m := map[string]store.LessonProgress{}
+		for _, id := range ids {
+			m[id] = store.LessonProgress{LessonID: id, ViewedAt: now, CompletedAt: &now}
+		}
+		return m
+	}
+	// «А» бүлэг бүтэн: +2×10; сургалт дутуу тул зөвлөмж.
+	ranks, ri := computeRanks(lessons, done("a1", "a2"), e)
+	in := ri.Integration
+	if len(ranks) != 3 || in.Sections != 1 || in.SectionsAll != 2 || in.Bonus != 20 || in.Courses != 0 || ri.Points != in.LessonPoints+20 {
+		t.Fatalf("бүлгийн интеграц: %+v", ri)
+	}
+	if !strings.Contains(strings.Join(ri.Tips, "|"), "бүх 3 хичээлийг дуусгавал") {
+		t.Fatalf("сургалтын интеграцын зөвлөмж алга: %v", ri.Tips)
+	}
+	// Бүгд дууссан: 2 бүлэг (+30) + сургалт (+3×20).
+	_, ri = computeRanks(lessons, done("a1", "a2", "b1"), e)
+	if in := ri.Integration; in.Sections != 2 || in.Courses != 1 || in.Bonus != 90 || ri.Points != in.LessonPoints+90 {
+		t.Fatalf("бүтэн интеграц: %+v", ri)
+	}
+	// Нэг хичээлд хуулах оролдлого → тэр бүлэг, сургалтын нэмэлт хаагдана.
+	e.addSession(&store.StudySession{LessonID: "a2", Kind: "lesson", Counts: map[string]int{"copy": 1}})
+	_, ri = computeRanks(lessons, done("a1", "a2", "b1"), e)
+	if in := ri.Integration; in.Sections != 1 || in.Courses != 0 || in.Bonus != 10 || ri.Cheated != 1 {
+		t.Fatalf("хуулсан бол интеграц хаагдана: %+v %+v", in, ri)
+	}
+	// Бүх сургалтын цол: сургалтуудын оноо, нэмэлтийг нэгтгэнэ.
+	m := mergeRanks(nil, []RankInfo{ri, ri}, []string{"Х", "Ү"})
+	if m.Points != 2*ri.Points || m.Integration.Bonus != 20 || m.Integration.CoursesAll != 2 || m.Name != RankFor(m.Points).Name {
+		t.Fatalf("нэгтгэл: %+v", m)
+	}
+}
+
+// Нэгдсэн цол: элсээгүй сургалтын үнэгүй хичээлээр авсан оноо ч "Миний хэсэг"-ийн цолд нэгтгэгдэж,
+// систем олгосон нийт оноотой ижил байна.
+func TestIntegratedRankAllCourses(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	mk := func(title string) (string, string) {
+		_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"`+title+`","price":0,"published":true}`)
+		cid := c["id"].(string)
+		_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Хичээл","is_free":true}`)
+		return cid, l["id"].(string)
+	}
+	ca, la := mk("А")
+	cb, lb := mk("Б")
+	s1, _ := register(t, srv, "stud", "student")
+	call(t, srv, "POST", "/api/courses/"+ca+"/enroll", s1, "")
+	study := func(cid, lid string) {
+		_, ss := call(t, srv, "POST", "/api/activity/start", s1, `{"course_id":"`+cid+`","lesson_id":"`+lid+`","kind":"lesson"}`)
+		call(t, srv, "POST", "/api/activity/beat", s1, `{"session_id":"`+ss["session_id"].(string)+`","active":120}`)
+		call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lid+"/complete", s1, "")
+	}
+	study(ca, la)
+	study(cb, lb) // «Б»-д элсээгүй, зөвхөн үнэгүй хичээл үзсэн
+	call(t, srv, "GET", "/api/courses/"+ca+"/access", s1, "")
+	_, acc := call(t, srv, "GET", "/api/courses/"+cb+"/access", s1, "")
+	if in := acc["rank"].(map[string]any)["integration"].(map[string]any); in["courses"].(float64) != 1 || in["bonus"].(float64) != 20 {
+		t.Fatalf("1 хичээлтэй сургалтыг бүтэн дуусгасан интеграц +20: %v", in)
+	}
+	total := acc["rank_total"].(map[string]any)["points"].(float64)
+	_, home := call(t, srv, "GET", "/api/me/home", s1, "")
+	rk := home["rank"].(map[string]any)
+	if rk["points"].(float64) != total || len(home["course_ranks"].([]any)) != 2 || rk["integration"].(map[string]any)["courses"].(float64) != 2 {
+		t.Fatalf("Миний хэсгийн цол (%v) олгосон нийт оноотой (%v) ижил, 2 сургалт нэгтгэсэн байх ёстой: %v", rk["points"], total, rk)
 	}
 }

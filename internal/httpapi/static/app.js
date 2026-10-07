@@ -1906,7 +1906,7 @@ function profilePage() {
       const p = e.target.closest(".pill"); if (!p) return;
       mode = p.dataset.f; $$(".pill", bar).forEach((x) => x.classList.toggle("active", x === p)); apply();
     });
-    $("input", bar).addEventListener("input", (e) => { q = e.target.value.trim().toLowerCase(); apply(); });
+    $("input", bar)?.addEventListener("input", (e) => { q = e.target.value.trim().toLowerCase(); apply(); });
   }
 
   // Хувийн болгох: суралцагчид өөрийнх нь сургалтыг тэмдэглэнэ, эзэмшигчид засах хэрэгслийг нээнэ.
@@ -2072,14 +2072,14 @@ async function homePage() {
     const tipLine = (t) => { const m = /\(\+(\d+)/.exec(t); return `<li><i>${m ? "+" + m[1] : "✓"}</i><span>${esc(t.replace(/\s*\(\+.*$/, ""))}</span></li>`; };
     parts.push(sec("my-rank", "Миний цол", `<div class="rank-hero">
       <div class="rank-hero-top">${ring}
-        <div class="grow"><span class="eyebrow">Цэргийн цол · систем автоматаар олгоно</span><strong class="rank-title">${esc(rk.name)}</strong>
+        <div class="grow"><span class="eyebrow">Нэгдсэн цол · бүх хичээлээ нэгтгэж систем олгоно</span><strong class="rank-title">${esc(rk.name)}</strong>
           <p class="rank-cheer">${cheer}</p>
-          <div class="rank-stats"><span><b>${rk.points}</b> оноо</span><span><b>${rk.honest}</b> шударга хичээл</span>${rk.cheated ? `<span class="bad"><b>${rk.cheated}</b> цолгүй</span>` : ""}${rk.next ? `<span><b>${left}</b> оноо дараагийн цолд</span>` : ""}</div>
+          <div class="rank-stats"><span><b>${rk.points}</b> оноо</span>${rk.integration?.bonus ? `<span><b>+${rk.integration.bonus}</b> интеграц</span>` : ""}<span><b>${rk.honest}</b> шударга хичээл</span>${rk.integration?.sections_all ? `<span><b>${rk.integration.sections}/${rk.integration.sections_all}</b> бүлэг бүтэн</span>` : ""}${rk.cheated ? `<span class="bad"><b>${rk.cheated}</b> тооцогдоогүй</span>` : ""}${rk.next ? `<span><b>${left}</b> оноо дараагийн цолд</span>` : ""}</div>
           ${rk.next ? `<div class="rank-next"><div class="meter"><i style="width:${rk.progress}%"></i></div><span>${esc(rk.name)} <em>→</em> ${esc(rk.next_name)} <b>${rk.progress}%</b></span></div>` : ""}</div></div>
       ${ladder.length ? `<div class="rank-ladder-wrap"><ol class="rank-ladder">${steps}</ol></div>` : ""}
       <div class="rank-grid">
         ${rk.tips?.length ? `<div class="rank-box rank-todo"><b>Дараагийн алхам — оноо нэмэх</b><ul>${rk.tips.filter((t) => !t.startsWith("дараагийн")).map(tipLine).join("")}</ul></div>` : ""}
-        ${h.course_ranks.length ? `<div class="rank-box"><b>Сургалт бүрээр</b><ul class="rank-courses">${h.course_ranks.map((c) => `<li><a href="/c/${esc(c.course_id)}"><span class="rank-shine" data-level="${c.rank.level}">${esc(c.rank.insignia)}</span><span class="grow"><strong>${esc(c.title)}</strong><small>${esc(c.rank.name)} · ${c.rank.points} оноо · ${c.lessons.length} хичээл</small></span><span class="chip chip-teal">Үргэлжлүүлэх</span></a></li>`).join("")}</ul></div>` : ""}
+        ${h.course_ranks.length ? `<div class="rank-box"><b>Сургалт бүрээр</b><ul class="rank-courses">${h.course_ranks.map((c) => `<li><a href="/c/${esc(c.course_id)}"><span class="rank-shine" data-level="${c.rank.level}">${esc(c.rank.insignia)}</span><span class="grow"><strong>${esc(c.title)}</strong><small>${esc(c.rank.name)} · ${c.rank.points} оноо${c.rank.integration?.bonus ? ` (интеграц +${c.rank.integration.bonus})` : ""} · ${c.lessons.length} хичээл${c.rank.integration?.courses ? " · бүтэн ✓" : ""}</small></span><span class="chip chip-teal">Үргэлжлүүлэх</span></a></li>`).join("")}</ul></div>` : ""}
       </div></div>`));
   }
   // 📊 Миний суралцсан байдал: бүх хичээлээр (сургалт бүрийн цолын мэдээллээс)
@@ -2093,7 +2093,7 @@ async function homePage() {
     const byTime = [...studied].sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
     const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
     const bar = (v, cls = "") => `<span class="st-bar ${cls}"><i style="width:${Math.max(0, Math.min(100, v))}%"></i></span>`;
-    const state = (l) => l.disqualified ? `<span class="st-chip bad">⛔ Цолгүй</span>` : l.completed ? `<span class="st-chip ok">✓ Дууссан</span>` : `<span class="st-chip">Үзэж байна</span>`;
+    const state = (l) => l.disqualified ? `<span class="st-chip bad">⛔ Тооцогдоогүй</span>` : l.completed ? `<span class="st-chip ok">✓ Дууссан</span>` : `<span class="st-chip">Үзэж байна</span>`;
     parts.push(sec("my-study", "Миний суралцсан байдал", `<div class="study">
       <div class="st-tiles">
         <div class="st-tile"><small>Идэвхтэй суралцсан</small><b>${dur(active)}</b><span>${studied.length} хичээлд · ${sum((l) => l.sessions)} удаа</span></div>
@@ -2103,13 +2103,13 @@ async function homePage() {
         <div class="st-tile"><small>Дүгнэлт бичсэн</small><b>${refl}</b><span>хичээлд</span></div>
         <div class="st-tile"><small>Шударга суралцсан</small><b>${honest}<em>/${studied.length}</em></b><span>хуулах оролдлогогүй</span></div>
       </div>
-      <div class="st-table-wrap"><table class="st-table"><thead><tr><th>Хичээл</th><th>Төлөв</th><th>Идэвхтэй</th><th>Асуулга</th><th>Видео</th><th>Оноо · цол</th></tr></thead><tbody>
+      <div class="st-table-wrap"><table class="st-table"><thead><tr><th>Хичээл</th><th>Төлөв</th><th>Идэвхтэй</th><th>Асуулга</th><th>Видео</th><th>Нэмсэн оноо</th></tr></thead><tbody>
         ${byTime.map((l) => `<tr><td><a href="/c/${esc(l.course_id)}#l=${esc(l.lesson_id)}"><strong>${esc(l.title)}</strong><small>${esc(l.course_title || "")}${l.last_at ? " · " + fmtDate(l.last_at) : ""}</small></a></td>
           <td>${state(l)}</td>
           <td><b>${dur(l.active_sec)}</b>${l.total_sec ? `<small>${pct(l.active_sec, l.total_sec)}% идэвхтэй${l.tab_switches ? ` · ${l.tab_switches} таб` : ""}</small>` : ""}</td>
           <td>${l.quiz_total ? `<b>${l.quiz_correct}/${l.quiz_total}</b>${bar(pct(l.quiz_correct, l.quiz_total), l.quiz_correct === l.quiz_total ? "ok" : "")}` : `<span class="muted">—</span>`}</td>
           <td>${l.has_video ? `<b>${l.video_pct}%</b>${bar(l.video_pct, l.video_pct >= 90 ? "ok" : "")}` : `<span class="muted">—</span>`}</td>
-          <td><span class="st-pts ${l.disqualified ? "bad" : l.points >= 75 ? "ok" : ""}"><b>${l.points}</b><small>${esc(l.rank)}</small></span></td></tr>`).join("")}
+          <td><span class="st-pts ${l.disqualified ? "bad" : l.points >= 75 ? "ok" : ""}" title="${esc((l.reasons || []).join(", "))}"><b>${l.disqualified ? "0" : "+" + l.points}</b><small>${l.disqualified ? "тооцогдоогүй" : "оноо"}</small></span></td></tr>`).join("")}
       </tbody></table></div></div>`));
   }
   if (h.tasks?.length) {
@@ -2218,15 +2218,15 @@ async function coursePage() {
     });
     const bar = $("#courseProgress");
     if (bar && a.total) { bar.hidden = false; $("i", bar).style.width = Math.round(a.done / a.total * 100) + "%"; $("span", bar).textContent = `${a.done}/${a.total} хичээл дууссан`; }
-    // Цэргийн цол: хичээл бүрийн үнэлгээ (хуулах оролдлоготой бол цолгүй) ба нэгдсэн цол.
+    // Цол хичээл бүрт биш: хичээл бүр нэгдсэн цолд оноо НЭМНЭ (хуулах оролдлоготой бол тооцогдохгүй).
     const ranks = a.ranks || {};
     $$(".lesson").forEach((li) => {
       const r = ranks[li.dataset.lesson]; let b = $(".lesson-rank", li);
       if (!r) { b?.remove(); return; }
       if (!b) { b = document.createElement("span"); b.className = "lesson-rank"; $(".lesson-title", li)?.append(b); }
-      b.className = "lesson-rank " + (r.disqualified ? "disq" : r.points >= 75 ? "high rank-shine" : "");
-      b.title = (r.reasons || []).join(", ");
-      b.textContent = r.disqualified ? "⛔ Цолгүй" : `🎖 ${r.rank} · ${r.points}`;
+      b.className = "lesson-rank " + (r.disqualified ? "disq" : r.points >= 75 ? "high" : "");
+      b.title = (r.disqualified ? "Хуулах оролдлоготой тул оноо тооцогдоогүй" : "Нэгдсэн цолд нэмсэн оноо") + ((r.reasons || []).length ? ": " + r.reasons.join(", ") : "");
+      b.textContent = r.disqualified ? "⛔ Тооцогдоогүй" : `+${r.points} оноо`;
     });
     if (a.rank && bar) {
       let rl = $("#courseRank");
@@ -2240,8 +2240,13 @@ async function coursePage() {
       let seen = -1; try { seen = localStorage.getItem(lvlKey) === null ? -1 : +localStorage.getItem(lvlKey); } catch {}
       if (a.rank_awarded || (seen >= 0 && shown.level > seen)) rankSalute(shown);
       try { localStorage.setItem(lvlKey, shown.level); } catch {}
-      rl.innerHTML = `<span class="cr-sign rank-shine" data-level="${rk.level}">${esc(rk.insignia)}</span><b class="rank-name">${esc(rk.name)}</b><span class="muted small">${rk.points} оноо${rk.next ? ` · дараагийн цол «${esc(rk.next_name)}» ${rk.next} оноонд` : " · дээд цол"}${tot ? ` · бүх сургалтаар: <b>${esc(tot.name)}</b> ${tot.points}` : ""}${rk.cheated ? ` · <span class="cr-bad">${rk.cheated} хичээлд хуулах оролдлогоос цол олгоогүй</span>` : ""}</span>
+      const ig = rk.integration || {};
+      rl.innerHTML = `<span class="cr-sign" data-level="${rk.level}">${esc(rk.insignia)}</span>
+        <span class="cr-main"><small class="cr-label">Сургалтын нэгдсэн цол</small><b class="rank-name">${esc(rk.name)}</b></span>
+        <span class="cr-pts"><b>${rk.points}</b> оноо</span>
+        <span class="cr-sum">Хичээлүүд ${ig.lesson_points ?? rk.points}${ig.bonus ? ` + интеграц ${ig.bonus}` : ""}${ig.sections_all ? ` · ${ig.sections}/${ig.sections_all} бүлэг бүтэн` : ""}${ig.courses ? " · сургалт бүтэн ✓" : ""}${rk.cheated ? ` · <span class="cr-bad">${rk.cheated} хичээл тооцогдоогүй</span>` : ""}</span>
         <span class="meter cr-meter"><i style="width:${rk.progress}%"></i></span>
+        <span class="cr-next">${rk.next ? `Дараагийн «${esc(rk.next_name)}» цол ${rk.next} оноонд` : "Дээд цол"}${tot ? ` · бүх сургалтаар: <b>${esc(tot.name)}</b> ${tot.points} оноо` : ""}</span>
         ${rk.tips?.length ? `<ul class="cr-tips">${rk.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}`;
     }
   };
@@ -2419,7 +2424,7 @@ async function coursePage() {
     if (was) return;
     const lid = row.dataset.lesson, p = access?.progress?.[lid], rk = access?.ranks?.[lid];
     const status = p?.completed_at ? `<span class="st-chip ok">✓ Дууссан · ${fmtDate(p.completed_at)}</span>` : p?.viewed_at ? `<span class="st-chip">Үзэж эхэлсэн · ${fmtDate(p.viewed_at)}</span>` : `<span class="st-chip">Шинэ хичээл</span>`;
-    const facts = [status, rk ? `<span class="st-chip ${rk.disqualified ? "bad" : rk.points >= 75 ? "ok" : ""}">🎖 ${esc(rk.rank)} · ${rk.points} оноо</span>` : ""].join("");
+    const facts = [status, rk ? `<span class="st-chip ${rk.disqualified ? "bad" : rk.points >= 75 ? "ok" : ""}" title="${esc((rk.reasons || []).join(", "))}">${rk.disqualified ? "⛔ Оноо тооцогдоогүй" : `+${rk.points} оноо нэгдсэн цолд`}</span>` : ""].join("");
     row.classList.add("open");
     if (!canOpen(row)) { // түгжээтэй: шалтгаан ба нээх товч
       const why = row.classList.contains("is-drip") ? esc($(".lesson-state", row)?.textContent || "Түгжээтэй") : "Энэ хичээл төлбөртэй";

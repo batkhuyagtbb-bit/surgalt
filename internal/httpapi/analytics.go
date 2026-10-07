@@ -290,7 +290,8 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 	for i := range watches {
 		ev(watches[i].UserID, watches[i].CourseID).addWatch(&watches[i])
 	}
-	rankPts := map[string]int{}
+	rankInfos := map[string][]RankInfo{}
+	rankTitles := map[string][]string{}
 	rankRows := map[string][]LessonRank{}
 	for _, sc := range scope {
 		users := map[string]bool{}
@@ -306,17 +307,18 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 			if uid == teacherID || (userID != "" && uid != userID) {
 				continue
 			}
-			ranks, sum := computeRanks(sc.lessons, sc.progress[uid], ev(uid, sc.course.ID))
+			ranks, info := computeRanks(sc.lessons, sc.progress[uid], ev(uid, sc.course.ID))
 			if len(ranks) == 0 {
 				continue
 			}
-			rankPts[uid] += sum
+			rankInfos[uid] = append(rankInfos[uid], info)
+			rankTitles[uid] = append(rankTitles[uid], sc.course.Title)
 			rankRows[uid] = append(rankRows[uid], ranks...)
 		}
 	}
 	for uid, rows := range rankRows {
 		st := get(uid, "")
-		st.Rank = summarizeRank(rows, rankPts[uid])
+		st.Rank = mergeRanks(rows, rankInfos[uid], rankTitles[uid])
 		if userID != "" {
 			st.LessonRanks = rows
 		}
