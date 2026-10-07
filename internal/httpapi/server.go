@@ -206,6 +206,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Нээлттэй профайл
 	mux.HandleFunc("GET /api/teachers/{username}", s.handlePublicProfile)
+	mux.HandleFunc("POST /api/views", s.handleTrackView)
 	mux.HandleFunc("GET /t/{username}/qr.png", s.handleQR)
 
 	// Чат

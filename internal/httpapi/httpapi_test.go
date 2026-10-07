@@ -2476,7 +2476,7 @@ func TestWarningLimitBlock(t *testing.T) {
 	if code, _ := call(t, srv, "POST", "/api/courses", tt, `{"title":"x","price":0,"max_warnings":99}`); code != 400 {
 		t.Fatal("сануулгын тоо 1-20")
 	}
-	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Хяналт","price":0,"published":true,"max_warnings":5,"block_hours":0}`)
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Хяналт","price":0,"published":true,"max_warnings":5,"block_minutes":-1}`)
 	cid := c["id"].(string)
 	if c["max_warnings"].(float64) != 5 {
 		t.Fatalf("тохиргоо хадгалагдаагүй: %v", c)
@@ -2903,5 +2903,112 @@ func TestPaidMeeting(t *testing.T) {
 	s3, _ := register(t, srv, "stud3", "student")
 	if code, b := call(t, srv, "POST", "/api/meetings/"+m.ID+"/buy", s3, ""); code != 200 || b["unlocked"] != true {
 		t.Fatalf("үнэгүй шууд хичээл нээлттэй: %d %v", code, b)
+	}
+}
+
+// Хичээлийн баримт (PowerPoint, Word, Excel, PDF): суралцагчид бодит зам биш, тасалбар; хичээл дотроос
+// (fetch) уншигдана, шинэ таб/хаягийн мөрөөс (татах) нээгдэхгүй. Багш зөвшөөрсөн файл л татагдана.
+func TestLessonDocsProtected(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, tid := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Баримт","price":0,"published":true}`)
+	cid := c["id"].(string)
+	ppt := uploadFile(t, srv, tt, "secret-slides.pptx", bytes.Repeat([]byte("p"), 2048))
+	xls := uploadFile(t, srv, tt, "grades.xlsx", bytes.Repeat([]byte("x"), 2048))
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true,"blocks":[`+
+		`{"id":"f001","type":"file","url":"`+ppt+`","name":"Слайд"},{"id":"f002","type":"file","url":"`+xls+`","name":"Дүн","download":true}]}`)
+	lid := l["id"].(string)
+	s1, _ := register(t, srv, "stud", "student")
+	_, got := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid, s1, "")
+	bs := got["blocks"].([]any)
+	u := bs[0].(map[string]any)["url"].(string)
+	if !strings.HasPrefix(u, "/api/media/") || !strings.HasSuffix(u, "/doc.pptx") || strings.Contains(u, "secret-slides") || strings.Contains(u, tid) {
+		t.Fatalf("баримтын бодит зам харагдах ёсгүй: %s", u)
+	}
+	get := func(path, dest, mode string) int {
+		req, _ := http.NewRequest("GET", srv.URL+path, nil)
+		req.Header.Set("Sec-Fetch-Dest", dest)
+		req.Header.Set("Sec-Fetch-Mode", mode)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	if code := get(u, "empty", "cors"); code != 200 {
+		t.Fatalf("хичээлийн харагч (fetch) уншина: %d", code)
+	}
+	if code := get(u, "document", "navigate"); code != 403 {
+		t.Fatalf("шинэ таб/татахад 403 байх ёстой: %d", code)
+	}
+	// Багш "татахыг зөвшөөрөх" асаасан файл: гарын үсэгтэй URL, шууд татагдана.
+	if d := bs[1].(map[string]any)["url"].(string); !strings.HasPrefix(d, "/files/") || get(d, "document", "navigate") != 200 {
+		t.Fatalf("зөвшөөрсөн файл татагдах ёстой: %s", d)
+	}
+}
+
+// Багш өөрийн профайл, сургалт, хичээлээ үзвэл тоолохгүй, мэдэгдэл ирэхгүй; бусад хүн үзвэл ирнэ.
+func TestOwnViewsNotNotified(t *testing.T) {
+	st := newTestStore(t)
+	fs, err := files.New(t.TempDir(), []byte("k"), 10<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := New(Config{TrustProxy: true, DevPayments: true, WebhookSecret: "wh", StorageFreeMB: 10}, st, auth.NewSigner("test", time.Hour), chat.NewHub(), fs, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Үзэлт","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true}`)
+	lid := l["id"].(string)
+	// Багш өөрөө үзэв: профайл, сургалт, үнэгүй хичээл.
+	for _, b := range []string{`{"kind":"profile","id":"teach"}`, `{"kind":"course","id":"` + cid + `"}`} {
+		if code, _ := call(t, srv, "POST", "/api/views", tt, b); code != http.StatusNoContent {
+			t.Fatalf("үзэлт: %d", code)
+		}
+	}
+	call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid, tt, "")
+	s.flushViews(context.Background())
+	_, ns := callList(t, srv, "GET", "/api/me/notifications", tt)
+	if strings.Contains(fmt.Sprint(ns), "үзлээ") {
+		t.Fatalf("өөрийн үзэлтэд мэдэгдэл ирэх ёсгүй: %v", ns)
+	}
+	// Бусад хүн (зочин, суралцагч) үзвэл мэдэгдэл ирнэ.
+	s1, _ := register(t, srv, "stud", "student")
+	call(t, srv, "POST", "/api/views", "", `{"kind":"profile","id":"teach"}`)
+	call(t, srv, "POST", "/api/views", s1, `{"kind":"course","id":"`+cid+`"}`)
+	call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid, s1, "")
+	s.flushViews(context.Background())
+	_, ns = callList(t, srv, "GET", "/api/me/notifications", tt)
+	for _, want := range []string{"профайлыг үзлээ", "сургалтыг тань үзлээ", "хичээлийг үзлээ"} {
+		if !strings.Contains(fmt.Sprint(ns), want) {
+			t.Fatalf("%q мэдэгдэл алга: %v", want, ns)
+		}
+	}
+}
+
+// Анхны тохиргоо: багш хоригийн хугацаа сонгоогүй бол хаагдсан хичээл 30 минутын дараа автоматаар нээгдэнэ.
+func TestBlockDefault30Min(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Анхдагч","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true}`)
+	lid := l["id"].(string)
+	s1, _ := register(t, srv, "stud", "student")
+	_, ss := call(t, srv, "POST", "/api/activity/start", s1, `{"course_id":"`+cid+`","lesson_id":"`+lid+`","kind":"lesson"}`)
+	call(t, srv, "POST", "/api/activity/beat", s1, `{"session_id":"`+ss["session_id"].(string)+`","active":5,"events":[{"type":"auto_block","detail":"3 удаа хичээлээс гарсан"}],"end":"auto_block"}`)
+	_, acc := call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
+	b, _ := acc["blocks"].(map[string]any)[lid].(map[string]any)
+	if b == nil || b["until"] == nil {
+		t.Fatalf("анхдагчаар хугацаатай хориг байх ёстой: %v", acc["blocks"])
+	}
+	until, _ := time.Parse(time.RFC3339Nano, b["until"].(string))
+	if d := time.Until(until); d < 29*time.Minute || d > 31*time.Minute {
+		t.Fatalf("30 минутын дараа нээгдэх ёстой: %v", d)
 	}
 }

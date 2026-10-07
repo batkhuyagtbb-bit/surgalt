@@ -117,7 +117,11 @@ func (s *Server) viewerBlocks(bs []store.Block) []store.Block {
 					b.Parts[k] = s.viewerMedia(p, "")
 				}
 			}
-			b.URL = s.viewerMedia(b.URL, "") // видео/аудио → нуусан тасалбар, бусад → гарын үсэгтэй URL
+			if b.Type == "file" && b.Download {
+				b.URL = s.media(b.URL) // багш татахыг зөвшөөрсөн: гарын үсэгтэй URL (татаж болно)
+			} else {
+				b.URL = s.viewerMedia(b.URL, "") // видео/аудио/баримт → нуусан тасалбар (зөвхөн хичээл дотроос)
+			}
 		}
 		if b.Quiz != nil {
 			b.Quiz = s.viewerQuiz(b.ID, b.Quiz)

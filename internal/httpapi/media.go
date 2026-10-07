@@ -25,6 +25,21 @@ func isStreamPath(p string) bool {
 	return strings.HasPrefix(m, "video/") || strings.HasPrefix(m, "audio/")
 }
 
+// isDocPath — хичээл дотор шууд үзүүлэх баримт (PDF, PowerPoint, Word, Excel …). Видеотой адил
+// тасалбараар: хуудсан дотроос (fetch) л уншигдана, шинэ таб/хаягийн мөрөөс нээгдэхгүй (татагдахгүй).
+func isDocPath(p string) bool {
+	p = strings.ToLower(strings.SplitN(p, "?", 2)[0])
+	i := strings.LastIndexByte(p, '.')
+	if i < 0 {
+		return false
+	}
+	switch p[i:] {
+	case ".pdf", ".ppt", ".pptx", ".doc", ".docx", ".xls", ".xlsx", ".ods", ".odt", ".odp", ".rtf", ".csv":
+		return true
+	}
+	return false
+}
+
 // viewerMedia — суралцагчид (эзэмшигч биш) очих медиа холбоос. Видео/аудио → тасалбар, бусад → гарын үсэгтэй URL.
 func (s *Server) viewerMedia(path, uid string) string {
 	// Гадаад холбоос: YouTube/Vimeo — ID-г кодолсон "yt:"/"vm:" хэлбэрээр (жинхэнэ холбоос харагдахгүй);
@@ -46,13 +61,15 @@ func (s *Server) viewerMedia(path, uid string) string {
 		}
 		return path
 	}
-	if !strings.HasPrefix(path, "/files/") || !strings.Contains(path, "/"+files.Private+"/") || !isStreamPath(path) {
+	if !strings.HasPrefix(path, "/files/") || !strings.Contains(path, "/"+files.Private+"/") || !(isStreamPath(path) || isDocPath(path)) {
 		return s.media(path)
 	}
-	ext := path[strings.LastIndexByte(path, '.'):]
-	kind := "audio"
-	if strings.HasPrefix(mimeOf(path), "video/") {
+	ext := strings.ToLower(path[strings.LastIndexByte(path, '.'):])
+	kind := "doc"
+	if m := mimeOf(path); strings.HasPrefix(m, "video/") {
 		kind = "video"
+	} else if strings.HasPrefix(m, "audio/") {
+		kind = "audio"
 	}
 	return "/api/media/" + s.files.Ticket(path, uid, mediaTicketTTL) + "/" + kind + ext
 }
@@ -67,19 +84,20 @@ func (s *Server) handleMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasPrefix(path, "https://") { // гадаад видео: proxy (холбоос суралцагчид харагдахгүй)
 		if d := r.Header.Get("Sec-Fetch-Dest"); (d != "" && d != "video" && d != "audio" && d != "empty") || r.Header.Get("Sec-Fetch-Mode") == "navigate" {
-			writeErr(w, http.StatusForbidden, "видеог зөвхөн хичээл дотроос үзнэ")
+			writeErr(w, http.StatusForbidden, "зөвхөн хичээл дотроос үзнэ")
 			return
 		}
 		s.proxyMedia(w, r, path)
 		return
 	}
-	// Хуудас болгон нээх (шинэ таб, хаягийн мөр) → хориглоно; <video>/<audio>-оос ирсэн хүсэлт л үйлчилнэ.
+	// Хуудас болгон нээх (шинэ таб, хаягийн мөр, татах) → хориглоно; <video>/<audio> болон хичээлийн
+	// баримт харагчийн (fetch) хүсэлт л үйлчилнэ.
 	if d := r.Header.Get("Sec-Fetch-Dest"); d != "" && d != "video" && d != "audio" && d != "empty" {
-		writeErr(w, http.StatusForbidden, "видеог зөвхөн хичээл дотроос үзнэ")
+		writeErr(w, http.StatusForbidden, "зөвхөн хичээл дотроос үзнэ")
 		return
 	}
 	if r.Header.Get("Sec-Fetch-Mode") == "navigate" {
-		writeErr(w, http.StatusForbidden, "видеог зөвхөн хичээл дотроос үзнэ")
+		writeErr(w, http.StatusForbidden, "зөвхөн хичээл дотроос үзнэ")
 		return
 	}
 	teacher, vis, name, ok := files.SplitPath(path)

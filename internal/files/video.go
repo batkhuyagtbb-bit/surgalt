@@ -76,10 +76,11 @@ func (s *Store) Parts(path string) []string {
 	return out
 }
 
-// isOfficeExt: LibreOffice-оор PDF болгож 3D номоор харуулах баримтууд.
+// isOfficeExt: LibreOffice-оор PDF болгох баримтууд. Excel (.xls/.xlsx/.ods) хөрвүүлэхгүй — хичээл дотор
+// хүснэгт хэлбэрээр (томьёо бодогдоно) шууд харуулна.
 func isOfficeExt(ext string) bool {
 	switch ext {
-	case ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".odt", ".odp", ".rtf":
+	case ".doc", ".docx", ".ppt", ".pptx", ".odt", ".odp", ".rtf":
 		return true
 	}
 	return false

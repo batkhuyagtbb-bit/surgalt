@@ -47,7 +47,7 @@ const (
 var allowed = map[string]bool{
 	".mp4": true, ".webm": true, ".mov": true, ".m4v": true, ".mp3": true, ".m4a": true, ".wav": true,
 	".pdf": true, ".png": true, ".jpg": true, ".jpeg": true, ".webp": true, ".gif": true, ".svg": false,
-	".mkv": true, ".avi": true, ".doc": true, ".ppt": true, ".xls": true, ".odt": true, ".odp": true, ".rtf": true, ".zip": true, ".pptx": true, ".docx": true, ".xlsx": true, ".txt": true, ".epub": true,
+	".mkv": true, ".avi": true, ".doc": true, ".ppt": true, ".xls": true, ".odt": true, ".odp": true, ".rtf": true, ".zip": true, ".pptx": true, ".docx": true, ".xlsx": true, ".ods": true, ".csv": true, ".txt": true, ".epub": true,
 }
 
 var (

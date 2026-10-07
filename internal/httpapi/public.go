@@ -330,9 +330,7 @@ func (s *Server) pageProfile(w http.ResponseWriter, r *http.Request) {
 		s.pageError(w, r, err)
 		return
 	}
-	t := p.Data.Teacher
-	s.trackView(r, t.ID, NotifProfileView, t.ID, "", "/t/"+t.Username)
-	serveRendered(w, r, p.ETag, p.HTML, "text/html; charset=utf-8")
+	serveRendered(w, r, p.ETag, p.HTML, "text/html; charset=utf-8") // үзэлтийг хөтөч /api/views-ээр мэдээлнэ
 }
 
 func (s *Server) pageCourse(w http.ResponseWriter, r *http.Request) {
@@ -341,8 +339,36 @@ func (s *Server) pageCourse(w http.ResponseWriter, r *http.Request) {
 		s.pageError(w, r, err)
 		return
 	}
-	s.trackView(r, c.Data.Course.TeacherID, NotifCourseView, c.Data.Course.ID, c.Data.Course.Title, "/c/"+c.Data.Course.ID)
 	serveRendered(w, r, c.ETag, c.HTML, "text/html; charset=utf-8")
+}
+
+// handleTrackView: POST /api/views {kind: profile|course, id} — профайл, сургалтын хуудас нээгдэхэд хөтөч
+// (нэвтэрсэн бол токентой) мэдээлнэ. HTML хуудас токенгүй ирдэг тул үзэгчийг энд л танина: багш өөрийнхөө
+// профайл, сургалтыг үзвэл тоолохгүй, мэдэгдэл явуулахгүй.
+func (s *Server) handleTrackView(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Kind string `json:"kind"`
+		ID   string `json:"id"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	uid := ""
+	if p, ok := s.principal(r); ok && !p.IsGuest() {
+		uid = p.UID
+	}
+	switch in.Kind {
+	case "profile":
+		if p, err := s.publicProfile(r.Context(), in.ID); err == nil && p.Data.Teacher.ID != uid {
+			t := p.Data.Teacher
+			s.trackView(r, t.ID, NotifProfileView, t.ID, "", "/t/"+t.Username)
+		}
+	case "course":
+		if c, err := s.publicCourse(r.Context(), in.ID); err == nil && c.Data.Course.TeacherID != uid {
+			s.trackView(r, c.Data.Course.TeacherID, NotifCourseView, c.Data.Course.ID, c.Data.Course.Title, "/c/"+c.Data.Course.ID)
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) pageError(w http.ResponseWriter, r *http.Request, err error) {

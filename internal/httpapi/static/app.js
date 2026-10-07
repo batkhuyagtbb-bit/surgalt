@@ -26,6 +26,11 @@ const UI_ICONS = {
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8M8 9h8M8 12h5"/>',
+  doc: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+  sheet: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/>',
+  down: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
 };
 const icon = (n, size = 18) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI_ICONS[n] || ""}</svg>`;
 // Огноог өөрсдөө хэлбэржүүлнэ: олон браузерт mn-MN локаль байхгүй тул англиар гардаг.
@@ -470,7 +475,7 @@ function mediaHTML(url, title) {
   if ([".webm", ".mp4", ".mov", ".m4v"].includes(ext)) return `<video src="${esc(url)}" controls playsinline preload="metadata" controlslist="nodownload" disablepictureinpicture oncontextmenu="return false"></video>`;
   if ([".mp3", ".m4a", ".wav"].includes(ext)) return `<audio src="${esc(url)}" controls controlslist="nodownload" oncontextmenu="return false" style="width:100%"></audio>`;
   if ([".webp", ".jpg", ".jpeg", ".png", ".gif"].includes(ext)) return `<img src="${esc(url)}" alt="">`;
-  if (ext === ".pdf") return `<div class="book-stage">${book3dHTML(url, title)}<button class="btn btn-gold" data-book="${esc(url)}" data-title="${esc(title || "")}">📖 Ном шиг нээж унших</button></div>`;
+  if (docKind(url)) return docViewHTML(url, title); // PDF, PowerPoint, Word, Excel — хичээл дотор шууд, хамгаалалттай
   return `<div style="padding:24px;text-align:center"><a class="btn btn-gold" href="${esc(url)}" target="_blank" rel="noopener">⬇ Файл татах</a></div>`;
 }
 
@@ -516,9 +521,11 @@ function blockHTML(b) {
     case "video": return `<figure class="rb-video" data-bid="${esc(b.id)}" ${b.parts?.length > 1 ? `data-parts="${esc(JSON.stringify(b.parts))}"` : ""}><div class="player">${mediaHTML(b.url, b.name)}</div>${b.parts?.length > 1 ? `<div class="vparts" aria-label="Видеоны хэсгүүд">${b.parts.map((_, i) => `<button type="button" data-vpart="${i}" class="${i ? "" : "on"}">${i + 1}-р хэсэг</button>`).join("")}<span class="muted small">6 минутын ${b.parts.length} хэсэг · дараалан тоглоно</span></div>` : ""}${cap}</figure>`;
     case "file": {
       const meta = esc([extOf(b.url).slice(1).toUpperCase(), fmtBytes(b.size)].filter(Boolean).join(" · ")) + (b.text ? " · " + esc(b.text) : "");
-      if (extOf(b.url) === ".pdf") return `<figure class="rb-file-pdf" ${b.download ? "data-dl" : "data-nodl"}>${mediaHTML(b.url, b.name || "PDF")}${cap}</figure>`;
+      const kind = docKind(b.url);
+      // PDF, PowerPoint, Word, Excel: хичээл дотор шууд (попапгүй), татах боломжгүй — багш зөвшөөрсөн бол л татна.
+      if (kind && kind !== "legacy") return `<figure class="rb-doc" ${b.download ? "data-dl" : "data-nodl"}>${docViewHTML(b.url, b.name || DOC_LABEL[kind])}${cap}</figure>`;
       return b.download ? `<a class="rb-file" href="${esc(b.url)}" target="_blank" rel="noopener" download><span class="rb-file-ico">📄</span><span><b>${esc(b.name || "Файл")}</b><small>${meta}</small></span><span class="btn btn-sm btn-glass">⬇ Татах</span></a>`
-        : `<div class="rb-file"><span class="rb-file-ico">🔒</span><span><b>${esc(b.name || "Файл")}</b><small>${meta} · Багш татахыг зөвшөөрөөгүй</small></span></div>`;
+        : `<div class="rb-file"><span class="rb-file-ico">🔒</span><span><b>${esc(b.name || "Файл")}</b><small>${meta} · ${kind === "legacy" ? "Хуучин форматыг шууд үзүүлэх боломжгүй — багш PDF, .pptx, .docx болгож оруулна" : "Зөвхөн хичээл дотор үзнэ"}</small></span></div>`;
     }
     case "quiz": return quizFormHTML(b, false);
   }
@@ -1200,7 +1207,7 @@ const coverIO = "IntersectionObserver" in window ? new IntersectionObserver((es)
     doc.destroy();
   } catch {}
 }), { rootMargin: "200px" }) : null;
-function hydrateBooks(root = document) { $$(".book3d:not([data-h])", root).forEach((b) => { b.dataset.h = 1; coverIO?.observe(b); }); }
+function hydrateBooks(root = document) { $$(".book3d:not([data-h])", root).forEach((b) => { b.dataset.h = 1; coverIO?.observe(b); }); hydrateDocs(root); }
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-book], .book3d");
   if (!b) return;
@@ -1210,7 +1217,9 @@ document.addEventListener("click", (e) => {
   Flipbook.open(b.dataset.book || b.dataset.pdf, b.dataset.title, { nodl });
 });
 
-const Flipbook = {
+// FlipCore — 3D хуудас эргүүлдэг PDF харагч (томруулах, чирэх, тод дахин зурах). Попап (Flipbook.open) болон
+// хичээл доторх (DocView) хувилбар хоёулаа үүнийг прототип болгоно: this.el дотор .fb-stage, .fb-nav байна.
+const FlipCore = {
   el: null,
   async open(url, title, opts = {}) {
     this.close();
@@ -1248,7 +1257,8 @@ const Flipbook = {
   build() {
     const el = this.el, stage = $(".fb-stage", el), n = this.doc.numPages;
     const sw = stage.clientWidth * 0.92, sh = stage.clientHeight * 0.9;
-    this.single = sw < 760;
+    const keepPage = this.leafEls ? (this.single ? this.cur + 1 : Math.max(1, this.cur * 2)) : 1; // дахин барихад хуудсаа хадгална
+    this.single = this.forceSingle || sw < 760;
     const cols = this.single ? 1 : 2;
     let pw = Math.min(sw / cols, sh / this.ratio), ph = pw * this.ratio;
     // Хуудас бүр нэг "навч"; хоёр талтай горимд навч нэг бүр 2 хуудас (урд/ард).
@@ -1277,9 +1287,9 @@ const Flipbook = {
     range.max = this.leaves; range.oninput = () => this.go(+range.value, true);
     $("[data-fb-prev]", el).onclick = () => this.go(this.cur - 1);
     $("[data-fb-next]", el).onclick = () => this.go(this.cur + 1);
-    this.bindGestures(stage);
+    if (!stage.dataset.g) { stage.dataset.g = 1; this.bindGestures(stage); }
     this.cur = 0;
-    this.go(0, true);
+    this.go(this.single ? keepPage - 1 : Math.floor(keepPage / 2), true);
     this.applyZoom();
   },
   // Томруулах: Ctrl/⌘ + дугуй (trackpad чимхэлт), давхар дарах, хоёр хуруугаар чимхэх, товч; томруулсан үед чирж/гүйлгэж харна.
@@ -1416,6 +1426,392 @@ const Flipbook = {
     this.doc?.destroy(); this.doc = null;
   },
 };
+
+const Flipbook = Object.create(FlipCore); // попап уншигч (номын сан, багшийн файл)
+
+/* ---------- Хичээлийн баримтыг хичээл дотор шууд, хамгаалалттай үзүүлэх ----------
+   Попап цонхгүй — хичээлийн агуулга дотор:
+   • PDF: хэвтээ хуудас (слайд) → слайд тоглуулагч; босоо → ном шиг эргэдэг хуудас (3D, томруулна).
+   • PowerPoint (.pptx) → слайд тоглуулагч («▶ Тоглуулах» = бүтэн дэлгэцээр презентаци).
+   • Word (.docx) → хуудаслагдсан баримт (томруулна).
+   • Excel (.xlsx/.xls/.ods/.csv) → хүснэгт: хуудаснууд, томьёоны мөр; томьёо бодогдоно, утгыг өөрчилж туршина.
+   Хамгаалалт: холбоос нь хугацаатай тасалбар (хичээл дотроос л уншигдана, шинэ таб/татахад 403), хуулах,
+   баруун товч, хэвлэх хаалттай, үзэж буй хүний нэрээр усан тэмдэг. Багш тухайн файлд зөвшөөрсөн үед л татах товч. */
+const DOC_LIBS = {
+  xlsx: "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.core.min.js", // xlsx/ods/csv (хөнгөн)
+  xlsxFull: "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js", // хуучин .xls (кодын хуудастай)
+  jszip: "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js",
+  docx: "https://cdn.jsdelivr.net/npm/docx-preview@0.3.5/dist/docx-preview.min.js",
+  pptx: "https://cdn.jsdelivr.net/npm/pptx-preview@1.0.7/dist/pptx-preview.umd.js",
+  formula: "https://cdn.jsdelivr.net/npm/hot-formula-parser@4.0.0/dist/formula-parser.min.js",
+};
+const scriptP = new Map();
+function loadScript(src) {
+  if (!scriptP.has(src)) scriptP.set(src, new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = src; s.async = true;
+    s.onload = res;
+    s.onerror = () => { scriptP.delete(src); s.remove(); rej(new Error("Харагч ачаалагдсангүй — интернэт холболтоо шалгана уу")); };
+    document.head.append(s);
+  }));
+  return scriptP.get(src);
+}
+const DOC_KIND = { ".pdf": "pdf", ".pptx": "pptx", ".docx": "docx", ".xlsx": "sheet", ".xls": "sheet", ".ods": "sheet", ".csv": "sheet", ".ppt": "legacy", ".doc": "legacy", ".odt": "legacy", ".odp": "legacy", ".rtf": "legacy" };
+const docKind = (url) => DOC_KIND[extOf(url)] || "";
+const DOC_LABEL = { pdf: "PDF баримт", pptx: "Презентаци", docx: "Word баримт", sheet: "Excel хүснэгт", legacy: "Баримт" };
+const DOC_ICO = { pdf: "book", pptx: "slides", docx: "doc", sheet: "sheet", legacy: "doc" };
+const docViewHTML = (url, title) => `<div class="doc-view" data-doc="${esc(url)}" data-kind="${docKind(url)}" data-title="${esc(title || "")}"><div class="dv-skel"><span class="loader"></span></div></div>`;
+// Усан тэмдэг: үзэж буй хүний нэр + ID-ийн сүүл (дэлгэцийн зураг аваад тараахаас сэргийлнэ).
+const wmText = () => { const u = Auth.user; return u ? `${u.display_name || u.username || ""} · #${String(u.id || "").slice(-6)}` : "surgalt.mn"; };
+const wmBG = (t) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="360" height="210"><text x="180" y="105" text-anchor="middle" transform="rotate(-24 180 105)" font-family="Manrope,Arial,sans-serif" font-size="15" font-weight="700" fill="rgba(120,134,170,0.2)">${t.replace(/[<>&"']/g, "")}</text></svg>`)}")`;
+const docIO = "IntersectionObserver" in window ? new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { docIO.unobserve(e.target); DocView.mount(e.target); } }), { rootMargin: "400px" }) : null;
+function hydrateDocs(root = document) { $$(".doc-view:not([data-h])", root).forEach((d) => { d.dataset.h = 1; docIO ? docIO.observe(d) : DocView.mount(d); }); }
+const zoomGroupHTML = () => `<div class="fb-zoom" role="group" aria-label="Томруулах"><button class="icon-btn" data-z="-" title="Жижигрүүлэх (−)" aria-label="Жижигрүүлэх">−</button><button class="fb-zv" data-z="0" title="Анхны хэмжээ (0)">100%</button><button class="icon-btn" data-z="+" title="Томруулах (+)" aria-label="Томруулах">+</button></div>`;
+
+const DocView = {
+  async mount(el) {
+    const url = el.dataset.doc, kind = el.dataset.kind || "legacy", title = el.dataset.title || DOC_LABEL[kind];
+    if (!url || el.dataset.m) return;
+    el.dataset.m = 1;
+    el.removeAttribute("data-doc"); // холбоосыг DOM-д ил үлдээхгүй
+    const canDl = !!el.closest("[data-dl]"); // зөвхөн багш энэ файлд зөвшөөрсөн бол
+    el.tabIndex = 0; el.classList.add("dv-" + kind);
+    el.innerHTML = `<div class="dv-bar"><span class="dv-ico" aria-hidden="true">${icon(DOC_ICO[kind], 18)}</span>
+        <span class="dv-title"><b>${esc(title)}</b><small>${DOC_LABEL[kind]}${canDl ? "" : " · зөвхөн үзнэ"}</small></span><span class="dv-tools"></span>
+        ${canDl ? `<button class="icon-btn" data-dv-dl title="Татах" aria-label="Татах">${icon("down", 18)}</button>` : `<span class="dv-lock" title="Зөвхөн хичээл дотор үзнэ — татах боломжгүй">${icon("lock", 16)}</span>`}
+        <button class="icon-btn dv-fs" data-dv-fs title="Бүтэн дэлгэц (F)" aria-label="Бүтэн дэлгэц">${icon("expand", 18)}</button></div>
+      <div class="dv-body"><div class="dv-load"><span class="loader"></span><small>${esc(DOC_LABEL[kind])} ачаалж байна…</small></div></div><div class="dv-wm" aria-hidden="true"></div>`;
+    $(".dv-wm", el).style.backgroundImage = wmBG(wmText());
+    // Хамгаалалт: хуулах, сонгох, чирэх, баруун товч (оролтын талбараас бусад). copy үйл явдал хичээлийн
+    // хяналт руу дамжина (зөрчил гэж бүртгэгдэнэ).
+    const guard = (e) => { if (!e.target.closest?.("input, textarea")) e.preventDefault(); };
+    ["contextmenu", "dragstart", "selectstart", "copy", "cut"].forEach((t) => el.addEventListener(t, guard));
+    el.addEventListener("click", (e) => {
+      if (e.target.closest("[data-dv-fs]")) DocView.fullscreen(el);
+      else if (e.target.closest("[data-dv-dl]")) DocView.download(url, title);
+    });
+    el.addEventListener("keydown", (e) => {
+      if (e.target.closest("input, textarea")) return;
+      if ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.metaKey) { e.preventDefault(); return DocView.fullscreen(el); }
+      if (e.key === "Escape" && el.classList.contains("dv-max")) { e.preventDefault(); return DocView.unmax(el); }
+      el._dv?.key?.(e);
+    });
+    const body = $(".dv-body", el);
+    if (kind === "legacy") {
+      body.innerHTML = `<div class="dv-msg">${icon("doc", 28)}<b>Энэ хуучин форматыг шууд үзүүлэх боломжгүй</b><span>Багш файлаа PDF, .pptx эсвэл .docx болгож оруулбал хичээл дотор шууд харагдана.</span></div>`;
+      return;
+    }
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Баримтыг нээж чадсангүй");
+      const buf = await res.arrayBuffer();
+      el._dv = (await DOC_VIEWS[kind](el, body, buf, url)) || {};
+    } catch (err) {
+      body.innerHTML = `<div class="dv-msg">${icon("doc", 28)}<b>Баримтыг нээж чадсангүй</b><span>${esc(err.message || "")}</span></div>`;
+    }
+  },
+  // Бүтэн дэлгэц: тухайн харагч өөрөө (шинэ цонх биш). iPhone гэх мэт дэмжихгүй бол дэлгэц дүүргэнэ.
+  fullscreen(el) {
+    if (document.fullscreenElement === el) return document.exitFullscreen?.();
+    if (el.classList.contains("dv-max")) return DocView.unmax(el);
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    // Fullscreen API байхгүй (iPhone) эсвэл татгалзвал: дэлгэцийг дүүргэнэ. Эцэг элемент transform/overflow-той
+    // байж болох тул түр body руу зөөж, гарахад байранд нь буцаана.
+    const fallback = () => {
+      el._ph = document.createComment("doc-view"); el.before(el._ph); document.body.append(el);
+      el.classList.add("dv-max", "dv-full"); document.documentElement.classList.add("dv-locked"); el.focus(); el._dv?.layout?.();
+    };
+    if (!req) return fallback();
+    try { const p = req.call(el); p?.catch?.(fallback); } catch { fallback(); }
+  },
+  unmax(el) {
+    el.classList.remove("dv-max", "dv-full"); document.documentElement.classList.remove("dv-locked");
+    if (el._ph) { el._ph.replaceWith(el); el._ph = null; }
+    el._dv?.layout?.();
+  },
+  async download(url, title) {
+    try {
+      const res = await fetch(url); if (!res.ok) throw new Error("Татаж чадсангүй");
+      const a = document.createElement("a"); a.href = URL.createObjectURL(await res.blob());
+      a.download = (title || "file").replace(/[\\/:*?"<>|]+/g, "_") + extOf(url); a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    } catch (e) { toast(e.message, true); }
+  },
+};
+document.addEventListener("fullscreenchange", () => {
+  $$(".doc-view.dv-full:not(.dv-max)").forEach((d) => { if (document.fullscreenElement !== d) { d.classList.remove("dv-full"); d._dv?.layout?.(); } });
+  const fe = document.fullscreenElement;
+  if (fe?.classList?.contains("doc-view")) { fe.classList.add("dv-full"); fe.focus(); fe._dv?.layout?.(); }
+});
+
+// Слайд тоглуулагч (PDF-ийн хэвтээ хуудас, PowerPoint): нэг слайд, сум/товч/шудрах, ▶ бүтэн дэлгэц.
+function slidePlayer(el, body, { count, ratio, draw, prefetch }) {
+  el.classList.add("dv-slides");
+  $(".dv-tools", el).innerHTML = `<span class="sl-count" aria-live="polite"></span><button class="btn btn-gold btn-sm" data-sl-play>▶ Тоглуулах</button>`;
+  body.innerHTML = `<div class="sl-stage" style="--r:${ratio}"><div class="sl-slide"></div>
+      <button class="sl-nav sl-prev" aria-label="Өмнөх слайд">‹</button><button class="sl-nav sl-next" aria-label="Дараагийн слайд">›</button></div>
+    <div class="sl-prog"><i></i></div>`;
+  const stage = $(".sl-stage", body), box = $(".sl-slide", body);
+  let cur = -1, tok = 0, lastW = 0;
+  const show = async (i, dir = 0) => {
+    i = Math.max(0, Math.min(count - 1, i));
+    const my = ++tok, changed = i !== cur; cur = i;
+    $(".sl-count", el).textContent = `${i + 1} / ${count}`;
+    $(".sl-prog i", body).style.width = ((i + 1) / count) * 100 + "%";
+    $(".sl-prev", body).disabled = i === 0; $(".sl-next", body).disabled = i === count - 1;
+    const w = lastW = box.clientWidth || stage.clientWidth;
+    const node = await draw(i, w);
+    if (my !== tok) return;
+    if (box.firstChild !== node) box.replaceChildren(node);
+    if (changed) fly(node, dir);
+    if (prefetch && i + 1 < count) setTimeout(() => { if (my === tok) draw(i + 1, w).catch(() => {}); }, 250);
+  };
+  // Тоглуулах үед: слайд шилжих чиглэлээсээ гулсаж орж ирээд, дээрх гарчиг, текст, зураг нэг нэгээрээ
+  // доороос нисэж гарч ирнэ (PowerPoint-ийн "Fly In" шиг).
+  const fly = (node, dir) => {
+    if (reduce) return;
+    if (dir) { box.classList.remove("fly-l", "fly-r"); void box.offsetWidth; box.classList.add(dir < 0 ? "fly-l" : "fly-r"); }
+    $$(".slide-wrapper > *", node).forEach((sh, k) => {
+      sh.classList.remove("fly-in"); sh.style.animationDelay = 140 + k * 120 + "ms"; void sh.offsetWidth; sh.classList.add("fly-in");
+    });
+  };
+  const step = (d) => show(cur + d, d);
+  $(".sl-prev", body).onclick = (e) => { e.stopPropagation(); step(-1); };
+  $(".sl-next", body).onclick = (e) => { e.stopPropagation(); step(1); };
+  $("[data-sl-play]", el).onclick = () => { DocView.fullscreen(el); };
+  let x0 = null, moved = false;
+  stage.addEventListener("pointerdown", (e) => { x0 = e.clientX; moved = false; });
+  stage.addEventListener("pointermove", (e) => { if (x0 != null && Math.abs(e.clientX - x0) > 8) moved = true; });
+  stage.addEventListener("pointerup", (e) => {
+    if (x0 == null) return;
+    const dx = e.clientX - x0; x0 = null;
+    if (e.target.closest(".sl-nav")) return;
+    if (moved && Math.abs(dx) > 40) return step(dx < 0 ? 1 : -1); // шудрах
+    if (!moved) { const r = stage.getBoundingClientRect(); step(e.clientX < r.left + r.width * 0.3 ? -1 : 1); } // дарах: зүүн талаар өмнөх
+  });
+  let rt = 0;
+  const ro = "ResizeObserver" in window ? new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(() => { if (Math.abs((box.clientWidth || 0) - lastW) > 4) show(cur); }, 120); }) : null;
+  ro?.observe(stage);
+  show(0);
+  return {
+    key(e) {
+      if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); step(1); }
+      else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) { e.preventDefault(); step(-1); }
+      else if (e.key === "Home") show(0); else if (e.key === "End") show(count - 1);
+    },
+    layout() { setTimeout(() => show(cur), 60); },
+  };
+}
+
+// Босоо PDF → хичээл доторх 3D ном (FlipCore-ийг ашиглана: томруулах, чирэх, тод дахин зурах).
+function flipInline(el, body, doc, ratio, wide) {
+  el.classList.add("dv-book"); if (wide) el.classList.add("dv-wide");
+  $(".dv-tools", el).innerHTML = zoomGroupHTML() + (wide ? `<button class="btn btn-gold btn-sm" data-sl-play>▶ Тоглуулах</button>` : "");
+  body.innerHTML = `<div class="fb-stage"></div><div class="fb-nav"><button class="btn btn-glass btn-sm" data-fb-prev aria-label="Өмнөх хуудас">←</button><input type="range" min="0" value="0" aria-label="Хуудас"><span class="fb-count"></span><button class="btn btn-glass btn-sm" data-fb-next aria-label="Дараагийн хуудас">→</button></div>`;
+  const fb = Object.create(FlipCore);
+  Object.assign(fb, { el, doc, ratio, zoom: 1, pan: { x: 0, y: 0 }, forceSingle: !!wide });
+  fb.build();
+  el.addEventListener("click", (e) => {
+    const z = e.target.closest("[data-z]"); if (z) fb.setZoom(z.dataset.z === "+" ? fb.zoom * 1.25 : z.dataset.z === "-" ? fb.zoom / 1.25 : 1);
+    if (e.target.closest("[data-sl-play]")) DocView.fullscreen(el);
+  });
+  let rt = 0;
+  return {
+    key(e) {
+      if (["ArrowRight", "PageDown", " "].includes(e.key)) { e.preventDefault(); fb.go(fb.cur + 1); }
+      else if (["ArrowLeft", "PageUp"].includes(e.key)) { e.preventDefault(); fb.go(fb.cur - 1); }
+      else if (e.key === "+" || e.key === "=") fb.setZoom(fb.zoom * 1.25);
+      else if (e.key === "-") fb.setZoom(fb.zoom / 1.25);
+      else if (e.key === "0") fb.setZoom(1);
+    },
+    layout() { clearTimeout(rt); rt = setTimeout(() => { fb.zoom = 1; fb.pan = { x: 0, y: 0 }; fb.build(); }, 150); },
+  };
+}
+
+const DOC_VIEWS = {
+  // PDF: ном шиг (3D хуудас эргүүлнэ, томруулна). Хэвтээ хуудастай (слайд) бол нэг хуудсаар эргэдэг ном
+  // бөгөөд «▶ Тоглуулах» нь бүтэн дэлгэцээр презентаци болгон тоглуулна.
+  async pdf(el, body, buf) {
+    const doc = await (await pdfLib()).getDocument({ data: buf }).promise;
+    const v = (await doc.getPage(1)).getViewport({ scale: 1 }), ratio = v.height / v.width;
+    return flipInline(el, body, doc, ratio, ratio < 0.9);
+  },
+  async pptx(el, body, buf) {
+    await loadScript(DOC_LIBS.pptx);
+    const BASE = 960, host = document.createElement("div");
+    host.className = "pp-host"; body.append(host);
+    let pv = window.pptxPreview.init(host, { width: BASE, height: 540, mode: "slide" });
+    await pv.preview(buf);
+    const ratio = pv.pptx?.width ? pv.pptx.height / pv.pptx.width : 0.5625;
+    if (Math.abs(ratio - 0.5625) > 0.01) { // 4:3 гэх мэт: харьцааг нь хадгалж дахин бэлтгэнэ
+      pv.destroy?.(); host.innerHTML = "";
+      pv = window.pptxPreview.init(host, { width: BASE, height: Math.round(BASE * ratio), mode: "slide" });
+      await pv.preview(buf);
+    }
+    host.style.width = BASE + "px"; host.style.height = Math.round(BASE * ratio) + "px";
+    return slidePlayer(el, body, { count: pv.slideCount || 1, ratio, async draw(i, w) {
+      if (pv.currentIndex !== i) { pv.renderSingleSlide(i); pv.currentIndex = i; }
+      host.style.transform = `scale(${w / BASE})`;
+      return host;
+    } });
+  },
+  async docx(el, body, buf) {
+    await loadScript(DOC_LIBS.jszip); await loadScript(DOC_LIBS.docx);
+    $(".dv-tools", el).innerHTML = `<span class="dx-pages muted small"></span>` + zoomGroupHTML();
+    body.innerHTML = `<div class="dx-scroll"><div class="dx-doc"></div></div>`;
+    const sc = $(".dx-scroll", body), doc = $(".dx-doc", body);
+    await window.docx.renderAsync(buf, doc, null, { className: "docx", inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: false, useBase64URL: true, renderHeaders: true, renderFooters: true, renderFootnotes: true });
+    const pages = $$("section.docx", doc), PW = (pages[0]?.offsetWidth || 816) + 40;
+    $(".dx-pages", el).textContent = pages.length + " хуудас";
+    let z = 1;
+    const apply = () => { const fit = Math.min(1, (sc.clientWidth - 4) / PW); doc.style.zoom = String(fit * z); $(".fb-zv", el).textContent = Math.round(z * 100) + "%"; };
+    const setZ = (v) => { z = Math.min(3, Math.max(0.5, v)); apply(); };
+    el.addEventListener("click", (e) => { const b = e.target.closest("[data-z]"); if (b) setZ(b.dataset.z === "+" ? z * 1.25 : b.dataset.z === "-" ? z / 1.25 : 1); });
+    sc.addEventListener("wheel", (e) => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); setZ(z * Math.exp(-e.deltaY / 300)); } }, { passive: false });
+    if ("ResizeObserver" in window) new ResizeObserver(apply).observe(sc);
+    apply();
+    return {
+      key(e) {
+        if (e.key === "+" || e.key === "=") setZ(z * 1.25); else if (e.key === "-") setZ(z / 1.25); else if (e.key === "0") setZ(1);
+        else if (e.key === "PageDown" || e.key === " ") { e.preventDefault(); sc.scrollBy({ top: sc.clientHeight * 0.9, behavior: "smooth" }); }
+        else if (e.key === "PageUp") { e.preventDefault(); sc.scrollBy({ top: -sc.clientHeight * 0.9, behavior: "smooth" }); }
+      },
+      layout: apply,
+    };
+  },
+  async sheet(el, body, buf, url) {
+    await loadScript(extOf(url) === ".xls" ? DOC_LIBS.xlsxFull : DOC_LIBS.xlsx);
+    // sheetStubs: томьёотой ч хадгалсан утгагүй нүд (жишээ нь программаар үүсгэсэн файл) алга болохгүй.
+    const wb = XLSX.read(buf, { type: "array", cellFormula: true, cellNF: true, cellDates: true, sheetStubs: true });
+    let FP = null; try { await loadScript(DOC_LIBS.formula); FP = window.formulaParser; } catch {}
+    return sheetView(el, body, wb, FP);
+  },
+};
+
+// Excel: хуудсууд, томьёоны мөр, нүдийг сонгох; томьёог бодно (дэмжээгүй функц бол файлд хадгалсан утга),
+// оролтын нүдийг давхар дарж өөрчилбөл томьёо шууд дахин бодогдоно (хадгалагдахгүй — дадлага).
+function sheetView(el, body, wb, FP) {
+  const MAXR = 1000, MAXC = 50, colName = XLSX.utils.encode_col;
+  $(".dv-tools", el).innerHTML = `<button class="btn btn-ghost btn-sm" data-xs-reset hidden>↺ Анхны утга</button>`;
+  body.innerHTML = `<div class="xs-fx"><span class="xs-ref">A1</span><span class="xs-fn">ƒx</span><span class="xs-f"></span></div>
+    <div class="xs-grid"></div><div class="xs-foot"><div class="xs-tabs" role="tablist">${wb.SheetNames.map((n, i) => `<button role="tab" data-sheet="${i}">${esc(n)}</button>`).join("")}</div>
+    <span class="xs-note"></span></div>`;
+  const grid = $(".xs-grid", body), parser = FP ? new FP.Parser() : null;
+  let S = null, memo = new Map(), stack = new Set(), sel = "0,0";
+  const valueAt = (r, c) => {
+    const k = r + "," + c, cell = S.cells.get(k);
+    if (!cell) return null;
+    if (!cell.f) return cell.v ?? null;
+    if (memo.has(k)) return memo.get(k);
+    if (stack.has(k)) return "#CYCLE!";
+    stack.add(k);
+    let v = cell.v0 ?? "";
+    if (parser && !cell.f.includes("!")) { const { result, error } = parser.parse(cell.f); v = error ? (cell.v0 ?? error) : result; } // өөр хуудас/дэмжээгүй → хадгалсан утга
+    stack.delete(k); memo.set(k, v);
+    return v;
+  };
+  if (parser) {
+    parser.on("callCellValue", (cc, done) => done(valueAt(cc.row.index, cc.column.index)));
+    parser.on("callRangeValue", (a, b, done) => {
+      const out = [];
+      for (let r = a.row.index; r <= b.row.index; r++) { const row = []; for (let c = a.column.index; c <= b.column.index; c++) row.push(valueAt(r, c)); out.push(row); }
+      done(out);
+    });
+  }
+  const recalc = () => { memo = new Map(); for (const [k, cell] of S.cells) if (cell.f) { const [r, c] = k.split(",").map(Number); cell.v = valueAt(r, c); } };
+  const fmt = (cell, v) => {
+    if (v == null || v === "") return "";
+    if (v instanceof Date) return v.toLocaleDateString();
+    if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+    if (typeof v === "number") { if (cell?.z && cell.z !== "General") { try { return XLSX.SSF.format(cell.z, v); } catch {} } return String(Math.round(v * 1e10) / 1e10); }
+    return String(v);
+  };
+  const text = (k, cell) => !cell ? "" : (!cell.f && !S.edited.has(k) && cell.w != null) ? cell.w : (cell.f && cell.v === cell.v0 && cell.w != null) ? cell.w : fmt(cell, cell.v);
+  const load = (i) => {
+    const ws = wb.Sheets[wb.SheetNames[i]] || {};
+    const ref = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]) : { e: { r: 0, c: 0 } };
+    const rows = Math.min(ref.e.r + 1, MAXR), cols = Math.min(ref.e.c + 1, MAXC), cells = new Map();
+    for (const a in ws) {
+      if (a[0] === "!") continue;
+      const p = XLSX.utils.decode_cell(a); if (p.r >= rows || p.c >= cols) continue;
+      const c = ws[a], stub = c.t === "z"; // хоосон/утгагүй нүд
+      if (stub && !c.f) continue;
+      cells.set(p.r + "," + p.c, { v: stub ? null : c.v, v0: stub ? null : c.v, f: c.f, z: c.z, w: stub ? undefined : c.w });
+    }
+    S = { i, ws, rows, cols, cells, edited: new Set(), merges: ws["!merges"] || [], cut: ref.e.r + 1 > MAXR || ref.e.c + 1 > MAXC };
+    recalc(); render(); select("0,0");
+    $("[data-xs-reset]", el).hidden = true;
+  };
+  const render = () => {
+    const covered = new Set(), span = new Map();
+    for (const m of S.merges) {
+      if (m.s.r >= S.rows || m.s.c >= S.cols) continue;
+      const er = Math.min(m.e.r, S.rows - 1), ec = Math.min(m.e.c, S.cols - 1);
+      span.set(m.s.r + "," + m.s.c, [er - m.s.r + 1, ec - m.s.c + 1]);
+      for (let r = m.s.r; r <= er; r++) for (let c = m.s.c; c <= ec; c++) if (r !== m.s.r || c !== m.s.c) covered.add(r + "," + c);
+    }
+    const cw = (c) => { const x = (S.ws["!cols"] || [])[c]; return Math.max(40, Math.min(420, Math.round(x?.wpx || (x?.wch ? x.wch * 7.5 + 12 : 92)))); };
+    let h = `<table class="xs-t"><colgroup><col style="width:46px">${Array.from({ length: S.cols }, (_, c) => `<col style="width:${cw(c)}px">`).join("")}</colgroup>
+      <thead><tr><th class="xs-corner"></th>${Array.from({ length: S.cols }, (_, c) => `<th>${colName(c)}</th>`).join("")}</tr></thead><tbody>`;
+    for (let r = 0; r < S.rows; r++) {
+      h += `<tr><th>${r + 1}</th>`;
+      for (let c = 0; c < S.cols; c++) {
+        const k = r + "," + c; if (covered.has(k)) continue;
+        const cell = S.cells.get(k), sp = span.get(k);
+        h += `<td data-k="${k}"${sp ? ` rowspan="${sp[0]}" colspan="${sp[1]}"` : ""} class="${typeof cell?.v === "number" ? "n" : ""}${cell?.f ? " f" : ""}">${esc(text(k, cell))}</td>`;
+      }
+      h += "</tr>";
+    }
+    grid.innerHTML = h + "</tbody></table>";
+    $$(".xs-tabs button", body).forEach((b) => b.setAttribute("aria-selected", String(+b.dataset.sheet === S.i)));
+    $(".xs-note", body).textContent = S.cut ? `Эхний ${S.rows} мөр, ${S.cols} баганыг харууллаа` : parser ? "Нүдийг давхар дарж утгыг өөрчилбөл томьёо шууд бодогдоно (хадгалагдахгүй)" : "";
+  };
+  const refresh = () => {
+    for (const td of $$("td[data-k]", grid)) {
+      const k = td.dataset.k, cell = S.cells.get(k);
+      if (cell?.f || S.edited.has(k)) { td.textContent = text(k, cell); td.classList.toggle("e", S.edited.has(k)); td.classList.toggle("n", typeof cell?.v === "number"); }
+    }
+    select(sel);
+  };
+  const select = (k) => {
+    const td = grid.querySelector(`td[data-k="${k}"]`); if (!td) return;
+    $(".xs-sel", grid)?.classList.remove("xs-sel"); td.classList.add("xs-sel"); sel = k;
+    const [r, c] = k.split(",").map(Number), cell = S.cells.get(k);
+    $(".xs-ref", body).textContent = colName(c) + (r + 1);
+    $(".xs-f", body).textContent = cell?.f ? "=" + cell.f : text(k, cell);
+  };
+  const edit = (td) => {
+    const k = td.dataset.k, cell = S.cells.get(k);
+    if (!parser) return;
+    if (cell?.f) return toast("Томьёотой нүд — оролтын нүдний утгыг өөрчилж туршина уу");
+    const inp = document.createElement("input"); inp.className = "xs-in"; inp.value = cell?.v ?? "";
+    td.textContent = ""; td.append(inp); inp.focus(); inp.select();
+    let done = false;
+    const finish = (save) => {
+      if (done) return; done = true;
+      if (save) {
+        const t = inp.value.trim(), num = t !== "" && isFinite(+t.replace(",", ".")) ? +t.replace(",", ".") : null;
+        let c2 = S.cells.get(k); if (!c2) { c2 = { v: null, v0: null }; S.cells.set(k, c2); }
+        c2.v = num ?? (t === "" ? null : t); S.edited.add(k); recalc();
+        $("[data-xs-reset]", el).hidden = false;
+      }
+      inp.remove(); refresh();
+    };
+    inp.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") finish(true); else if (e.key === "Escape") finish(false); });
+    inp.addEventListener("blur", () => finish(true));
+  };
+  grid.addEventListener("click", (e) => { const td = e.target.closest("td[data-k]"); if (td && !e.target.closest("input")) select(td.dataset.k); });
+  grid.addEventListener("dblclick", (e) => { const td = e.target.closest("td[data-k]"); if (td && !e.target.closest("input")) edit(td); });
+  body.addEventListener("click", (e) => { const t = e.target.closest("[data-sheet]"); if (t) load(+t.dataset.sheet); });
+  el.addEventListener("click", (e) => { if (e.target.closest("[data-xs-reset]")) load(S.i); });
+  load(0);
+  return {
+    key(e) {
+      const [r, c] = sel.split(",").map(Number), mv = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];
+      if (mv) { e.preventDefault(); const k = Math.max(0, Math.min(S.rows - 1, r + mv[0])) + "," + Math.max(0, Math.min(S.cols - 1, c + mv[1])); select(k); grid.querySelector(`td[data-k="${k}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+      else if (e.key === "Enter" || e.key === "F2") { e.preventDefault(); const td = grid.querySelector(`td[data-k="${sel}"]`); if (td) edit(td); }
+    },
+  };
+}
 
 /* ---------- Номын уншигч: хамгаалагдсан хуудсууд, 3D эргэлт, томруулах ----------
    Хуудас бүрийг серверээс (эрх шалгаж, уншигчийн тэмдэгтэйгээр) нэг нэгээр нь авна. Төлөөгүй бол зөвхөн
@@ -2841,5 +3237,10 @@ if (page === "profile" || page === "course") chatWidget();
 if (page === "course") coursePage();
 if (page === "login") loginPage();
 if (page === "home") findCourses();
+// Үзэлт: хуудас нээгдэхэд хөтөч мэдээлнэ (нэвтэрсэн бол токентой) — багш өөрийнхийгөө үзвэл сервер тоолохгүй.
+{
+  const v = page === "profile" ? ["profile", $("main.pf")?.dataset.teacher] : page === "course" ? ["course", $("main.course-page")?.dataset.course] : null;
+  if (v?.[1]) api("/api/views", { method: "POST", body: { kind: v[0], id: v[1] } }).catch(() => {});
+}
 if (page === "book") bookPage();
 })();

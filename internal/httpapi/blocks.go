@@ -13,14 +13,23 @@ import (
 // Сануулгын хязгаар хэтэрсэн (auto_block) суралцагч тэр хичээл рүү дахин орж чадахгүй:
 // багш "хоригийг цуцлах" (teacher_unblock) хүртэл, эсвэл сургалтын тохиргооны BlockHours өнгөрөх хүртэл.
 
-const defaultMaxWarnings = 3
+const (
+	defaultMaxWarnings  = 3
+	defaultBlockMinutes = 30 // анхны тохиргоо: хаагдсан хичээл 30 минутын дараа автоматаар нээгдэнэ
+	blockManual         = -1 // багш "Дахин нээх" дарах хүртэл хаалттай
+)
 
-// blockMinutes — хориг хэдэн минутын дараа автоматаар нээгдэх (0 = багш нээтэл).
+// blockMinutes — хориг хэдэн минутын дараа автоматаар нээгдэх (0 = багш нээтэл). Багш сонгоогүй бол 30 минут.
 func blockMinutes(c *store.Course) int {
-	if c.BlockMinutes > 0 {
+	switch {
+	case c.BlockMinutes == blockManual:
+		return 0
+	case c.BlockMinutes > 0:
 		return c.BlockMinutes
+	case c.BlockHours > 0:
+		return c.BlockHours * 60
 	}
-	return c.BlockHours * 60
+	return defaultBlockMinutes
 }
 
 func maxWarnings(c *store.Course) int {

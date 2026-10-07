@@ -27,7 +27,7 @@ type courseInput struct {
 	Certificate   bool   `json:"certificate"`     // сертификат олгоно
 	MaxWarnings   int    `json:"max_warnings"`    // таб солих сануулгын тоо (1-20, 0 = 3)
 	BlockHours    int    `json:"block_hours"`     // (хуучин) хориг, цаг
-	BlockMinutes  int    `json:"block_minutes"`   // хэтэрвэл хэдэн минутын дараа автоматаар нээгдэх (0 = багш нээтэл)
+	BlockMinutes  int    `json:"block_minutes"`   // хэтэрвэл хэдэн минутын дараа автоматаар нээгдэх (0 = анхдагч 30 мин, -1 = багш нээтэл)
 }
 
 func (in *courseInput) validate() string {
@@ -46,8 +46,8 @@ func (in *courseInput) validate() string {
 	if in.BlockHours < 0 || in.BlockHours > 24*30 {
 		return "хоригийн хугацаа 0-720 цаг"
 	}
-	if in.BlockMinutes < 0 || in.BlockMinutes > 60*24*30 {
-		return "хоригийн хугацаа 0-43200 минут"
+	if in.BlockMinutes < blockManual || in.BlockMinutes > 60*24*30 {
+		return "хоригийн хугацаа 0-43200 минут (−1 = багш нээх хүртэл)"
 	}
 	if in.BlockMinutes == 0 && in.BlockHours > 0 { // хуучин талбараар ирвэл минут руу хөрвүүлнэ
 		in.BlockMinutes = in.BlockHours * 60
@@ -699,7 +699,9 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 		for _, l := range pc.Data.Lessons {
 			if l.ID == lid {
 				if l.IsFree {
-					s.trackView(r, pc.Data.Course.TeacherID, NotifLessonView, l.ID, l.Title, "/c/"+cid)
+					if p, ok := s.principal(r); !ok || p.IsGuest() || p.UID != pc.Data.Course.TeacherID { // багш өөрийн хичээлээ үзвэл тоолохгүй
+						s.trackView(r, pc.Data.Course.TeacherID, NotifLessonView, l.ID, l.Title, "/c/"+cid)
+					}
 					if p, ok := s.principal(r); ok && !p.IsGuest() { // нэвтэрсэн бол явцад тэмдэглэнэ (дараалалд хэрэгтэй)
 						if co, err := s.store.CourseByID(r.Context(), cid); err == nil {
 							if b := s.lessonBlocked(r.Context(), p.UID, co, l.ID); b != nil {
