@@ -149,6 +149,12 @@ func sanitize(original string) (base, ext string, err error) {
 // quota нь тухайн багшийн (төлбөрөөс хамаарсан) нийт багтаамж.
 // Зураг бол урт талыг MaxImageSide хүртэл багасгана.
 func (s *Store) Save(teacherID, visibility, originalName string, r io.Reader, quota int64) (*Info, error) {
+	return s.SaveOpts(teacherID, visibility, originalName, r, quota, false)
+}
+
+// SaveOpts — officePDF=true бол Word/PowerPoint-ийг заавал PDF болгоно (ном). Үгүй бол .pptx/.docx эх
+// хэвээр (хичээл дотор шууд харагдана), зөвхөн хуучин формат (.ppt/.doc …) PDF болно.
+func (s *Store) SaveOpts(teacherID, visibility, originalName string, r io.Reader, quota int64, officePDF bool) (*Info, error) {
 	if visibility != Public && visibility != Private {
 		return nil, ErrBadVisibility
 	}
@@ -204,7 +210,7 @@ func (s *Store) Save(teacherID, visibility, originalName string, r io.Reader, qu
 	name := hex.EncodeToString(rnd[:]) + "__" + base + ext
 
 	// Видео → WebM, Office → PDF: ард хөрвүүлнэ. Хариунд эцсийн замыг шууд өгнө.
-	if target := s.tc.targetExt(ext); target != "" {
+	if target := s.tc.targetExt(ext, officePDF); target != "" {
 		final := hex.EncodeToString(rnd[:]) + "__" + base + target
 		src := filepath.Join(vdir, processingPrefix+name)
 		if err := os.Rename(tmp.Name(), src); err != nil {

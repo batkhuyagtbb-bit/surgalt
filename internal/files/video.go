@@ -76,8 +76,8 @@ func (s *Store) Parts(path string) []string {
 	return out
 }
 
-// isOfficeExt: LibreOffice-оор PDF болгох баримтууд. Excel (.xls/.xlsx/.ods) хөрвүүлэхгүй — хичээл дотор
-// хүснэгт хэлбэрээр (томьёо бодогдоно) шууд харуулна.
+// isOfficeExt: LibreOffice-оор PDF болгож болох баримтууд. Excel (.xls/.xlsx/.ods) хөрвүүлэхгүй — хичээл
+// дотор хүснэгт хэлбэрээр (томьёо бодогдоно) шууд харуулна.
 func isOfficeExt(ext string) bool {
 	switch ext {
 	case ".doc", ".docx", ".ppt", ".pptx", ".odt", ".odp", ".rtf":
@@ -86,14 +86,25 @@ func isOfficeExt(ext string) bool {
 	return false
 }
 
-// targetExt нь хөрвүүлэлтийн дараах өргөтгөл ("" бол хөрвүүлэхгүй).
-func (t *Transcoder) targetExt(ext string) string {
+// isLegacyOfficeExt: хөтөч шууд харуулж чадахгүй хуучин формат — үргэлж PDF болгоно. Орчин үеийн .pptx/.docx
+// эх хэвээрээ үлдэж хичээл дотор слайд тоглуулагч (нисэж орж ирдэг), Word харагчаар харагдана.
+func isLegacyOfficeExt(ext string) bool {
+	switch ext {
+	case ".doc", ".ppt", ".odt", ".odp", ".rtf":
+		return true
+	}
+	return false
+}
+
+// targetExt нь хөрвүүлэлтийн дараах өргөтгөл ("" бол хөрвүүлэхгүй). officePDF: бүх Office-ийг PDF болгох
+// (жишээ нь ном оруулахад).
+func (t *Transcoder) targetExt(ext string, officePDF bool) string {
 	switch {
 	case t == nil:
 		return ""
 	case isVideoExt(ext) && t.ffmpeg != "":
 		return ".webm"
-	case isOfficeExt(ext) && t.soffice != "":
+	case t.soffice != "" && (isLegacyOfficeExt(ext) || (officePDF && isOfficeExt(ext))):
 		return ".pdf"
 	}
 	return ""

@@ -58,7 +58,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 			part.Close()
 			continue
 		}
-		info, err := s.files.Save(c.UID, visibility, part.FileName(), part, quota)
+		info, err := s.files.SaveOpts(c.UID, visibility, part.FileName(), part, quota, r.URL.Query().Get("convert") == "pdf")
 		part.Close()
 		if err != nil {
 			s.filesErr(w, err)

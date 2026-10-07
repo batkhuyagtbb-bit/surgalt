@@ -1123,7 +1123,7 @@ async function books() {
     else { // Word/PowerPoint: сервер PDF болгоно (LibreOffice)
       say("Word файлыг PDF болгож байна…", 10);
       const fd = new FormData(); fd.append("file", file);
-      let info = await api("/api/me/files?visibility=private", { method: "POST", body: fd });
+      let info = await api("/api/me/files?visibility=private&convert=pdf", { method: "POST", body: fd }); // ном: заавал PDF
       if (!/\.pdf$/i.test(info.path)) throw new Error("Сервер дээр LibreOffice суугаагүй тул Word файлыг хөрвүүлэх боломжгүй — PDF болгож оруулна уу");
       for (let i = 0; info.status === "processing" && i < 120; i++) {
         await new Promise((r) => setTimeout(r, 2000));

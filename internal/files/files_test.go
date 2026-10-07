@@ -147,3 +147,26 @@ func TestVideoParts(t *testing.T) {
 		t.Fatalf("бүх хэсэг устах ёстой: %v", left)
 	}
 }
+
+// Хөрвүүлэх дүрэм: хуучин Office (.ppt/.doc …) үргэлж PDF; .pptx/.docx эх хэвээр (хичээл дотор шууд
+// харагдана), ном оруулахад (officePDF) л PDF; Excel хэзээ ч хөрвүүлэхгүй (хүснэгт харагч).
+func TestOfficeConversionRules(t *testing.T) {
+	tc := &Transcoder{soffice: "/usr/bin/soffice"}
+	cases := []struct {
+		ext  string
+		book bool
+		want string
+	}{
+		{".ppt", false, ".pdf"}, {".doc", false, ".pdf"}, {".odp", false, ".pdf"},
+		{".pptx", false, ""}, {".docx", false, ""}, {".xlsx", false, ""},
+		{".pptx", true, ".pdf"}, {".docx", true, ".pdf"}, {".xlsx", true, ""},
+	}
+	for _, c := range cases {
+		if got := tc.targetExt(c.ext, c.book); got != c.want {
+			t.Fatalf("%s (ном=%v): %q, хүлээсэн %q", c.ext, c.book, got, c.want)
+		}
+	}
+	if (&Transcoder{}).targetExt(".ppt", false) != "" {
+		t.Fatal("LibreOffice байхгүй бол хөрвүүлэхгүй")
+	}
+}
