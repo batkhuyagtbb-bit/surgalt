@@ -99,14 +99,73 @@ func validateAssignment(a *store.Assignment) string {
 	if a == nil {
 		return ""
 	}
-	if a.MaxScore <= 0 {
-		a.MaxScore = 100
-	}
-	if a.MaxScore > 1000 {
-		return "даалгаврын дээд оноо 1-1000"
+	switch a.Grading {
+	case "", "score": // тоогоор
+		a.Grading, a.Rubric = "", nil
+		if a.MaxScore <= 0 {
+			a.MaxScore = 100
+		}
+		if a.MaxScore > 1000 {
+			return "даалгаврын дээд оноо 1-1000"
+		}
+	case "rubric": // рубрикаар: дээд оноо = шалгуур бүрийн хамгийн их онооны нийлбэр
+		if msg := validateRubric(a.Rubric); msg != "" {
+			return msg
+		}
+		if a.MaxScore = a.Rubric.Max(); a.MaxScore <= 0 {
+			return "рубрикийн нийт оноо 0-ээс их байх ёстой"
+		}
+	default:
+		return "үнэлэх арга буруу"
 	}
 	a.AllowFiles = false // хариу зөвхөн текст ба холбоосоор — файл илгээхгүй
 	return validateDue(&a.Due)
+}
+
+// validateRubric — 2-8 түвшин (багана), 1-20 шалгуур (мөр); нүд бүр 0-1000 оноо, 500 хүртэл тэмдэгтийн тайлбартай.
+func validateRubric(r *store.Rubric) string {
+	if r == nil || len(r.Levels) < 2 || len(r.Levels) > 8 {
+		return "рубрикт 2-8 түвшин (багана) байна"
+	}
+	if len(r.Criteria) == 0 || len(r.Criteria) > 20 {
+		return "рубрикт 1-20 шалгуур (мөр) байна"
+	}
+	for i := range r.Levels {
+		r.Levels[i] = strings.TrimSpace(r.Levels[i])
+		if n := utf8.RuneCountInString(r.Levels[i]); n == 0 || n > 60 {
+			return fmt.Sprintf("%d-р түвшний нэр 1-60 тэмдэгт", i+1)
+		}
+	}
+	seen := map[string]bool{}
+	for i := range r.Criteria {
+		c := &r.Criteria[i]
+		c.ID = fixBlockID(c.ID, seen)
+		seen[c.ID] = true
+		c.Name = strings.TrimSpace(c.Name)
+		if n := utf8.RuneCountInString(c.Name); n == 0 || n > 200 {
+			return fmt.Sprintf("%d-р шалгуурын нэр 1-200 тэмдэгт", i+1)
+		}
+		pts, desc := make([]int, len(r.Levels)), make([]string, len(r.Levels))
+		for j := range r.Levels {
+			if j < len(c.Points) {
+				pts[j] = c.Points[j]
+			}
+			if pts[j] < 0 || pts[j] > 1000 {
+				return fmt.Sprintf("«%s» шалгуурын оноо 0-1000", c.Name)
+			}
+			if j < len(c.Desc) {
+				desc[j] = strings.TrimSpace(c.Desc[j])
+			}
+			if utf8.RuneCountInString(desc[j]) > 500 {
+				return fmt.Sprintf("«%s» шалгуурын тайлбар 500 тэмдэгтээс хэтрэхгүй", c.Name)
+			}
+		}
+		c.Points, c.Desc = pts, desc
+	}
+	if r.Max() > 10000 {
+		return "рубрикийн нийт оноо 10000-аас хэтрэхгүй"
+	}
+	return ""
 }
 
 // passes — хоцролтын ба оролцооны төлбөрийг төлсөн эсэх (явцын тэмдгүүд).
@@ -199,6 +258,9 @@ func (s *Server) subView(sub *store.Submission) map[string]any {
 		"submitted_at": sub.SubmittedAt, "late": sub.Late, "feedback": sub.Feedback, "graded_at": sub.GradedAt}
 	if sub.Score != nil {
 		out["score"] = *sub.Score
+	}
+	if len(sub.Rubric) > 0 {
+		out["rubric"] = sub.Rubric
 	}
 	return out
 }
@@ -387,8 +449,9 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Score    int    `json:"score"`
-		Feedback string `json:"feedback"`
+		Score    int            `json:"score"`
+		Feedback string         `json:"feedback"`
+		Rubric   map[string]int `json:"rubric"` // рубрикаар: шалгуурын ID → сонгосон түвшний индекс
 	}
 	if !decode(w, r, &in) {
 		return
@@ -396,6 +459,18 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 	maxScore := 100
 	if l.Assignment != nil && l.Assignment.MaxScore > 0 {
 		maxScore = l.Assignment.MaxScore
+	}
+	var picks map[string]int
+	if a := l.Assignment; a != nil && a.Grading == "rubric" && a.Rubric != nil { // оноог сервер өөрөө бодно
+		picks, in.Score = map[string]int{}, 0
+		for _, cr := range a.Rubric.Criteria {
+			idx, ok := in.Rubric[cr.ID]
+			if !ok || idx < 0 || idx >= len(cr.Points) {
+				writeErr(w, http.StatusBadRequest, "«"+cr.Name+"» шалгуурын түвшинг сонгоно уу")
+				return
+			}
+			picks[cr.ID], in.Score = idx, in.Score+cr.Points[idx]
+		}
 	}
 	if in.Score < 0 || in.Score > maxScore {
 		writeErr(w, http.StatusBadRequest, fmt.Sprintf("оноо 0-%d", maxScore))
@@ -406,7 +481,7 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	uid := r.PathValue("uid")
-	if err := s.store.GradeSubmission(r.Context(), l.ID, uid, in.Score, strings.TrimSpace(in.Feedback)); s.storeErr(w, r, err) {
+	if err := s.store.GradeSubmission(r.Context(), l.ID, uid, in.Score, strings.TrimSpace(in.Feedback), picks); s.storeErr(w, r, err) {
 		return
 	}
 	s.notify(r.Context(), &store.Notification{UserID: uid, Type: "grade", Title: fmt.Sprintf("✅ Даалгавар дүгнэгдлээ: %d/%d", in.Score, maxScore),

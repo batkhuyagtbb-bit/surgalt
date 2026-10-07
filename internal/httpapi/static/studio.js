@@ -386,7 +386,54 @@ function beMediaPreview(b) {
 }
 
 // Нэг маягт дээр засварлагчийг холбоно. f._be.collect() → блокууд.
+// Рубрик засварлагч: түвшин (багана) ба шалгуур (мөр)-ийг динамикаар нэмж/хасна; нүд бүрт тайлбар, оноо.
+function mountRubricEditor(box, init) {
+  const rid = () => Math.random().toString(36).slice(2, 10).padEnd(6, "0");
+  const st = init?.levels?.length >= 2 ? JSON.parse(JSON.stringify(init))
+    : { levels: ["Маш сайн", "Сайн", "Дунд", "Хангалтгүй"], criteria: [{ id: rid(), name: "Агуулга", points: [10, 7, 4, 1], desc: ["", "", "", ""] }, { id: rid(), name: "Бүтэц, хэлбэр", points: [5, 4, 2, 1], desc: ["", "", "", ""] }] };
+  st.criteria.forEach((c) => { c.points = st.levels.map((_, j) => +(c.points?.[j] ?? 0)); c.desc = st.levels.map((_, j) => c.desc?.[j] ?? ""); });
+  const top = (c) => Math.max(0, ...c.points.map((p) => +p || 0));
+  const total = () => st.criteria.reduce((a, c) => a + top(c), 0);
+  const draw = () => {
+    box.innerHTML = `<div class="rb-wrap"><table class="rb-ed">
+      <thead><tr><th class="rb-corner">Шалгуур <span>↓</span> · Түвшин <span>→</span></th>${st.levels.map((lv, j) => `<th><div class="rb-lv"><input data-lv="${j}" value="${esc(lv)}" maxlength="60" placeholder="Түвшний нэр" aria-label="${j + 1}-р түвшний нэр">${st.levels.length > 2 ? `<button type="button" class="icon-btn rb-x" data-del-lv="${j}" title="Энэ түвшинг (баганыг) хасах" aria-label="Түвшин хасах">${ico("x", 13)}</button>` : ""}</div></th>`).join("")}
+        ${st.levels.length < 8 ? `<th class="rb-add-col"><button type="button" class="rb-add" data-add-lv title="Түвшин (багана) нэмэх">${ico("plus", 16)}<span>Багана</span></button></th>` : ""}</tr></thead>
+      <tbody>${st.criteria.map((c, i) => `<tr><th><div class="rb-cr"><textarea data-cn="${i}" rows="2" maxlength="200" placeholder="Шалгуур (жишээ нь: Агуулга)" aria-label="${i + 1}-р шалгуур">${esc(c.name)}</textarea>${st.criteria.length > 1 ? `<button type="button" class="icon-btn rb-x" data-del-cr="${i}" title="Энэ шалгуурыг (мөрийг) хасах" aria-label="Шалгуур хасах">${ico("x", 13)}</button>` : ""}</div><small class="rb-max" data-max="${i}">дээд ${top(c)} оноо</small></th>
+        ${st.levels.map((_, j) => `<td><textarea data-cd="${i}:${j}" rows="2" maxlength="500" placeholder="Тайлбар (заавал биш)" aria-label="${esc(c.name || "Шалгуур")} — ${esc(st.levels[j])} тайлбар">${esc(c.desc[j] || "")}</textarea><label class="rb-pts"><input type="number" data-cp="${i}:${j}" min="0" max="1000" value="${c.points[j]}" aria-label="оноо"><span>оноо</span></label></td>`).join("")}${st.levels.length < 8 ? "<td class=\"rb-add-col\"></td>" : ""}</tr>`).join("")}</tbody></table></div>
+      <div class="rb-foot">${st.criteria.length < 20 ? `<button type="button" class="btn btn-glass btn-sm" data-add-cr>${ico("plus", 15)}Шалгуур (мөр) нэмэх</button>` : ""}<span class="rb-total">Нийт дээд оноо <b>${total()}</b></span></div>`;
+  };
+  box.addEventListener("input", (e) => {
+    const t = e.target, d = t.dataset;
+    if (d.lv != null) st.levels[+d.lv] = t.value;
+    else if (d.cn != null) st.criteria[+d.cn].name = t.value;
+    else if (d.cd) { const [i, j] = d.cd.split(":").map(Number); st.criteria[i].desc[j] = t.value; }
+    else if (d.cp) {
+      const [i, j] = d.cp.split(":").map(Number); st.criteria[i].points[j] = Math.max(0, Math.min(1000, +t.value || 0));
+      if (+t.value > 1000) t.value = 1000; else if (+t.value < 0) t.value = 0;
+      $(".rb-total b", box).textContent = total(); const m = $(`[data-max="${i}"]`, box); if (m) m.textContent = `дээд ${top(st.criteria[i])} оноо`;
+    }
+  });
+  box.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || !box.contains(b)) return;
+    if (b.dataset.addLv != null) { st.levels.push(`${st.levels.length + 1}-р түвшин`); st.criteria.forEach((c) => { c.points.push(0); c.desc.push(""); }); draw(); $(`[data-lv="${st.levels.length - 1}"]`, box)?.select(); }
+    else if (b.dataset.delLv != null) { const j = +b.dataset.delLv; st.levels.splice(j, 1); st.criteria.forEach((c) => { c.points.splice(j, 1); c.desc.splice(j, 1); }); draw(); }
+    else if (b.dataset.addCr != null) { st.criteria.push({ id: rid(), name: "", points: st.criteria[0] ? [...st.criteria[0].points] : st.levels.map(() => 0), desc: st.levels.map(() => "") }); draw(); $(`[data-cn="${st.criteria.length - 1}"]`, box)?.focus(); }
+    else if (b.dataset.delCr != null) { st.criteria.splice(+b.dataset.delCr, 1); draw(); }
+  });
+  draw();
+  return {
+    value: () => ({ levels: st.levels.map((x) => x.trim()), criteria: st.criteria.map((c) => ({ id: c.id, name: c.name.trim(), points: c.points.map((p) => +p || 0), desc: c.desc.map((x) => x.trim()) })) }),
+    check() {
+      if (st.levels.some((x) => !x.trim())) throw new Error("Рубрикийн түвшин (багана) бүрт нэр өгнө үү");
+      if (st.criteria.some((c) => !c.name.trim())) throw new Error("Рубрикийн шалгуур (мөр) бүрт нэр өгнө үү");
+      if (!total()) throw new Error("Рубрикийн нийт оноо 0-ээс их байх ёстой");
+    },
+  };
+}
+
 function mountBlockEditor(f, blocks) {
+  const rb = f.querySelector?.(".gr-rubric");
+  if (rb) { let init = null; try { init = JSON.parse(rb.dataset.rubric || "null"); } catch {} f._rb = mountRubricEditor(rb, init); }
   const box = $(".be", f);
   box.innerHTML = `<div class="be-list">${blocks.map(beBlockHTML).join("")}</div>
     <div class="be-add"><span class="muted small">Нэмэх:</span>${Object.entries(BE).map(([t, [icn, label]]) => `<button type="button" class="btn btn-glass btn-sm" data-add="${t}">${ico(icn, 15)}${label}</button>`).join("")}</div>
@@ -673,7 +720,13 @@ async function courseEditor(id) {
         <div class="pe-checks"><label class="check"><input type="checkbox" name="ex_shuffle" ${l?.exam?.shuffle ? "checked" : ""}> Асуултыг холих</label>
           <label class="check"><input type="checkbox" name="ex_show" ${l?.exam ? (l.exam.show_answers ? "checked" : "") : "checked"}> Дууссаны дараа зөв хариултыг харуулах</label></div>
         <h5>Хугацаа ба төлбөр</h5>${dueHTML("ex", l?.exam?.due, "Шалгалтын")}`, "pe-exam", kind !== "exam")}
-      ${step(4, "Даалгаврын тохиргоо", `<div class="pe-grid pe-grid-3"><label>Дээд оноо<input name="asg_max" type="number" min="1" max="1000" value="${l?.assignment?.max_score || 100}"></label></div>
+      ${step(4, "Даалгаврын тохиргоо", `<h5>Үнэлэх арга</h5>
+        <div class="gr-modes" role="radiogroup" aria-label="Үнэлэх арга">
+          <label class="gr-mode ${l?.assignment?.grading === "rubric" ? "" : "on"}"><input type="radio" name="asg_grading" value="" ${l?.assignment?.grading === "rubric" ? "" : "checked"}><span class="gr-ic" aria-hidden="true">123</span><span><strong>Тоогоор</strong><small>0-ээс дээд оноо хүртэл нэг тоо өгнө</small></span></label>
+          <label class="gr-mode ${l?.assignment?.grading === "rubric" ? "on" : ""}"><input type="radio" name="asg_grading" value="rubric" ${l?.assignment?.grading === "rubric" ? "checked" : ""}><span class="gr-ic" aria-hidden="true">▦</span><span><strong>Рубрикаар</strong><small>Шалгуур × түвшин хүснэгт — оноо өөрөө бодогдоно</small></span></label>
+        </div>
+        <div class="pe-grid pe-grid-3 gr-score" ${l?.assignment?.grading === "rubric" ? "hidden" : ""}><label>Дээд оноо<input name="asg_max" type="number" min="1" max="1000" value="${l?.assignment?.max_score || 100}"></label></div>
+        <div class="gr-rubric" ${l?.assignment?.grading === "rubric" ? "" : "hidden"} data-rubric="${esc(JSON.stringify(l?.assignment?.rubric || null))}"></div>
         <h5>Хугацаа ба төлбөр</h5>${dueHTML("asg", l?.assignment?.due, "Даалгаврын")}
         <p class="muted small" style="margin:8px 0 0">Хариу: текст мэдээлэл ба холбоос (Google Docs, видео, GitHub г.м). Файл илгээхгүй.</p>`, "pe-asg", kind !== "assignment")}
       <details class="pe-step pe-more" ${l?.active_min || l?.format || l?.mode || c.drip ? "open" : ""}><summary><span class="pe-num" aria-hidden="true">${ico("gear", 14)}</span><span class="pe-step-body"><h4>Нэмэлт тохиргоо <small class="muted">хэлбэр, идэвхтэй хугацаа${c.drip ? ", хэзээ нээгдэх" : ""}</small></h4></span></summary>
@@ -840,13 +893,14 @@ async function courseEditor(id) {
     if (x.viewed) rows.push(["Дүгнэлт", x.refl ? "✍️ Бичсэн" : "Бичээгүй"]);
     if (x.tabs) rows.push(["Таб солилт", x.tabs + " удаа"]);
     if (x.exam) rows.push(["Шалгалт", `Шилдэг ${x.exam.best}% · ${x.exam.passed ? "✓ тэнцсэн" : "тэнцээгүй"} · ${x.exam.tries} оролдлого${x.exam.terminated ? ` · ⛔ ${x.exam.terminated} хаагдсан` : ""}`]);
-    if (x.asg) rows.push(["Даалгавар", `${x.asg.score != null ? `Дүн ${x.asg.score}/${x.asg.max}` : "Илгээсэн — дүгнээгүй"}${x.asg.late ? " · хоцорсон" : ""} · ${fmtDate(x.asg.at)}${x.asg.feedback ? ` · «${esc(x.asg.feedback)}»` : ""}`]);
+    if (x.asg) rows.push(["Даалгавар", `${x.asg.score != null ? `Дүн ${x.asg.score}/${x.asg.max}${l.rubric ? " · рубрикаар" : ""}` : "Илгээсэн — дүгнээгүй"}${x.asg.late ? " · хоцорсон" : ""} · ${fmtDate(x.asg.at)}${x.asg.feedback ? ` · «${esc(x.asg.feedback)}»` : ""}`]);
     if (x.last) rows.push(["Сүүлд", fmtDate(x.last)]);
     jrModal(`<span class="eyebrow">${String(l.position).padStart(2, "0")} · ${esc(l.title)}</span><h3 class="h3">${esc(s.name)}</h3>
       <dl class="jr-dl">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
       ${x.reasons?.length ? `<p class="muted small" style="margin:10px 0 0">Үндэслэл: ${x.reasons.map(esc).join(", ")}</p>` : ""}
+      ${l.rubric && x.asg?.rubric ? `<h4 class="jr-rb-h">Рубрикийн дүн</h4>${SG.rubricView(l.rubric, x.asg.rubric)}` : ""}
       ${l.kind === "assignment" && x.asg ? `<div class="hero-cta" style="margin:14px 0 0"><button class="btn btn-gold btn-sm" data-jr-grade="${esc(l.id)}">${ico("users", 15)}Дүгнэх</button></div>` : ""}
-      ${l.kind === "exam" && x.exam ? `<div class="hero-cta jr-reopen" style="margin:14px 0 0"><button class="btn btn-gold btn-sm" data-reopen-exam="${esc(l.id)}" data-reopen-user="${esc(uid)}">🔓 Шалгалтыг дахин нээх (+1 оролдлого)</button><span class="muted small">${x.exam.terminated ? "Хаагдсан шалгалтыг" : "Оролдлого дууссан ч"} дахин өгөх боломж олгоно — суралцагчид мэдэгдэл очно.</span></div>` : ""}`);
+      ${l.kind === "exam" && x.exam ? `<div class="hero-cta jr-reopen" style="margin:14px 0 0"><button class="btn btn-gold btn-sm" data-reopen-exam="${esc(l.id)}" data-reopen-user="${esc(uid)}">🔓 Шалгалтыг дахин нээх (+1 оролдлого)</button><span class="muted small">${x.exam.terminated ? "Хаагдсан шалгалтыг" : "Оролдлого дууссан ч"} дахин өгөх боломж олгоно — суралцагчид мэдэгдэл очно.</span></div>` : ""}`, l.rubric && x.asg?.rubric ? 900 : 640);
   };
   const jrStudentModal = (uid) => {
     const s = jr.students.find((x) => x.user_id === uid), row = jr.cells[uid] || {};
@@ -858,8 +912,8 @@ async function courseEditor(id) {
       <table class="tbl"><thead><tr><th>Хичээл</th><th>Төлөв</th><th>Оноо / дүн</th></tr></thead><tbody>${jr.lessons.map((l) => { const x = row[l.id], [t, k] = jrCell(l, x);
         return `<tr><td>${String(l.position).padStart(2, "0")} · ${esc(l.title)}</td><td>${!x ? `<span class="muted">Үзээгүй</span>` : x.disq ? "⛔ Хуулах оролдлого" : x.done || x.exam?.passed ? "✓ Дууссан" : x.asg ? "Илгээсэн" : "Үзэж байна"}</td><td><span class="jr-c ${k}">${t || "—"}</span></td></tr>`; }).join("")}</tbody></table>`);
   };
-  const jrModal = (html) => {
-    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="jrModal"><div class="modal-card" style="width:min(640px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}</div></div>`);
+  const jrModal = (html, w = 640) => {
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="jrModal"><div class="modal-card" style="width:min(${w}px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}</div></div>`);
     const m = $("#jrModal"); SG.openModal(m);
     m.addEventListener("click", (e) => {
       const g = e.target.closest("[data-jr-grade]"); if (g) { SG.closeModal(m); setTimeout(() => m.remove(), 300); return gradeModal(g.dataset.jrGrade); }
@@ -878,20 +932,35 @@ async function courseEditor(id) {
   // Даалгаврын хариунууд: багш оноо, тайлбар өгнө.
   const gradeModal = async (lid) => {
     const d = await api(`/api/courses/${c.id}/lessons/${lid}/submissions`);
-    const max = d.assignment?.max_score || 100;
+    const max = d.assignment?.max_score || 100, rub = d.assignment?.grading === "rubric" && d.assignment.rubric;
+    // Рубрикаар: мөр бүрээс нэг нүд сонгоно — нийт оноо шууд бодогдоно.
+    const rbForm = (s) => `<form class="sub-grade sub-grade-rb"><div class="rb-wrap"><table class="rb-grade"><thead><tr><th>Шалгуур</th>${rub.levels.map((lv) => `<th>${esc(lv)}</th>`).join("")}</tr></thead>
+      <tbody>${rub.criteria.map((cr) => `<tr><th>${esc(cr.name)}</th>${rub.levels.map((_, j) => `<td><label class="rb-cell ${s.rubric?.[cr.id] === j ? "on" : ""}"><input type="radio" name="rb_${esc(cr.id)}" value="${j}" ${s.rubric?.[cr.id] === j ? "checked" : ""} required><b>${cr.points[j]} оноо</b>${cr.desc[j] ? `<small>${esc(cr.desc[j])}</small>` : ""}</label></td>`).join("")}</tr>`).join("")}</tbody></table></div>
+      <div class="rb-grade-foot"><span class="rb-total">Нийт <b>${s.score ?? 0}</b>/${max}</span><label class="grow">Тайлбар<input name="feedback" maxlength="5000" value="${esc(s.feedback || "")}" placeholder="Юу сайн, юуг сайжруулах вэ?"></label><button class="btn btn-gold btn-sm">${s.graded_at ? "Шинэчлэх" : "Дүгнэх"}</button></div></form>`;
     const row = (s) => `<article class="sub-item" data-uid="${esc(s.user_id)}"><header><b>${esc(s.user_name)}</b><small class="muted">${fmtDate(s.submitted_at)}${s.late ? ` · <span class="an-bad">хоцорсон</span>` : ""}</small></header>
       ${s.text ? `<p class="sub-text">${SG.linkify(s.text)}</p>` : ""}${s.links?.length ? `<p class="sub-files">${s.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 70))}</a>`).join("<br>")}</p>` : ""}${s.files?.length ? `<p class="sub-files">${s.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`).join(" ")}</p>` : ""}
-      <form class="sub-grade"><label>Оноо (0-${max})<input name="score" type="number" min="0" max="${max}" value="${s.score ?? ""}" required></label><label class="grow">Тайлбар<input name="feedback" maxlength="5000" value="${esc(s.feedback || "")}" placeholder="Юу сайн, юуг сайжруулах вэ?"></label><button class="btn btn-gold btn-sm">${s.graded_at ? "Шинэчлэх" : "Дүгнэх"}</button>${s.graded_at ? `<small class="muted">✓ ${fmtDate(s.graded_at)}</small>` : ""}</form></article>`;
+      ${rub ? rbForm(s) : `<form class="sub-grade"><label>Оноо (0-${max})<input name="score" type="number" min="0" max="${max}" value="${s.score ?? ""}" required></label><label class="grow">Тайлбар<input name="feedback" maxlength="5000" value="${esc(s.feedback || "")}" placeholder="Юу сайн, юуг сайжруулах вэ?"></label><button class="btn btn-gold btn-sm">${s.graded_at ? "Шинэчлэх" : "Дүгнэх"}</button>${s.graded_at ? `<small class="muted">✓ ${fmtDate(s.graded_at)}</small>` : ""}</form>`}</article>`;
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="gradeModal"><div class="modal-card" style="width:min(820px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
       <h3 class="h3">${esc(d.lesson)} — хариунууд (${d.submissions.length})</h3>${d.assignment?.due?.at || d.assignment?.due?.start_at ? `<p class="muted small">${d.assignment.due.start_at ? `Эхлэх: ${fmtDate(d.assignment.due.start_at)} · ` : ""}${d.assignment.due.at ? `Дуусах: ${fmtDate(d.assignment.due.at)} · хоцорвол ${d.assignment.due.late === "paid" ? money(d.assignment.due.late_fee) : d.assignment.due.late === "closed" ? "хаалттай" : "төлбөргүй"}` : ""}${d.assignment.due.fee ? ` · оролцооны төлбөр ${money(d.assignment.due.fee)}` : ""}</p>` : ""}
       <div class="sub-list">${d.submissions.map(row).join("") || `<p class="muted">Хариу ирээгүй байна.</p>`}</div></div></div>`);
     const m = $("#gradeModal"); SG.openModal(m);
     m.addEventListener("click", (e) => { if (e.target === m || e.target.closest("[data-close]")) { SG.closeModal(m); setTimeout(() => m.remove(), 300); } });
+    m.addEventListener("change", (e) => { // рубрик: сонгосон нүд тодорч, нийт оноо шууд бодогдоно
+      const r = e.target.closest(".rb-cell input"); if (!r || !rub) return;
+      const f = r.closest("form");
+      $$(`input[name="${CSS.escape(r.name)}"]`, f).forEach((x) => x.closest(".rb-cell").classList.toggle("on", x.checked));
+      $(".rb-total b", f).textContent = rub.criteria.reduce((a, cr) => { const v = f.querySelector(`input[name="rb_${CSS.escape(cr.id)}"]:checked`); return a + (v ? cr.points[+v.value] : 0); }, 0);
+    });
     m.addEventListener("submit", async (e) => {
       const f = e.target.closest(".sub-grade"); if (!f) return; e.preventDefault();
       const uid = f.closest("[data-uid]").dataset.uid, b = $("button", f); b.disabled = true;
-      try { await api(`/api/courses/${c.id}/lessons/${lid}/submissions/${uid}`, { method: "PUT", body: { score: +f.score.value, feedback: f.feedback.value } }); toast("Дүгнэлээ ✓ — суралцагчид мэдэгдлээ"); b.textContent = "Шинэчлэх"; }
-      catch (err) { toast(err.message, true); } finally { b.disabled = false; }
+      const body = rub ? { feedback: f.feedback.value, rubric: Object.fromEntries(rub.criteria.map((cr) => [cr.id, +(f.querySelector(`input[name="rb_${CSS.escape(cr.id)}"]:checked`)?.value ?? -1)])) }
+        : { score: +f.score.value, feedback: f.feedback.value };
+      try {
+        const r = await api(`/api/courses/${c.id}/lessons/${lid}/submissions/${uid}`, { method: "PUT", body });
+        toast(`Дүгнэлээ ✓ ${r.score}/${max} — суралцагч ба журналд орлоо`); b.textContent = "Шинэчлэх";
+        if ($("#journal")) loadJournal(); // журнал автоматаар шинэчлэгдэнэ
+      } catch (err) { toast(err.message, true); } finally { b.disabled = false; }
     });
   };
   const saveCourse = async (body) => { c = { ...c, ...(await api(`/api/courses/${c.id}`, { method: "PUT", body })) }; searchCourses = null; };
@@ -901,7 +970,9 @@ async function courseEditor(id) {
     const kind = f.kind.value;
     const due = (pfx) => { const iso = (v) => (v ? new Date(v).toISOString() : null), late = f[pfx + "_late"].value; return { start_at: iso(f[pfx + "_start"].value), at: iso(f[pfx + "_due"].value), late, late_fee: late === "paid" ? +f[pfx + "_fee"].value || 0 : 0, fee: +f[pfx + "_entry"].value || 0 }; };
     const exam = kind === "exam" ? { time_min: +f.ex_time.value || 0, attempts: +f.ex_attempts.value || 0, pass_pct: +f.ex_pass.value || 0, shuffle: f.ex_shuffle.checked, show_answers: f.ex_show.checked, due: due("ex") } : null;
-    const assignment = kind === "assignment" ? { due: due("asg"), max_score: +f.asg_max.value || 100, allow_files: false } : null;
+    const grading = kind === "assignment" && f.asg_grading?.value === "rubric" ? "rubric" : "";
+    if (grading) f._rb?.check();
+    const assignment = kind === "assignment" ? { due: due("asg"), max_score: +f.asg_max.value || 100, allow_files: false, grading, rubric: grading ? f._rb?.value() : null } : null;
     if (exam && !blocks.some((b) => b.type === "quiz")) throw new Error("Шалгалтад дор хаяж нэг асуулт нэмнэ үү");
     for (const d of [exam?.due, assignment?.due]) {
       if (d?.late === "paid" && !d.late_fee) throw new Error("Хоцролтын төлбөрийг оруулна уу");
@@ -1111,6 +1182,7 @@ async function courseEditor(id) {
       f.title.placeholder = T.title; $("[data-content-title]", f).textContent = T.content; $("[data-content-hint]", f).textContent = T.hint;
       if (!f.dataset.edit) $(".pe-foot .btn-gold", f).textContent = k === "exam" ? "Шалгалт нийтлэх" : k === "assignment" ? "Даалгавар нийтлэх" : "Хичээл нийтлэх";
     }
+    if (e.target.name === "asg_grading") { const rub = e.target.value === "rubric"; $$(".gr-mode", f).forEach((x) => x.classList.toggle("on", x.contains(e.target))); $(".gr-score", f).hidden = rub; $(".gr-rubric", f).hidden = !rub; }
     if (e.target.name === "unlock_rule") { $$(".ur", f).forEach((x) => x.classList.toggle("on", x.contains(e.target))); const tm = $(".ur-time", f); if (tm) tm.hidden = !["view", "complete", ""].includes(e.target.value); }
     if (/_late$/.test(e.target.name)) { const fee = e.target.closest(".pe-grid")?.querySelector(".pe-fee"); if (fee) fee.hidden = e.target.value !== "paid"; }
     if (e.target.name === "section_pick") { const isNew = f.section_pick.value === "__new"; f.section_new.hidden = !isNew; f.section_new.required = isNew; if (isNew) f.section_new.focus(); }

@@ -21,6 +21,8 @@ type JournalLesson struct {
 	Kind     string `json:"kind"` // lesson | exam | assignment
 	Hidden   bool   `json:"hidden,omitempty"`
 	IsFree   bool   `json:"is_free,omitempty"`
+	// Rubric — рубрикаар үнэлдэг даалгаврын хүснэгт (журналд шалгуур бүрийн дүнг харуулахад).
+	Rubric *store.Rubric `json:"rubric,omitempty"`
 }
 
 type JournalExam struct {
@@ -31,11 +33,12 @@ type JournalExam struct {
 }
 
 type JournalAsg struct {
-	Score    *int      `json:"score,omitempty"`
-	Max      int       `json:"max"`
-	Late     bool      `json:"late,omitempty"`
-	At       time.Time `json:"at"`
-	Feedback string    `json:"feedback,omitempty"`
+	Score    *int           `json:"score,omitempty"`
+	Max      int            `json:"max"`
+	Late     bool           `json:"late,omitempty"`
+	At       time.Time      `json:"at"`
+	Feedback string         `json:"feedback,omitempty"`
+	Rubric   map[string]int `json:"rubric,omitempty"` // шалгуур бүрээс сонгосон түвшин
 }
 
 type JournalCell struct {
@@ -160,11 +163,14 @@ func (s *Server) handleCourseJournal(w http.ResponseWriter, r *http.Request) {
 			if subs, err := s.store.Submissions(ctx, l.ID); err == nil {
 				for _, sb := range subs {
 					users[sb.UserID] = true
-					cell(sb.UserID, l.ID).Asg = &JournalAsg{Score: sb.Score, Max: l.Assignment.MaxScore, Late: sb.Late, At: sb.SubmittedAt, Feedback: sb.Feedback}
+					cell(sb.UserID, l.ID).Asg = &JournalAsg{Score: sb.Score, Max: l.Assignment.MaxScore, Late: sb.Late, At: sb.SubmittedAt, Feedback: sb.Feedback, Rubric: sb.Rubric}
 				}
 			}
 		}
 		jl[i] = JournalLesson{ID: l.ID, Title: l.Title, Position: l.Position, Section: l.Section, Kind: kind, Hidden: l.Hidden, IsFree: l.IsFree}
+		if l.Assignment != nil && l.Assignment.Grading == "rubric" {
+			jl[i].Rubric = l.Assignment.Rubric
+		}
 	}
 	delete(users, course.TeacherID)
 	delete(users, "")

@@ -161,6 +161,7 @@ var chMigrations = []string{
 	"ALTER TABLE meetings ADD COLUMN IF NOT EXISTS price Int64 DEFAULT 0",
 	"ALTER TABLE meetings ADD COLUMN IF NOT EXISTS members_free Bool DEFAULT false",
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS meeting_id String DEFAULT ''",
+	"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS rubric String DEFAULT ''",
 }
 
 var chTables = []chTable{
@@ -209,7 +210,7 @@ var chTables = []chTable{
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (target, target_id, user_id)`},
 	{"submissions", `(id String, user_id String, user_name String, course_id String, lesson_id String, teacher_id String,
 		text String, files Array(String), submitted_at ` + tsType + `, late Bool, score Nullable(Int32), feedback String,
-		graded_at Nullable(` + tsType + `), ver UInt64, links Array(String))
+		graded_at Nullable(` + tsType + `), ver UInt64, links Array(String), rubric String DEFAULT '')
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (lesson_id, user_id)`},
 	{"lesson_progress", `(user_id String, course_id String, lesson_id String, viewed_at ` + tsType + `,
 		completed_at Nullable(` + tsType + `), quiz Map(String, Bool), quiz_done_at Nullable(` + tsType + `), ver UInt64)

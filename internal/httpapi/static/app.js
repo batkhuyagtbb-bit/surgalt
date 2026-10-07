@@ -1163,6 +1163,18 @@ function bindLatePay(card, base, label, after) {
 }
 
 // Даалгавар: нөхцөл (блокууд дээр), хугацаа, хариу илгээх (текст + файл), багшийн дүн.
+// Рубрикийн хүснэгт (харах): сонгосон нүд тодорч, мөр бүрийн оноо ба нийт гарна (суралцагч, журнал, үнэлэх цонх).
+function rubricViewHTML(r, picks) {
+  if (!r?.levels?.length || !r.criteria?.length) return "";
+  const top = (c) => Math.max(0, ...c.points);
+  const max = r.criteria.reduce((a, c) => a + top(c), 0);
+  const got = picks ? r.criteria.reduce((a, c) => a + (picks[c.id] != null ? c.points[picks[c.id]] || 0 : 0), 0) : 0;
+  return `<div class="rb-wrap"><table class="rb-view ${picks ? "graded" : ""}">
+    <thead><tr><th>Шалгуур</th>${r.levels.map((lv) => `<th>${esc(lv)}</th>`).join("")}${picks ? "<th>Авсан</th>" : ""}</tr></thead>
+    <tbody>${r.criteria.map((c) => { const pk = picks?.[c.id]; return `<tr><th>${esc(c.name)}</th>${r.levels.map((_, j) => `<td class="${pk === j ? "on" : ""}"><b>${c.points[j]} оноо</b>${c.desc[j] ? `<small>${esc(c.desc[j])}</small>` : ""}</td>`).join("")}${picks ? `<td class="rb-got"><b>${pk != null ? c.points[pk] : "—"}</b><small>/${top(c)}</small></td>` : ""}</tr>`; }).join("")}</tbody>
+    ${picks ? `<tfoot><tr><th colspan="${r.levels.length + 1}">Нийт дүн</th><td class="rb-got"><b>${got}</b><small>/${max}</small></td></tr></tfoot>` : ""}</table></div>`;
+}
+
 async function assignmentCard(box, { courseId, lessonId }) {
   const base = `/api/courses/${courseId}/lessons/${lessonId}`;
   const card = document.createElement("section"); card.className = "exam-card asg-card"; box.append(card);
@@ -1172,15 +1184,20 @@ async function assignmentCard(box, { courseId, lessonId }) {
     try { info = await api(`${base}/assignment`); } catch (e) { card.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
     const a = info.assignment, due = info.due || { open: true }, sub = info.submission;
     card.innerHTML = `<h3>${icon("clip", 20)} Даалгавар</h3>
-      <ul class="exam-facts">${due.start_at ? `<li>▶ Эхлэх: <b>${fmtDate(due.start_at)}</b></li>` : ""}${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : "<li>📅 Хугацаагүй</li>"}<li>🎯 Дээд оноо: <b>${a.max_score || 100}</b></li>${due.entry_fee ? `<li>💳 Төлбөр: <b>${money(due.entry_fee)}</b>${due.paid ? " ✓" : ""}</li>` : ""}<li>✍️ Хариу: текст ба холбоос</li></ul>
+      <ul class="exam-facts">${due.start_at ? `<li>▶ Эхлэх: <b>${fmtDate(due.start_at)}</b></li>` : ""}${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : "<li>📅 Хугацаагүй</li>"}<li>🎯 ${a.grading === "rubric" ? `Рубрикаар · <b>${a.max_score}</b> оноо` : `Дээд оноо: <b>${a.max_score || 100}</b>`}</li>${due.entry_fee ? `<li>💳 Төлбөр: <b>${money(due.entry_fee)}</b>${due.paid ? " ✓" : ""}</li>` : ""}<li>✍️ Хариу: текст ба холбоос</li></ul>
       ${dueNotice(due)}
       ${sub ? `<div class="sub-mine"><b>Таны хариу</b> <small class="muted">${fmtDate(sub.submitted_at)}${sub.late ? " · хоцорсон" : ""}</small>${sub.text ? `<p>${esc(sub.text)}</p>` : ""}${sub.links?.length ? `<p>${sub.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 60))}</a>`).join("<br>")}</p>` : ""}${sub.files?.length ? `<p>${sub.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`).join(" · ")}</p>` : ""}
-        ${sub.score !== undefined ? `<div class="sub-score">✅ Дүн: <b>${sub.score}/${a.max_score || 100}</b>${sub.feedback ? `<p>${esc(sub.feedback)}</p>` : ""}</div>` : `<p class="muted small">Багш хараахан дүгнээгүй байна.</p>`}</div>` : ""}
+        ${sub.score !== undefined ? `<div class="sub-score">✅ Дүн: <b>${sub.score}/${a.max_score || 100}</b>${a.grading === "rubric" ? rubricViewHTML(a.rubric, sub.rubric || {}) : ""}${sub.feedback ? `<p class="sub-fb"><b>Багшийн тайлбар:</b> ${esc(sub.feedback)}</p>` : ""}</div>` : `<p class="muted small">Багш хараахан дүгнээгүй байна — дүгнэмэгц энд автоматаар гарч ирнэ.</p>`}</div>` : ""}
+      ${a.grading === "rubric" && sub?.score === undefined ? `<details class="asg-rubric" open><summary>Үнэлэх шалгуур (рубрик) · ${a.max_score} оноо</summary>${rubricViewHTML(a.rubric)}</details>` : ""}
       ${due.closed || due.not_started ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж даалгавраа илгээх</button>`
         : `<form class="sub-form"><label>${sub ? "Хариугаа шинэчлэх" : "Хариу"}<textarea name="text" rows="5" maxlength="20000" placeholder="Хариугаа энд бичнэ үү…">${esc(sub?.text || "")}</textarea></label>
           <label>Холбоос (Google Docs, GitHub, видео… мөр тус бүрд нэг, 5 хүртэл)<textarea name="links" rows="2" placeholder="https://…">${esc((sub?.links || []).join("\n"))}</textarea></label>
           <p class="form-error" role="alert"></p><button class="btn btn-gold">${sub ? "Дахин илгээх" : "Илгээх"}</button></form>`}`;
     bindLatePay(card, base, "Даалгаврын төлбөр", draw);
+    if (!card._live) { // багш дүгнэмэгц дүн, рубрик автоматаар орж ирнэ
+      card._live = (d) => { if (!card.isConnected) return Live.handlers.delete(card._live); if (d.type === "notification" && d.notification?.type === "grade" && (d.notification.link || "").endsWith("#l=" + lessonId)) draw(); };
+      Live.on(card._live);
+    }
     const f = $(".sub-form", card);
     if (f) f.onsubmit = async (e) => {
       e.preventDefault();
@@ -3614,7 +3631,7 @@ function loginPage() {
 }
 
 /* ---------- эхлүүлэх ---------- */
-window.SG = { pay: payWindow, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
+window.SG = { pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх

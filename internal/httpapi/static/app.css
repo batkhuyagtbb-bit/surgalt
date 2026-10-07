@@ -3096,3 +3096,74 @@ html.lp-focus .rail-tab{display:none!important}
   #ov-sales tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:10px 2px;border-bottom:1px solid var(--line)}
   #ov-sales td{display:block;padding:0!important;border:0!important}
   #ov-sales td:nth-child(1){grid-column:1/-1;font-weight:700}#ov-sales td:nth-child(3){grid-column:2;grid-row:2;text-align:right}#ov-sales td:nth-child(4){grid-column:1/-1;font-size:.78rem}.ovx-course{grid-template-columns:40px minmax(0,1fr) auto}.ovx-go{display:none}}
+
+/* ===== Даалгаврын үнэлгээ: тоогоор эсвэл рубрикаар (шалгуур × түвшин) ===== */
+.gr-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 12px}
+.gr-mode{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface);cursor:pointer;transition:border-color .15s,background .15s}
+.gr-mode:hover{border-color:var(--line-2)}
+.gr-mode.on{border-color:var(--brand);background:var(--brand-soft)}
+.gr-mode input{position:absolute;opacity:0;pointer-events:none}
+.gr-mode strong{display:block;font-size:.92rem}
+.gr-mode small{display:block;margin-top:2px;font-size:.78rem;color:var(--muted);line-height:1.35}
+.gr-ic{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:var(--surface-2);color:var(--brand);font-size:.86rem;font-weight:800;letter-spacing:-.02em}
+.gr-mode.on .gr-ic{background:var(--brand);color:#fff}
+.gr-mode:focus-within{outline:2px solid var(--brand);outline-offset:2px}
+.gr-rubric{margin:0 0 14px}
+.rb-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.rb-ed,.rb-view,.rb-grade{width:100%;border-collapse:separate;border-spacing:0;font-size:.86rem}
+.rb-ed th,.rb-ed td,.rb-view th,.rb-view td,.rb-grade th,.rb-grade td{padding:8px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);vertical-align:top;text-align:left}
+.rb-ed tr>*:last-child,.rb-view tr>*:last-child,.rb-grade tr>*:last-child{border-right:0}
+.rb-ed tbody tr:last-child>*,.rb-view tbody tr:last-child>*,.rb-grade tbody tr:last-child>*{border-bottom:0}
+.rb-ed thead th,.rb-view thead th,.rb-grade thead th{background:var(--surface-2);font-size:.78rem;font-weight:800;color:var(--text-2)}
+.rb-ed tbody th,.rb-view tbody th,.rb-grade tbody th{background:var(--surface-2);font-weight:700;min-width:150px;max-width:220px}
+.rb-corner{font-size:.72rem!important;color:var(--muted)!important;white-space:nowrap}
+.rb-corner span{color:var(--accent-ink)}
+.rb-ed td{min-width:150px}
+.rb-ed input,.rb-ed textarea{width:100%;min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font:inherit;font-size:.84rem;resize:vertical}
+.rb-ed input:focus,.rb-ed textarea:focus{border-color:var(--brand);outline:0;box-shadow:0 0 0 2px var(--brand-glow)}
+.rb-lv,.rb-cr{display:flex;align-items:flex-start;gap:4px}
+.rb-lv input{font-weight:700}
+.rb-cr textarea{font-weight:700}
+.rb-x{flex:none;width:26px;height:26px;color:var(--muted)}
+.rb-x:hover{color:var(--coral);background:var(--coral-soft)}
+.rb-max{display:block;margin-top:4px;font-size:.72rem;font-weight:600;color:var(--muted)}
+.rb-pts{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:.76rem;color:var(--muted)}
+.rb-pts input{width:76px;font-weight:800;color:var(--brand)}
+.rb-add-col{width:1%;background:var(--surface)!important;vertical-align:middle!important}
+.rb-add{display:inline-flex;flex-direction:column;align-items:center;gap:2px;padding:8px 10px;border:1.5px dashed var(--line-2);border-radius:10px;background:none;font:inherit;font-size:.74rem;font-weight:700;color:var(--brand);cursor:pointer;white-space:nowrap}
+.rb-add:hover{border-color:var(--brand);background:var(--brand-soft)}
+.rb-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px}
+.rb-total{font-size:.9rem;color:var(--muted)}
+.rb-total b{font-size:1.15rem;color:var(--brand)}
+/* Харах (суралцагч, журнал) */
+.rb-view td{min-width:120px;color:var(--text-2)}
+.rb-view td b{display:block;font-size:.8rem;color:var(--text)}
+.rb-view td small{display:block;margin-top:3px;font-size:.78rem;line-height:1.4;color:var(--muted)}
+.rb-view.graded td:not(.on):not(.rb-got){opacity:.55}
+.rb-view td.on{background:var(--teal-soft);box-shadow:inset 0 0 0 2px var(--teal);opacity:1}
+.rb-view td.on b{color:var(--teal)}
+.rb-got{min-width:70px!important;text-align:center!important;background:var(--brand-soft)}
+.rb-got b{display:inline!important;font-size:1rem!important;color:var(--brand)!important}
+.rb-got small{display:inline!important;color:var(--muted)}
+.rb-view tfoot th,.rb-view tfoot td{border-top:1px solid var(--line-2);border-bottom:0;background:var(--surface-2);font-weight:800}
+/* Үнэлэх: нүд дээр дарж сонгоно */
+.rb-grade td{padding:4px;min-width:130px}
+.rb-cell{display:block;height:100%;padding:8px;border-radius:10px;border:1.5px solid transparent;cursor:pointer;transition:background .12s,border-color .12s}
+.rb-cell:hover{background:var(--surface-2);border-color:var(--line-2)}
+.rb-cell input{position:absolute;opacity:0;pointer-events:none}
+.rb-cell b{display:block;font-size:.8rem}
+.rb-cell small{display:block;margin-top:3px;font-size:.76rem;line-height:1.35;color:var(--muted)}
+.rb-cell.on{background:var(--brand-soft);border-color:var(--brand)}
+.rb-cell.on b{color:var(--brand)}
+.rb-cell:focus-within{outline:2px solid var(--brand);outline-offset:1px}
+.sub-grade-rb{display:grid;gap:10px}
+.rb-grade-foot{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.rb-grade-foot .grow{flex:1;min-width:200px}
+/* Суралцагч, журнал */
+.asg-rubric{margin:12px 0;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.asg-rubric summary{padding:12px 14px;font-weight:800;cursor:pointer}
+.asg-rubric .rb-wrap{margin:0 12px 12px}
+.sub-score .rb-wrap{margin:10px 0}
+.sub-fb{margin:8px 0 0}
+.jr-rb-h{margin:16px 0 8px;font-size:.86rem}
+@media (max-width:640px){.gr-modes{grid-template-columns:minmax(0,1fr)}.rb-ed td{min-width:140px}}

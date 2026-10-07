@@ -165,7 +165,8 @@ type LearningStore interface {
 	SaveSubmission(ctx context.Context, sub *Submission) error
 	SubmissionFor(ctx context.Context, userID, lessonID string) (*Submission, error)
 	Submissions(ctx context.Context, lessonID string) ([]Submission, error)
-	GradeSubmission(ctx context.Context, lessonID, userID string, score int, feedback string) error
+	// GradeSubmission — оноо, тайлбар; rubric нь рубрикаар үнэлсэн бол сонгосон түвшнүүд (тоогоор бол nil).
+	GradeSubmission(ctx context.Context, lessonID, userID string, score int, feedback string, rubric map[string]int) error
 	AddQuizLog(ctx context.Context, l QuizLog) error
 	QuizLogs(ctx context.Context, f ActivityFilter, limit int) ([]QuizLog, error)
 	SaveReflection(ctx context.Context, r *Reflection) error

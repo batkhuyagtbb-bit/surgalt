@@ -27,6 +27,7 @@ func cloneSub(s *Submission) Submission {
 		v := *s.Score
 		c.Score = &v
 	}
+	c.Rubric = maps.Clone(s.Rubric)
 	return c
 }
 
@@ -69,7 +70,7 @@ func (m *Memory) Submissions(_ context.Context, lessonID string) ([]Submission, 
 	return out, nil
 }
 
-func (m *Memory) GradeSubmission(_ context.Context, lessonID, userID string, score int, feedback string) error {
+func (m *Memory) GradeSubmission(_ context.Context, lessonID, userID string, score int, feedback string, rubric map[string]int) error {
 	l := &m.learn
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -78,7 +79,7 @@ func (m *Memory) GradeSubmission(_ context.Context, lessonID, userID string, sco
 		return ErrNotFound
 	}
 	now := time.Now()
-	s.Score, s.Feedback, s.GradedAt = &score, feedback, &now
+	s.Score, s.Feedback, s.GradedAt, s.Rubric = &score, feedback, &now, maps.Clone(rubric)
 	return nil
 }
 

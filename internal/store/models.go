@@ -257,8 +257,40 @@ var LatePolicies = map[string]string{"": "төлбөргүй", "free": "төлб
 // Assignment — даалгавар: суралцагч текст, файлаар хариугаа илгээж, багш оноо, тайлбар өгнө.
 type Assignment struct {
 	Due        Due  `json:"due"`
-	MaxScore   int  `json:"max_score"`   // дээд оноо (анхдагч 100)
+	MaxScore   int  `json:"max_score"`   // дээд оноо (анхдагч 100; рубрикт мөр бүрийн хамгийн их онооны нийлбэр)
 	AllowFiles bool `json:"allow_files"` // файл хавсаргахыг зөвшөөрөх
+	// Grading — үнэлэх арга: "" = тоогоор (0..MaxScore), "rubric" = рубрикаар (шалгуур × түвшин).
+	Grading string  `json:"grading,omitempty"`
+	Rubric  *Rubric `json:"rubric,omitempty"`
+}
+
+// Rubric — үнэлгээний хүснэгт: багана нь түвшин (Маш сайн, Сайн…), мөр нь шалгуур. Нүд бүр тайлбар, оноотой.
+type Rubric struct {
+	Levels   []string          `json:"levels"`
+	Criteria []RubricCriterion `json:"criteria"`
+}
+
+type RubricCriterion struct {
+	ID     string   `json:"id"`
+	Name   string   `json:"name"`
+	Points []int    `json:"points"` // багана бүрийн оноо
+	Desc   []string `json:"desc"`   // багана бүрийн тайлбар
+}
+
+// Max — рубрикийн дээд оноо: шалгуур бүрийн хамгийн их онооны нийлбэр.
+func (r *Rubric) Max() int {
+	if r == nil {
+		return 0
+	}
+	total := 0
+	for _, c := range r.Criteria {
+		top := 0
+		for _, p := range c.Points {
+			top = max(top, p)
+		}
+		total += top
+	}
+	return total
 }
 
 // Comment — хичээлийн доорх хэлэлцүүлгийн нэг сэтгэгдэл (ParentID байвал хариу).
@@ -311,6 +343,8 @@ type Submission struct {
 	Score       *int       `json:"score,omitempty"`
 	Feedback    string     `json:"feedback,omitempty"`
 	GradedAt    *time.Time `json:"graded_at,omitempty"`
+	// Rubric — рубрикаар үнэлсэн бол шалгуур бүрээс сонгосон түвшин (шалгуурын ID → баганын индекс).
+	Rubric map[string]int `json:"rubric,omitempty"`
 }
 
 // BlockTypes — зөвшөөрөгдсөн блокийн төрлүүд.

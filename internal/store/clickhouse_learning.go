@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"time"
 
@@ -451,12 +452,16 @@ func (c *ClickHouse) SetUserRankLevel(ctx context.Context, userID string, level 
 
 // ---- даалгаврын хариу ----
 
-const subCols = `id, user_id, user_name, course_id, lesson_id, teacher_id, text, files, submitted_at, late, score, feedback, graded_at, links`
+const subCols = `id, user_id, user_name, course_id, lesson_id, teacher_id, text, files, submitted_at, late, score, feedback, graded_at, links, rubric`
 
 func scanSub(r driver.Rows) (Submission, error) {
 	var s Submission
 	var score *int32
-	err := r.Scan(&s.ID, &s.UserID, &s.UserName, &s.CourseID, &s.LessonID, &s.TeacherID, &s.Text, &s.Files, &s.SubmittedAt, &s.Late, &score, &s.Feedback, &s.GradedAt, &s.Links)
+	var rubric string
+	err := r.Scan(&s.ID, &s.UserID, &s.UserName, &s.CourseID, &s.LessonID, &s.TeacherID, &s.Text, &s.Files, &s.SubmittedAt, &s.Late, &score, &s.Feedback, &s.GradedAt, &s.Links, &rubric)
+	if rubric != "" {
+		_ = json.Unmarshal([]byte(rubric), &s.Rubric)
+	}
 	if score != nil {
 		v := int(*score)
 		s.Score = &v
@@ -483,9 +488,14 @@ func (c *ClickHouse) writeSub(ctx context.Context, s *Submission) error {
 	if links == nil {
 		links = []string{}
 	}
+	rubric := ""
+	if len(s.Rubric) > 0 {
+		b, _ := json.Marshal(s.Rubric)
+		rubric = string(b)
+	}
 	return c.insert(ctx, "submissions", []string{"id", "user_id", "user_name", "course_id", "lesson_id", "teacher_id", "text", "files",
-		"submitted_at", "late", "score", "feedback", "graded_at", "ver", "links"},
-		s.ID, s.UserID, s.UserName, s.CourseID, s.LessonID, s.TeacherID, s.Text, files, s.SubmittedAt.UTC(), s.Late, score, s.Feedback, nullTime(s.GradedAt), ver(), links)
+		"submitted_at", "late", "score", "feedback", "graded_at", "ver", "links", "rubric"},
+		s.ID, s.UserID, s.UserName, s.CourseID, s.LessonID, s.TeacherID, s.Text, files, s.SubmittedAt.UTC(), s.Late, score, s.Feedback, nullTime(s.GradedAt), ver(), links, rubric)
 }
 
 func (c *ClickHouse) subsWhere(ctx context.Context, where string, args ...any) ([]Submission, error) {
@@ -529,7 +539,7 @@ func (c *ClickHouse) Submissions(ctx context.Context, lessonID string) ([]Submis
 	return c.subsWhere(ctx, "lesson_id = ?", lessonID)
 }
 
-func (c *ClickHouse) GradeSubmission(ctx context.Context, lessonID, userID string, score int, feedback string) error {
+func (c *ClickHouse) GradeSubmission(ctx context.Context, lessonID, userID string, score int, feedback string, rubric map[string]int) error {
 	unlock, err := c.lock(ctx, "sub:"+userID+":"+lessonID)
 	if err != nil {
 		return err
@@ -540,6 +550,6 @@ func (c *ClickHouse) GradeSubmission(ctx context.Context, lessonID, userID strin
 		return err
 	}
 	now := time.Now()
-	cur.Score, cur.Feedback, cur.GradedAt = &score, feedback, &now
+	cur.Score, cur.Feedback, cur.GradedAt, cur.Rubric = &score, feedback, &now, rubric
 	return c.writeSub(ctx, cur)
 }
