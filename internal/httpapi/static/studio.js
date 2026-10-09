@@ -790,9 +790,9 @@ async function courseEditor(id) {
       <button type="button" class="ol-handle" data-drag="row" aria-label="«${esc(l.title)}» хичээлийг зөөх (↑↓ товч)" title="Чирж зөөх">${ico("grip", 18)}</button>
       <span class="ol-num">${String(n).padStart(2, "0")}</span>
       <span class="ol-title"><strong>${esc(l.title)}</strong><small>${[l.format && kindName(l.format), l.mode && kindName(l.mode)].filter(Boolean).map((k) => `<span class="kind">${esc(k)}</span>`).join("")}${audience(l)}${c.drip && !l.always_open && n > 1 ? ruleBadge(l) : ""}${kindBadge(l)}${l.active_min ? `<span class="aud">🕒 ${l.active_min} мин идэвхтэй</span>` : ""}</small></span>
-      ${visHTML(l)}
+      <span class="ol-acts">${visHTML(l)}
       <button type="button" class="icon-btn" data-edit-post aria-label="Засах" title="Засах">${ico("edit", 17)}</button>
-      <button type="button" class="icon-btn ol-del" data-del-post aria-label="Устгах" title="Устгах">${ico("x", 17)}</button></li>`;
+      <button type="button" class="icon-btn ol-del" data-del-post aria-label="Устгах" title="Устгах">${ico("x", 17)}</button></span></li>`;
   const outlineHTML = () => {
     const gs = groupsModel(); let n = 0;
     return `<div class="ol" id="olSecs">${gs.map((g, i) => `<section class="ol-sec" data-sec="${esc(g.name)}">
@@ -809,11 +809,30 @@ async function courseEditor(id) {
   const render = () => {
     main.innerHTML = `<section class="gp-head" style="--h:${hueOfName(c.title)}">
         <div class="gp-cover"><a class="gp-back" href="#courses" aria-label="Сургалтууд руу буцах">${ico("back", 18)}Сургалтууд</a><b>${esc(c.title.trim()[0] || "?")}</b></div>
-        <div class="gp-bar"><div class="grow"><h1>${esc(c.title)}</h1>
-          <p class="muted">${ico(c.published ? "globe" : "lock", 15)}${c.published ? "Нийтлэгдсэн сургалт" : "Ноорог — зөвхөн танд харагдана"} · <b>${roster.length}</b> суралцагч · <b>${lessons.length}</b> хичээл · <b>${free()}</b> үнэгүй · <b>${c.views || 0}</b> үзэлт</p></div>
-          <div class="hero-cta" style="margin:0">${c.published ? `<a class="btn btn-glass" href="/c/${esc(c.id)}" target="_blank" rel="noopener">${ico("ext", 18)}Харах</a>` : `<button class="btn btn-gold" id="gpPublish">${ico("globe", 18)}Нийтлэх</button>`}
-          <button class="btn btn-glass" id="gpSettings">${ico("gear", 18)}Тохиргоо</button></div></div></section>
-      <div class="gp-body ${view === "journal" ? "gp-wide" : ""}">
+        <div class="gp-bar">
+          <div class="grow gp-info"><h1>${esc(c.title)}</h1>
+            <p class="gp-desc">${c.description ? esc(c.description) : `<span class="muted">Тайлбар нэмээгүй байна — «Тохиргоо»-оос нэмнэ.</span>`}</p>
+          </div>
+          <div class="gp-hside">
+            <button type="button" class="gp-roster" id="gpRoster" aria-label="Суралцагчид (${roster.length})">
+              <span class="gp-avs">${roster.slice(0, 5).map((r) => avatar(r.user, "avatar-sm")).join("") || `<span class="gp-av0">${ico("users", 16)}</span>`}</span>
+              <span class="gp-rn"><b>${roster.length}</b> суралцагч</span>${ico("chevron", 15)}</button>
+            <div class="gp-acts">
+              ${c.published ? `<a class="btn btn-glass btn-sm" href="/c/${esc(c.id)}" target="_blank" rel="noopener">${ico("ext", 16)}Харах</a>` : `<button class="btn btn-gold btn-sm" id="gpPublish">${ico("globe", 16)}Нийтлэх</button>`}
+              <button class="btn btn-glass btn-sm" id="gpChat" title="Элссэн бүх суралцагчтай нэг дор ярилцана">${ico("chat", 16)}Бүлэг чат</button>
+              <a class="btn btn-glass btn-sm" href="#live" title="Google Meet-ээр шууд хичээл товлох">${ico("live", 16)}Шууд хичээл</a>
+              <button class="btn btn-glass btn-sm" id="gpSettings">${ico("gear", 16)}Тохиргоо</button>
+            </div></div>
+          <ul class="gp-facts">
+              <li class="${c.published ? "ok" : "draft"}">${ico(c.published ? "globe" : "lock", 15)}${c.published ? "Нийтлэгдсэн · профайл дээр харагдана" : "Ноорог — зөвхөн танд харагдана"}</li>
+              <li>${ico("money", 15)}${c.price ? `Багц <b>${money(c.price)}</b>` : "Хичээл тус бүрээр зарна"}</li>
+              <li>${ico("clock", 15)}${c.drip ? `<b>Дарааллаар</b> нээгдэнэ${c.unlock_all_paid && c.price ? " · багц төлбөл бүгд шууд" : ""}` : "Бүх хичээл нэг дор нээлттэй"}</li>
+              <li>${ico("book", 15)}<b>${lessons.length}</b> хичээл · <b>${free()}</b> үнэгүй</li>
+              <li>${ico("eye", 15)}<b>${c.views || 0}</b> үзэлт</li>
+              <li>${ico("cal", 15)}${fmtDate(c.created_at)} үүсгэсэн</li>
+            </ul>
+        </div></section>
+      <div class="gp-body gp-full">
         <div class="gp-feed">
           <section class="card composer-box" id="composer">
             <button class="composer" id="composerOpen">${avatar(me, "avatar-sm")}<span class="composer-input">Шинэ хичээл нийтлэх…</span></button>
@@ -824,22 +843,11 @@ async function courseEditor(id) {
             <button role="tab" data-view="posts" aria-selected="${view === "posts"}">${ico("book", 16)}Нийтлэлүүд</button>
             <button role="tab" data-view="journal" aria-selected="${view === "journal"}">${ico("users", 16)}Журнал</button></div>` : ""}
           <div id="gpView">${view === "journal" && lessons.length ? `<div class="jr" id="journal"><div class="loader"></div></div>` : view === "outline" && (lessons.length || pending.length) ? outlineHTML() : feedHTML()}</div>
-        </div>
-        <aside class="gp-side">
-          <section class="card"><div class="card-head"><h2>Тухай</h2><button class="icon-btn" id="gpSettings2" aria-label="Сургалтын тохиргоо">${ico("edit", 18)}</button></div>
-            <p class="post-text">${c.description ? esc(c.description) : `<span class="muted">Тайлбар нэмээгүй байна.</span>`}</p>
-            <ul class="pf-facts"><li>${ico("money", 18)}<span>${c.price ? `Багц үнэ <b>${money(c.price)}</b>` : "Хичээл тус бүрээр зарна"}</span></li>
-              <li>${ico(c.published ? "globe" : "lock", 18)}<span>${c.published ? "Профайл дээр харагдаж байна" : "Нийтлээгүй (ноорог)"}</span></li>
-              <li>${ico("clock", 18)}<span>${c.drip ? `Хичээлүүд <b>дарааллаар</b> нээгдэнэ${c.unlock_all_paid && c.price ? ", багц төлсөн бол бүгд шууд" : ""}` : "Бүх хичээл нэг дор нээлттэй"}</span></li>
-              <li>${ico("cal", 18)}<span>${fmtDate(c.created_at)} үүсгэсэн</span></li></ul></section>
-          <section class="card"><div class="card-head"><h2>Суралцагчид</h2><span class="chip">${roster.length}</span></div>
-            <div class="items">${roster.slice(0, 6).map(studentRow).join("") || `<p class="muted small" style="margin:0">Хараахан хэн ч элсээгүй байна.</p>`}</div>
-            ${roster.length > 6 ? `<a class="link" href="#students" style="margin-top:10px;display:inline-flex">Бүгдийг харах (${roster.length}) ${ico("chevron", 14)}</a>` : ""}</section>
-          <section class="card"><div class="card-head"><h2>Бүлэг чат</h2></div><p class="muted small" style="margin:0 0 10px">Энэ сургалтад элссэн бүх суралцагчтай нэг дор ярилцана. Шинэ элсэгч автоматаар орно.</p>
-            <button class="btn btn-gold btn-block" id="gpChat">${ico("chat", 18)}Бүлэг чат нээх</button></section>
-          <section class="card"><div class="card-head"><h2>Шууд хичээл</h2></div><p class="muted small" style="margin:0 0 10px">Элссэн суралцагчидтайгаа Google Meet-ээр уулзана.</p>
-            <a class="btn btn-glass btn-block" href="#live">${ico("live", 18)}Шууд хичээл товлох</a></section>
-        </aside></div>
+        </div></div>
+      <div class="modal" id="gpRosterModal"><div class="modal-card" style="width:min(580px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+        <h3 class="h3">Суралцагчид <span class="chip">${roster.length}</span></h3>
+        <div class="items">${roster.map(studentRow).join("") || `<p class="muted small" style="margin:0">Хараахан хэн ч элсээгүй байна.</p>`}</div>
+        ${roster.length ? `<a class="link" href="#students" style="display:inline-flex;margin-top:12px">${ico("chart", 15)}Хяналт ба статистик ${ico("chevron", 14)}</a>` : ""}</div></div>
       <div class="modal" id="gpModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
         <h3 class="h3">Сургалтын тохиргоо</h3><form class="form" id="gpForm">${courseFormHTML(c)}<p class="form-error" role="alert"></p>
         <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`;
@@ -1081,9 +1089,15 @@ async function courseEditor(id) {
     renameSection2(secEl, inp);
   };
 
+  // Нэг л хичээл дээр ажиллана: өөр хичээл (эсвэл шинэ хичээлийн маягт) нээхэд бусад засварлагч хаагдана.
+  const editingNow = () => $$(".post.editing, .ol-row.editing", main).length > 0 || ($("#composerBody") && !$("#composerBody").hidden);
+  const closeEditors = () => {
+    if ($$(".post-editor[data-dirty]", main).some((f) => f.offsetParent) && !confirm("Нээлттэй хичээлд хадгалаагүй өөрчлөлт байна. Хаагаад үргэлжлүүлэх үү?")) return false;
+    render(); return true;
+  };
   const onClick = async (e) => {
     const t = e.target;
-    const openComposer = (preset, kind) => { const b = $("#composerBody"); if (preset !== undefined || kind) putEditor(b, null, preset, kind); $("#composerOpen").hidden = true; b.hidden = false; $("#composer").scrollIntoView({ behavior: "smooth", block: "start" }); $("#composerForm").title.focus(); };
+    const openComposer = (preset, kind) => { if ($$(".post.editing, .ol-row.editing", main).length && !closeEditors()) return; const b = $("#composerBody"); if (preset !== undefined || kind) putEditor(b, null, preset, kind); $("#composerOpen").hidden = true; b.hidden = false; $("#composer").scrollIntoView({ behavior: "smooth", block: "start" }); $("#composerForm").title.focus(); };
     // Нэмэх товч → төрөл сонгох жижиг цэс: Хичээл / Шалгалт / Даалгавар.
     const kindMenu = (anchor, preset) => {
       $(".kind-menu")?.remove();
@@ -1122,7 +1136,8 @@ async function courseEditor(id) {
       sec.dataset.sec = ""; $$(".ol-row", sec).length ? await saveOutline("Бүлэг задарлаа — хичээлүүд бүлэггүй боллоо") : render();
       return;
     }
-    if (t.closest("#gpSettings, #gpSettings2")) { SG.openModal($("#gpModal")); return; }
+    if (t.closest("#gpSettings")) { SG.openModal($("#gpModal")); return; }
+    if (t.closest("#gpRoster")) { SG.openModal($("#gpRosterModal")); return; }
     if (t.closest("#gpChat")) {
       const b = $("#gpChat"); b.disabled = true;
       try { const d = await api(`/api/courses/${c.id}/chat`, { method: "POST" }); Live.reconnect(); window.openRailChat?.(d.conversation.id); }
@@ -1135,7 +1150,17 @@ async function courseEditor(id) {
     }
     const post = t.closest(".post, .ol-row"), l = post && lessons.find((x) => x.id === post.dataset.lid);
     if (t.closest("[data-cancel]")) return render();
-    if (t.closest("[data-edit-post]") && l) { post.classList.add("editing"); putEditor(post, l); $("input[name=title]", post).focus(); return; }
+    if (t.closest("[data-edit-post]") && l) {
+      if (post.classList.contains("editing")) return;
+      let row = post;
+      if (editingNow()) { // бусад нь хаагдана
+        if (!closeEditors()) return;
+        row = $(`.post[data-lid="${CSS.escape(l.id)}"], .ol-row[data-lid="${CSS.escape(l.id)}"]`, main); if (!row) return;
+      }
+      row.classList.add("editing"); putEditor(row, l);
+      row.scrollIntoView({ block: "start", behavior: "smooth" }); $("input[name=title]", row)?.focus({ preventScroll: true });
+      return;
+    }
     if (t.closest("[data-del-post]") && l) {
       const nFiles = new Set([l.video_url, ...(l.blocks || []).flatMap((b) => [b.url, b.quiz?.image])].map(stripQ).filter((u) => u.startsWith("/files/"))).size;
       if (!confirm(`«${l.title}» хичээлийг устгах уу?${nFiles ? `\nЗөвхөн энэ хичээлд ашигласан файлууд (${nFiles}) хамт устна.` : ""}\nСуралцагчдын явцын түүх хадгалагдана.`)) return;
@@ -1203,7 +1228,8 @@ async function courseEditor(id) {
       await reload();
     } catch (err) { if (errBox) errBox.textContent = err.message; toast(err.message, true); }
   };
-  const evs = [["click", onClick], ["change", onChange], ["submit", onSubmit], ["pointerdown", onPointerDown], ["keydown", onKeyDown], ["focusout", onFocusOut]];
+  const onEdInput = (e) => { const pe = e.target.closest?.(".post-editor"); if (pe) pe.dataset.dirty = "1"; }; // хадгалаагүй өөрчлөлт
+  const evs = [["click", onClick], ["change", onChange], ["submit", onSubmit], ["pointerdown", onPointerDown], ["keydown", onKeyDown], ["focusout", onFocusOut], ["input", onEdInput]];
   evs.forEach(([n, f]) => main.addEventListener(n, f));
   cleanup = () => { evs.forEach(([n, f]) => main.removeEventListener(n, f)); onPointerUp(); };
   render();
