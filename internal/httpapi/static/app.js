@@ -3640,6 +3640,17 @@ if (page === "me") { // өөрийн хуудас руу: багш профай�
   else if (u?.role === "teacher" && u.username) location.replace("/t/" + u.username + h);
   else api("/api/me").then((me) => { Auth.set(Auth.token, me); location.replace(me.role === "teacher" ? "/t/" + me.username + h : "/" + h); }).catch(() => location.replace("/login"));
 }
+// Интро (Three.js робот): анх орох үед нэг удаа, эсвэл ?intro=1. WebGL байхгүй, хөдөлгөөн багасгах тохиргоотой бол гарахгүй.
+if (page === "home") {
+  const force = new URLSearchParams(location.search).has("intro");
+  let seen = false; try { seen = !!localStorage.getItem("sg_intro"); } catch {}
+  const gl = (() => { try { return !!document.createElement("canvas").getContext("webgl2"); } catch { return false; } })();
+  if ((force || !seen) && gl && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    try { localStorage.setItem("sg_intro", "1"); } catch {}
+    const ver = new URL($("script[src*='app.js']").src).searchParams.get("v") || "";
+    import(`/static/intro.js?v=${ver}`).then((m) => m.runIntro()).catch(() => document.documentElement.classList.remove("intro-on"));
+  }
+}
 if (page === "home") homePage();
 if (page === "profile") profilePage();
 if (page === "profile" || page === "course") chatWidget();

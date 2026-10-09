@@ -3224,3 +3224,19 @@ html.lp-focus .rail-tab{display:none!important}
 .vs-meta b{font-size:.9rem;font-variant-numeric:tabular-nums}
 @media (max-width:900px){.vs-grid{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:640px){#ov-visits .anx-tools{width:100%}#ov-visits .anx-seg{flex:1}#ov-visits .anx-seg button{flex:1;padding:0 6px}.vs-bars li{grid-template-columns:96px minmax(0,1fr) auto}}
+
+/* ===== Интро: робот угсрагдана (Three.js) ===== */
+html.intro-on,html.intro-on body{overflow:hidden}
+.intro{position:fixed;inset:0;z-index:6000;background:#0a1430;transition:opacity .6s ease}
+.intro.out{opacity:0;pointer-events:none}
+.intro canvas{display:block;width:100%;height:100%}
+.intro::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 40%,transparent 55%,rgba(5,10,28,.65) 100%)}
+.intro-brand{position:absolute;left:0;right:0;bottom:clamp(36px,10vh,110px);z-index:1;display:grid;justify-items:center;gap:10px;color:#fff;text-align:center;pointer-events:none}
+.intro-brand b{font:800 clamp(2.4rem,7vw,4.6rem)/1 Manrope,system-ui,sans-serif;letter-spacing:-.03em;text-shadow:0 10px 40px rgba(31,60,143,.8)}
+.intro-brand i{font-style:normal;color:#eaa02e}
+.intro-brand>span{font:600 clamp(.85rem,2.2vw,1.1rem)/1.3 Manrope,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+.intro-brand .ch{display:inline-block;opacity:0;transform:translateY(55%) scale(.9);filter:blur(6px)}
+.intro.show-brand .ch{animation:intro-ch .55s cubic-bezier(.2,.9,.25,1.25) forwards;animation-delay:calc(var(--i) * 38ms)}
+@keyframes intro-ch{to{opacity:1;transform:none;filter:none}}
+.intro-skip{position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;z-index:2;display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 16px;border:1px solid rgba(255,255,255,.25);border-radius:999px;background:rgba(255,255,255,.08);color:#fff;font:700 .86rem Manrope,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(6px)}
+.intro-skip:hover{background:rgba(255,255,255,.18)}
