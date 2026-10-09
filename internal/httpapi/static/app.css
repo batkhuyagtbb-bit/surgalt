@@ -3245,5 +3245,13 @@ html.intro-on,html.intro-on body{overflow:hidden}
   .intro-brand{left:clamp(24px,7vw,120px);right:auto;bottom:auto;top:50%;transform:translateY(-10%);justify-items:start;text-align:left;max-width:46vw}
   .intro-brand b{font-size:clamp(2.6rem,6vw,5rem)}
 }
-.intro-skip{position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;z-index:2;display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 16px;border:1px solid rgba(255,255,255,.25);border-radius:999px;background:rgba(255,255,255,.08);color:#fff;font:700 .86rem Manrope,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(6px)}
-.intro-skip:hover{background:rgba(255,255,255,.18)}
+.intro-ctl{position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;z-index:2;display:flex;gap:8px}
+.intro-skip,.intro-sound{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 16px;border:1px solid rgba(255,255,255,.25);border-radius:999px;background:rgba(255,255,255,.08);color:#fff;font:700 .86rem Manrope,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(6px)}
+.intro-skip:hover,.intro-sound:hover{background:rgba(255,255,255,.18)}
+.intro-sound{padding:0 14px 0 12px}
+.intro-sound[hidden]{display:none}
+.intro-sound svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.intro-sound .snd-on,.intro-sound.on .snd-off{display:none}
+.intro-sound.on .snd-on{display:block}
+.intro-sound:not(.on){border-color:rgba(234,160,46,.8);animation:intro-snd 1.8s ease-out infinite} /* дуу асаахыг санал болгоно */
+@keyframes intro-snd{0%{box-shadow:0 0 0 0 rgba(234,160,46,.55)}100%{box-shadow:0 0 0 12px rgba(234,160,46,0)}}

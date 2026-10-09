@@ -1,11 +1,11 @@
 // Интро: «Оюуны сансар огторгуйн хамгаалагч» — сансарт хөвөх голограмм тавцан дээр цэргийн хуягт машин орж ирээд
 // хамгаалагч-робот болж хувирч, ёслол хийнэ (Three.js / WebGL). Дүр нь surgalt.mn-ийн өөрийн загвар (брэндийн өнгө,
 // «s» од тэмдэг, цолны тэмдэг) — ямар нэг кино, тоглоомын дүрийн хуулбар биш.
-// app.js зөвхөн анх орох үед (эсвэл ?intro=1) ачаална; Three.js-ийг энд л татна.
+// app.js зөвхөн анх орох үед (эсвэл ?intro=1) ачаална; Three.js-ийг энд л татна. Дуу: intro-sound.js (WebAudio, файлгүй).
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js";
 
 export async function runIntro({ onDone } = {}) {
-  const T = await import(THREE_URL);
+  const [T, S] = await Promise.all([import(THREE_URL), import(`./intro-sound.js${new URL(import.meta.url).search}`).catch(() => null)]);
   const el = document.createElement("div");
   el.className = "intro";
   el.setAttribute("role", "img");
@@ -14,7 +14,10 @@ export async function runIntro({ onDone } = {}) {
   const chars = (s, off = 0) => [...s].map((c, i) => `<span class="ch" style="--i:${i + off}">${c === " " ? "&nbsp;" : c}</span>`).join("");
   el.innerHTML = `<canvas></canvas>
     <div class="intro-brand"><em class="intro-title">${[...title].map((c, i) => `<span class="tc" style="--i:${i}">${c === " " ? "&nbsp;" : c}</span>`).join("")}</em><b>${chars(brand)}<i>${chars(tld, brand.length)}</i></b><span>${chars(slogan, brand.length + 3)}</span></div>
-    <button type="button" class="intro-skip">Алгасах <span aria-hidden="true">›</span></button>`;
+    <div class="intro-ctl">
+      <button type="button" class="intro-sound" aria-pressed="false" hidden><svg class="snd-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h3l5-4v14l-5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg><svg class="snd-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h3l5-4v14l-5-4H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg><span>Дуу асаах</span></button>
+      <button type="button" class="intro-skip">Алгасах <span aria-hidden="true">›</span></button>
+    </div>`;
   document.body.append(el);
   document.documentElement.classList.add("intro-on");
 
@@ -204,9 +207,23 @@ export async function runIntro({ onDone } = {}) {
   const outCubic = (t) => 1 - (1 - t) ** 3;
   const outBack = (t) => { const c = 1.6; return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2; };
   const clamp01 = (t) => Math.min(1, Math.max(0, t));
-  const DRIVE = 1.35, formed = T0 + 2.25, total = formed + 4;
+  const DRIVE = 1.35, formed = T0 + 2.25, total = formed + 4, BEAT = (formed - T0) / 6; // хөгжмийн цохилт (intro-sound.js-тэй ижил)
   const portrait = innerWidth / innerHeight < 0.85;
   let start = performance.now(), last = start, raf = 0, ended = false, typed = 0, brandShown = false;
+  // ---- Дуу: хөтөч хэрэглэгч товшихоос өмнө дуу гаргахыг хориглодог тул «Дуу асаах» товч эсвэл дэлгэц дээр товшиход
+  // нэгдэнэ (зөвшөөрөлтэй бол шууд). Хөгжим интроны цагтай уялдаж, нэгдсэн мөчөөс үргэлжилнэ.
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let ac = null, score = null, joined = false, muted = false;
+  if (S && AC) try { ac = new AC(); score = S.createScore(ac, ac.destination, { T0, formed, total }); } catch { ac = score = null; }
+  const sndBtn = el.querySelector(".intro-sound");
+  const paintSnd = () => { const on = joined && !muted; sndBtn.classList.toggle("on", on); sndBtn.setAttribute("aria-pressed", String(on)); sndBtn.querySelector("span").textContent = on ? "Дуу хаах" : "Дуу асаах"; };
+  const join = () => { if (joined || ended || ac?.state !== "running") return; joined = true; score.start((performance.now() - start) / 1000, ac.currentTime); paintSnd(); };
+  const unlock = () => { if (score && !joined && !ended) ac.resume().then(join, () => {}); };
+  if (score) {
+    sndBtn.hidden = false; ac.onstatechange = join; unlock();
+    el.addEventListener("click", (e) => { if (!e.target.closest(".intro-skip")) unlock(); });
+    sndBtn.addEventListener("click", () => { if (joined) { muted = !muted; score.mute(muted); paintSnd(); } });
+  }
   const tmpQ = new T.Quaternion(), look = new T.Vector3(), IDQ = new T.Quaternion();
   // Ёслол: мөрөөс тохой урагш-дээш (u), шуу дуулганы зах руу (f) — эргэлтийг векторуудаас яг тооцоолно.
   const DOWN = new T.Vector3(0, -1, 0), u = new T.Vector3(0.2, 0.75, 0.6).normalize(), f = new T.Vector3(-0.82, 0.37, -0.1).normalize();
@@ -235,16 +252,17 @@ export async function runIntro({ onDone } = {}) {
   resize(); addEventListener("resize", resize);
   const finish = () => {
     if (ended) return; ended = true;
-    el.classList.add("out");
+    el.classList.add("out"); score?.fadeOut(0.6); removeEventListener("keydown", onKey);
     setTimeout(() => {
-      cancelAnimationFrame(raf); removeEventListener("resize", resize);
+      cancelAnimationFrame(raf); removeEventListener("resize", resize); Promise.resolve(ac?.close?.()).catch(() => {});
       renderer.dispose(); texs.forEach((t) => t.dispose()); scene.traverse((o) => o.geometry?.dispose());
       el.remove(); document.documentElement.classList.remove("intro-on");
       onDone?.();
     }, 650);
   };
   el.querySelector(".intro-skip").onclick = finish;
-  addEventListener("keydown", function esc(e) { if (e.key === "Escape") { removeEventListener("keydown", esc); finish(); } });
+  const onKey = (e) => { if (e.key === "Escape") finish(); else unlock(); };
+  addEventListener("keydown", onKey);
 
   const frame = (now) => {
     raf = requestAnimationFrame(frame);
@@ -259,7 +277,7 @@ export async function runIntro({ onDone } = {}) {
       p.o.visible = !p.hidden || t >= p.at;
       p.o.position.lerpVectors(p.vp, p.rp, e);
       p.o.quaternion.copy(tmpQ.slerpQuaternions(p.vq, p.rq, Math.min(1, e)));
-      if (k >= 1 && !p.done) { p.done = true; burst(p.o.getWorldPosition(new T.Vector3())); }
+      if (k >= 1 && !p.done) { p.done = true; burst(p.o.getWorldPosition(new T.Vector3())); score?.clank(p.hidden ? 1.6 : 0.75 + Math.random() * 0.5); }
     }
     emblemMat.emissiveIntensity = t > T0 + 1.3 ? Math.min(1.3, (t - T0 - 1.3) * 2) * (0.85 + 0.15 * Math.sin(t * 5)) : 0;
     if (t > formed) {
@@ -275,8 +293,8 @@ export async function runIntro({ onDone } = {}) {
       bot.position.y = Math.sin(a * 2.2) * 0.02;
       // Гарчиг: дохио хүлээн авч буй мэт тэмдэгт бүрээр бичигдэнэ (CSS анимацийн төгсгөлд найдахгүй, хугацаагаар)
       const n = Math.min(tcs.length + 2, Math.floor(a / 0.034));
-      if (n !== typed) { typed = n; tcs.forEach((ch, i) => { ch.classList.toggle("on", i < n); ch.classList.toggle("cur", i < n && i >= n - 2); }); }
-      if (!brandShown && a > 1.1) { brandShown = true; el.classList.add("show-brand"); }
+      if (n !== typed) { if (n > typed && n <= tcs.length) score?.tick(); typed = n; tcs.forEach((ch, i) => { ch.classList.toggle("on", i < n); ch.classList.toggle("cur", i < n && i >= n - 2); }); }
+      if (!brandShown && a > 3 * BEAT) { brandShown = true; el.classList.add("show-brand"); } // ялалтын хөгийн эхний (B♭) цохилттой зэрэг
     }
     aim(t);
     for (let i = 0; i < N; i++) {
