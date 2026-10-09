@@ -409,6 +409,20 @@ type Order struct {
 	PaidAt    *time.Time  `json:"paid_at,omitempty"`
 }
 
+// PageVisit — нээлттэй хуудсанд (профайл, сургалт) нэг удаа орсон нь: хэн, хэзээ, хэр удаан, хаанаас, ямар төхөөрөмжөөр.
+type PageVisit struct {
+	ID        string    `json:"id"`
+	TeacherID string    `json:"teacher_id"`
+	Kind      string    `json:"kind"`       // profile | course
+	TargetID  string    `json:"target_id"`  // профайл бол багшийн ID, сургалт бол сургалтын ID
+	VisitorID string    `json:"visitor_id"` // нэвтэрсэн бол хэрэглэгчийн ID, үгүй бол "a:" + хөтчийн санамсаргүй ID
+	UserName  string    `json:"user_name,omitempty"`
+	At        time.Time `json:"at"`
+	Seconds   int       `json:"seconds"`  // хуудсанд идэвхтэй байсан хугацаа
+	Referrer  string    `json:"referrer"` // эх сурвалж: facebook.com, google, шууд, surgalt.mn дотроос…
+	Device    string    `json:"device"`   // mobile | tablet | desktop
+}
+
 // PaymentInvoice — төлбөрийн үйлчилгээ (QPay)-нд захиалгад үүсгэсэн нэхэмжлэх: QR-ын текст, банкны апп-уудын холбоос.
 type PaymentInvoice struct {
 	OrderID   string    `json:"order_id"`
@@ -623,6 +637,10 @@ type Store interface {
 	OrderByID(ctx context.Context, id string) (*Order, error)
 	// MarkOrderPaid нь идемпотент: дахин дуудахад алдаагүй, элсэлт/багтаамж давхардахгүй.
 	MarkOrderPaid(ctx context.Context, orderID string, amount int64) (*Order, error)
+	// SaveVisit / VisitByID / Visits — хуудасны үзэлт (хугацаа шинэчлэхэд SaveVisit-ээр дахин бичнэ).
+	SaveVisit(ctx context.Context, v *PageVisit) error
+	VisitByID(ctx context.Context, id string) (*PageVisit, error)
+	Visits(ctx context.Context, teacherID string, since time.Time) ([]PageVisit, error)
 	// SaveInvoice / InvoiceByOrder — захиалгын сүүлийн нэхэмжлэх (QR); байхгүй бол ErrNotFound.
 	SaveInvoice(ctx context.Context, inv *PaymentInvoice) error
 	InvoiceByOrder(ctx context.Context, orderID string) (*PaymentInvoice, error)

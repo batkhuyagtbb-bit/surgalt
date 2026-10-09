@@ -346,10 +346,14 @@ func (s *Server) pageCourse(w http.ResponseWriter, r *http.Request) {
 // handleTrackView: POST /api/views {kind: profile|course, id} — профайл, сургалтын хуудас нээгдэхэд хөтөч
 // (нэвтэрсэн бол токентой) мэдээлнэ. HTML хуудас токенгүй ирдэг тул үзэгчийг энд л танина: багш өөрийнхөө
 // профайл, сургалтыг үзвэл тоолохгүй, мэдэгдэл явуулахгүй.
+// handleTrackView: POST /api/views {kind, id, vid, ref} — үзэлтийг тоолж (мэдэгдэл), багшид зориулсан
+// үзэлтийн бичлэг үүсгэнэ; хариуд нь хугацаа илгээх ID, гарын үсэг өгнө. Багш өөрийнхийгөө үзвэл тоологдохгүй.
 func (s *Server) handleTrackView(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Kind string `json:"kind"`
 		ID   string `json:"id"`
+		VID  string `json:"vid"` // хөтчийн санамсаргүй ID (давтагдаагүй зочин тоолоход)
+		Ref  string `json:"ref"` // хаанаас ирсэн (домэйн; "self" = сайтын дотроос)
 	}
 	if !decode(w, r, &in) {
 		return
@@ -358,18 +362,39 @@ func (s *Server) handleTrackView(w http.ResponseWriter, r *http.Request) {
 	if p, ok := s.principal(r); ok && !p.IsGuest() {
 		uid = p.UID
 	}
+	teacherID, target := "", ""
 	switch in.Kind {
 	case "profile":
 		if p, err := s.publicProfile(r.Context(), in.ID); err == nil && p.Data.Teacher.ID != uid {
 			t := p.Data.Teacher
 			s.trackView(r, t.ID, NotifProfileView, t.ID, "", "/t/"+t.Username)
+			teacherID, target = t.ID, t.ID
 		}
 	case "course":
 		if c, err := s.publicCourse(r.Context(), in.ID); err == nil && c.Data.Course.TeacherID != uid {
 			s.trackView(r, c.Data.Course.TeacherID, NotifCourseView, c.Data.Course.ID, c.Data.Course.Title, "/c/"+c.Data.Course.ID)
+			teacherID, target = c.Data.Course.TeacherID, c.Data.Course.ID
 		}
 	}
-	w.WriteHeader(http.StatusNoContent)
+	if teacherID == "" || botRe.MatchString(r.UserAgent()) {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	v := &store.PageVisit{TeacherID: teacherID, Kind: in.Kind, TargetID: target, At: time.Now(), Referrer: refName(in.Ref), Device: deviceOf(r.UserAgent())}
+	switch vid := cleanVID(in.VID); {
+	case uid != "":
+		v.VisitorID, v.UserName = uid, s.displayName(r.Context(), uid, "")
+	case vid != "":
+		v.VisitorID = "a:" + vid
+	default:
+		v.VisitorID = "ip:" + s.tokens.MAC("ip", s.clientIP(r))
+	}
+	if err := s.store.SaveVisit(r.Context(), v); err != nil {
+		s.log.Warn("үзэлт хадгалах", "err", err)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"visit": v.ID, "t": s.tokens.MAC("visit", v.ID)})
 }
 
 func (s *Server) pageError(w http.ResponseWriter, r *http.Request, err error) {

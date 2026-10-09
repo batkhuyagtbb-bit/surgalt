@@ -138,7 +138,7 @@ async function overview() {
     <div class="anx-kpis">
       ${kpi("money", "kSum", "Нийт орлого", `${sales.count} борлуулалт`, "#ov-sales")}
       ${kpi("users", "kStu", "Суралцагч", "элссэн, хичээл авсан", "#students")}
-      ${kpi("eye", "kPv", "Профайл үзэлт", "нээлттэй хуудас", "/t/" + esc(me.username))}
+      ${kpi("eye", "kPv", "Профайл үзэлт", `<span id="kPvSub">сүүлийн 30 хоног · хэн, хэр удаан ↓</span>`, "#ov-visits")}
       ${kpi("book", "kCv", "Сургалт үзэлт", `${courses.length} сургалт`, "#courses")}
     </div>
 
@@ -173,14 +173,64 @@ async function overview() {
       </div>
     </div>
 
+    <section class="anx-card" id="ov-visits"><div class="anx-card-head"><h3>${ico("eye", 18)}Профайлын үзэлт ба зочид</h3>
+      <div class="anx-tools"><div class="anx-seg" role="group" aria-label="Хуудас">${[["profile", "Профайл"], ["course", "Сургалтууд"], ["all", "Бүгд"]].map(([k, t]) => `<button type="button" data-vk="${k}" aria-pressed="${k === "profile"}">${t}</button>`).join("")}</div>
+        <div class="anx-seg" role="group" aria-label="Хугацаа">${[7, 30, 90].map((d) => `<button type="button" data-vd="${d}" aria-pressed="${d === 30}">${d} хоног</button>`).join("")}</div></div></div>
+      <div id="vsBody"><div class="pw-load"><span class="loader"></span></div></div></section>
+
   </div>`;
 
   // Хавтанд багтахын тулд том дүнг товчилно (1,250,000₮ -> 1.25 сая₮).
   const short = (n) => (n >= 1e9 ? +(n / 1e9).toFixed(2) + " тэрбум₮" : n >= 1e6 ? +(n / 1e6).toFixed(2) + " сая₮" : n ? money(n) : "0₮");
   countUp($("#kSum"), sales.total_amount, short);
-  countUp($("#kStu"), tp.students); countUp($("#kPv"), me.profile_views || 0); countUp($("#kCv"), views);
+  countUp($("#kStu"), tp.students); countUp($("#kCv"), views); // профайл үзэлтийг доорх үзэлтийн статистикаас (сүүлийн 30 хоног)
   requestAnimationFrame(() => { const m = $("#sMeter"); if (m) m.style.width = Math.min(100, pct) + "%"; });
   $("#copyLink").onclick = () => navigator.clipboard.writeText(`${location.origin}/t/${me.username}`).then(() => toast("Профайлын холбоос хуулагдлаа ✓"), () => toast(`${location.origin}/t/${me.username}`));
+
+  // Профайлын үзэлт: хэдэн хүн, хэдэн удаа, хэр удаан, хаанаас, ямар төхөөрөмжөөр.
+  const vst = { kind: "profile", days: 30 };
+  const secs = (n) => (n < 60 ? `${n} сек` : n < 3600 ? `${Math.floor(n / 60)} мин${n % 60 ? ` ${n % 60} сек` : ""}` : `${Math.floor(n / 3600)} ц ${Math.round(n % 3600 / 60)} мин`);
+  const DEV = { mobile: "Утас", desktop: "Компьютер", tablet: "Таблет" };
+  const barList = (rows, label = (x) => esc(x.name)) => { const mx = Math.max(1, ...rows.map((x) => x.count)); return rows.length ? `<ul class="vs-bars">${rows.map((x) => `<li><span>${label(x)}</span><i style="width:${x.count / mx * 100}%"></i><b>${x.count}</b></li>`).join("")}</ul>` : `<p class="muted small" style="margin:0">Мэдээлэл алга</p>`; };
+  const visChart = (daily) => {
+    const mx = Math.max(0, ...daily.map((d) => d.views));
+    if (!mx) return `<div class="anx-empty">${ico("eye", 28)}<p>Энэ хугацаанд үзэлт бүртгэгдээгүй байна. Профайлынхаа холбоосыг түгээгээрэй.</p></div>`;
+    const top = [2, 4, 6, 10, 20, 40, 60, 100, 200, 500, 1000, 2000, 5000, 10000].find((x) => x >= mx) || mx, lbl = (day) => day.slice(5).replace("-", "/");
+    return `<div class="anx-chart vs-chart"><div class="anx-y" aria-hidden="true"><span>${top}</span><span>${Math.round(top / 2)}</span><span>0</span></div>
+      <div class="anx-plot"><div class="anx-cols">${daily.map((d) => `<div class="anx-col" title="${esc(d.day)}: ${d.views} үзэлт · ${d.unique} зочин${d.seconds ? " · " + secs(d.seconds) : ""}"><i class="ac" style="height:${d.views / top * 100}%"></i></div>`).join("")}</div></div>
+      <div class="anx-x" aria-hidden="true"><span>${lbl(daily[0].day)}</span><span>${lbl(daily[Math.floor((daily.length - 1) / 2)].day)}</span><span>${lbl(daily[daily.length - 1].day)}</span></div></div>`;
+  };
+  const loadVisits = async () => {
+    const box = $("#vsBody"); if (!box) return;
+    let d; try { d = await api(`/api/me/visits?days=${vst.days}&kind=${vst.kind}`); } catch (e) { box.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
+    const t = d.totals;
+    if (vst.kind === "profile" && vst.days === 30 && !box.dataset.kpi) { box.dataset.kpi = "1"; countUp($("#kPv"), t.views); $("#kPvSub").textContent = `сүүлийн 30 хоног · ${t.unique} зочин ↓`; }
+    box.innerHTML = `<div class="anx-stats vs-stats">
+        <div class="anx-stat"><small>Нийт үзэлт</small><b>${t.views}</b></div>
+        <div class="anx-stat"><small>Давтагдаагүй зочин</small><b>${t.unique}</b></div>
+        <div class="anx-stat"><small>Бүртгэлтэй хэрэглэгч</small><b>${t.members}</b></div>
+        <div class="anx-stat"><small>Дундаж хугацаа</small><b>${t.measured ? secs(t.avg_sec) : "—"}</b></div>
+        <div class="anx-stat"><small>Нийт хугацаа</small><b>${t.total_sec ? secs(t.total_sec) : "—"}</b></div>
+        <div class="anx-stat ${t.bounce_pct >= 60 ? "bad" : ""}"><small>10 секундэд гарсан</small><b>${t.measured ? t.bounce_pct + "%" : "—"}</b></div></div>
+      <div class="vs-grid">
+        <div class="vs-main"><h4 class="anx-sub-h">Өдөр бүрийн үзэлт</h4>${visChart(d.daily)}
+          ${d.courses.length && vst.kind !== "profile" ? `<h4 class="anx-sub-h">Сургалт бүрээр</h4><div class="an-table-wrap"><table class="tbl"><thead><tr><th>Сургалт</th><th>Үзэлт</th><th>Зочин</th><th>Дундаж хугацаа</th></tr></thead><tbody>${d.courses.map((c) => `<tr><td>${esc(c.title || "—")}</td><td><b>${c.views}</b></td><td>${c.unique}</td><td>${c.avg_sec ? secs(c.avg_sec) : "—"}</td></tr>`).join("")}</tbody></table></div>` : ""}
+          <h4 class="anx-sub-h">Сүүлийн зочид</h4>
+          ${d.recent.length ? `<ul class="vs-recent">${d.recent.slice(0, 12).map((v) => `<li><span class="vs-av ${v.member ? "" : "guest"}" style="--h:${hueOfName(v.name)}">${v.member ? esc(initialsOf(v.name)) : ico("profile", 16)}</span>
+            <span class="vs-who"><b>${esc(v.name)}</b><small>${esc(v.kind === "course" ? v.title || "Сургалт" : "Профайл")} · ${fmtDate(v.at)}</small></span>
+            <span class="vs-meta"><b>${v.seconds ? secs(v.seconds) : "—"}</b><small>${esc(DEV[v.device] || v.device)} · ${esc(v.referrer)}</small></span></li>`).join("")}</ul>`
+            : `<p class="muted small" style="margin:0">Одоогоор зочин алга.</p>`}</div>
+        <div class="vs-side"><h4 class="anx-sub-h">Хэр удаан байсан бэ</h4>${barList(d.durations)}
+          <h4 class="anx-sub-h">Төхөөрөмж</h4>${barList(d.devices, (x) => esc(DEV[x.name] || x.name))}
+          <h4 class="anx-sub-h">Хаанаас ирсэн бэ</h4>${barList(d.referrers)}</div>
+      </div>`;
+  };
+  $("#ov-visits").onclick = (e) => {
+    const k = e.target.closest("[data-vk]"), dd = e.target.closest("[data-vd]");
+    if (k) { vst.kind = k.dataset.vk; $$("[data-vk]").forEach((b) => b.setAttribute("aria-pressed", String(b === k))); loadVisits(); }
+    if (dd) { vst.days = +dd.dataset.vd; $$("[data-vd]").forEach((b) => b.setAttribute("aria-pressed", String(b === dd))); loadVisits(); }
+  };
+  loadVisits();
 
   const agenda = (i) => {
     const list = perDay(days[i]);

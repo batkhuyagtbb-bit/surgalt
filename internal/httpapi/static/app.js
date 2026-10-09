@@ -3646,10 +3646,27 @@ if (page === "profile" || page === "course") chatWidget();
 if (page === "course") coursePage();
 if (page === "login") loginPage();
 if (page === "home") findCourses();
-// Үзэлт: хуудас нээгдэхэд хөтөч мэдээлнэ (нэвтэрсэн бол токентой) — багш өөрийнхийгөө үзвэл сервер тоолохгүй.
+// Үзэлт: хуудас нээгдэхэд бүртгэж, хэр удаан (идэвхтэй, харагдаж байсан) байсныг гарахдаа илгээнэ.
+// Багш өөрийнхийгөө үзвэл сервер тоолохгүй. Давтагдаагүй зочныг хөтчийн санамсаргүй ID-гаар ялгана.
 {
   const v = page === "profile" ? ["profile", $("main.pf")?.dataset.teacher] : page === "course" ? ["course", $("main.course-page")?.dataset.course] : null;
-  if (v?.[1]) api("/api/views", { method: "POST", body: { kind: v[0], id: v[1] } }).catch(() => {});
+  if (v?.[1]) {
+    let vid = ""; try { vid = localStorage.getItem("sg_vid") || ""; if (!vid) { vid = crypto.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("sg_vid", vid); } } catch {}
+    let ref = ""; try { if (document.referrer) { const u = new URL(document.referrer); ref = u.host === location.host ? "self" : u.host; } } catch {}
+    api("/api/views", { method: "POST", body: { kind: v[0], id: v[1], vid, ref } }).then((d) => {
+      if (!d?.visit) return;
+      let acc = 0, since = document.hidden ? 0 : Date.now(), sent = 0;
+      const flush = () => {
+        if (since) { acc += Date.now() - since; since = document.hidden ? 0 : Date.now(); }
+        const sec = Math.round(acc / 1000); if (sec <= sent) return; sent = sec;
+        const url = `/api/views/${d.visit}/end`, body = JSON.stringify({ t: d.t, seconds: sec });
+        if (!navigator.sendBeacon?.(url, new Blob([body], { type: "application/json" }))) fetch(url, { method: "POST", body, headers: { "Content-Type": "application/json" }, keepalive: true }).catch(() => {});
+      };
+      document.addEventListener("visibilitychange", () => { if (document.hidden) flush(); else since = Date.now(); });
+      addEventListener("pagehide", flush);
+      setInterval(() => { if (!document.hidden) flush(); }, 60000); // урт айлчлалыг минут тутам хадгална
+    }).catch(() => {});
+  }
 }
 if (page === "book") bookPage();
 })();

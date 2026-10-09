@@ -3199,3 +3199,28 @@ html.lp-focus .rail-tab{display:none!important}
 /* Хөтөлбөрийн мөр утсан дээр: гарчиг эхний мөрөнд, нээх/хаах, засах, устгах доор баруун талд */
 .ol-acts{display:flex;align-items:center;gap:4px;flex:none}
 @media (max-width:560px){.ol-row{flex-wrap:wrap;row-gap:2px}.ol-title{flex:1 1 0}.ol-title strong{white-space:normal}.ol-acts{flex-basis:100%;justify-content:flex-end}}
+
+/* ===== Профайлын үзэлт ба зочид ===== */
+#ov-visits .anx-card-head{margin-bottom:14px}
+.vs-stats{margin:0 0 18px}
+.vs-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:24px;align-items:start}
+.vs-grid .anx-sub-h:first-child{margin-top:0}
+.vs-chart{grid-template-rows:180px auto}
+.vs-side .anx-sub-h:first-child{margin-top:0}
+.vs-bars{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.vs-bars li{display:grid;grid-template-columns:118px minmax(0,1fr) auto;align-items:center;gap:8px;font-size:.84rem}
+.vs-bars span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2)}
+.vs-bars i{display:block;height:8px;min-width:4px;border-radius:999px;background:var(--brand)}
+.vs-bars b{font-variant-numeric:tabular-nums}
+.vs-recent{list-style:none;margin:0;padding:0;display:grid}
+.vs-recent li{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 2px}
+.vs-recent li+li{border-top:1px solid var(--line)}
+.vs-av{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:hsl(var(--h,220) 45% 92%);color:hsl(var(--h,220) 45% 32%);font-size:.78rem;font-weight:800}
+.vs-av.guest{background:var(--surface-2);color:var(--muted)}
+.vs-who,.vs-meta{display:grid;min-width:0}
+.vs-who b{font-size:.9rem}
+.vs-who small,.vs-meta small{font-size:.76rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vs-meta{text-align:right}
+.vs-meta b{font-size:.9rem;font-variant-numeric:tabular-nums}
+@media (max-width:900px){.vs-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){#ov-visits .anx-tools{width:100%}#ov-visits .anx-seg{flex:1}#ov-visits .anx-seg button{flex:1;padding:0 6px}.vs-bars li{grid-template-columns:96px minmax(0,1fr) auto}}

@@ -283,6 +283,9 @@ var chTables = []chTable{
 	{"meeting_access", `(user_id String, meeting_id String, course_id String, teacher_id String, created_at ` + tsType + `, ver UInt64,
 		INDEX ix_teacher teacher_id TYPE bloom_filter GRANULARITY 1)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, meeting_id)`},
+	{"page_visits", `(id String, teacher_id String, kind String, target_id String, visitor_id String, user_name String,
+		at ` + tsType + `, seconds Int32, referrer String, device String, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (teacher_id, at, id)`},
 	{"payment_invoices", `(order_id String, provider String, invoice_id String, amount Int64, qr_text String, urls String,
 		created_at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY order_id`},

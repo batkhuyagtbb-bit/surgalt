@@ -42,6 +42,7 @@ type Memory struct {
 	engage      engageMem                  // идэвхийн нэмэлт (memory_engagement.go)
 	books       bookMem                    // ном (memory_books.go)
 	invoices    map[string]*PaymentInvoice // order → сүүлийн нэхэмжлэх
+	visits      map[string]*PageVisit      // хуудасны үзэлт
 }
 
 func NewMemory() *Memory {
@@ -50,8 +51,43 @@ func NewMemory() *Memory {
 		courses: map[string]*Course{}, lessons: map[string][]*Lesson{}, orders: map[string]*Order{},
 		pending: map[[2]string]string{}, enrollments: map[[2]string]time.Time{},
 		convs: map[string]*Conversation{}, convByKey: map[string]string{}, messages: map[string][]*Message{}, identities: map[string]string{}, applied: map[string]bool{}, notifs: map[string][]*Notification{}, progress: map[[2]string]*LessonProgress{}, lessonAcc: map[[2]string]string{}, pendingL: map[[2]string]string{},
-		invoices: map[string]*PaymentInvoice{},
+		invoices: map[string]*PaymentInvoice{}, visits: map[string]*PageVisit{},
 	}
+}
+
+func (m *Memory) SaveVisit(_ context.Context, v *PageVisit) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if v.ID == "" {
+		v.ID = m.next()
+	}
+	cp := *v
+	m.visits[v.ID] = &cp
+	return nil
+}
+
+func (m *Memory) VisitByID(_ context.Context, id string) (*PageVisit, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	v, ok := m.visits[id]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	cp := *v
+	return &cp, nil
+}
+
+func (m *Memory) Visits(_ context.Context, teacherID string, since time.Time) ([]PageVisit, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := []PageVisit{}
+	for _, v := range m.visits {
+		if v.TeacherID == teacherID && !v.At.Before(since) {
+			out = append(out, *v)
+		}
+	}
+	slices.SortFunc(out, func(a, b PageVisit) int { return b.At.Compare(a.At) })
+	return out, nil
 }
 
 func (m *Memory) SaveInvoice(_ context.Context, inv *PaymentInvoice) error {

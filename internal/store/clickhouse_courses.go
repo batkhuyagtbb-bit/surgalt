@@ -870,3 +870,52 @@ func (c *ClickHouse) InvoiceByOrder(ctx context.Context, orderID string) (*Payme
 	}
 	return inv, nil
 }
+
+const visitCols = "id, teacher_id, kind, target_id, visitor_id, user_name, at, seconds, referrer, device"
+
+func (c *ClickHouse) SaveVisit(ctx context.Context, v *PageVisit) error {
+	if v.ID == "" {
+		v.ID = NewID()
+	}
+	return c.insert(ctx, "page_visits", []string{"id", "teacher_id", "kind", "target_id", "visitor_id", "user_name", "at", "seconds", "referrer", "device", "ver"},
+		v.ID, v.TeacherID, v.Kind, v.TargetID, v.VisitorID, v.UserName, v.At.UTC(), int32(v.Seconds), v.Referrer, v.Device, ver())
+}
+
+func scanVisit(r driver.Rows) (PageVisit, error) {
+	var v PageVisit
+	var sec int32
+	err := r.Scan(&v.ID, &v.TeacherID, &v.Kind, &v.TargetID, &v.VisitorID, &v.UserName, &v.At, &sec, &v.Referrer, &v.Device)
+	v.Seconds = int(sec)
+	return v, err
+}
+
+func (c *ClickHouse) VisitByID(ctx context.Context, id string) (*PageVisit, error) {
+	var out *PageVisit
+	err := c.query(ctx, "SELECT "+visitCols+" FROM page_visits FINAL WHERE id = ? LIMIT 1", []any{id}, func(r driver.Rows) error {
+		v, err := scanVisit(r)
+		if err == nil {
+			out = &v
+		}
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	if out == nil {
+		return nil, ErrNotFound
+	}
+	return out, nil
+}
+
+func (c *ClickHouse) Visits(ctx context.Context, teacherID string, since time.Time) ([]PageVisit, error) {
+	out := []PageVisit{}
+	err := c.query(ctx, "SELECT "+visitCols+" FROM page_visits FINAL WHERE teacher_id = ? AND at >= ? ORDER BY at DESC LIMIT 50000",
+		[]any{teacherID, since.UTC()}, func(r driver.Rows) error {
+			v, err := scanVisit(r)
+			if err == nil {
+				out = append(out, v)
+			}
+			return err
+		})
+	return out, err
+}
