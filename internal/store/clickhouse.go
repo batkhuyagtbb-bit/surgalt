@@ -162,6 +162,7 @@ var chMigrations = []string{
 	"ALTER TABLE meetings ADD COLUMN IF NOT EXISTS members_free Bool DEFAULT false",
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS meeting_id String DEFAULT ''",
 	"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS rubric String DEFAULT ''",
+	"ALTER TABLE users ADD COLUMN IF NOT EXISTS phone String DEFAULT ''",
 }
 
 var chTables = []chTable{
@@ -170,7 +171,7 @@ var chTables = []chTable{
 		display_name String, headline String, bio String, avatar_url String, cover_url String,
 		subjects Array(String), location String, links Map(String, String),
 		created_at ` + tsType + `, storage_extra_bytes Int64, storage_expires_at Nullable(` + tsType + `),
-		google_token String, ver UInt64, deleted Bool DEFAULT false,
+		google_token String, phone String DEFAULT '', ver UInt64, deleted Bool DEFAULT false,
 		INDEX ix_email email TYPE bloom_filter GRANULARITY 1,
 		INDEX ix_username username TYPE bloom_filter GRANULARITY 1
 	) ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
@@ -414,7 +415,7 @@ func (c *ClickHouse) counters(ctx context.Context, entity string, ids []string) 
 // ---- хэрэглэгч ----
 
 const userCols = `id, username, email, password_hash, role, display_name, headline, bio, avatar_url, cover_url,
-	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, deleted`
+	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, deleted`
 
 func scanUser(r driver.Rows) (*User, bool, error) {
 	var u User
@@ -423,7 +424,7 @@ func scanUser(r driver.Rows) (*User, bool, error) {
 	var exp *time.Time
 	if err := r.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &role, &u.DisplayName, &u.Headline, &u.Bio,
 		&u.AvatarURL, &u.CoverURL, &u.Subjects, &u.Location, &u.Links, &u.CreatedAt, &u.StorageExtraBytes, &exp,
-		&u.GoogleToken, &deleted); err != nil {
+		&u.GoogleToken, &u.Phone, &deleted); err != nil {
 		return nil, false, err
 	}
 	u.Role = Role(role)
@@ -441,10 +442,10 @@ func scanUser(r driver.Rows) (*User, bool, error) {
 func (c *ClickHouse) writeUser(ctx context.Context, u *User, deleted bool) error {
 	return c.insert(ctx, "users", []string{"id", "username", "email", "password_hash", "role", "display_name", "headline", "bio",
 		"avatar_url", "cover_url", "subjects", "location", "links", "created_at", "storage_extra_bytes", "storage_expires_at",
-		"google_token", "ver", "deleted"},
+		"google_token", "phone", "ver", "deleted"},
 		u.ID, u.Username, u.Email, u.PasswordHash, string(u.Role), u.DisplayName, u.Headline, u.Bio,
 		u.AvatarURL, u.CoverURL, nzStrings(u.Subjects), u.Location, nzLinks(u.Links), u.CreatedAt.UTC(), u.StorageExtraBytes,
-		nullTime(u.StorageExpiresAt), u.GoogleToken, ver(), deleted)
+		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, ver(), deleted)
 }
 
 func (c *ClickHouse) userWhere(ctx context.Context, where string, args ...any) (*User, error) {
@@ -528,7 +529,7 @@ func (c *ClickHouse) UpdateProfile(ctx context.Context, id string, p ProfileUpda
 		return err
 	}
 	u.DisplayName, u.Headline, u.Bio, u.AvatarURL, u.CoverURL = p.DisplayName, p.Headline, p.Bio, p.AvatarURL, p.CoverURL
-	u.Subjects, u.Location, u.Links = cloneStrings(p.Subjects), p.Location, cloneLinks(p.Links)
+	u.Subjects, u.Location, u.Links, u.Phone = cloneStrings(p.Subjects), p.Location, cloneLinks(p.Links), p.Phone
 	return c.writeUser(ctx, u, false)
 }
 

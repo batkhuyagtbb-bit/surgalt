@@ -179,7 +179,13 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, u)
+	writeJSON(w, http.StatusOK, meView{u, u.Phone})
+}
+
+// meView: өөрийн мэдээлэл — нээлттэй JSON-д гардаггүй утасны дугаарыг эзэмшигчид л нэмж өгнө.
+type meView struct {
+	*store.User
+	Phone string `json:"phone"`
 }
 
 func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
@@ -196,6 +202,7 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		Subjects    []string          `json:"subjects"`
 		Location    string            `json:"location"`
 		Links       map[string]string `json:"links"`
+		Phone       *string           `json:"phone"` // ирээгүй бол хэвээр (зураг солих зэрэг хэсэгчилсэн хадгалалт)
 	}
 	if !decode(w, r, &in) {
 		return
@@ -229,8 +236,20 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, msg)
 		return
 	}
-	err := s.store.UpdateProfile(r.Context(), c.UID, store.ProfileUpdate{DisplayName: in.DisplayName, Headline: in.Headline,
-		Bio: in.Bio, AvatarURL: in.AvatarURL, CoverURL: in.CoverURL, Subjects: subjects, Location: in.Location, Links: links})
+	cur, err := s.store.UserByID(r.Context(), c.UID)
+	if s.storeErr(w, r, err) {
+		return
+	}
+	phone := cur.Phone
+	if in.Phone != nil {
+		var ok bool
+		if phone, ok = cleanPhone(*in.Phone); !ok {
+			writeErr(w, http.StatusBadRequest, "утасны дугаар: 8 оронтой (9911 2233) эсвэл «+»-ээр эхэлсэн олон улсын дугаар")
+			return
+		}
+	}
+	err = s.store.UpdateProfile(r.Context(), c.UID, store.ProfileUpdate{DisplayName: in.DisplayName, Headline: in.Headline,
+		Bio: in.Bio, AvatarURL: in.AvatarURL, CoverURL: in.CoverURL, Subjects: subjects, Location: in.Location, Links: links, Phone: phone})
 	if s.storeErr(w, r, err) {
 		return
 	}
@@ -239,7 +258,7 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, u)
+	writeJSON(w, http.StatusOK, meView{u, u.Phone})
 }
 
 // handleUpdateUsername: багш профайлын холбоосоо (/t/<нэр>) солино.

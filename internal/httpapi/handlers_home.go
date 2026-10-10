@@ -144,6 +144,7 @@ func (s *Server) profileInsights(u *store.User, courses []store.Course) ProfileI
 		{ProfileTip{"paid", "Төлбөртэй агуулга", "Багц үнэ эсвэл хичээлийн үнэ тавьж орлого олж эхлээрэй.", "#courses", paid > 0}, 5},
 		{ProfileTip{"links", "Сошиал холбоос", "Facebook, Instagram, YouTube эсвэл вэб сайтаа холбоорой.", "#profile", len(u.Links) > 0}, 5},
 		{ProfileTip{"location", "Байршил", "Хаана байдгаа заавал танхимын сургалтад хэрэгтэй.", "#profile", u.Location != ""}, 5},
+		{ProfileTip{"phone", "Утасны дугаар", "Зочид нэг товшилтоор залгана; хэн дугаарыг тань харсныг мэдэгдэнэ.", "#profile", u.Phone != ""}, 5},
 	}
 	if s.Meet != nil {
 		items = append(items, item{ProfileTip{"meet", "Google Meet холболт", "Шууд хичээлийг нэг товчоор товлох боломжтой болно.", "#live", u.MeetConnected}, 5})

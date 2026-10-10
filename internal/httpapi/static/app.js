@@ -2455,6 +2455,21 @@ function profilePage() {
     try { await navigator.clipboard.writeText(location.origin + location.pathname); toast("Холбоос хуулагдлаа ✓"); } catch { toast(location.href); }
   }));
   $$("[data-share]").forEach((b) => b.addEventListener("click", () => share(b.dataset.title)));
+  // Утас: эхний 4 орон харагдана → дарахад бүтэн дугаар (багшид мэдэгдэнэ) → дахин дарахад tel: холбоосоор шууд залгана.
+  $$("[data-phone]").forEach((a) => a.addEventListener("click", async (e) => {
+    if (a.dataset.tel) return;
+    e.preventDefault();
+    if (a.classList.contains("loading")) return;
+    a.classList.add("loading");
+    let vid = ""; try { vid = localStorage.getItem("sg_vid") || ""; } catch {}
+    try {
+      const d = await api(`/api/teachers/${encodeURIComponent(a.dataset.phone)}/phone`, { method: "POST", body: { vid } });
+      a.dataset.tel = d.tel; a.href = "tel:" + d.tel;
+      $(".pf-phone-n", a).textContent = d.display; $("small", a).textContent = "Залгах";
+      a.classList.add("revealed"); a.setAttribute("aria-label", d.display + " дугаар руу залгах");
+    } catch (x) { toast(x.message, true); }
+    a.classList.remove("loading");
+  }));
   localTimes();
 
   /* Таб: агуулгыг сольж, доогуур зураас нь гулсана. Холбоосоор (#about гэх мэт) шууд нээгдэнэ. */
@@ -2668,7 +2683,7 @@ function profileOwner(root, h) {
     } catch (x) { say(x.message, "bad"); toast(x.message, true); unBtn.disabled = false; }
   });
   // Зөвлөмж: дутуу алхмыг нэг товшилтоор гүйцээнэ (талбар руу очих, зураг оруулах, хэсэг рүү шилжих).
-  const FIELD = { bio: "bio", headline: "headline", subjects: "subjects", location: "location", links: "link_website" };
+  const FIELD = { bio: "bio", headline: "headline", subjects: "subjects", location: "location", links: "link_website", phone: "phone" };
   const loadTips = async () => {
     try {
       const ins = await api("/api/me/profile/insights"), todo = ins.tips.filter((t) => !t.done);
@@ -2692,6 +2707,7 @@ function profileOwner(root, h) {
       const u = await api("/api/me");
       form.display_name.value = u.display_name; form.headline.value = u.headline || ""; form.bio.value = u.bio || "";
       form.subjects.value = (u.subjects || []).join(", "); form.location.value = u.location || "";
+      form.phone.value = (u.phone || "").replace(/^(\d{4})(\d{4})$/, "$1 $2");
       LINK_KEYS.forEach((k) => (form["link_" + k].value = (u.links || {})[k] || ""));
       preview(); count(); unReset(u.username);
       emTab(["info", "link", "tips"].includes(tab) ? tab : "info"); openModal(modal); loadTips();
@@ -2704,7 +2720,7 @@ function profileOwner(root, h) {
     e.preventDefault(); err.textContent = "";
     const btn = $("button.btn-gold", form); btn.disabled = true;
     try {
-      await save({ display_name: form.display_name.value, headline: form.headline.value, bio: form.bio.value, location: form.location.value,
+      await save({ display_name: form.display_name.value, headline: form.headline.value, bio: form.bio.value, location: form.location.value, phone: form.phone.value,
         subjects: form.subjects.value.split(/[,\n]/).map((x) => x.trim()).filter(Boolean),
         links: Object.fromEntries(LINK_KEYS.map((k) => [k, form["link_" + k].value.trim()]).filter(([, v]) => v)) });
       location.reload(); // хуудас серверээс шинээр рендерлэгдэнэ (кэш аль хэдийн цэвэрлэгдсэн)

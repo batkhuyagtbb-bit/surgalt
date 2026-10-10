@@ -27,6 +27,7 @@
       </div>
       <div class="pf-actions" data-visitor>
         <button class="btn btn-gold magnetic" data-open-chat>{{icon "chat"}}Чатлах</button>
+        {{with $t.PhoneHint}}<a class="btn btn-glass pf-phone" href="#" data-phone="{{$t.Username}}" rel="nofollow" aria-label="Утасны дугаар харах">{{icon "phone"}}<span class="pf-phone-n">{{.}} ••••</span><small>Харах</small></a>{{end}}
         <a class="btn btn-glass" href="#courses" data-tab-go="courses">{{icon "courses"}}Сургалтууд</a>
         <button class="btn btn-glass btn-icon" data-open-qr aria-label="QR код" title="QR код">{{icon "qr"}}</button>
         <button class="btn btn-glass btn-icon" data-share data-title="{{$t.DisplayName}}" aria-label="Хуваалцах" title="Хуваалцах">{{icon "share"}}</button>
@@ -226,6 +227,7 @@
           <label>Байршил<input name="location" maxlength="60" placeholder="Улаанбаатар"></label>
         </div>
         <div class="tags" id="subjPreview"></div>
+        <label><span class="em-lbl">Утасны дугаар <small class="muted">зочдод эхний 4 орон харагдана, дарж нээхэд танд мэдэгдэнэ</small></span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="9911 2233"></label>
         <fieldset class="em-links"><legend>Сошиал холбоос</legend><div class="form-row">
           <label>Вэб сайт<input name="link_website" maxlength="300" inputmode="url" placeholder="https://"></label>
           <label>Facebook<input name="link_facebook" maxlength="300" inputmode="url" placeholder="facebook.com/…"></label>

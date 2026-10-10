@@ -28,6 +28,7 @@ const ICON = {
   live: '<rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/>',
   chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/>',
   profile: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>',
+  phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>',
   ext: '<path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
   out: '<path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4"/><path d="m16 8 4 4-4 4"/><path d="M20 12H9"/>',
   money: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 9v.01M17 15v.01"/>',
@@ -212,11 +213,14 @@ async function overview() {
         <div class="anx-stat"><small>Дундаж хугацаа</small><b>${t.measured ? secs(t.avg_sec) : "—"}</b></div>
         <div class="anx-stat"><small>Нийт хугацаа</small><b>${t.total_sec ? secs(t.total_sec) : "—"}</b></div>
         <div class="anx-stat ${t.bounce_pct >= 60 ? "bad" : ""}"><small>10 секундэд гарсан</small><b>${t.measured ? t.bounce_pct + "%" : "—"}</b></div></div>
+      ${vst.kind !== "course" ? `<p class="vs-lead">${ico("phone", 16)}<span><b>${t.phone || 0}</b> хүн утасны дугаарыг тань харсан</span><small>нэг хүн 6 цагт нэг удаа тоологдоно</small></p>` : ""}
       <div class="vs-grid">
         <div class="vs-main"><h4 class="anx-sub-h">Өдөр бүрийн үзэлт</h4>${visChart(d.daily)}
           ${d.courses.length && vst.kind !== "profile" ? `<h4 class="anx-sub-h">Сургалт бүрээр</h4><div class="an-table-wrap"><table class="tbl"><thead><tr><th>Сургалт</th><th>Үзэлт</th><th>Зочин</th><th>Дундаж хугацаа</th></tr></thead><tbody>${d.courses.map((c) => `<tr><td>${esc(c.title || "—")}</td><td><b>${c.views}</b></td><td>${c.unique}</td><td>${c.avg_sec ? secs(c.avg_sec) : "—"}</td></tr>`).join("")}</tbody></table></div>` : ""}
           <h4 class="anx-sub-h">Сүүлийн зочид</h4>
-          ${d.recent.length ? `<ul class="vs-recent">${d.recent.slice(0, 12).map((v) => `<li><span class="vs-av ${v.member ? "" : "guest"}" style="--h:${hueOfName(v.name)}">${v.member ? esc(initialsOf(v.name)) : ico("profile", 16)}</span>
+          ${d.recent.length ? `<ul class="vs-recent">${d.recent.slice(0, 12).map((v) => v.kind === "phone" ? `<li class="vs-ph"><span class="vs-av ${v.member ? "" : "guest"}" style="--h:${hueOfName(v.name)}">${v.member ? esc(initialsOf(v.name)) : ico("profile", 16)}</span>
+            <span class="vs-who"><b>${esc(v.name)}</b><small>${ico("phone", 13)} Утасны дугаар харсан · ${fmtDate(v.at)}</small></span>
+            <span class="vs-meta"><b>${ico("phone", 16)}</b><small>${esc(DEV[v.device] || v.device)}</small></span></li>` : `<li><span class="vs-av ${v.member ? "" : "guest"}" style="--h:${hueOfName(v.name)}">${v.member ? esc(initialsOf(v.name)) : ico("profile", 16)}</span>
             <span class="vs-who"><b>${esc(v.name)}</b><small>${esc(v.kind === "course" ? v.title || "Сургалт" : "Профайл")} · ${fmtDate(v.at)}</small></span>
             <span class="vs-meta"><b>${v.seconds ? secs(v.seconds) : "—"}</b><small>${esc(DEV[v.device] || v.device)} · ${esc(v.referrer)}</small></span></li>`).join("")}</ul>`
             : `<p class="muted small" style="margin:0">Одоогоор зочин алга.</p>`}</div>

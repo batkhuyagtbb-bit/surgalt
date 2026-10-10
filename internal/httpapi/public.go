@@ -41,6 +41,8 @@ type PublicTeacher struct {
 	CourseCount     int          `json:"course_count"`
 	LessonCount     int          `json:"lesson_count"`
 	FreeLessonCount int          `json:"free_lesson_count"`
+	// Утасны эхний 4 орон (бүтэн дугаарыг POST /api/teachers/{username}/phone өгнө — хуудас кэштэй тул энд хэзээ ч орохгүй).
+	PhoneHint string `json:"phone_hint,omitempty"`
 }
 
 // PublicLink нь профайл дээрх гадаад холбоос (store.LinkKeys-ийн дарааллаар).
@@ -135,6 +137,7 @@ func groupLessons(ls []PublicLesson) ([]PublicSection, bool) {
 func publicTeacher(u *store.User) PublicTeacher {
 	t := PublicTeacher{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, Headline: u.Headline, Bio: u.Bio, AvatarURL: u.AvatarURL, CoverURL: u.CoverURL,
 		Subjects: u.Subjects, Location: u.Location, Links: []PublicLink{}, JoinedYear: u.CreatedAt.Year()}
+	_, _, t.PhoneHint = phoneParts(u.Phone)
 	if t.Subjects == nil {
 		t.Subjects = []string{}
 	}

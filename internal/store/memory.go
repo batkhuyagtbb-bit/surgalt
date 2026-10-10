@@ -193,7 +193,7 @@ func (m *Memory) UpdateProfile(_ context.Context, id string, p ProfileUpdate) er
 		return ErrNotFound
 	}
 	u.DisplayName, u.Headline, u.Bio, u.AvatarURL = p.DisplayName, p.Headline, p.Bio, p.AvatarURL
-	u.CoverURL = p.CoverURL
+	u.CoverURL, u.Phone = p.CoverURL, p.Phone
 	u.Subjects, u.Location, u.Links = cloneStrings(p.Subjects), p.Location, cloneLinks(p.Links)
 	return nil
 }

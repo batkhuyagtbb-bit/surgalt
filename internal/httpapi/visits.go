@@ -159,7 +159,21 @@ func (s *Server) handleMyVisits(w http.ResponseWriter, r *http.Request) {
 	perCourse := map[string]*courseAgg{}
 	views, totalSec, measured, bounce := 0, 0, 0, 0
 	recent := []visitRow{}
+	phones := 0
 	for _, v := range all { // шинээс хуучин
+		if v.Kind == "phone" { // утасны дугаар харсан: үзэлтэд тооцохгүй, профайлын хүрээнд тусад нь
+			if kind != "course" {
+				phones++
+				if len(recent) < 30 {
+					name := v.UserName
+					if name == "" {
+						name = "Зочин"
+					}
+					recent = append(recent, visitRow{Name: name, Member: v.UserName != "", At: v.At, Device: v.Device, Kind: "phone", Title: "Утасны дугаар харсан"})
+				}
+			}
+			continue
+		}
 		if kind != "all" && v.Kind != kind {
 			continue
 		}
@@ -262,7 +276,7 @@ func (s *Server) handleMyVisits(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, no-store")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"days": days, "kind": kind,
-		"totals": map[string]any{"views": views, "unique": len(uniq), "members": len(members), "avg_sec": avg, "total_sec": totalSec, "measured": measured, "bounce_pct": bouncePct},
+		"totals": map[string]any{"views": views, "unique": len(uniq), "members": len(members), "avg_sec": avg, "total_sec": totalSec, "measured": measured, "bounce_pct": bouncePct, "phone": phones},
 		"daily":  daily, "devices": sorted(devices, 3), "referrers": sorted(refs, 6), "durations": buckets, "recent": recent, "courses": courses,
 	})
 }

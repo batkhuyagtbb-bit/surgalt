@@ -31,6 +31,9 @@ type User struct {
 	Bio          string `json:"bio"`
 	AvatarURL    string `json:"avatar_url"`
 	CoverURL     string `json:"cover_url"` // профайлын дээд талын өргөн зураг
+	// Утас: нээлттэй профайлд зөвхөн эхний 4 орон харагдана; бүтэн дугаарыг зочин дарж нээхэд л
+	// (багшид мэдэгдэж, бүртгэгдэнэ) өгнө — тиймээс JSON-д автоматаар гарахгүй.
+	Phone string `json:"-"`
 	// Нээлттэй профайлын нэмэлт мэдээлэл (багш).
 	Subjects  []string          `json:"subjects"` // заадаг чиглэлүүд
 	Location  string            `json:"location"` // хот / байршил
@@ -58,6 +61,7 @@ type ProfileUpdate struct {
 	Subjects    []string
 	Location    string
 	Links       map[string]string
+	Phone       string
 }
 
 // Notification — хэрэглэгчид (ихэвчлэн багшид) очих мэдэгдэл.

@@ -3255,3 +3255,17 @@ html.intro-on,html.intro-on body{overflow:hidden}
 .intro-sound.on .snd-on{display:block}
 .intro-sound:not(.on){border-color:rgba(234,160,46,.8);animation:intro-snd 1.8s ease-out infinite} /* дуу асаахыг санал болгоно */
 @keyframes intro-snd{0%{box-shadow:0 0 0 0 rgba(234,160,46,.55)}100%{box-shadow:0 0 0 12px rgba(234,160,46,0)}}
+
+/* ---- Профайл: багшийн утас — эхний 4 орон → дарж нээх (багшид мэдэгдэнэ) → дахин дарахад залгах ---- */
+.pf-phone{font-variant-numeric:tabular-nums;white-space:nowrap}
+.pf-phone .pf-phone-n{letter-spacing:.02em}
+.pf-phone small{font-size:.7rem;font-weight:800;line-height:1;padding:4px 8px;border-radius:999px;background:var(--brand);color:#fff}
+.pf-phone.revealed small{background:var(--accent);color:#1b2240}
+.pf-phone.loading{opacity:.6;cursor:progress}
+.vs-lead{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:-6px 0 18px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);color:var(--brand);font-size:.92rem}
+.vs-lead svg{flex:none}
+.vs-lead b{font-size:1.05rem}
+.vs-lead span{color:var(--text,#1b2240)}
+.vs-lead small{margin-left:auto;color:var(--muted)}
+.vs-ph .vs-who small svg{vertical-align:-2px;color:var(--brand)}
+.vs-ph .vs-meta b{color:var(--brand)}

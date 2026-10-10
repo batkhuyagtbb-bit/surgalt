@@ -46,6 +46,7 @@ type Server struct {
 	limiter  *ratelimit.Limiter
 	authLim  *ratelimit.Limiter // нэвтрэлт/бүртгэл/зочин токен — илүү чанга
 	chatLim  *ratelimit.Limiter // мессеж илгээх
+	phoneLim *ratelimit.Limiter // багшийн утасны дугаар нээх — дугаар хусуурдахаас сэргийлнэ
 	profiles *cache.Cache[*Rendered[PublicProfile]]
 	courses  *cache.Cache[*Rendered[PublicCourse]]
 	qrs      *cache.Cache[[]byte]
@@ -74,6 +75,7 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 		limiter:  ratelimit.New(cfg.RateLimitRPS, cfg.RateBurst),
 		authLim:  ratelimit.New(1, 10),
 		chatLim:  ratelimit.New(2, 10),
+		phoneLim: ratelimit.New(0.05, 8),
 		profiles: cache.New[*Rendered[PublicProfile]](30*time.Second, 5*time.Second, isNF),
 		courses:  cache.New[*Rendered[PublicCourse]](30*time.Second, 5*time.Second, isNF),
 		qrs:      cache.New[[]byte](time.Hour, 5*time.Second, isNF),
@@ -92,6 +94,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.limiter.Janitor(ctx)
 	go s.authLim.Janitor(ctx)
 	go s.chatLim.Janitor(ctx)
+	go s.phoneLim.Janitor(ctx)
 	go s.notifyLoop(ctx)
 }
 
@@ -214,6 +217,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Нээлттэй профайл
 	mux.HandleFunc("GET /api/teachers/{username}", s.handlePublicProfile)
+	mux.HandleFunc("POST /api/teachers/{username}/phone", s.handleRevealPhone)
 	mux.HandleFunc("POST /api/views", s.handleTrackView)
 	mux.HandleFunc("POST /api/views/{id}/end", s.handleVisitEnd)
 	mux.HandleFunc("GET /api/me/visits", s.handleMyVisits)

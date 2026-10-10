@@ -20,6 +20,7 @@ const (
 	NotifPurchase    = "purchase"
 	NotifMessage     = "message"
 	NotifStorage     = "storage"
+	NotifPhoneView   = "phone_view"
 )
 
 type viewKey struct{ teacher, kind, id string }
@@ -37,6 +38,8 @@ type notifier struct {
 	views   map[viewKey]*viewAgg
 	seen    map[string]struct{}  // ip|kind|id — нэг цонхонд нэг л удаа тоолно
 	msgLast map[string]time.Time // яриа -> сүүлд мэдэгдсэн
+	// багш|зочин -> утасны дугаарыг сүүлд нээсэн (phone.go)
+	phoneSeen map[string]time.Time
 }
 
 const (
@@ -47,7 +50,7 @@ const (
 )
 
 func newNotifier() *notifier {
-	return &notifier{views: map[viewKey]*viewAgg{}, seen: map[string]struct{}{}, msgLast: map[string]time.Time{}}
+	return &notifier{views: map[viewKey]*viewAgg{}, seen: map[string]struct{}{}, msgLast: map[string]time.Time{}, phoneSeen: map[string]time.Time{}}
 }
 
 // trackView нь маш хурдан (зөвхөн map-д нэмнэ) тул халуун зам дээр аюулгүй.
@@ -93,6 +96,11 @@ func (s *Server) flushViews(ctx context.Context) {
 	for k, t := range n.msgLast {
 		if time.Since(t) > msgThrottle {
 			delete(n.msgLast, k)
+		}
+	}
+	for k, t := range n.phoneSeen {
+		if time.Since(t) > phoneRepeat {
+			delete(n.phoneSeen, k)
 		}
 	}
 	n.mu.Unlock()
