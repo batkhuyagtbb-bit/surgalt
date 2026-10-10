@@ -581,6 +581,8 @@ type Store interface {
 	// Meetings нь from-оос хойшхи уулзалтууд (courseID хоосон бол багшийн бүх).
 	Meetings(ctx context.Context, teacherID, courseID string, from time.Time, limit int) ([]Meeting, error)
 	DeleteMeeting(ctx context.Context, id string) error
+	// SetMeetingURL — Meet холбоосыг гараар тавих (meet.new-ээс хуулсан).
+	SetMeetingURL(ctx context.Context, id, url string) error
 	// Цаг захиалга (slots.go): багшийн сул цагууд ба тэдгээрийн захиалга.
 	AddSlots(ctx context.Context, slots []*Slot) error
 	SlotByID(ctx context.Context, id string) (*Slot, error)

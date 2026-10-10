@@ -269,3 +269,72 @@ func TestCancelBookingsBulk(t *testing.T) {
 		t.Fatalf("хоосон жагсаалт 400: %d", code)
 	}
 }
+
+func TestCleanMeetURL(t *testing.T) {
+	for in, want := range map[string]string{
+		"meet.google.com/abc-defg-hij":                "https://meet.google.com/abc-defg-hij",
+		" https://meet.google.com/abc-defg-hij?a=1":   "https://meet.google.com/abc-defg-hij?a=1",
+		"https://us02web.zoom.us/j/123456":            "https://us02web.zoom.us/j/123456",
+		"https://teams.microsoft.com/l/meetup-join/x": "https://teams.microsoft.com/l/meetup-join/x",
+	} {
+		if got, ok := cleanMeetURL(in); !ok || got != want {
+			t.Fatalf("cleanMeetURL(%q) = %q %v, хүлээсэн %q", in, got, ok, want)
+		}
+	}
+	for _, in := range []string{"", "http://meet.google.com/abc-defg-hij", "javascript:alert(1)", "https://evil.com/meet.google.com/abc",
+		"https://meet.google.com/", "https://user:pw@meet.google.com/abc-defg-hij", "https://meet.google.com.evil.com/abc"} {
+		if _, ok := cleanMeetURL(in); ok {
+			t.Fatalf("cleanMeetURL(%q) зөвшөөрөх ёсгүй", in)
+		}
+	}
+}
+
+// Google Meet холбоогүй багш meet.new-ээс хуулсан холбоосоо онлайн захиалгад тавина: «Шууд хичээл», суралцагчийн
+// нүүр шинэчлэгдэж мэдэгдэл очно; шууд хичээлийг ч гараар тавьсан холбоосоор товлоно.
+func TestManualMeetLink(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	other, _ := register(t, srv, "other", "teacher")
+	st, _ := register(t, srv, "stud", "student")
+	at := time.Now().Add(48 * time.Hour).Truncate(time.Hour).UTC()
+	_, out := callArr(t, srv, "POST", "/api/me/slots", tt, `{"starts":["`+at.Format(time.RFC3339)+`","`+at.Add(time.Hour).Format(time.RFC3339)+`"],"duration_min":60,"mode":"online"}`)
+	booked, free := out[0].(map[string]any)["id"].(string), out[1].(map[string]any)["id"].(string)
+	call(t, srv, "POST", "/api/slots/"+booked+"/book", st, `{}`)
+	link := `{"meet_url":"meet.google.com/abc-defg-hij"}`
+	if code, _ := call(t, srv, "PUT", "/api/me/slots/"+booked+"/meet", tt, `{"meet_url":"https://evil.com/x"}`); code != http.StatusBadRequest {
+		t.Fatalf("буруу холбоос 400: %d", code)
+	}
+	if code, _ := call(t, srv, "PUT", "/api/me/slots/"+booked+"/meet", other, link); code != http.StatusNotFound {
+		t.Fatalf("бусдын захиалгад холбоос тавихгүй: %d", code)
+	}
+	if code, _ := call(t, srv, "PUT", "/api/me/slots/"+free+"/meet", tt, link); code != http.StatusNotFound {
+		t.Fatalf("захиалаагүй цагт холбоос тавихгүй: %d", code)
+	}
+	if code, sl := call(t, srv, "PUT", "/api/me/slots/"+booked+"/meet", tt, link); code != 200 || sl["meet_url"] != "https://meet.google.com/abc-defg-hij" {
+		t.Fatalf("холбоос тавих: %d %v", code, sl)
+	}
+	if _, ms := callArrMap(t, srv, "GET", "/api/me/meetings", tt); len(ms) != 1 || ms[0]["meet_url"] != "https://meet.google.com/abc-defg-hij" {
+		t.Fatalf("«Шууд хичээл»-д холбоос: %v", ms)
+	}
+	_, h := call(t, srv, "GET", "/api/me/home", st, "")
+	found := false
+	for _, m := range h["meetings"].([]any) {
+		if mm := m.(map[string]any); mm["booking"] == true && mm["meet_url"] == "https://meet.google.com/abc-defg-hij" {
+			found = true
+		}
+	}
+	_, ns := call(t, srv, "GET", "/api/me/notifications", st, "")
+	if ts := notifTitles(ns, NotifBooking); !found || !strings.Contains(strings.Join(ts, "|"), "Уулзалтын холбоос ирлээ") {
+		t.Fatalf("суралцагчийн нүүрт холбоос, мэдэгдэл: %v %v", found, ts)
+	}
+
+	// Шууд хичээл: Google тохируулаагүй ч гараар тавьсан холбоосоор товлоно; холбоосгүй бол Google шаардана.
+	start := time.Now().Add(72 * time.Hour).UTC().Format(time.RFC3339)
+	if code, m := call(t, srv, "POST", "/api/me/meetings", tt, `{"title":"Давтлага","starts_at":"`+start+`","duration_min":60,"meet_url":"https://meet.google.com/xyz-abcd-efg"}`); code != 201 || m["meet_url"] != "https://meet.google.com/xyz-abcd-efg" {
+		t.Fatalf("гараар тавьсан холбоосоор товлох: %d %v", code, m)
+	}
+	if code, _ := call(t, srv, "POST", "/api/me/meetings", tt, `{"title":"Давтлага","starts_at":"`+start+`","duration_min":60}`); code != http.StatusServiceUnavailable {
+		t.Fatalf("холбоосгүй бол Google Meet шаардана: %d", code)
+	}
+}

@@ -758,6 +758,20 @@ func (c *ClickHouse) SetMeetingPrice(ctx context.Context, id string, price int64
 	return c.writeMeeting(ctx, m)
 }
 
+func (c *ClickHouse) SetMeetingURL(ctx context.Context, id, url string) error {
+	unlock, err := c.lock(ctx, "meeting:"+id)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	m, err := c.MeetingByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	m.MeetURL = url
+	return c.writeMeeting(ctx, m)
+}
+
 func (c *ClickHouse) CreateOrGetPendingMeetingOrder(ctx context.Context, userID string, m *Meeting, title string) (*Order, error) {
 	return c.pendingOrder(ctx, userID+":m:"+m.ID, "user_id = ? AND meeting_id = ? AND kind = ?", []any{userID, m.ID, OrderKindMeeting},
 		&Order{Kind: OrderKindMeeting, Title: title, UserID: userID, CourseID: m.CourseID, MeetingID: m.ID, TeacherID: m.TeacherID, Amount: m.Price})

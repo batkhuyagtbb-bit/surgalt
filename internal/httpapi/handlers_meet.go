@@ -125,6 +125,30 @@ func (s *Server) meetErr(w http.ResponseWriter, r *http.Request, err error) {
 	}
 }
 
+// cleanMeetURL: гараар тавьсан уулзалтын холбоос (meet.new-ээс хуулсан г.м.) — зөвхөн https, мэдэгдэх видео
+// уулзалтын үйлчилгээ (Google Meet, Zoom, Teams); «meet.google.com/…» гэж схемгүй тавьсан ч болно.
+func cleanMeetURL(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || len(raw) > 300 {
+		return "", false
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.User != nil {
+		return "", false
+	}
+	h := strings.ToLower(u.Hostname())
+	switch {
+	case h == "meet.google.com" && len(strings.Trim(u.Path, "/")) >= 3,
+		h == "zoom.us" || strings.HasSuffix(h, ".zoom.us"),
+		h == "teams.microsoft.com" || h == "teams.live.com":
+		return u.String(), true
+	}
+	return "", false
+}
+
 // meetingPriceErr — шууд хичээлийн үнийн шалгалт. Төлбөртэй бол сургалттай холбоотой байх ёстой
 // (суралцагчид сургалтын хуудаснаас худалдаж авна).
 func meetingPriceErr(price int64, courseID string) string {
@@ -152,10 +176,11 @@ func meetingOpen(m *store.Meeting, course *store.Course, uid string, enrolled bo
 	return (course.Price == 0 && course.Published) || enrolled
 }
 
-// handleCreateMeeting: {title, starts_at (RFC3339), duration_min, course_id?, price?, members_free?}
+// handleCreateMeeting: {title, starts_at (RFC3339), duration_min, course_id?, price?, members_free?, meet_url?} —
+// meet_url (meet.new-ээс хуулсан холбоос) байвал Google холболтгүйгээр товлоно, үгүй бол багшийн Google Meet-ээр.
 func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireTeacher(w, r)
-	if !ok || !s.meetEnabled(w) {
+	if !ok {
 		return
 	}
 	var in struct {
@@ -165,8 +190,20 @@ func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
 		CourseID    string    `json:"course_id"`
 		Price       int64     `json:"price"`
 		MembersFree bool      `json:"members_free"`
+		MeetURL     string    `json:"meet_url"`
 	}
 	if !decode(w, r, &in) {
+		return
+	}
+	manual := strings.TrimSpace(in.MeetURL) != ""
+	if manual {
+		u, ok := cleanMeetURL(in.MeetURL)
+		if !ok {
+			writeErr(w, http.StatusBadRequest, "уулзалтын холбоос: https://meet.google.com/… (эсвэл Zoom, Teams)")
+			return
+		}
+		in.MeetURL = u
+	} else if !s.meetEnabled(w) {
 		return
 	}
 	in.Title = strings.TrimSpace(in.Title)
@@ -195,7 +232,15 @@ func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	m, err := s.createMeet(r.Context(), c.UID, in.CourseID, in.Title, in.StartsAt, in.DurationMin, in.Price, in.MembersFree)
+	var m *store.Meeting
+	var err error
+	if manual {
+		m = &store.Meeting{TeacherID: c.UID, CourseID: in.CourseID, Title: in.Title, StartsAt: in.StartsAt, DurationMin: in.DurationMin,
+			MeetURL: in.MeetURL, Price: in.Price, MembersFree: in.MembersFree}
+		err = s.store.CreateMeeting(r.Context(), m)
+	} else {
+		m, err = s.createMeet(r.Context(), c.UID, in.CourseID, in.Title, in.StartsAt, in.DurationMin, in.Price, in.MembersFree)
+	}
 	if err != nil {
 		s.meetErr(w, r, err)
 		return

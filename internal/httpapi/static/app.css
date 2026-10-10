@@ -3375,6 +3375,19 @@ html.intro-on,html.intro-on body{overflow:hidden}
   .ab-row input{grid-row:1/span 3}
   .ab-when{grid-column:2;grid-row:1}
   .ab-who{grid-column:2;grid-row:2}
-  .ab-row .chip{grid-column:2;grid-row:3;justify-self:start}
   .ab-row [data-cancel-one]{grid-column:3;grid-row:1/span 3}
 }
+
+/* ---- Уулзалтын холбоосыг гараар (meet.new → хуулах → тавих) ---- */
+.ml-steps{display:grid;gap:8px;margin:12px 0 10px;padding-left:20px}
+.ml-steps li{padding-left:2px}
+.ml-steps li::marker{color:var(--brand);font-weight:800}
+.ml-steps li>*{vertical-align:middle}
+.ml-steps li span{margin-left:8px;color:var(--muted);font-size:.88rem}
+.ml-steps li:last-child span{margin-left:0}
+.ml-form{display:flex;flex-wrap:wrap;gap:8px}
+.ml-form input{flex:1 1 220px;min-width:0;height:42px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);font:inherit}
+.ml-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px}
+.ml-row label{flex:1 1 260px}
+.ab-acts{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
+@media (max-width:760px){ .ab-row .ab-acts{grid-column:2;grid-row:3;justify-content:flex-start} }

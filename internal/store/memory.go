@@ -627,6 +627,18 @@ func (m *Memory) SetMeetingPrice(_ context.Context, id string, price int64, memb
 	return ErrNotFound
 }
 
+func (m *Memory) SetMeetingURL(_ context.Context, id, url string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, mt := range m.meetings {
+		if mt.ID == id {
+			mt.MeetURL = url
+			return nil
+		}
+	}
+	return ErrNotFound
+}
+
 func (m *Memory) CreateOrGetPendingMeetingOrder(_ context.Context, userID string, mt *Meeting, title string) (*Order, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -1622,7 +1622,7 @@ function slotsPanel() {
       <label>Давтах<select id="scWeeks">${[[1, "Давтахгүй"], [13, "Улирал · 13 долоо хоног"], [52, "Жил · 52 долоо хоног"]].map(([v, t]) => `<option value="${v}" ${v === SC.weeks ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       <label class="sc-loc" ${SC.mode === "offline" ? "" : "hidden"}>Уулзах газар<input id="scLoc" maxlength="120" value="${esc(SC.loc || me.location || "")}" placeholder="Номын сан, 2 давхар"></label>
     </div>
-    ${me.meet_connected ? "" : `<p class="sc-warn" ${SC.mode === "online" ? "" : "hidden"}>${ico("live", 15)}Google Meet холбоогүй байна — онлайн уулзалтын холбоос автоматаар үүсэхгүй. Доороос «Google Meet холбох»-оор холбоорой.</p>`}
+    ${me.meet_connected ? "" : `<p class="sc-warn" ${SC.mode === "online" ? "" : "hidden"}>${ico("live", 15)}Google Meet холбоогүй тул холбоос автоматаар үүсэхгүй — захиалга ирэхэд «Захиалгууд»-аас «Холбоос нэмэх» дарж meet.new-ээс хуулж тавина (эсвэл доороос холбоно уу).</p>`}
     <div class="sc-nav"><button type="button" class="icon-btn" data-wk="-1" aria-label="Өмнөх долоо хоног">${ico("chevron", 16)}</button><b id="scRange"></b><button type="button" class="icon-btn" data-wk="1" aria-label="Дараагийн долоо хоног">${ico("chevron", 16)}</button>
       <button type="button" class="btn btn-ghost btn-sm" data-wk="0">Энэ долоо хоног</button>
       <span class="sc-legend"><i class="free"></i>Сул <i class="held"></i>Төлбөр хүлээгдэж буй <i class="booked"></i>Захиалсан <i class="meet"></i>Шууд хичээл</span></div>
@@ -1712,6 +1712,39 @@ async function mountSlots(meetings) {
   grid.onpointerup = finish;
   grid.onpointerleave = () => { if (drag) { drag.el.remove(); drag = null; } };
 }
+// Meet холбоосыг гараар: meet.new шинэ уулзалт нээнэ → хаягийн мөрөөс хуулна → «Тавих» (санах ойгоос) → хадгална.
+const pasteInto = async (input) => {
+  try { const t = (await navigator.clipboard.readText()).trim(); if (t) { input.value = t; return; } } catch {}
+  input.focus(); toast("⌘V / Ctrl+V дарж холбоосоо тавина уу");
+};
+function meetLinkModal({ title, sub = "", value = "", onSave }) {
+  $("#mlModal")?.remove();
+  document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="mlModal"><div class="modal-card ml-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+    <span class="eyebrow">${ico("live", 13)} Уулзалтын холбоос</span><h3 class="h3">${esc(title)}</h3>${sub ? `<p class="muted small" style="margin:0">${esc(sub)}</p>` : ""}
+    <ol class="ml-steps"><li><a class="btn btn-gold btn-sm" href="https://meet.new" target="_blank" rel="noopener">${ico("live", 15)}Google Meet нээх</a><span>Шинэ уулзалт шууд үүснэ</span></li>
+      <li><span>Хаягийн мөрөөс холбоосыг хуулж аваад доор тавина уу</span></li></ol>
+    <form class="ml-form" id="mlForm"><input name="url" inputmode="url" autocomplete="off" value="${esc(value)}" placeholder="https://meet.google.com/abc-defg-hij" required>
+      <button type="button" class="btn btn-ghost" data-paste>Тавих</button><button class="btn btn-gold">Хадгалах</button></form>
+    <p class="form-error" role="alert"></p><p class="muted small" style="margin:0">Zoom, Teams-ийн холбоос ч болно.</p></div></div>`);
+  const md = $("#mlModal"), f = $("#mlForm", md);
+  SG.openModal(md);
+  const close = () => { SG.closeModal(md); setTimeout(() => md.remove(), 300); };
+  md.addEventListener("click", (ev) => {
+    if (ev.target === md || ev.target.closest("[data-close]")) { ev.preventDefault(); close(); }
+    else if (ev.target.closest("[data-paste]")) pasteInto(f.url);
+  });
+  f.onsubmit = async (ev) => {
+    ev.preventDefault();
+    const btn = $("button.btn-gold", f); btn.disabled = true;
+    try { await onSave(f.url.value.trim()); close(); } catch (err) { $(".form-error", md).textContent = err.message; btn.disabled = false; }
+  };
+}
+const slotMeetSave = (x) => meetLinkModal({
+  title: `${x.student_name || "Суралцагч"}-тай уулзалт`, sub: `${WEEKDAYS[new Date(x.starts_at).getDay()]}, ${new Date(x.starts_at).getMonth() + 1}/${new Date(x.starts_at).getDate()} · ${scHM(new Date(x.starts_at))} — холбоос суралцагчид мэдэгдлээр очно`,
+  value: x.meet_url || "",
+  onSave: async (u) => { await api(`/api/me/slots/${x.id}/meet`, { method: "PUT", body: { meet_url: u } }); toast("Холбоос хадгалагдаж, суралцагчид илгээгдлээ ✓"); live(); },
+});
+
 // Захиалгууд: удахгүй болох бүх захиалга — нэг нэгээр, сонгосныг эсвэл бүгдийг нэг дор цуцална.
 async function mountBookings() {
   const box = $("#abBox"); if (!box) return;
@@ -1727,7 +1760,8 @@ async function mountBookings() {
       return `<li class="ab-row ${x.held ? "held" : ""}"><input type="checkbox" value="${esc(x.id)}" aria-label="Сонгох">
         <span class="ab-when"><b>${WEEKDAYS_SHORT[st.getDay()]} ${st.getMonth() + 1}/${st.getDate()} · ${scHM(st)}–${scHM(en)}</b><small>${x.mode === "offline" ? "Биечлэн · " + esc(x.location || "") : "Онлайн"} · ${x.price ? money(x.price) : "Үнэгүй"}</small></span>
         <span class="ab-who">${avatar({ username: x.student_name || "?", display_name: x.student_name || "?" }, "avatar-sm")}<span><b>${esc(x.student_name || "Суралцагч")}</b>${x.note ? `<small>«${esc(x.note)}»</small>` : ""}</span></span>
-        <span class="chip ${x.held ? "chip-amber" : x.price ? "chip-teal" : ""}">${x.held ? "Төлбөр хүлээгдэж буй" : x.price ? "Төлсөн" : "Баталгаажсан"}</span>
+        <span class="ab-acts"><span class="chip ${x.held ? "chip-amber" : x.price ? "chip-teal" : ""}">${x.held ? "Төлбөр хүлээгдэж буй" : x.price ? "Төлсөн" : "Баталгаажсан"}</span>
+          ${x.mode === "online" && !x.held ? (x.meet_url ? `<a class="btn btn-glass btn-sm" href="${esc(x.meet_url)}" target="_blank" rel="noopener">${ico("live", 14)}Нээх</a>` : `<button type="button" class="btn btn-gold btn-sm" data-meet="${esc(x.id)}">${ico("live", 14)}Холбоос нэмэх</button>`) : ""}</span>
         <button type="button" class="btn btn-ghost btn-sm" data-cancel-one="${esc(x.id)}">Цуцлах</button></li>`;
     }).join("")}</ul>`;
   const boxes = () => $$(".ab-row input", box), chosen = () => boxes().filter((c) => c.checked).map((c) => c.value);
@@ -1744,8 +1778,9 @@ async function mountBookings() {
   };
   box.onchange = (e) => { if (e.target.id === "abAll") boxes().forEach((c) => (c.checked = e.target.checked)); sync(); };
   box.onclick = (e) => {
-    const one = e.target.closest("[data-cancel-one]");
-    if (one) cancel([one.dataset.cancelOne]);
+    const one = e.target.closest("[data-cancel-one]"), mt = e.target.closest("[data-meet]");
+    if (mt) slotMeetSave(list.find((x) => x.id === mt.dataset.meet));
+    else if (one) cancel([one.dataset.cancelOne]);
     else if (e.target.id === "abSel") cancel(chosen());
     else if (e.target.id === "abEvery") cancel(list.map((x) => x.id));
   };
@@ -1778,13 +1813,14 @@ function slotInfo(x, meetings) {
     <div class="sc-who">${avatar({ username: x.student_name, display_name: x.student_name }, "avatar-sm")}<b>${esc(x.student_name || "Суралцагч")}</b></div>
     <p class="muted">${x.mode === "offline" ? `Биечлэн · ${esc(x.location)}` : "Онлайн · Google Meet"} · ${x.price ? money(x.price) + " · төлсөн" : "Үнэгүй"}</p>
     ${x.note ? `<blockquote class="sc-note">${esc(x.note)}</blockquote>` : ""}
-    <div class="hero-cta" style="margin:0;justify-content:flex-end">${x.meet_url ? `<a class="btn btn-gold" href="${esc(x.meet_url)}" target="_blank" rel="noopener">${ico("live", 16)}Meet нээх</a>` : ""}
+    <div class="hero-cta" style="margin:0;justify-content:flex-end">${x.meet_url ? `<a class="btn btn-gold" href="${esc(x.meet_url)}" target="_blank" rel="noopener">${ico("live", 16)}Meet нээх</a>` : x.mode === "online" ? `<button type="button" class="btn btn-gold" data-meet-add>${ico("live", 16)}Meet холбоос нэмэх</button>` : ""}
       <button type="button" class="btn btn-danger" data-cancel>Цуцлах</button></div></div></div>`);
   const md = $("#scModal");
   SG.openModal(md);
   const close = () => { SG.closeModal(md); setTimeout(() => md.remove(), 300); };
   md.addEventListener("click", async (ev) => {
     if (ev.target === md || ev.target.closest("[data-close]")) { ev.preventDefault(); close(); return; }
+    if (ev.target.closest("[data-meet-add]")) { close(); slotMeetSave(x); return; }
     if (!ev.target.closest("[data-cancel]")) return;
     if (!confirm(`${x.student_name || "Суралцагч"}-ийн захиалгыг цуцлах уу? Түүнд мэдэгдэл очно.${x.price ? "\n\nТөлсөн мөнгийг та буцаан олгоно." : ""}`)) return;
     try { await api(`/api/me/slots/${x.id}`, { method: "DELETE" }); toast("Захиалга цуцлагдлаа"); close(); live(); } catch (err) { toast(err.message, true); }
@@ -1800,7 +1836,7 @@ async function live() {
   main.innerHTML = panel(slotsPanel(), 0, "sc-panel") +
     panel(`<div class="panel-head"><h2>${ico("users", 20)}Захиалгууд<i class="ab-n" id="abN"></i></h2><span class="muted small">Нэг нэгээр, сонгож эсвэл бүгдийг нь цуцалж болно</span></div><div id="abBox"><div class="pw-load"><span class="loader"></span></div></div>`, 1) +
     panel(`<div class="panel-head"><h2>Google Meet</h2>${me.meet_connected ? `<span class="chip chip-teal">✓ Холбогдсон</span>` : `<span class="chip">Холбогдоогүй</span>`}</div>
-      <p class="muted">Холбосноор шууд хичээл товлоход болон чатаас нэг товчоор Google Meet холбоос автоматаар үүснэ. Холбоос таны Google Calendar-т хадгалагдана.</p>
+      <p class="muted">Холбосноор шууд хичээл товлоход болон чатаас нэг товчоор Google Meet холбоос автоматаар үүснэ. Холбоос таны Google Calendar-т хадгалагдана. Холбохгүйгээр ч meet.new-ээр уулзалт нээж, холбоосыг нь хуулж тавьж болно.</p>
       ${me.meet_connected ? `<button class="btn btn-ghost btn-sm" id="meetOff">Салгах</button>` : `<button class="btn btn-gold" id="meetOn">📹 Google Meet холбох</button>`}`) +
     panel(`<h2>Шууд хичээл товлох</h2><form class="form" id="meetForm">
       <label>Сэдэв<input name="title" required maxlength="200" placeholder="ЭЕШ давтлага — Логарифм"></label>
@@ -1809,7 +1845,10 @@ async function live() {
       <label>Сургалт (элссэн суралцагчид харна)<select name="course"><option value="">— Ерөнхий —</option>${list.map((c) => `<option value="${c.id}">${esc(c.title)}</option>`).join("")}</select></label>
       <div class="form-row"><label>Үнэ (₮, 0 = үнэгүй)<input name="price" type="number" min="0" step="500" value="0"><small class="muted">Төлбөртэй бол зөвхөн худалдаж авсан хүн Meet холбоосыг харна. Сургалттай холбоно.</small></label>
         <label class="check" style="align-self:center"><input type="checkbox" name="members_free"> Сургалтад элссэн суралцагчдад үнэгүй</label></div>
-      <button class="btn btn-gold" ${me.meet_connected ? "" : "disabled"}>Товлох</button></form>`, 2) +
+      ${me.meet_connected ? "" : `<div class="ml-row"><label>Meet холбоос<input name="meet_url" inputmode="url" autocomplete="off" placeholder="https://meet.google.com/abc-defg-hij" required></label>
+        <a class="btn btn-ghost" href="https://meet.new" target="_blank" rel="noopener">${ico("live", 15)}Google Meet нээх</a><button type="button" class="btn btn-ghost" data-paste>Тавих</button></div>
+        <p class="muted small" style="margin:0">«Google Meet нээх» дарахад шинэ уулзалт үүснэ — хаягийн мөрөөс холбоосыг хуулж аваад энд тавина.</p>`}
+      <button class="btn btn-gold">Товлох</button></form>`, 2) +
     panel(`<h2>Удахгүй болох</h2><div class="meet-list" id="meetMine">${meetings.map((m) => `<div class="meet-item"><time>${fmtDate(m.starts_at)}</time><span style="flex:1">${esc(m.title)} · ${m.duration_min} мин
         ${m.title.startsWith("Цаг захиалга: ") && !m.course_id ? `<span class="chip chip-teal">${m.title.endsWith("биечлэн") ? "Биечлэн" : "Онлайн"}</span>`
           : m.price ? `<span class="chip chip-amber">${money(m.price)}${m.members_free ? " · элссэнд үнэгүй" : ""}</span> <span class="muted small">${m.buyers || 0} худалдаж авсан</span>` : `<span class="chip">Үнэгүй</span>`}</span>
@@ -1830,11 +1869,12 @@ async function live() {
   $("#meetOn")?.addEventListener("click", async () => { try { const d = await api("/api/me/meet/connect", { method: "POST" }); location.href = d.url; } catch (e) { toast(e.message, true); } });
   $("#meetOff")?.addEventListener("click", async () => { await api("/api/me/meet", { method: "DELETE" }); live(); });
   const f = $("#meetForm");
+  $("[data-paste]", f)?.addEventListener("click", () => pasteInto(f.meet_url));
   f.onsubmit = async (e) => {
     e.preventDefault();
     try {
       await api("/api/me/meetings", { method: "POST", body: { title: f.title.value, starts_at: new Date(f.start.value).toISOString(), duration_min: +f.dur.value, course_id: f.course.value,
-        price: +f.price.value || 0, members_free: f.members_free.checked } });
+        price: +f.price.value || 0, members_free: f.members_free.checked, meet_url: f.meet_url?.value.trim() || "" } });
       toast("📹 Meet үүслээ"); live();
     } catch (err) { toast(err.message, true); }
   };

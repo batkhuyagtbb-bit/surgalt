@@ -385,6 +385,44 @@ func (s *Server) handleCancelSlots(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]int{"cancelled": s.cancelSlots(r.Context(), c.UID, c.Name, pick)})
 }
 
+// handleSlotMeet: PUT /api/me/slots/{id}/meet {meet_url} — онлайн захиалгад meet.new-ээс хуулсан холбоосыг тавина
+// (Google Meet холбоогүй, эсвэл өөр холбоос хэрэглэх үед): «Шууд хичээл» шинэчлэгдэж, суралцагчид мэдэгдэнэ.
+func (s *Server) handleSlotMeet(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireTeacher(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		MeetURL string `json:"meet_url"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	link, ok := cleanMeetURL(in.MeetURL)
+	if !ok {
+		writeErr(w, http.StatusBadRequest, "уулзалтын холбоос: https://meet.google.com/… (эсвэл Zoom, Teams)")
+		return
+	}
+	sl, err := s.store.UpdateSlot(r.Context(), r.PathValue("id"), func(x *store.Slot) error {
+		if x.TeacherID != c.UID || x.StudentID == "" {
+			return store.ErrNotFound
+		}
+		x.MeetURL = link
+		return nil
+	})
+	if s.storeErr(w, r, err) {
+		return
+	}
+	if sl.MeetingID != "" {
+		if err := s.store.SetMeetingURL(r.Context(), sl.MeetingID, link); err != nil {
+			s.log.Warn("уулзалтын холбоос", "err", err)
+		}
+	}
+	s.notify(r.Context(), &store.Notification{UserID: sl.StudentID, Type: NotifBooking, Count: 1,
+		Title: "📹 Уулзалтын холбоос ирлээ · " + slotWhen(sl.StartsAt), Body: s.displayName(r.Context(), c.UID, c.Name) + ": " + link, Link: "/#my-live"})
+	writeJSON(w, http.StatusOK, sl)
+}
+
 // handleTeacherSlots: GET /api/teachers/{username}/slots — захиалж болох сул цагууд; нэвтэрсэн бол энэ багштай
 // өөрийн захиалгууд (mine).
 func (s *Server) handleTeacherSlots(w http.ResponseWriter, r *http.Request) {
