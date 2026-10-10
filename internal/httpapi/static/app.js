@@ -3829,7 +3829,21 @@ function howDemo() {
   }, { threshold: 0.35 }).observe(el);
   steps.forEach((li, i) => li.addEventListener("click", () => { clearTimeout(timer); set(i); if (on) loop(); }));
 }
-if (page === "home") { homePage(); howMap(); howDemo(); }
+// Нүүр: «Хэрхэн ашиглах вэ?» — суралцагч/багшийн аялал; хөдөлгөөн хэсэг дэлгэцэнд байхад л тоглоно.
+function useCases() {
+  const sec = $("#uses"); if (!sec) return;
+  const tabs = $$(".uc-tabs [data-uc]", sec), lists = $$(".uc-list", sec);
+  const pick = (b) => {
+    tabs.forEach((x) => { x.setAttribute("aria-selected", String(x === b)); x.tabIndex = x === b ? 0 : -1; });
+    lists.forEach((l) => (l.hidden = l.dataset.uc !== b.dataset.uc));
+  };
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => pick(b));
+    b.addEventListener("keydown", (e) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const n = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]; pick(n); n.focus(); } });
+  });
+  new IntersectionObserver(([e]) => sec.classList.toggle("run", e.isIntersecting), { threshold: 0.12 }).observe(sec);
+}
+if (page === "home") { homePage(); howMap(); howDemo(); useCases(); }
 if (page === "profile") profilePage();
 if (page === "profile" || page === "course") chatWidget();
 if (page === "course") coursePage();

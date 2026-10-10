@@ -3555,3 +3555,80 @@ input.ml-ok{border-color:#1d8a52;box-shadow:0 0 0 3px rgba(29,138,82,.15)}
 @keyframes hd-pop{0%{transform:scale(.6)}70%{transform:scale(1.12)}100%{transform:none}}
 @media (max-width:860px){ .how-demo{grid-template-columns:minmax(0,1fr)} .hd-body{min-height:280px} }
 @media (prefers-reduced-motion:reduce){ .how-demo *{animation:none!important;transition:none!important} }
+
+/* ---- Нүүр: «Хэрхэн ашиглах вэ?» — суралцагч, багшийн аялал (алхам бүр жижиг хөдөлгөөнт дүрслэлтэй) ---- */
+.uc{position:relative;z-index:2;max-width:1220px;margin:0 auto;padding:clamp(48px,7vw,88px) clamp(16px,4vw,40px) clamp(48px,7vw,84px)}
+.uc-tabs{display:flex;gap:6px;width:max-content;max-width:100%;margin:0 auto 22px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.uc-tabs button{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 20px;border:0;border-radius:999px;background:none;color:var(--muted);font:inherit;font-weight:800;cursor:pointer}
+.uc-tabs button[aria-selected="true"]{background:var(--brand);color:#fff}
+.uc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin:0;padding:0;list-style:none}
+.uc-card{position:relative;display:grid;align-content:start;gap:6px;padding:12px 14px 18px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--shadow-sm)}
+.uc-card h3{margin:2px 0 0;font:800 1.05rem/1.25 var(--sans);letter-spacing:-.01em}
+.uc-card p{margin:0;color:var(--muted);font-size:.88rem;line-height:1.5}
+.uc-n{display:inline-grid;place-items:center;width:24px;height:24px;margin-right:8px;border-radius:50%;background:var(--brand);color:#fff;font-size:.76rem;font-weight:800;vertical-align:2px}
+.uc-stage{position:relative;display:flex;align-items:center;justify-content:center;gap:12px;height:136px;margin-bottom:6px;padding:12px;overflow:hidden;border-radius:14px;background:linear-gradient(160deg,var(--brand-soft),#f8f9fd)}
+/* нийтлэг хөдөлгөөн: 5 секундийн тойрог, --d — алхам доторх хоцролт (сек) */
+.uc .k{opacity:0;animation:k-in 5s var(--ease) infinite both;animation-delay:calc(var(--d,0) * 1s)}
+@keyframes k-in{0%{opacity:0;transform:translateY(8px) scale(.94)}10%,82%{opacity:1;transform:none}94%,100%{opacity:0;transform:translateY(-4px)}}
+.k-pulse{animation:k-pulse 1.6s ease-in-out infinite}
+@keyframes k-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+.k-fill,.k-drain{display:block;height:100%;border-radius:inherit;transform-origin:left;animation:k-fill 5s var(--ease) infinite both;animation-delay:calc(var(--d,0) * 1s)}
+.k-fill{background:var(--brand)}
+.k-drain{animation-name:k-drain}
+@keyframes k-fill{0%{transform:scaleX(0)}45%,88%{transform:scaleX(var(--w,1))}100%{transform:scaleX(0)}}
+@keyframes k-drain{0%{transform:scaleX(.95)}45%,88%{transform:scaleX(.18)}100%{transform:scaleX(.95)}}
+.k-pick,.k-cell{animation:k-cell 5s ease infinite both;animation-delay:calc(var(--d,0) * 1s)}
+@keyframes k-cell{0%,12%{background:#eef2fa;box-shadow:none}22%,85%{background:var(--brand-soft);box-shadow:inset 0 0 0 1.5px var(--brand)}100%{background:#eef2fa;box-shadow:none}}
+.k-pick,.k-cell.bk{animation-name:k-solid}
+@keyframes k-solid{0%,12%{background:#eef2fa}22%,85%{background:var(--brand)}100%{background:#eef2fa}}
+.k-grow{transform-origin:bottom;animation:k-grow 5s var(--ease) infinite both;animation-delay:calc(var(--d,0) * 1s)}
+@keyframes k-grow{0%{transform:scaleY(0)}35%,85%{transform:scaleY(1)}100%{transform:scaleY(0)}}
+@property --p{syntax:"<number>";inherits:false;initial-value:0}
+.k-ring{animation:k-ring 5s var(--ease) infinite both;animation-delay:calc(var(--d,0) * 1s)}
+@keyframes k-ring{0%{--p:0}50%,88%{--p:.85}100%{--p:0}}
+.k-flip{animation:k-flip 2.6s ease-in-out infinite}
+@keyframes k-flip{0%,20%{transform:rotateY(0);opacity:1}65%,100%{transform:rotateY(-165deg);opacity:.15}}
+@keyframes k-scan{from{transform:translateY(0)}to{transform:translateY(38px)}}
+/* дүрслэлийн хэсгүүд */
+.u-col{display:grid;gap:6px;justify-items:start}
+.u-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--text);font-size:.76rem;font-weight:700;white-space:nowrap;box-shadow:0 6px 14px -10px rgba(27,34,64,.4)}
+.u-chip.ok{border-color:#bfe6cf;background:#e7f6ee;color:#16683f}
+.u-chip.amber{border-color:#f1d7a8;background:#fff4e0;color:#8a5a00}
+.u-chip.bad{border-color:#f5c2c2;background:#fdecec;color:#b42f2f}
+.u-chip.dark{border-color:#1b2240;background:#1b2240;color:#fff}
+.u-phone{position:relative;display:grid;place-items:center;flex:none;width:52px;height:88px;border:3px solid #1b2240;border-radius:12px;background:#fff}
+.u-qr{display:block;width:34px;height:34px;border-radius:2px;background:repeating-conic-gradient(#1b2240 0 25%,#fff 0 50%) 0 0/8.5px 8.5px}
+.u-scan{position:absolute;left:6px;right:6px;top:22px;height:2px;border-radius:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:k-scan 1.6s ease-in-out infinite alternate}
+.u-qrbox{display:grid;place-items:center;flex:none;width:64px;height:64px;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 8px 20px -12px rgba(27,34,64,.4)}
+.u-qrbox.sm{width:48px;height:48px}
+.u-qrbox.sm .u-qr{width:28px;height:28px;background-size:7px 7px}
+.u-video{display:grid;place-items:center;flex:none;width:84px;height:56px;border-radius:10px;background:linear-gradient(135deg,#1f3c8f,#2f55c0);color:#fff;font-size:1.2rem}
+.u-bar{display:block;width:110px;height:8px;overflow:hidden;border-radius:999px;background:#dfe5f3}
+.u-bar.warn .k-drain{background:linear-gradient(90deg,#d93a3a,var(--accent))}
+.u-row{display:flex;align-items:center;gap:6px}
+.u-row b{display:grid;place-items:center;width:18px;height:18px;border-radius:5px;background:var(--brand);color:#fff;font-size:.7rem}
+.u-row i{display:block;width:70px;height:6px;border-radius:999px;background:#cfd7ea}
+.u-cal,.u-grid,.u-rub{display:grid;grid-template-columns:repeat(3,22px);gap:5px;flex:none;padding:8px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.u-cal i,.u-grid i,.u-rub i{height:16px;border-radius:4px;background:#eef2fa}
+.u-tiles{display:grid;grid-template-columns:repeat(3,26px);gap:4px}
+.u-tiles i{display:grid;place-items:center;height:26px;border-radius:7px;background:#1b2240;color:#fff;font-size:.7rem;font-style:normal;font-weight:800}
+.u-ring{position:relative;display:grid;place-items:center;flex:none;width:74px;height:74px}
+.u-ring b{position:relative;font-size:.9rem}
+.k-ring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(var(--brand) calc(var(--p) * 1turn),#dfe5f3 0);-webkit-mask:radial-gradient(circle,transparent 56%,#000 58%);mask:radial-gradient(circle,transparent 56%,#000 58%)}
+.u-card{display:grid;gap:6px;flex:none;width:86px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.u-card .u-av{width:26px;height:26px;border-radius:50%;background:var(--brand)}
+.u-card i:not(.u-av){height:6px;border-radius:999px;background:#d6deef}
+.u-card i:last-child{width:70%}
+.u-blk{display:block;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:.76rem;font-weight:700;box-shadow:0 6px 14px -10px rgba(27,34,64,.35)}
+.u-book{position:relative;flex:none;width:64px;height:82px;perspective:320px}
+.u-book i{position:absolute;inset:0;border-radius:3px 8px 8px 3px;background:linear-gradient(90deg,#172c6b 0 12%,#1f3c8f 12%);box-shadow:0 10px 20px -10px rgba(27,34,64,.5)}
+.u-book .k-flip{left:12%;border:1px solid var(--line);background:#fff repeating-linear-gradient(180deg,transparent 0 9px,#e3e8f4 9px 10px);transform-origin:left center}
+.u-chat{justify-items:stretch;gap:5px;width:100%}
+.u-bub{justify-self:start;max-width:86%;padding:6px 10px;border:1px solid var(--line);border-radius:12px 12px 12px 4px;background:#fff;font-size:.74rem}
+.u-bub.me{justify-self:end;border-color:var(--brand);border-radius:12px 12px 4px 12px;background:var(--brand);color:#fff}
+.u-bars{display:flex;align-items:flex-end;gap:5px;flex:none;height:66px}
+.u-bars i{width:14px;height:calc(var(--h) * 100%);border-radius:4px 4px 2px 2px;background:linear-gradient(180deg,var(--accent),#f3c06b)}
+/* дэлгэцэнд байхад л тоглоно; хөдөлгөөн багасгах тохиргоонд хөдөлгөөнгүй, бүрэн харагдана */
+.uc:not(.run) .uc-stage *{animation-play-state:paused!important}
+@media (prefers-reduced-motion:reduce){ .uc .uc-stage *{animation:none!important;opacity:1!important;transform:none!important} }
+@media (max-width:560px){ .uc-tabs button{padding:0 16px} .uc-list{grid-template-columns:minmax(0,1fr)} }
