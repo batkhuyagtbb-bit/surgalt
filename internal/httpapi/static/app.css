@@ -3314,6 +3314,8 @@ html.intro-on,html.intro-on body{overflow:hidden}
 .sc-slot.short{display:flex;align-items:center;gap:6px;padding-top:2px;padding-bottom:2px}
 .sc-slot.short small{min-width:0}
 .sc-meet{border:1px solid var(--line);background:var(--surface-2);color:var(--muted);cursor:default}
+.sc-sel{position:absolute;left:3px;right:3px;z-index:2;display:grid;place-items:center;border:2px dashed var(--brand);border-radius:8px;background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand);font-size:.74rem;font-weight:700;pointer-events:none}
+.sc-grid{user-select:none;-webkit-user-select:none}
 .sc-who{display:flex;align-items:center;gap:8px;margin:8px 0 2px}
 .sc-note{margin:8px 0 12px;padding:8px 12px;border-left:3px solid var(--accent);border-radius:0 10px 10px 0;background:var(--surface-2)}
 

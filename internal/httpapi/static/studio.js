@@ -1624,7 +1624,7 @@ function slotsPanel() {
     <div class="sc-nav"><button type="button" class="icon-btn" data-wk="-1" aria-label="Өмнөх долоо хоног">${ico("chevron", 16)}</button><b id="scRange"></b><button type="button" class="icon-btn" data-wk="1" aria-label="Дараагийн долоо хоног">${ico("chevron", 16)}</button>
       <button type="button" class="btn btn-ghost btn-sm" data-wk="0">Энэ долоо хоног</button>
       <span class="sc-legend"><i class="free"></i>Сул <i class="held"></i>Төлбөр хүлээгдэж буй <i class="booked"></i>Захиалсан <i class="meet"></i>Шууд хичээл</span></div>
-    <p class="muted small sc-hint">Хүснэгтэн дээр дарж сул цаг нэмнэ · сул цаг дээр дахин дарж хасна · захиалсан цаг дээр дарж дэлгэрэнгүйг харна.</p>
+    <p class="muted small sc-hint">Хүснэгтэн дээр дарж сул цаг нэмнэ, чирж хүрээ сонговол (10:00–14:00 г.м.) олон цаг нэг дор · сул цаг дээр дахин дарж хасна · захиалсан цаг дээр дарж дэлгэрэнгүйг харна.</p>
     <div class="sc-wrap"><div class="sc-grid" id="scGrid"></div></div>`;
 }
 async function mountSlots(meetings) {
@@ -1664,15 +1664,49 @@ async function mountSlots(meetings) {
       try { await api(`/api/me/slots/${x.id}`, { method: "DELETE" }); toast("Сул цаг хасагдлаа"); mountSlots(meetings); } catch (err) { toast(err.message, true); }
       return;
     }
+    if (mouseDrag) return; // хулганаар — pointerup дээр (нэг товшилт ч, чирсэн хүрээ ч) тэмдэглэгдсэн
     const col = e.target.closest(".sc-col"); if (!col || e.target.closest(".sc-meet")) return;
-    const y = e.clientY - col.getBoundingClientRect().top, [Y, M, D] = col.dataset.day.split("-").map(Number);
-    const st = new Date(Y, M - 1, D, SC_FROM, Math.floor(y / SC_ROW) * 30);
-    if (st.getTime() < Date.now() + 5 * 60e3) return toast("Өнгөрсөн цагт тэмдэглэх боломжгүй", true);
+    const row = Math.floor((e.clientY - col.getBoundingClientRect().top) / SC_ROW);
+    addRange(col, row, row);
+  };
+  // Хулганаар чирч хүрээ сонговол (жишээ нь 10:00–14:00) сонгосон үргэлжлэх хугацаагаар дараалсан сул цагууд нэг дор үүснэ.
+  const rowTime = (col, row) => { const [Y, M, D] = col.dataset.day.split("-").map(Number); return new Date(Y, M - 1, D, SC_FROM, row * 30); };
+  const addRange = async (col, a, b) => {
+    const lo = Math.min(a, b), hi = Math.max(a, b), dur = SC.dur * 60e3, end = rowTime(col, hi + 1).getTime();
+    const busy = (t) => slots.some((x) => { const s0 = new Date(x.starts_at).getTime(); return t < s0 + x.duration_min * 60e3 && s0 < t + dur; });
+    const first = rowTime(col, lo).getTime(), times = [first]; // нэг товшилт бол нэг цаг
+    for (let t = first + dur; t + dur <= end; t += dur) times.push(t);
+    const starts = times.filter((t) => t >= Date.now() + 5 * 60e3 && !busy(t)).map((t) => new Date(t));
+    if (!starts.length) return toast(rowTime(col, lo).getTime() < Date.now() + 5 * 60e3 ? "Өнгөрсөн цагт тэмдэглэх боломжгүй" : "Энэ цаг аль хэдийн тэмдэглэгдсэн байна", true);
     try {
-      await api("/api/me/slots", { method: "POST", body: { starts: [st.toISOString()], duration_min: SC.dur, mode: SC.mode, price: SC.price, location: SC.mode === "offline" ? SC.loc : "" } });
+      await api("/api/me/slots", { method: "POST", body: { starts: starts.map((d) => d.toISOString()), duration_min: SC.dur, mode: SC.mode, price: SC.price, location: SC.mode === "offline" ? SC.loc : "" } });
+      if (starts.length > 1) toast(`${starts.length} сул цаг тэмдэглэгдлээ`);
       mountSlots(meetings);
     } catch (err) { toast(err.message, true); }
   };
+  let drag = null, mouseDrag = false;
+  const paint = () => {
+    const lo = Math.min(drag.a, drag.b), hi = Math.max(drag.a, drag.b);
+    drag.el.style.cssText = `top:${lo * SC_ROW}px;height:${(hi - lo + 1) * SC_ROW - 2}px`;
+    drag.el.textContent = `${scHM(rowTime(drag.col, lo))}–${scHM(rowTime(drag.col, hi + 1))}`;
+  };
+  grid.onpointerdown = (e) => {
+    mouseDrag = e.pointerType === "mouse";
+    if (!mouseDrag || e.button !== 0 || e.target.closest(".sc-slot, .sc-meet")) return;
+    const col = e.target.closest(".sc-col"); if (!col) return;
+    const row = Math.floor((e.clientY - col.getBoundingClientRect().top) / SC_ROW);
+    drag = { col, a: row, b: row, el: document.createElement("div") };
+    drag.el.className = "sc-sel"; col.append(drag.el); paint();
+    e.preventDefault();
+  };
+  grid.onpointermove = (e) => {
+    if (!drag) return;
+    drag.b = Math.max(0, Math.min(rows - 1, Math.floor((e.clientY - drag.col.getBoundingClientRect().top) / SC_ROW)));
+    paint();
+  };
+  const finish = () => { if (!drag) return; const d = drag; drag = null; d.el.remove(); addRange(d.col, d.a, d.b); };
+  grid.onpointerup = finish;
+  grid.onpointerleave = () => { if (drag) { drag.el.remove(); drag = null; } };
 }
 function slotInfo(x, meetings) {
   const st = new Date(x.starts_at), en = new Date(st.getTime() + x.duration_min * 60e3);
