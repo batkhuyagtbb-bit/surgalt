@@ -3355,3 +3355,26 @@ html.intro-on,html.intro-on body{overflow:hidden}
 .ap-card .grow{display:grid;gap:2px}
 .ap-card small{color:var(--muted)}
 @media (max-width:560px){ .ap-card{flex-wrap:wrap} .ap-card .btn{width:100%} .ap-times{grid-template-columns:repeat(2,minmax(0,1fr))} }
+
+/* ---- Захиалгууд: багш нэг нэгээр, сонгосныг эсвэл бүгдийг цуцална ---- */
+.ab-n{margin-left:8px;padding:1px 9px;border-radius:999px;background:var(--brand-soft);color:var(--brand);font-size:.8rem;font-style:normal}
+.ab-n:empty{display:none}
+.ab-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 10px}
+.ab-tools .check{margin-right:auto}
+.ab-list{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.ab-row{display:grid;grid-template-columns:auto minmax(150px,1fr) minmax(170px,1.3fr) auto auto;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.ab-row.held{border-style:dashed;border-color:var(--accent)}
+.ab-row:has(input:checked){border-color:var(--brand);background:var(--brand-soft)}
+.ab-row input{width:18px;height:18px;accent-color:var(--brand)}
+.ab-when,.ab-who>span{display:grid;gap:2px;min-width:0}
+.ab-when b{font-variant-numeric:tabular-nums}
+.ab-when small,.ab-who small{overflow:hidden;color:var(--muted);font-size:.78rem;white-space:nowrap;text-overflow:ellipsis}
+.ab-who{display:flex;align-items:center;gap:8px;min-width:0}
+@media (max-width:760px){
+  .ab-row{grid-template-columns:auto minmax(0,1fr) auto;row-gap:6px}
+  .ab-row input{grid-row:1/span 3}
+  .ab-when{grid-column:2;grid-row:1}
+  .ab-who{grid-column:2;grid-row:2}
+  .ab-row .chip{grid-column:2;grid-row:3;justify-self:start}
+  .ab-row [data-cancel-one]{grid-column:3;grid-row:1/span 3}
+}

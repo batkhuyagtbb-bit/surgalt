@@ -1712,6 +1712,44 @@ async function mountSlots(meetings) {
   grid.onpointerup = finish;
   grid.onpointerleave = () => { if (drag) { drag.el.remove(); drag = null; } };
 }
+// Захиалгууд: удахгүй болох бүх захиалга — нэг нэгээр, сонгосныг эсвэл бүгдийг нэг дор цуцална.
+async function mountBookings() {
+  const box = $("#abBox"); if (!box) return;
+  let list = [];
+  try { list = await api("/api/me/bookings"); } catch (e) { box.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
+  $("#abN").textContent = list.length || "";
+  if (!list.length) { box.innerHTML = `<div class="empty">Одоогоор захиалга алга. Сул цагаа тэмдэглэхэд суралцагчид профайлаас тань захиална.</div>`; return; }
+  box.innerHTML = `<div class="ab-tools"><label class="check"><input type="checkbox" id="abAll"> Бүгдийг сонгох</label>
+      <button type="button" class="btn btn-ghost btn-sm" id="abSel" disabled>Сонгосныг цуцлах</button>
+      <button type="button" class="btn btn-danger btn-sm" id="abEvery">Бүгдийг цуцлах (${list.length})</button></div>
+    <ul class="ab-list">${list.map((x) => {
+      const st = new Date(x.starts_at), en = new Date(st.getTime() + x.duration_min * 6e4);
+      return `<li class="ab-row ${x.held ? "held" : ""}"><input type="checkbox" value="${esc(x.id)}" aria-label="Сонгох">
+        <span class="ab-when"><b>${WEEKDAYS_SHORT[st.getDay()]} ${st.getMonth() + 1}/${st.getDate()} · ${scHM(st)}–${scHM(en)}</b><small>${x.mode === "offline" ? "Биечлэн · " + esc(x.location || "") : "Онлайн"} · ${x.price ? money(x.price) : "Үнэгүй"}</small></span>
+        <span class="ab-who">${avatar({ username: x.student_name || "?", display_name: x.student_name || "?" }, "avatar-sm")}<span><b>${esc(x.student_name || "Суралцагч")}</b>${x.note ? `<small>«${esc(x.note)}»</small>` : ""}</span></span>
+        <span class="chip ${x.held ? "chip-amber" : x.price ? "chip-teal" : ""}">${x.held ? "Төлбөр хүлээгдэж буй" : x.price ? "Төлсөн" : "Баталгаажсан"}</span>
+        <button type="button" class="btn btn-ghost btn-sm" data-cancel-one="${esc(x.id)}">Цуцлах</button></li>`;
+    }).join("")}</ul>`;
+  const boxes = () => $$(".ab-row input", box), chosen = () => boxes().filter((c) => c.checked).map((c) => c.value);
+  const sync = () => {
+    const n = chosen().length, sel = $("#abSel"), all = $("#abAll");
+    sel.disabled = !n; sel.textContent = n ? `Сонгосныг цуцлах (${n})` : "Сонгосныг цуцлах";
+    all.checked = n === list.length; all.indeterminate = n > 0 && n < list.length;
+  };
+  const cancel = async (ids) => {
+    if (!ids.length) return;
+    const paid = list.filter((x) => ids.includes(x.id) && x.price && !x.held).length;
+    if (!confirm(`${ids.length} захиалгыг цуцлах уу? Суралцагчдад мэдэгдэл очиж, эдгээр цаг календариас хасагдана.${paid ? `\n\nТөлбөртэй ${paid} захиалгын мөнгийг та буцаан олгоно.` : ""}`)) return;
+    try { const r = await api("/api/me/slots/cancel", { method: "POST", body: { ids } }); toast(`${r.cancelled} захиалга цуцлагдлаа`); live(); } catch (e) { toast(e.message, true); }
+  };
+  box.onchange = (e) => { if (e.target.id === "abAll") boxes().forEach((c) => (c.checked = e.target.checked)); sync(); };
+  box.onclick = (e) => {
+    const one = e.target.closest("[data-cancel-one]");
+    if (one) cancel([one.dataset.cancelOne]);
+    else if (e.target.id === "abSel") cancel(chosen());
+    else if (e.target.id === "abEvery") cancel(list.map((x) => x.id));
+  };
+}
 // Давтагддаг сул цаг: зөвхөн энэ эсвэл энэ цагаас хойших бүх давталт (захиалсан цагууд хэвээр).
 function seriesAsk(x, meetings) {
   const st = new Date(x.starts_at);
@@ -1759,7 +1797,9 @@ async function live() {
   const fresh = await api("/api/me"); me = fresh;
   const dt = new Date(Date.now() + 3600e3); dt.setMinutes(0, 0, 0);
   const local = new Date(dt - dt.getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
-  main.innerHTML = panel(slotsPanel(), 0, "sc-panel") + panel(`<div class="panel-head"><h2>Google Meet</h2>${me.meet_connected ? `<span class="chip chip-teal">✓ Холбогдсон</span>` : `<span class="chip">Холбогдоогүй</span>`}</div>
+  main.innerHTML = panel(slotsPanel(), 0, "sc-panel") +
+    panel(`<div class="panel-head"><h2>${ico("users", 20)}Захиалгууд<i class="ab-n" id="abN"></i></h2><span class="muted small">Нэг нэгээр, сонгож эсвэл бүгдийг нь цуцалж болно</span></div><div id="abBox"><div class="pw-load"><span class="loader"></span></div></div>`, 1) +
+    panel(`<div class="panel-head"><h2>Google Meet</h2>${me.meet_connected ? `<span class="chip chip-teal">✓ Холбогдсон</span>` : `<span class="chip">Холбогдоогүй</span>`}</div>
       <p class="muted">Холбосноор шууд хичээл товлоход болон чатаас нэг товчоор Google Meet холбоос автоматаар үүснэ. Холбоос таны Google Calendar-т хадгалагдана.</p>
       ${me.meet_connected ? `<button class="btn btn-ghost btn-sm" id="meetOff">Салгах</button>` : `<button class="btn btn-gold" id="meetOn">📹 Google Meet холбох</button>`}`) +
     panel(`<h2>Шууд хичээл товлох</h2><form class="form" id="meetForm">
@@ -1786,7 +1826,7 @@ async function live() {
     scLoc.hidden = SC.mode !== "offline"; if (scWarn) scWarn.hidden = SC.mode !== "online";
   }));
   $$("[data-wk]").forEach((b) => b.addEventListener("click", () => { SC.week = +b.dataset.wk === 0 ? 0 : SC.week + +b.dataset.wk; mountSlots(meetings); }));
-  mountSlots(meetings);
+  mountSlots(meetings); mountBookings();
   $("#meetOn")?.addEventListener("click", async () => { try { const d = await api("/api/me/meet/connect", { method: "POST" }); location.href = d.url; } catch (e) { toast(e.message, true); } });
   $("#meetOff")?.addEventListener("click", async () => { await api("/api/me/meet", { method: "DELETE" }); live(); });
   const f = $("#meetForm");

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -261,24 +262,127 @@ func (s *Server) handleDeleteSlot(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]int{"deleted": n})
 		return
 	}
-	if err := s.store.DeleteSlot(r.Context(), sl.ID); s.storeErr(w, r, err) {
+	if s.cancelSlots(r.Context(), c.UID, c.Name, []store.Slot{*sl}) == 0 {
+		writeErr(w, http.StatusInternalServerError, "хасаж чадсангүй")
 		return
 	}
-	if sl.StudentID != "" {
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// cancelSlots: цагуудыг хасна; захиалсан байсныг «Шууд хичээл»-ээс хасч, суралцагч бүрт нэг мэдэгдэл (хэд хэдэн
+// уулзалт цуцлагдсан бол нэгтгэж) илгээнэ. Хассан тоог буцаана.
+func (s *Server) cancelSlots(ctx context.Context, teacherID, teacherUser string, slots []store.Slot) int {
+	type lost struct {
+		when []string
+		paid bool
+	}
+	byStudent, order, n := map[string]*lost{}, []string{}, 0
+	for i := range slots {
+		sl := &slots[i]
+		if err := s.store.DeleteSlot(ctx, sl.ID); err != nil {
+			s.log.Warn("цаг хасах", "slot", sl.ID, "err", err)
+			continue
+		}
+		n++
+		if sl.StudentID == "" {
+			continue
+		}
 		if sl.MeetingID != "" {
-			if err := s.store.DeleteMeeting(r.Context(), sl.MeetingID); err != nil {
+			if err := s.store.DeleteMeeting(ctx, sl.MeetingID); err != nil {
 				s.log.Warn("цуцалсан уулзалтыг хасах", "err", err)
 			}
 		}
-		body := "Өөр цаг сонгож дахин захиална уу."
-		if sl.Price > 0 {
-			body = "Төлсөн мөнгийг багш буцаан олгоно — чатаар холбогдоорой."
+		l := byStudent[sl.StudentID]
+		if l == nil {
+			l = &lost{}
+			byStudent[sl.StudentID] = l
+			order = append(order, sl.StudentID)
 		}
-		s.notify(r.Context(), &store.Notification{UserID: sl.StudentID, Type: NotifBooking, Count: 1,
-			Title: "❌ " + s.displayName(r.Context(), c.UID, c.Name) + " уулзалтыг цуцаллаа · " + slotWhen(sl.StartsAt), Body: body, Link: "/t/" + c.Name})
+		l.when, l.paid = append(l.when, slotWhen(sl.StartsAt)), l.paid || sl.Price > 0
 	}
-	s.profiles.Delete(c.Name)
-	w.WriteHeader(http.StatusNoContent)
+	if len(order) > 0 {
+		teacher := s.displayName(ctx, teacherID, teacherUser)
+		ns := make([]*store.Notification, 0, len(order))
+		for _, uid := range order {
+			l := byStudent[uid]
+			body := "Өөр цаг сонгож дахин захиална уу."
+			if l.paid {
+				body = "Төлсөн мөнгийг багш буцаан олгоно — чатаар холбогдоорой."
+			}
+			nt := &store.Notification{UserID: uid, Type: NotifBooking, Count: 1, Link: "/t/" + teacherUser, Body: body,
+				Title: "❌ " + teacher + " уулзалтыг цуцаллаа · " + l.when[0]}
+			if len(l.when) > 1 {
+				nt.Title = fmt.Sprintf("❌ %s %d уулзалтыг цуцаллаа", teacher, len(l.when))
+				nt.Body = strings.Join(l.when, ", ") + " · " + body
+			}
+			ns = append(ns, nt)
+		}
+		s.notify(ctx, ns...)
+	}
+	s.profiles.Delete(teacherUser)
+	return n
+}
+
+// handleMyBookings: GET /api/me/bookings — удахгүй болох бүх захиалга (баталгаажсан ба төлбөр хүлээгдэж буй).
+func (s *Server) handleMyBookings(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireTeacher(w, r)
+	if !ok {
+		return
+	}
+	now := time.Now()
+	ss, err := s.store.Slots(r.Context(), c.UID, now.Add(-2*time.Hour), now.Add(slotMaxAhead+60*24*time.Hour))
+	if s.storeErr(w, r, err) {
+		return
+	}
+	type booking struct {
+		store.Slot
+		Held bool `json:"held,omitempty"` // төлбөр хүлээгдэж буй
+	}
+	out := []booking{}
+	for i := range ss {
+		if ss[i].End().Before(now) {
+			continue
+		}
+		if held := ss[i].StudentID == "" && !ss[i].Free(now); ss[i].StudentID != "" || held {
+			out = append(out, booking{Slot: ss[i], Held: held})
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// handleCancelSlots: POST /api/me/slots/cancel {ids} — сонгосон (эсвэл бүх) захиалгыг нэг дор цуцална.
+// Зөвхөн энэ багшийн цагуудыг хүлээн авна.
+func (s *Server) handleCancelSlots(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireTeacher(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		IDs []string `json:"ids"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if len(in.IDs) == 0 || len(in.IDs) > maxFutureSlots {
+		writeErr(w, http.StatusBadRequest, "цуцлах захиалгаа сонгоно уу")
+		return
+	}
+	want := make(map[string]bool, len(in.IDs))
+	for _, id := range in.IDs {
+		want[id] = true
+	}
+	now := time.Now()
+	ss, err := s.store.Slots(r.Context(), c.UID, now.Add(-2*time.Hour), now.Add(slotMaxAhead+60*24*time.Hour))
+	if s.storeErr(w, r, err) {
+		return
+	}
+	var pick []store.Slot
+	for i := range ss {
+		if want[ss[i].ID] {
+			pick = append(pick, ss[i])
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"cancelled": s.cancelSlots(r.Context(), c.UID, c.Name, pick)})
 }
 
 // handleTeacherSlots: GET /api/teachers/{username}/slots — захиалж болох сул цагууд; нэвтэрсэн бол энэ багштай

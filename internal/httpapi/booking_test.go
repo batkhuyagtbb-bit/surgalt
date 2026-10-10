@@ -215,3 +215,57 @@ func TestSlotRepeatWeekly(t *testing.T) {
 		t.Fatalf("үлдэх ёстой: эхний 2 давталт, тусдаа цаг, захиалсан цаг: %d", len(left))
 	}
 }
+
+// Багш захиалгуудаа жагсаалтаар харж, сонгосныг (эсвэл бүгдийг) нэг дор цуцална: суралцагч бүрт нэг мэдэгдэл,
+// «Шууд хичээл»-ээс хасагдана; бусдын цагийг цуцалж чадахгүй.
+func TestCancelBookingsBulk(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	other, _ := register(t, srv, "other", "teacher")
+	s1, _ := register(t, srv, "stud1", "student")
+	s2, _ := register(t, srv, "stud2", "student")
+	base := time.Now().Add(48 * time.Hour).Truncate(time.Hour)
+	at := func(h int) string { return base.Add(time.Duration(h) * time.Hour).UTC().Format(time.RFC3339) }
+	_, out := callArr(t, srv, "POST", "/api/me/slots", tt, `{"starts":["`+at(0)+`","`+at(1)+`","`+at(2)+`","`+at(3)+`"],"duration_min":60,"mode":"online"}`)
+	_, foreign := callArr(t, srv, "POST", "/api/me/slots", other, `{"starts":["`+at(0)+`"],"duration_min":60,"mode":"online"}`)
+	id := func(i int) string { return out[i].(map[string]any)["id"].(string) }
+	for i, who := range []string{s1, s1, s2} {
+		if code, _ := call(t, srv, "POST", "/api/slots/"+id(i)+"/book", who, `{}`); code != 200 {
+			t.Fatalf("захиалга %d: %d", i, code)
+		}
+	}
+	if _, bs := callArr(t, srv, "GET", "/api/me/bookings", tt, ""); len(bs) != 3 {
+		t.Fatalf("багшид 3 захиалга (сул цаг орохгүй): %d", len(bs))
+	}
+	if code, _ := call(t, srv, "GET", "/api/me/bookings", s1, ""); code != http.StatusForbidden {
+		t.Fatalf("суралцагч багшийн захиалгыг харахгүй: %d", code)
+	}
+	foreignID := foreign[0].(map[string]any)["id"].(string)
+	code, d := call(t, srv, "POST", "/api/me/slots/cancel", tt, `{"ids":["`+id(0)+`","`+id(1)+`","`+foreignID+`"]}`)
+	if code != 200 || d["cancelled"].(float64) != 2 {
+		t.Fatalf("сонгосон 2-ыг цуцална, бусдын цагийг үл тооно: %d %v", code, d)
+	}
+	_, ns := call(t, srv, "GET", "/api/me/notifications", s1, "")
+	var cancels []string
+	for _, x := range notifTitles(ns, NotifBooking) {
+		if strings.Contains(x, "цуцаллаа") {
+			cancels = append(cancels, x)
+		}
+	}
+	if len(cancels) != 1 || !strings.Contains(cancels[0], "2 уулзалтыг цуцаллаа") {
+		t.Fatalf("нэг суралцагчид нэгтгэсэн нэг мэдэгдэл: %v", cancels)
+	}
+	if _, ms := callArrMap(t, srv, "GET", "/api/me/meetings", tt); len(ms) != 1 {
+		t.Fatalf("цуцалсан уулзалтууд «Шууд хичээл»-ээс хасагдана: %v", ms)
+	}
+	if _, bs := callArr(t, srv, "GET", "/api/me/bookings", tt, ""); len(bs) != 1 {
+		t.Fatalf("1 захиалга үлдэнэ: %d", len(bs))
+	}
+	if code, d := call(t, srv, "POST", "/api/me/slots/cancel", tt, `{"ids":["`+id(2)+`"]}`); code != 200 || d["cancelled"].(float64) != 1 {
+		t.Fatalf("үлдсэнийг цуцлах: %d %v", code, d)
+	}
+	if code, _ := call(t, srv, "POST", "/api/me/slots/cancel", tt, `{"ids":[]}`); code != http.StatusBadRequest {
+		t.Fatalf("хоосон жагсаалт 400: %d", code)
+	}
+}

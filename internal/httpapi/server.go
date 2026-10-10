@@ -224,6 +224,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/slots", s.handleMySlots)
 	mux.HandleFunc("POST /api/me/slots", s.handleAddSlots)
 	mux.HandleFunc("DELETE /api/me/slots/{id}", s.handleDeleteSlot)
+	mux.HandleFunc("GET /api/me/bookings", s.handleMyBookings)
+	mux.HandleFunc("POST /api/me/slots/cancel", s.handleCancelSlots)
 	mux.HandleFunc("POST /api/views", s.handleTrackView)
 	mux.HandleFunc("POST /api/views/{id}/end", s.handleVisitEnd)
 	mux.HandleFunc("GET /api/me/visits", s.handleMyVisits)
