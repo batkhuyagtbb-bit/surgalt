@@ -79,6 +79,19 @@ func (m *Memory) DeleteSlot(_ context.Context, id string) error {
 	return nil
 }
 
+func (m *Memory) DeleteFreeSlots(_ context.Context, ids []string, now time.Time) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, id := range ids {
+		if s, ok := m.slots[id]; ok && s.Free(now) {
+			delete(m.slots, id)
+			n++
+		}
+	}
+	return n, nil
+}
+
 func (m *Memory) CreateOrGetPendingSlotOrder(_ context.Context, userID string, s *Slot, title string) (*Order, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

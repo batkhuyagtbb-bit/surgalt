@@ -591,6 +591,8 @@ type Store interface {
 	// UpdateSlot — түгжээтэй уншиж fn-ээр өөрчлөөд хадгална; fn алдаа буцаавал хадгалахгүй.
 	UpdateSlot(ctx context.Context, id string, fn func(*Slot) error) (*Slot, error)
 	DeleteSlot(ctx context.Context, id string) error
+	// DeleteFreeSlots — өгөгдсөн цагуудаас одоо ч сул (захиалаагүй, төлбөр хүлээгдээгүй) байгааг нь хасаж, тоог буцаана.
+	DeleteFreeSlots(ctx context.Context, ids []string, now time.Time) (int, error)
 	// CreateOrGetPendingSlotOrder — хэрэглэгч+цаг дээр хүлээгдэж буй нэг л захиалга.
 	CreateOrGetPendingSlotOrder(ctx context.Context, userID string, s *Slot, title string) (*Order, error)
 	// Гадаад нэвтрэлт (Google, Facebook ...): provider+subject -> хэрэглэгч.

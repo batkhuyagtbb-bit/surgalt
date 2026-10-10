@@ -169,3 +169,49 @@ func TestSlotBooking(t *testing.T) {
 		t.Fatalf("сул цаг үлдээгүй: %v", p["teacher"])
 	}
 }
+
+// Давталт: улирал (13 долоо хоног) — цаг бүр долоо хоног бүр, нэг цувралд; өмнө тэмдэглэсэн цагтай давхцах долоо
+// хоногийг алгасна; «энэ цагаас хойших бүгд»-ийг хасахад захиалсан цаг үлдэнэ.
+func TestSlotRepeatWeekly(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	st, _ := register(t, srv, "stud", "student")
+	first := time.Now().Add(72 * time.Hour).Truncate(time.Hour)
+	iso := func(wk int) string { return first.AddDate(0, 0, 7*wk).UTC().Format(time.RFC3339) }
+	if code, _ := callArr(t, srv, "POST", "/api/me/slots", tt, `{"starts":["`+iso(2)+`"],"duration_min":60,"mode":"online"}`); code != 201 {
+		t.Fatalf("тусдаа цаг: %d", code)
+	}
+	if code, _ := call(t, srv, "POST", "/api/me/slots", tt, `{"starts":["`+iso(0)+`"],"duration_min":60,"mode":"online","weeks":60}`); code != http.StatusBadRequest {
+		t.Fatalf("53-аас их долоо хоног 400: %d", code)
+	}
+	code, out := callArr(t, srv, "POST", "/api/me/slots", tt, `{"starts":["`+iso(0)+`"],"duration_min":60,"mode":"online","weeks":13}`)
+	if code != 201 || len(out) != 12 {
+		t.Fatalf("13 долоо хоногоос давхцсан 1-ийг алгасаж 12 цаг: %d %d", code, len(out))
+	}
+	series := out[0].(map[string]any)["series_id"]
+	for i, o := range out {
+		m := o.(map[string]any)
+		wk := i
+		if i >= 2 {
+			wk = i + 1 // 3 дахь долоо хоног (wk=2) алгасагдсан
+		}
+		if m["series_id"] != series || series == "" {
+			t.Fatalf("нэг цувралд байх ёстой: %v", m)
+		}
+		if at, _ := time.Parse(time.RFC3339, m["starts_at"].(string)); !at.Equal(first.AddDate(0, 0, 7*wk)) {
+			t.Fatalf("%d дэх цаг долоо хоног бүр ижил цагт: %v", i, at)
+		}
+	}
+	if code, b := call(t, srv, "POST", "/api/slots/"+out[3].(map[string]any)["id"].(string)+"/book", st, `{}`); code != 200 || b["booked"] != true {
+		t.Fatalf("давталтын нэгийг захиалах: %d %v", code, b)
+	}
+	code, d := call(t, srv, "DELETE", "/api/me/slots/"+out[2].(map[string]any)["id"].(string)+"?series=1", tt, "")
+	if code != 200 || d["deleted"].(float64) != 9 {
+		t.Fatalf("цааших сул давталтыг хасна (захиалсныг үлдээнэ): %d %v", code, d)
+	}
+	from := first.In(mnLoc).Format("2006-01-02")
+	if _, left := callArr(t, srv, "GET", "/api/me/slots?from="+from+"&days=62", tt, ""); len(left) != 4 {
+		t.Fatalf("үлдэх ёстой: эхний 2 давталт, тусдаа цаг, захиалсан цаг: %d", len(left))
+	}
+}

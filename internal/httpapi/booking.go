@@ -22,7 +22,10 @@ const (
 	slotLead       = 5 * time.Minute     // эхлэхэд үүнээс бага хугацаа үлдсэн цагийг захиалахгүй
 	slotHorizon    = 60 * 24 * time.Hour // зочдод харагдах хугацаа
 	maxSlotsPerReq = 60
-	maxFutureSlots = 500
+	maxWeeks       = 53   // давталт: улирал (13), жил (52) долоо хоног
+	maxExpanded    = 800  // нэг хүсэлтээр үүсэх цагийн дээд хэмжээ (давталтын дараа)
+	maxFutureSlots = 3000 // багшийн нийт цаг
+	slotMaxAhead   = 400 * 24 * time.Hour
 )
 
 var errSlotTaken = errors.New("slot taken")
@@ -110,8 +113,10 @@ func (s *Server) handleMySlots(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// handleAddSlots: POST /api/me/slots {starts: [RFC3339], duration_min, mode, price, location} — календарь дээр дарж
-// тэмдэглэсэн сул цагууд. Өөр цагтай давхцвал хадгалахгүй.
+// handleAddSlots: POST /api/me/slots {starts: [RFC3339], duration_min, mode, price, location, weeks} — календарь дээр
+// дарж тэмдэглэсэн сул цагууд. weeks > 1 бол долоо хоног бүр давтана (улирал 13, жил 52): цаг бүр өөрийн цувралтай
+// (series_id) — давталтыг дараа нь хамт хасна; давтахад өөр цагтай давхцах долоо хоногийг алгасна. Давталтгүй үед
+// давхцвал хадгалахгүй (409).
 func (s *Server) handleAddSlots(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireTeacher(w, r)
 	if !ok {
@@ -123,13 +128,21 @@ func (s *Server) handleAddSlots(w http.ResponseWriter, r *http.Request) {
 		Mode        string      `json:"mode"`
 		Price       int64       `json:"price"`
 		Location    string      `json:"location"`
+		Weeks       int         `json:"weeks"` // 1 (давтахгүй) … 53
 	}
 	if !decode(w, r, &in) {
 		return
 	}
 	in.Location = strings.Join(strings.Fields(in.Location), " ")
+	in.Weeks = max(in.Weeks, 1)
 	now := time.Now()
 	switch {
+	case in.Weeks > maxWeeks:
+		writeErr(w, http.StatusBadRequest, "давталт 53 долоо хоногоос ихгүй")
+		return
+	case len(in.Starts)*in.Weeks > maxExpanded:
+		writeErr(w, http.StatusBadRequest, "хэт олон цаг — сонголт эсвэл давталтаа багасгана уу")
+		return
 	case len(in.Starts) == 0 || len(in.Starts) > maxSlotsPerReq:
 		writeErr(w, http.StatusBadRequest, "1-60 цаг сонгоно уу")
 		return
@@ -158,37 +171,56 @@ func (s *Server) handleAddSlots(w http.ResponseWriter, r *http.Request) {
 	if in.Mode == store.SlotOnline {
 		in.Location = ""
 	}
-	existing, err := s.store.Slots(r.Context(), c.UID, now.Add(-24*time.Hour), now.Add(400*24*time.Hour))
+	existing, err := s.store.Slots(r.Context(), c.UID, now.Add(-24*time.Hour), now.Add(slotMaxAhead+60*24*time.Hour))
 	if s.storeErr(w, r, err) {
 		return
 	}
-	if len(existing)+len(in.Starts) > maxFutureSlots {
+	if len(existing)+len(in.Starts)*in.Weeks > maxFutureSlots {
 		writeErr(w, http.StatusBadRequest, "хэт олон сул цаг — хуучнаа цэвэрлэнэ үү")
 		return
 	}
 	dur := time.Duration(in.DurationMin) * time.Minute
 	overlaps := func(a time.Time, b *store.Slot) bool { return a.Before(b.End()) && b.StartsAt.Before(a.Add(dur)) }
+	busy := func(st time.Time, add []*store.Slot) bool {
+		for i := range existing {
+			if overlaps(st, &existing[i]) {
+				return true
+			}
+		}
+		for _, o := range add {
+			if overlaps(st, o) {
+				return true
+			}
+		}
+		return false
+	}
 	var add []*store.Slot
-	for _, st := range in.Starts {
-		st = st.Truncate(time.Minute)
-		if st.Before(now.Add(slotLead)) || st.After(now.Add(366*24*time.Hour)) {
+	for _, st0 := range in.Starts {
+		st0 = st0.Truncate(time.Minute)
+		if st0.Before(now.Add(slotLead)) || st0.After(now.Add(slotMaxAhead)) {
 			writeErr(w, http.StatusBadRequest, "өнгөрсөн эсвэл хэт хол цаг")
 			return
 		}
-		for i := range existing {
-			if overlaps(st, &existing[i]) {
-				writeErr(w, http.StatusConflict, "Энэ цаг өөр тэмдэглэсэн цагтай давхцаж байна")
-				return
-			}
+		series := ""
+		if in.Weeks > 1 {
+			series = randHex(8)
 		}
-		sl := &store.Slot{TeacherID: c.UID, StartsAt: st, DurationMin: in.DurationMin, Mode: in.Mode, Price: in.Price, Location: in.Location}
-		for _, o := range add {
-			if overlaps(st, o) {
-				writeErr(w, http.StatusConflict, "Сонгосон цагууд хоорондоо давхцаж байна")
-				return
+		for wk := 0; wk < in.Weeks; wk++ {
+			st := st0.AddDate(0, 0, 7*wk) // Улаанбаатарт зуны цаг байхгүй — цагийн зөрүү гарахгүй
+			if busy(st, add) {
+				if in.Weeks == 1 {
+					writeErr(w, http.StatusConflict, "Энэ цаг өөр тэмдэглэсэн цагтай давхцаж байна")
+					return
+				}
+				continue // давталтад: тэр долоо хоногийг алгасна
 			}
+			add = append(add, &store.Slot{TeacherID: c.UID, StartsAt: st, DurationMin: in.DurationMin, Mode: in.Mode, Price: in.Price,
+				Location: in.Location, SeriesID: series})
 		}
-		add = append(add, sl)
+	}
+	if len(add) == 0 {
+		writeErr(w, http.StatusConflict, "Эдгээр цаг аль хэдийн тэмдэглэгдсэн байна")
+		return
 	}
 	if err := s.store.AddSlots(r.Context(), add); s.storeErr(w, r, err) {
 		return
@@ -197,8 +229,9 @@ func (s *Server) handleAddSlots(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, add)
 }
 
-// handleDeleteSlot: DELETE /api/me/slots/{id} — сул цагийг хасна; захиалсан бол захиалгыг цуцалж (Шууд хичээлээс
-// хасна) суралцагчид мэдэгдэнэ.
+// handleDeleteSlot: DELETE /api/me/slots/{id}[?series=1] — сул цагийг хасна; захиалсан бол захиалгыг цуцалж (Шууд
+// хичээлээс хасна) суралцагчид мэдэгдэнэ. series=1 бол энэ цагаас хойших давталтын СУЛ цагуудыг хамт хасна
+// (захиалсан, төлбөр хүлээгдэж буй цаг хэвээр үлдэнэ).
 func (s *Server) handleDeleteSlot(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireTeacher(w, r)
 	if !ok {
@@ -207,6 +240,25 @@ func (s *Server) handleDeleteSlot(w http.ResponseWriter, r *http.Request) {
 	sl, err := s.store.SlotByID(r.Context(), r.PathValue("id"))
 	if err != nil || sl.TeacherID != c.UID {
 		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		return
+	}
+	if r.URL.Query().Get("series") == "1" && sl.SeriesID != "" && sl.StudentID == "" {
+		ss, err := s.store.Slots(r.Context(), c.UID, sl.StartsAt, sl.StartsAt.Add(slotMaxAhead+60*24*time.Hour))
+		if s.storeErr(w, r, err) {
+			return
+		}
+		var ids []string
+		for i := range ss {
+			if ss[i].SeriesID == sl.SeriesID {
+				ids = append(ids, ss[i].ID)
+			}
+		}
+		n, err := s.store.DeleteFreeSlots(r.Context(), ids, time.Now())
+		if s.storeErr(w, r, err) {
+			return
+		}
+		s.profiles.Delete(c.Name)
+		writeJSON(w, http.StatusOK, map[string]int{"deleted": n})
 		return
 	}
 	if err := s.store.DeleteSlot(r.Context(), sl.ID); s.storeErr(w, r, err) {

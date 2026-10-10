@@ -26,6 +26,7 @@ type Slot struct {
 	Note        string     `json:"note,omitempty"` // захиалагчийн бичсэн (юу ярилцах)
 	HoldBy      string     `json:"-"`              // төлбөр хүлээгдэж буй хүн
 	HoldUntil   *time.Time `json:"-"`
+	SeriesID    string     `json:"series_id,omitempty"`  // долоо хоног бүр давтагдах цуврал (улирал, жил)
 	MeetingID   string     `json:"meeting_id,omitempty"` // баталгаажсаны дараа «Шууд хичээл»-д үүссэн уулзалт
 	MeetURL     string     `json:"meet_url,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`

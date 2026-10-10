@@ -29,6 +29,7 @@ const ICON = {
   chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/>',
   profile: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>',
   phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>',
+  repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',
   ext: '<path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
   out: '<path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4"/><path d="m16 8 4 4-4 4"/><path d="M20 12H9"/>',
   money: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 9v.01M17 15v.01"/>',
@@ -1608,7 +1609,7 @@ function fileCard(f, perMB, used) {
 }
 
 /* ---------- Цаг захиалга: багш календарьтаа сул цагаа тэмдэглэнэ (дарж нэмнэ, дахин дарж хасна) ---------- */
-const SC = { week: 0, dur: 60, mode: "online", price: 0, loc: "" }; // таб солиход тохиргоо хадгалагдана
+const SC = { week: 0, dur: 60, mode: "online", price: 0, loc: "", weeks: 1 }; // таб солиход тохиргоо хадгалагдана
 const SC_FROM = 7, SC_TO = 22, SC_ROW = 22; // 07:00–22:00, 30 минут тутам нэг мөр
 const scDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const scHM = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -1618,13 +1619,14 @@ function slotsPanel() {
       <label>Үргэлжлэх<select id="scDur">${[[30, "30 мин"], [45, "45 мин"], [60, "1 цаг"], [90, "1.5 цаг"], [120, "2 цаг"]].map(([v, t]) => `<option value="${v}" ${v === SC.dur ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       <div class="sc-seg" role="group" aria-label="Уулзах хэлбэр">${[["online", "Онлайн"], ["offline", "Биечлэн"]].map(([v, t]) => `<button type="button" data-scmode="${v}" aria-pressed="${SC.mode === v}">${t}</button>`).join("")}</div>
       <label>Үнэ (₮, 0 = үнэгүй)<input id="scPrice" type="number" min="0" step="1000" value="${SC.price}"></label>
+      <label>Давтах<select id="scWeeks">${[[1, "Давтахгүй"], [13, "Улирал · 13 долоо хоног"], [52, "Жил · 52 долоо хоног"]].map(([v, t]) => `<option value="${v}" ${v === SC.weeks ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       <label class="sc-loc" ${SC.mode === "offline" ? "" : "hidden"}>Уулзах газар<input id="scLoc" maxlength="120" value="${esc(SC.loc || me.location || "")}" placeholder="Номын сан, 2 давхар"></label>
     </div>
     ${me.meet_connected ? "" : `<p class="sc-warn" ${SC.mode === "online" ? "" : "hidden"}>${ico("live", 15)}Google Meet холбоогүй байна — онлайн уулзалтын холбоос автоматаар үүсэхгүй. Доороос «Google Meet холбох»-оор холбоорой.</p>`}
     <div class="sc-nav"><button type="button" class="icon-btn" data-wk="-1" aria-label="Өмнөх долоо хоног">${ico("chevron", 16)}</button><b id="scRange"></b><button type="button" class="icon-btn" data-wk="1" aria-label="Дараагийн долоо хоног">${ico("chevron", 16)}</button>
       <button type="button" class="btn btn-ghost btn-sm" data-wk="0">Энэ долоо хоног</button>
       <span class="sc-legend"><i class="free"></i>Сул <i class="held"></i>Төлбөр хүлээгдэж буй <i class="booked"></i>Захиалсан <i class="meet"></i>Шууд хичээл</span></div>
-    <p class="muted small sc-hint">Хүснэгтэн дээр дарж сул цаг нэмнэ, чирж хүрээ сонговол (10:00–14:00 г.м.) олон цаг нэг дор · сул цаг дээр дахин дарж хасна · захиалсан цаг дээр дарж дэлгэрэнгүйг харна.</p>
+    <p class="muted small sc-hint">Хүснэгтэн дээр дарж сул цаг нэмнэ, чирж хүрээ сонговол (10:00–14:00 г.м.) олон цаг нэг дор · «Давтах»-аар улирал, жилээр долоо хоног бүр · сул цаг дээр дахин дарж хасна · захиалсан цаг дээр дарж дэлгэрэнгүйг харна.</p>
     <div class="sc-wrap"><div class="sc-grid" id="scGrid"></div></div>`;
 }
 async function mountSlots(meetings) {
@@ -1647,7 +1649,7 @@ async function mountSlots(meetings) {
         const st = new Date(x.starts_at), state = x.student_id ? "booked" : x.held ? "held" : "free", gone = st.getTime() < now;
         const what = `${x.mode === "offline" ? "Биечлэн" : "Онлайн"} · ${x.price ? money(x.price) : "Үнэгүй"}`;
         return `<button type="button" class="sc-slot ${state} ${gone ? "gone" : ""} ${x.duration_min < 60 ? "short" : ""}" data-slot="${esc(x.id)}" style="${pos(st, x.duration_min)}" title="${scHM(st)} · ${x.duration_min} мин · ${what}">
-          <b>${scHM(st)}</b><small>${state === "booked" ? esc(x.student_name || "Захиалсан") : state === "held" ? "Төлбөр хүлээгдэж байна" : what}</small></button>`;
+          <b>${scHM(st)}${x.series_id ? `<i class="sc-rep" title="Долоо хоног бүр давтагдана">${ico("repeat", 11)}</i>` : ""}</b><small>${state === "booked" ? esc(x.student_name || "Захиалсан") : state === "held" ? "Төлбөр хүлээгдэж байна" : what}</small></button>`;
       }).join("");
       const meets = meetings.filter((m) => !linked.has(m.id) && scDay(new Date(m.starts_at)) === key).map((m) => {
         const st = new Date(m.starts_at);
@@ -1661,6 +1663,7 @@ async function mountSlots(meetings) {
       const x = slots.find((y) => y.id === b.dataset.slot); if (!x) return;
       if (x.student_id) return slotInfo(x, meetings);
       if (x.held) return toast("Энэ цагийг захиалж, төлбөрөө төлж байна — түр хүлээнэ үү");
+      if (x.series_id) return seriesAsk(x, meetings);
       try { await api(`/api/me/slots/${x.id}`, { method: "DELETE" }); toast("Сул цаг хасагдлаа"); mountSlots(meetings); } catch (err) { toast(err.message, true); }
       return;
     }
@@ -1679,8 +1682,9 @@ async function mountSlots(meetings) {
     const starts = times.filter((t) => t >= Date.now() + 5 * 60e3 && !busy(t)).map((t) => new Date(t));
     if (!starts.length) return toast(rowTime(col, lo).getTime() < Date.now() + 5 * 60e3 ? "Өнгөрсөн цагт тэмдэглэх боломжгүй" : "Энэ цаг аль хэдийн тэмдэглэгдсэн байна", true);
     try {
-      await api("/api/me/slots", { method: "POST", body: { starts: starts.map((d) => d.toISOString()), duration_min: SC.dur, mode: SC.mode, price: SC.price, location: SC.mode === "offline" ? SC.loc : "" } });
-      if (starts.length > 1) toast(`${starts.length} сул цаг тэмдэглэгдлээ`);
+      const made = await api("/api/me/slots", { method: "POST", body: { starts: starts.map((d) => d.toISOString()), duration_min: SC.dur, mode: SC.mode, price: SC.price, location: SC.mode === "offline" ? SC.loc : "", weeks: SC.weeks } });
+      if (SC.weeks > 1) { const last = new Date(Math.max(...made.map((x) => new Date(x.starts_at).getTime()))); toast(`${made.length} сул цаг · ${last.getFullYear()}/${last.getMonth() + 1}/${last.getDate()} хүртэл долоо хоног бүр`); }
+      else if (made.length > 1) toast(`${made.length} сул цаг тэмдэглэгдлээ`);
       mountSlots(meetings);
     } catch (err) { toast(err.message, true); }
   };
@@ -1707,6 +1711,27 @@ async function mountSlots(meetings) {
   const finish = () => { if (!drag) return; const d = drag; drag = null; d.el.remove(); addRange(d.col, d.a, d.b); };
   grid.onpointerup = finish;
   grid.onpointerleave = () => { if (drag) { drag.el.remove(); drag = null; } };
+}
+// Давтагддаг сул цаг: зөвхөн энэ эсвэл энэ цагаас хойших бүх давталт (захиалсан цагууд хэвээр).
+function seriesAsk(x, meetings) {
+  const st = new Date(x.starts_at);
+  document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="scSeries"><div class="modal-card sc-series"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+    <span class="eyebrow">${ico("repeat", 13)} Давтагдах цаг</span><h3 class="h3">${WEEKDAYS[st.getDay()]} гараг бүр ${scHM(st)}</h3>
+    <p class="muted">${x.duration_min} мин · ${x.mode === "offline" ? "Биечлэн" : "Онлайн"} · ${x.price ? money(x.price) : "Үнэгүй"} · сонгосон: ${st.getMonth() + 1}/${st.getDate()}</p>
+    <div class="sc-series-acts"><button type="button" class="btn btn-ghost" data-one>Зөвхөн энэ цагийг хасах</button>
+      <button type="button" class="btn btn-danger" data-all>Энэ цагаас хойших бүх давталтыг хасах</button></div>
+    <p class="muted small" style="margin:0">Захиалсан цагууд хэвээр үлдэнэ.</p></div></div>`);
+  const md = $("#scSeries");
+  SG.openModal(md);
+  const close = () => { SG.closeModal(md); setTimeout(() => md.remove(), 300); };
+  md.addEventListener("click", async (ev) => {
+    if (ev.target === md || ev.target.closest("[data-close]")) { ev.preventDefault(); close(); return; }
+    const all = ev.target.closest("[data-all]"); if (!all && !ev.target.closest("[data-one]")) return;
+    try {
+      const r = await api(`/api/me/slots/${x.id}${all ? "?series=1" : ""}`, { method: "DELETE" });
+      toast(all ? `${r?.deleted || 0} давталт хасагдлаа` : "Сул цаг хасагдлаа"); close(); mountSlots(meetings);
+    } catch (err) { toast(err.message, true); }
+  });
 }
 function slotInfo(x, meetings) {
   const st = new Date(x.starts_at), en = new Date(st.getTime() + x.duration_min * 60e3);
@@ -1752,6 +1777,7 @@ async function live() {
   // Цаг захиалгын тохиргоо ба календарь
   const scLoc = $(".sc-loc"), scWarn = $(".sc-warn");
   $("#scDur").onchange = (e) => { SC.dur = +e.target.value; };
+  $("#scWeeks").onchange = (e) => { SC.weeks = +e.target.value || 1; };
   $("#scPrice").oninput = (e) => { SC.price = Math.max(0, Math.round(+e.target.value || 0)); };
   $("#scLoc").oninput = (e) => { SC.loc = e.target.value; };
   SC.loc = $("#scLoc").value;

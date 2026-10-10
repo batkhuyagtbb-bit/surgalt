@@ -164,6 +164,7 @@ var chMigrations = []string{
 	"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS rubric String DEFAULT ''",
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS phone String DEFAULT ''",
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS slot_id String DEFAULT ''",
+	"ALTER TABLE slots ADD COLUMN IF NOT EXISTS series_id String DEFAULT ''",
 }
 
 var chTables = []chTable{
@@ -191,7 +192,7 @@ var chTables = []chTable{
 	// Цаг захиалга: багшийн сул цаг ба захиалга нэг мөрөнд (slots.go).
 	{"slots", `(id String, teacher_id String, starts_at ` + tsType + `, duration_min Int32, mode String, price Int64,
 		location String, student_id String, student_name String, note String, hold_by String,
-		hold_until Nullable(` + tsType + `), meeting_id String, meet_url String, created_at ` + tsType + `,
+		hold_until Nullable(` + tsType + `), series_id String DEFAULT '', meeting_id String, meet_url String, created_at ` + tsType + `,
 		ver UInt64, deleted Bool DEFAULT false,
 		INDEX ix_id id TYPE bloom_filter GRANULARITY 1,
 		INDEX ix_student student_id TYPE bloom_filter GRANULARITY 1)

@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -10,22 +12,27 @@ import (
 // ---- цаг захиалга (slots.go) ----
 
 const slotCols = `id, teacher_id, starts_at, duration_min, mode, price, location, student_id, student_name, note,
-	hold_by, hold_until, meeting_id, meet_url, created_at`
+	hold_by, hold_until, series_id, meeting_id, meet_url, created_at`
+
+var slotInsertCols = []string{"id", "teacher_id", "starts_at", "duration_min", "mode", "price", "location", "student_id",
+	"student_name", "note", "hold_by", "hold_until", "series_id", "meeting_id", "meet_url", "created_at", "ver", "deleted"}
+
+func slotRow(s *Slot, deleted bool) []any {
+	return []any{s.ID, s.TeacherID, s.StartsAt.UTC(), int32(s.DurationMin), s.Mode, s.Price, s.Location, s.StudentID,
+		s.StudentName, s.Note, s.HoldBy, nullTime(s.HoldUntil), s.SeriesID, s.MeetingID, s.MeetURL, s.CreatedAt.UTC(), ver(), deleted}
+}
 
 func scanSlot(r driver.Rows) (Slot, error) {
 	var s Slot
 	var dur int32
 	err := r.Scan(&s.ID, &s.TeacherID, &s.StartsAt, &dur, &s.Mode, &s.Price, &s.Location, &s.StudentID, &s.StudentName, &s.Note,
-		&s.HoldBy, &s.HoldUntil, &s.MeetingID, &s.MeetURL, &s.CreatedAt)
+		&s.HoldBy, &s.HoldUntil, &s.SeriesID, &s.MeetingID, &s.MeetURL, &s.CreatedAt)
 	s.DurationMin = int(dur)
 	return s, err
 }
 
 func (c *ClickHouse) writeSlot(ctx context.Context, s *Slot, deleted bool) error {
-	return c.insert(ctx, "slots", []string{"id", "teacher_id", "starts_at", "duration_min", "mode", "price", "location", "student_id",
-		"student_name", "note", "hold_by", "hold_until", "meeting_id", "meet_url", "created_at", "ver", "deleted"},
-		s.ID, s.TeacherID, s.StartsAt.UTC(), int32(s.DurationMin), s.Mode, s.Price, s.Location, s.StudentID,
-		s.StudentName, s.Note, s.HoldBy, nullTime(s.HoldUntil), s.MeetingID, s.MeetURL, s.CreatedAt.UTC(), ver(), deleted)
+	return c.insert(ctx, "slots", slotInsertCols, slotRow(s, deleted)...)
 }
 
 func (c *ClickHouse) slotsWhere(ctx context.Context, where string, args ...any) ([]Slot, error) {
@@ -40,14 +47,22 @@ func (c *ClickHouse) slotsWhere(ctx context.Context, where string, args ...any) 
 	return out, err
 }
 
+// AddSlots — нэг INSERT-ээр (жилийн давталт хэдэн зуун мөр байж болно).
 func (c *ClickHouse) AddSlots(ctx context.Context, slots []*Slot) error {
+	if len(slots) == 0 {
+		return nil
+	}
+	b, err := c.conn.PrepareBatch(ctx, "INSERT INTO slots ("+strings.Join(slotInsertCols, ", ")+")")
+	if err != nil {
+		return err
+	}
 	for _, s := range slots {
 		s.ID, s.CreatedAt = NewID(), time.Now()
-		if err := c.writeSlot(ctx, s, false); err != nil {
+		if err := b.Append(slotRow(s, false)...); err != nil {
 			return err
 		}
 	}
-	return nil
+	return b.Send()
 }
 
 func (c *ClickHouse) SlotByID(ctx context.Context, id string) (*Slot, error) {
@@ -96,6 +111,35 @@ func (c *ClickHouse) DeleteSlot(ctx context.Context, id string) error {
 		return err
 	}
 	return c.writeSlot(ctx, s, true)
+}
+
+// DeleteFreeSlots — цаг бүрийг түгжиж дахин уншаад, одоо ч сул бол л хасна (зэрэг захиалсныг устгахгүй).
+func (c *ClickHouse) DeleteFreeSlots(ctx context.Context, ids []string, now time.Time) (int, error) {
+	n := 0
+	for _, id := range ids {
+		ok, err := func() (bool, error) {
+			unlock, err := c.lock(ctx, "slot:"+id)
+			if err != nil {
+				return false, err
+			}
+			defer unlock()
+			s, err := c.SlotByID(ctx, id)
+			if errors.Is(err, ErrNotFound) {
+				return false, nil
+			}
+			if err != nil || !s.Free(now) {
+				return false, err
+			}
+			return true, c.writeSlot(ctx, s, true)
+		}()
+		if err != nil {
+			return n, err
+		}
+		if ok {
+			n++
+		}
+	}
+	return n, nil
 }
 
 func (c *ClickHouse) CreateOrGetPendingSlotOrder(ctx context.Context, userID string, s *Slot, title string) (*Order, error) {
