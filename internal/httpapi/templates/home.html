@@ -28,6 +28,7 @@
         <a class="btn btn-gold btn-lg" href="/login?role=teacher">Багшаар эхлэх</a>
         <a class="btn btn-glass btn-lg" href="/login">Суралцагчаар нэвтрэх</a>
       </div>
+      <nav class="home-go landing" aria-label="Танилцах"><a href="#explore">▶ Хэрхэн ажилладаг вэ?</a><a href="#explore=stu">Суралцагчийн аялал</a><a href="#explore=tch">Багшийн аялал</a></nav>
     </div>
   </section>
   {{/* Нэвтэрсэн хэрэглэгчийн самбар — app.js /api/me/home-оос бөглөнө. Хуудас өөрөө кэшлэгддэг статик HTML. */}}
@@ -37,122 +38,131 @@
     <div class="skeleton" style="height:220px;margin-top:24px"></div>
   </div>
   <div class="landing">
-  {{/* Систем хэрхэн ажилладаг: багш → surgalt.mn → суралцагч тойрог. Утаснууд, урсах цэгүүдийг app.js (howMap) зурна. */}}
-  <section class="how" id="how" aria-labelledby="howTitle">
+  {{/* surgalt.mn хэрхэн ажилладаг вэ — нэгтгэсэн ухаалаг хэсэг: зүүнд оюуны зураглал (навигаци), баруунд дэлгэрэнгүй
+       самбар (хөдөлгөөнт жишээ). Горим: Бүтэц / Суралцагчийн аялал / Багшийн аялал. app.js (explore) удирдана. */}}
+  <section class="ex" id="explore" aria-labelledby="exTitle">
     <div class="how-head">
       <p class="eyebrow">Нэг тойрог · гурван ялалт</p>
-      <h2 id="howTitle">Систем хэрхэн ажилладаг вэ?</h2>
+      <h2 id="exTitle">surgalt.mn хэрхэн ажилладаг вэ?</h2>
       <p class="lead">Багш мэдлэгээ хуваалцаж <b>орлого</b> олно. Суралцагч хяналттай орчинд <b>сахилга баттай</b>, <b>хариуцлагатай</b>, <b>идэвхтэй</b> суралцана.</p>
     </div>
-    <div class="how-map" id="howMap">
-      <svg class="how-wires" aria-hidden="true"></svg>
-      <article class="how-node how-teacher" style="--i:0">
-        <header><span class="how-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h10M12 16v4M7 12l3-3 2 2 4-4"/></svg></span>
-          <div><b>Багш</b><small>Мэдлэгээ хуваалцана</small></div></header>
-        <ul class="how-list"><li>Сургалт, хичээл, ном</li><li>Шууд хичээл, цаг захиалга</li><li>Шалгалт, даалгавар, рубрик</li></ul>
-        <div class="how-income">
-          <span class="how-out-k"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>Орлого</span>
-          <b class="how-count" data-to="2450000">0₮</b><small>сарын орлого — жишээ</small>
-          <span class="how-bars" aria-hidden="true"><i style="--h:.32;--k:0"></i><i style="--h:.45;--k:1"></i><i style="--h:.4;--k:2"></i><i style="--h:.62;--k:3"></i><i style="--h:.8;--k:4"></i><i style="--h:1;--k:5"></i></span>
-        </div>
-      </article>
-      <article class="how-node how-core" style="--i:1">
-        <span class="how-pulse" aria-hidden="true"></span>
-        <span class="how-logo">surgalt<b>.mn</b></span>
-        <small class="how-core-sub">Нэг дороос — найдвартай</small>
-        <ul class="how-chips"><li>QPay төлбөр</li><li>Анхаарлын хяналт</li><li>Хугацаа, сануулга</li><li>Ахиц, цол</li><li>Google Meet</li></ul>
-      </article>
-      <article class="how-node how-student" style="--i:2">
-        <header><span class="how-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5M22 9v5"/></svg></span>
-          <div><b>Суралцагч</b><small>Хяналттай орчинд суралцана</small></div></header>
-        <ul class="how-meters">
-          <li style="--v:.92;--k:0"><span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Сахилга бат</span><small>Анхаарлаа хадгална · таб солих хяналт</small><i></i></li>
-          <li style="--v:.87;--k:1"><span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 12l2 2 4-4"/></svg>Хариуцлага</span><small>Даалгавар, шалгалт хугацаандаа</small><i></i></li>
-          <li style="--v:.95;--k:2"><span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4 0 7-2.7 7-6.5 0-3.3-2.2-5.4-3.6-7.2-.6 1.6-1.6 2.6-2.9 2.9.4-3-1-5.9-3.5-8.2-.2 3.4-3 5.5-4.2 8.2A7 7 0 0 0 12 22z"/></svg>Идэвхтэй</span><small>Цол ахиж, ахиц харагдана</small><i></i></li>
-        </ul>
-      </article>
+    <div class="ex-modes" role="tablist" aria-label="Юуг үзэх вэ">
+      <button type="button" role="tab" data-mode="map" aria-selected="true"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/></svg>Бүтэц</button>
+      <button type="button" role="tab" data-mode="stu" aria-selected="false"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/></svg><span class="ex-l">Суралцагчийн аялал</span><span class="ex-s">Суралцагч</span></button>
+      <button type="button" role="tab" data-mode="tch" aria-selected="false"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h10M12 16v4"/></svg><span class="ex-l">Багшийн аялал</span><span class="ex-s">Багш</span></button>
     </div>
-    {{/* Сахилга бат — амьд жишээ: идэвхгүй бол дохио → сануулга → хичээл түр хаагдах → багшид мэдэгдэл. app.js (howDemo) тоглуулна. */}}
-    <div class="how-demo" id="howDemo" data-s="0">
-      <div class="hd-copy">
-        <p class="eyebrow">Сахилга бат · амьд жишээ</p>
-        <h3>Идэвхгүй бол систем өөрөө дохиолж, хичээлийг түр хаана</h3>
-        <ol class="hd-steps">
-          <li data-s="0"><b>Анхааралтай үзэж байна</b><small>Идэвхтэй минут, анхаарал тоологдоно</small></li>
-          <li data-s="1"><b>Таб сольсон</b><small>Улаан дохио, дуут сануулга · 1/3</small></li>
-          <li data-s="2"><b>Хичээлээс хөндийрсөн</b><small>Курсор гарсан · 2/3</small></li>
-          <li data-s="3"><b>Хичээл түр хаагдлаа</b><small>3/3 — багшийн тогтоосон хугацаагаар</small></li>
-          <li data-s="4"><b>Багшид мэдэгдэл очно</b><small>Багш шалгаад дахин нээж болно</small></li>
-        </ol>
+    <div class="ex-body">
+      <div class="ex-map">
+        <svg class="ex-wires" aria-hidden="true"></svg>
+        <button type="button" class="ex-core" data-node="core"><b>surgalt<i>.mn</i></b><small>Сур, сур, бас дахин сур</small></button>
+        <button type="button" class="ex-br" data-node="0" data-tone="brand" data-leaves="QR код|Нууц утас|Статистик"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg><span>Профайл</span></button>
+        <button type="button" class="ex-br" data-node="1" data-tone="brand" data-leaves="Блок хичээл|Ном, өгүүлэл|Нээх дүрэм"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/></svg><span>Сургалт</span></button>
+        <button type="button" class="ex-br" data-node="2" data-tone="brand" data-leaves="Шалгалт|Рубрик|Журнал"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 12l2 2 4-4"/></svg><span>Үнэлгээ</span></button>
+        <button type="button" class="ex-br" data-node="3" data-tone="red" data-leaves="Анхаарал|Сануулга|Түр хаалт"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span>Сахилга бат</span></button>
+        <button type="button" class="ex-br" data-node="4" data-tone="brand" data-leaves="Шууд хичээл|Цаг захиалга|Давталт"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Хуваарь</span></button>
+        <button type="button" class="ex-br" data-node="5" data-tone="amber" data-leaves="QPay QR|Үнэгүй / төлбөртэй|Орлого"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg><span>Төлбөр</span></button>
+        <button type="button" class="ex-br" data-node="6" data-tone="brand" data-leaves="Чат|Бүлгийн чат|Мэдэгдэл"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg><span>Харилцаа</span></button>
+        <button type="button" class="ex-br" data-node="7" data-tone="amber" data-leaves="Цол|Сертификат|Нүүр самбар"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="15" r="5"/><path d="M8.5 10.5 6 3h4l2 4 2-4h4l-2.5 7.5"/></svg><span>Ахиц</span></button>
+        <div class="ex-leaves" aria-hidden="true"></div>
       </div>
-      <div class="hd-screen" aria-hidden="true">
-        <div class="hd-bar"><i></i><i></i><i></i><span>surgalt.mn · Логарифмын шинж чанар</span></div>
-        <div class="hd-body">
-          <div class="hd-video"><svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5.5 3.5-5.5 3.5z"/></svg><span class="hd-lines"><i></i><i></i><i></i></span></div>
-          <div class="hd-stats">
-            <div class="hd-meter"><span>Анхаарал</span><b class="hd-att">96%</b><i><em></em></i></div>
-            <div class="hd-strikes"><span>Зөрчил</span><i></i><i></i><i></i></div>
-          </div>
-          <div class="hd-alert hd-a1"><b>⚠️ Таб сольсон байна!</b><span>Хичээл рүүгээ буцна уу · 1/3</span><em class="hd-snd">🔊</em></div>
-          <div class="hd-alert hd-a2"><b>🖱 Хичээлээс гарсан байна</b><span>Анхаарлаа хандуулна уу · 2/3</span></div>
-          <div class="hd-lock"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path class="hd-shackle" d="M8 11V8a4 4 0 0 1 8 0v3"/><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M12 15v2"/></svg>
-            <b>Хичээл түр хаагдлаа</b><span>3 удаа зөрчил гаргасан · 30 минутын дараа нээгдэнэ</span></div>
-          <div class="hd-notif"><span class="hd-notif-ico">⛔</span><span><small class="hd-notif-k">Багшид ирсэн мэдэгдэл</small><b>Бат: «Логарифм» хаагдсан</b><small>Таб 2 удаа сольсон · курсор 1 удаа гарсан</small></span></div>
-        </div>
+      <div class="ex-side">
+        <div class="ex-chips" role="tablist" aria-label="Алхам, салбар"></div>
+        <article class="ex-panel" aria-live="polite"></article>
+        <div class="ex-nav"><button type="button" class="icon-btn ex-prev" aria-label="Өмнөх">‹</button><span class="ex-prog" aria-hidden="true"><i></i></span><button type="button" class="ex-play" aria-label="Түр зогсоох">❚❚</button><button type="button" class="icon-btn ex-next" aria-label="Дараах">›</button></div>
       </div>
     </div>
-  </section>
-  {{/* Системийн бүтэц — оюуны зураглал: өргөн дэлгэцэнд app.js (mindMap) тойргоор байрлуулж утас зурна; утсанд мод бүтэц */}}
-  <section class="mm-sec" id="map" aria-labelledby="mmTitle">
-    <div class="how-head">
-      <p class="eyebrow">Системийн бүтэц</p>
-      <h2 id="mmTitle">Оюуны зураглал</h2>
-      <p class="lead">surgalt.mn юунаас бүрддэгийг нэг зурагт — салбар дээр очвол тайлбар нь гарна.</p>
+    <template data-node="core"><span class="ex-k">Төв · нэг тойрог</span><h3>Багш, суралцагч, систем — нэг тойрог</h3>
+      <p>Багш мэдлэгээ хуваалцаж орлого олно. Суралцагч төлбөрөө QR-аар төлж, хяналттай орчинд суралцана.</p>
+      <div class="ex-visual"><div class="ex-loop"><svg viewBox="0 0 440 220" role="img" aria-label="Багш, surgalt.mn, суралцагчийн тойрог">
+          <path id="xlk" class="xl-w know" d="M70,92 C150,22 290,22 370,92"/><path id="xlp" class="xl-w pay" d="M370,128 C290,198 150,198 70,128"/>
+          <text class="xl-l know" x="220" y="30" text-anchor="middle">Хичээл, мэдлэг →</text><text class="xl-l pay" x="220" y="206" text-anchor="middle">← Төлбөр ₮</text>
+          <g class="xl-n"><circle cx="58" cy="110" r="34"/><text x="58" y="115" text-anchor="middle">Багш</text></g>
+          <g class="xl-n core"><rect x="160" y="80" width="120" height="60" rx="16"/><text x="220" y="116" text-anchor="middle">surgalt<tspan>.mn</tspan></text></g>
+          <g class="xl-n"><circle cx="382" cy="110" r="34"/><text x="382" y="115" text-anchor="middle">Суралцагч</text></g>
+          <g class="xl-d know"><circle r="5"/><animateMotion dur="3.4s" repeatCount="indefinite" begin="0s"><mpath href="#xlk"/></animateMotion></g>
+          <g class="xl-d know"><circle r="5"/><animateMotion dur="3.4s" repeatCount="indefinite" begin="-1.13s"><mpath href="#xlk"/></animateMotion></g>
+          <g class="xl-d know"><circle r="5"/><animateMotion dur="3.4s" repeatCount="indefinite" begin="-2.26s"><mpath href="#xlk"/></animateMotion></g>
+          <g class="xl-d pay"><circle r="9"/><text dy="4" text-anchor="middle">₮</text><animateMotion dur="3.4s" repeatCount="indefinite" begin="-.5s"><mpath href="#xlp"/></animateMotion></g>
+          <g class="xl-d pay"><circle r="9"/><text dy="4" text-anchor="middle">₮</text><animateMotion dur="3.4s" repeatCount="indefinite" begin="-2.2s"><mpath href="#xlp"/></animateMotion></g>
+        </svg><div class="ex-loop-out"><span class="u-chip amber">Багш · ₮ орлого</span><span class="u-chip">Суралцагч · сахилга бат · хариуцлага · идэвх</span></div></div></div></template>
+    <template data-node="0"><span class="ex-k"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Салбар · Профайл</span><h3>Профайл, QR — танд хүрэх зам</h3><p>Суралцагч QR уншуулаад профайлыг тань шууд олно. Утсаа нууцалж, хэн үзсэн, хэн утас харсныг мэднэ.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-card k" style="--d:.2"><i class="u-av"></i><i></i><i></i></span><span class="u-col"><span class="u-qrbox sm k" style="--d:.8"><i class="u-qr"></i></span><span class="u-chip k" style="--d:1.5">📞 8811 ••••</span></span></div></div></template>
+    <template data-node="1"><span class="ex-k"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/></svg>Салбар · Сургалт</span><h3>Сургалтаа блокоор угсарна</h3><p>Текст, видео, тест, файлыг блокоор угсарч, үнэгүй, төлбөртэй хичээл, ном зарна; нээх дүрмээ өөрөө тавина.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-col"><span class="u-blk k" style="--d:.2">📝 Текст</span><span class="u-blk k" style="--d:.7">🎬 Видео</span><span class="u-blk k" style="--d:1.2">❓ Тест</span></span><span class="u-chip ok k" style="--d:1.9">Нийтлэв ✓</span></div></div></template>
+    <template data-node="2"><span class="ex-k"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 12l2 2 4-4"/></svg>Салбар · Үнэлгээ</span><h3>Шалгалт, рубрик, журнал</h3><p>Шалгалт, даалгаврыг тоогоор эсвэл рубрикаар дүгнэнэ — дүн суралцагчид шууд очиж, журнал автоматаар бүрдэнэ.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-rub"><i></i><i class="k-cell" style="--d:.3"></i><i></i><i class="k-cell" style="--d:.7"></i><i></i><i></i><i></i><i></i><i class="k-cell" style="--d:1.1"></i></span><span class="u-col"><span class="u-chip k" style="--d:1.6">Нийт 14/15</span><span class="u-chip ok k" style="--d:2">Журналд ✓</span></span></div></div></template>
+    <template data-node="3"><span class="ex-k"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Салбар · Сахилга бат</span><h3>Идэвхгүй бол систем өөрөө дохиолно</h3><p>Анхаарлыг хянаж, таб сольвол сануулж, давтвал хичээлийг түр хаана — багшид мэдэгдэл очно.</p>
+      <div class="ex-visual"><div class="how-demo compact" data-s="0">
+  <div class="hd-screen" aria-hidden="true">
+    <div class="hd-bar"><i></i><i></i><i></i><span>surgalt.mn · Логарифмын шинж чанар</span></div>
+    <div class="hd-body">
+      <div class="hd-video"><svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5.5 3.5-5.5 3.5z"/></svg><span class="hd-lines"><i></i><i></i><i></i></span></div>
+      <div class="hd-stats">
+        <div class="hd-meter"><span>Анхаарал</span><b class="hd-att">96%</b><i><em></em></i></div>
+        <div class="hd-strikes"><span>Зөрчил</span><i></i><i></i><i></i></div>
+      </div>
+      <div class="hd-alert hd-a1"><b>⚠️ Таб сольсон байна!</b><span>Хичээл рүүгээ буцна уу · 1/3</span><em class="hd-snd">🔊</em></div>
+      <div class="hd-alert hd-a2"><b>🖱 Хичээлээс гарсан байна</b><span>Анхаарлаа хандуулна уу · 2/3</span></div>
+      <div class="hd-lock"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path class="hd-shackle" d="M8 11V8a4 4 0 0 1 8 0v3"/><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M12 15v2"/></svg>
+        <b>Хичээл түр хаагдлаа</b><span>3 удаа зөрчил гаргасан · 30 минутын дараа нээгдэнэ</span></div>
+      <div class="hd-notif"><span class="hd-notif-ico">⛔</span><span><small class="hd-notif-k">Багшид ирсэн мэдэгдэл</small><b>Бат: «Логарифм» хаагдсан</b><small>Таб 2 удаа сольсон · курсор 1 удаа гарсан</small></span></div>
     </div>
-    <div class="mm" id="mindMap">
-      <svg class="mm-wires" aria-hidden="true"></svg>
-      <div class="mm-core"><b>surgalt<i>.mn</i></b><span class="mm-desc" aria-live="polite">Сур, сур, бас дахин сур</span></div>
-      <ul class="mm-branches">
-        <li class="mm-b" data-tone="brand" data-desc="Профайл, QR-аар суралцагч таныг олж, хэн үзсэнийг мэднэ."><span class="mm-bn" tabindex="0"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Профайл</span><ul><li>QR код</li><li>Нууц утас</li><li>Статистик</li></ul></li>
-        <li class="mm-b" data-tone="brand" data-desc="Хичээлийг блокоор угсарч, ном зарж, нээх дүрэм тавина."><span class="mm-bn" tabindex="0"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/></svg>Сургалт</span><ul><li>Блок хичээл</li><li>Ном, өгүүлэл</li><li>Нээх дүрэм</li></ul></li>
-        <li class="mm-b" data-tone="brand" data-desc="Шалгалт, даалгаврыг рубрикаар дүгнэж, журнал автоматаар бүрдэнэ."><span class="mm-bn" tabindex="0"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 12l2 2 4-4"/></svg>Үнэлгээ</span><ul><li>Шалгалт</li><li>Рубрик</li><li>Журнал</li></ul></li>
-        <li class="mm-b" data-tone="red" data-desc="Анхаарлыг хянаж, таб сольвол сануулж, давтвал хичээлийг түр хаана."><span class="mm-bn" tabindex="0"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Сахилга бат</span><ul><li>Анхаарал</li><li>Сануулга</li><li>Түр хаалт</li></ul></li>
-        <li class="mm-b" data-tone="brand" data-desc="Шууд хичээл товлож, сул цагаа тэмдэглэн захиалга авна."><span class="mm-bn" tabindex="0"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Хуваарь</span><ul><li>Шууд хичээл</li><li>Цаг захиалга</li><li>Давталт</li></ul></li>
-        <li class="mm-b" data-tone="amber" data-desc="QPay QR-аар төлмөгц шууд нээгдэж, багшид орлого орно."><span class="mm-bn" tabindex="0"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>Төлбөр</span><ul><li>QPay QR</li><li>Үнэгүй / төлбөртэй</li><li>Орлого</li></ul></li>
-        <li class="mm-b" data-tone="brand" data-desc="Суралцагч, бүлгээрээ чатлаж, мэдэгдэл бодит хугацаанд ирнэ."><span class="mm-bn" tabindex="0"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>Харилцаа</span><ul><li>Чат</li><li>Бүлгийн чат</li><li>Мэдэгдэл</li></ul></li>
-        <li class="mm-b" data-tone="amber" data-desc="Цол ахиж, сертификат авч, ахиц нүүр самбарт харагдана."><span class="mm-bn" tabindex="0"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="15" r="5"/><path d="M8.5 10.5 6 3h4l2 4 2-4h4l-2.5 7.5"/></svg>Ахиц</span><ul><li>Цол</li><li>Сертификат</li><li>Нүүр самбар</li></ul></li>
-      </ul>
+  </div>
+        <p class="hd-cap"></p>
+      </div></div></template>
+    <template data-node="4"><span class="ex-k"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Салбар · Хуваарь</span><h3>Шууд хичээл, цаг захиалга</h3><p>Нэг календарь дээр шууд хичээл товлож, сул цагаа тэмдэглэнэ — улирал, жилээр давтана; Meet холбоос өөрөө орж ирнэ.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-grid"><i class="k-cell" style="--d:.2"></i><i></i><i class="k-cell" style="--d:.5"></i><i></i><i class="k-cell" style="--d:.8"></i><i class="k-cell bk" style="--d:1.6"></i><i></i><i class="k-cell" style="--d:1.1"></i><i></i></span><span class="u-chip k" style="--d:1.8">📅 Захиалга ирлээ</span></div></div></template>
+    <template data-node="5"><span class="ex-k"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>Салбар · Төлбөр</span><h3>QPay-ээр төлмөгц шууд нээгдэнэ</h3><p>Хичээл, багц, шалгалт, шууд хичээл, цаг, номыг QR-аар төлнө — багшид орлого шууд орно.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-qrbox"><i class="u-qr"></i></span><span class="u-col"><span class="u-chip amber k" style="--d:.3">₮ 25,000</span><span class="u-chip ok k" style="--d:1.5">🔓 Нээгдлээ</span></span></div></div></template>
+    <template data-node="6"><span class="ex-k"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>Салбар · Харилцаа</span><h3>Чат, мэдэгдэл бодит хугацаанд</h3><p>Суралцагч, бүлгээрээ чатлана; захиалга, дүн, сануулга бүр мэдэгдлээр шууд ирнэ.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-col u-chat"><span class="u-bub k" style="--d:.2">Багш аа, асуулт байна</span><span class="u-bub me k" style="--d:1">Тэгье, бичээрэй 👍</span><span class="u-bub k" style="--d:1.8">Баярлалаа!</span></span></div></div></template>
+    <template data-node="7"><span class="ex-k"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="15" r="5"/><path d="M8.5 10.5 6 3h4l2 4 2-4h4l-2.5 7.5"/></svg>Салбар · Ахиц</span><h3>Ахиц, цол, сертификат</h3><p>Идэвхтэй суралцах тусам цол ахиж, сертификат авна — бүгд нүүр самбарт харагдана.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-ring"><i class="k-ring" style="--d:.2"></i><b>85%</b></span><span class="u-chip amber k" style="--d:1.7">🏅 Цол ахилаа</span></div></div></template>
+    <template data-step="stu" data-branch="0"><span class="ex-k">Суралцагч · алхам 1/7</span><h3>QR уншуулна</h3><p>Багшийн QR-ыг утсаараа уншуулахад профайл нь шууд нээгдэнэ.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-phone"><i class="u-qr"></i><i class="u-scan"></i></span><span class="u-chip ok k" style="--d:1.5">✓ Профайл нээгдлээ</span></div></div></template>
+    <template data-step="stu" data-branch="1"><span class="ex-k">Суралцагч · алхам 2/7</span><h3>Үнэгүй хичээл үзнэ</h3><p>Үнэгүй хичээлээр багштайгаа танилцаж, итгэл төрнө.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-video k-pulse">▶</span><span class="u-col"><span class="u-chip amber">Үнэгүй</span><span class="u-bar"><i class="k-fill" style="--w:1;--d:.3"></i></span></span></div></div></template>
+    <template data-step="stu" data-branch="5"><span class="ex-k">Суралцагч · алхам 3/7</span><h3>QPay-ээр төлнө</h3><p>Хичээл, багц, шалгалтыг QR-аар төлөхөд шууд нээгдэнэ.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-qrbox"><i class="u-qr"></i></span><span class="u-col"><span class="u-chip amber k" style="--d:.3">₮ 25,000</span><span class="u-chip ok k" style="--d:1.5">🔓 Нээгдлээ</span></span></div></div></template>
+    <template data-step="stu" data-branch="3"><span class="ex-k">Суралцагч · алхам 4/7</span><h3>Хяналттай суралцана</h3><p>Таб сольвол сануулга, давтвал хичээл түр хаагдана — анхааралтай суралцана.</p>
+      <div class="ex-visual"><div class="how-demo compact" data-s="0">
+  <div class="hd-screen" aria-hidden="true">
+    <div class="hd-bar"><i></i><i></i><i></i><span>surgalt.mn · Логарифмын шинж чанар</span></div>
+    <div class="hd-body">
+      <div class="hd-video"><svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5.5 3.5-5.5 3.5z"/></svg><span class="hd-lines"><i></i><i></i><i></i></span></div>
+      <div class="hd-stats">
+        <div class="hd-meter"><span>Анхаарал</span><b class="hd-att">96%</b><i><em></em></i></div>
+        <div class="hd-strikes"><span>Зөрчил</span><i></i><i></i><i></i></div>
+      </div>
+      <div class="hd-alert hd-a1"><b>⚠️ Таб сольсон байна!</b><span>Хичээл рүүгээ буцна уу · 1/3</span><em class="hd-snd">🔊</em></div>
+      <div class="hd-alert hd-a2"><b>🖱 Хичээлээс гарсан байна</b><span>Анхаарлаа хандуулна уу · 2/3</span></div>
+      <div class="hd-lock"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path class="hd-shackle" d="M8 11V8a4 4 0 0 1 8 0v3"/><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M12 15v2"/></svg>
+        <b>Хичээл түр хаагдлаа</b><span>3 удаа зөрчил гаргасан · 30 минутын дараа нээгдэнэ</span></div>
+      <div class="hd-notif"><span class="hd-notif-ico">⛔</span><span><small class="hd-notif-k">Багшид ирсэн мэдэгдэл</small><b>Бат: «Логарифм» хаагдсан</b><small>Таб 2 удаа сольсон · курсор 1 удаа гарсан</small></span></div>
     </div>
-  </section>
-  {{/* Хэрхэн ашиглах вэ: суралцагч ба багшийн аялал — алхам бүр жижиг хөдөлгөөнт дүрслэлтэй (CSS), app.js (useCases) таб солино */}}
-  <section class="uc" id="uses" aria-labelledby="ucTitle">
-    <div class="how-head">
-      <p class="eyebrow">Бүх боломж · энгийнээр</p>
-      <h2 id="ucTitle">Хэрхэн ашиглах вэ?</h2>
-      <p class="lead">Суралцагч ба багшийн аялал — алхам бүрийг хөдөлгөөнт жишээгээр.</p>
-    </div>
-    <div class="uc-tabs" role="tablist" aria-label="Хэний аялал">
-      <button type="button" role="tab" id="ucT1" aria-controls="ucP1" aria-selected="true" data-uc="stu"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/></svg>Суралцагч</button>
-      <button type="button" role="tab" id="ucT2" aria-controls="ucP2" aria-selected="false" data-uc="tch"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h10M12 16v4"/></svg>Багш</button>
-    </div>
-    <ol class="uc-list" role="tabpanel" id="ucP1" aria-labelledby="ucT1" data-uc="stu">
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-phone"><i class="u-qr"></i><i class="u-scan"></i></span><span class="u-chip ok k" style="--d:1.5">✓ Профайл нээгдлээ</span></div><h3><span class="uc-n">1</span>QR уншуулна</h3><p>Багшийн QR-ыг утсаараа уншуулахад профайл нь шууд нээгдэнэ.</p></li>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-video k-pulse">▶</span><span class="u-col"><span class="u-chip amber">Үнэгүй</span><span class="u-bar"><i class="k-fill" style="--w:1;--d:.3"></i></span></span></div><h3><span class="uc-n">2</span>Үнэгүй хичээл үзнэ</h3><p>Үнэгүй хичээлээр багштайгаа танилцаж, итгэл төрнө.</p></li>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-qrbox"><i class="u-qr"></i></span><span class="u-col"><span class="u-chip amber k" style="--d:.3">₮ 25,000</span><span class="u-chip ok k" style="--d:1.5">🔓 Нээгдлээ</span></span></div><h3><span class="uc-n">3</span>QPay-ээр төлнө</h3><p>Хичээл, багц, шалгалтыг QR-аар төлөхөд шууд нээгдэнэ.</p></li>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-col"><span class="u-bar warn"><i class="k-drain" style="--d:.2"></i></span><span class="u-chip bad k" style="--d:.9">⚠️ Таб сольсон · 1/3</span><span class="u-chip dark k" style="--d:2.1">🔒 Түр хаагдлаа</span></span></div><h3><span class="uc-n">4</span>Хяналттай суралцана</h3><p>Анхаарал хянагдана: таб сольвол сануулга, давтвал хичээл түр хаагдана.</p></li>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-col"><span class="u-row k" style="--d:.2"><b>✓</b><i></i></span><span class="u-row k" style="--d:.7"><b>✓</b><i></i></span><span class="u-row k" style="--d:1.2"><b>✓</b><i></i></span></span><span class="u-chip ok k" style="--d:1.9">Дүн 18/20</span></div><h3><span class="uc-n">5</span>Шалгалт, даалгавар</h3><p>Шалгалт өгч, даалгавраа илгээнэ — дүн нь шууд ирнэ.</p></li>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-cal"><i></i><i></i><i class="k-pick" style="--d:.4"></i><i></i><i></i><i></i></span><span class="u-col"><span class="u-tiles k" style="--d:1.3"><i>Б</i><i>Т</i><i>С</i></span><span class="u-chip bad live k" style="--d:1.5">● LIVE</span></span></div><h3><span class="uc-n">6</span>Багштай уулзана</h3><p>Сул цагаас захиалж, шууд хичээлд Google Meet-ээр нэгдэнэ.</p></li>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-ring"><i class="k-ring" style="--d:.2"></i><b>85%</b></span><span class="u-chip amber k" style="--d:1.7">🏅 Цол ахилаа</span></div><h3><span class="uc-n">7</span>Цол ахина</h3><p>Ахиц, цол, сертификат нүүр хуудсанд тань хадгалагдана.</p></li>
-    </ol>
-    <ol class="uc-list" role="tabpanel" id="ucP2" aria-labelledby="ucT2" data-uc="tch" hidden>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-card k" style="--d:.2"><i class="u-av"></i><i></i><i></i></span><span class="u-col"><span class="u-qrbox sm k" style="--d:.8"><i class="u-qr"></i></span><span class="u-chip k" style="--d:1.5">📞 8811 ••••</span></span></div><h3><span class="uc-n">1</span>Профайл, QR</h3><p>Профайлаа бүрдүүлж QR-аа тараана — хэн үзсэн, утас харсныг мэднэ.</p></li>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-col"><span class="u-blk k" style="--d:.2">📝 Текст</span><span class="u-blk k" style="--d:.7">🎬 Видео</span><span class="u-blk k" style="--d:1.2">❓ Тест</span></span><span class="u-chip ok k" style="--d:1.9">Нийтлэв ✓</span></div><h3><span class="uc-n">2</span>Сургалт угсарна</h3><p>Текст, видео, тест, файлыг блокоор угсарч, үнэ, нээх дүрмээ тавина.</p></li>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-grid"><i class="k-cell" style="--d:.2"></i><i></i><i class="k-cell" style="--d:.5"></i><i></i><i class="k-cell" style="--d:.8"></i><i class="k-cell bk" style="--d:1.6"></i><i></i><i class="k-cell" style="--d:1.1"></i><i></i></span><span class="u-chip k" style="--d:1.8">📅 Захиалга ирлээ</span></div><h3><span class="uc-n">3</span>Хуваарь гаргана</h3><p>Шууд хичээл товлож, сул цагаа тэмдэглэнэ — улирал, жилээр давтана.</p></li>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-rub"><i></i><i class="k-cell" style="--d:.3"></i><i></i><i class="k-cell" style="--d:.7"></i><i></i><i></i><i></i><i></i><i class="k-cell" style="--d:1.1"></i></span><span class="u-col"><span class="u-chip k" style="--d:1.6">Нийт 14/15</span><span class="u-chip ok k" style="--d:2">Журналд ✓</span></span></div><h3><span class="uc-n">4</span>Хянаж, үнэлнэ</h3><p>Анхаарал, зөрчлийг харж, даалгаврыг рубрикаар дүгнэнэ — журнал автоматаар.</p></li>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-book"><i></i><i class="k-flip"></i></span><span class="u-chip k" style="--d:1.2">🔏 Таны нэр шингэсэн</span></div><h3><span class="uc-n">5</span>Ном зарна</h3><p>Ном, өгүүллээ уншигчийн нэрийг хуудас бүрт шингээж хамгаалан зарна.</p></li>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-col u-chat"><span class="u-bub k" style="--d:.2">Багш аа, асуулт байна</span><span class="u-bub me k" style="--d:1">Тэгье, бичээрэй 👍</span><span class="u-bub k" style="--d:1.8">Баярлалаа!</span></span></div><h3><span class="uc-n">6</span>Чатлана</h3><p>Суралцагч, бүлгээрээ бодит хугацаанд чатлана.</p></li>
-        <li class="uc-card"><div class="uc-stage" aria-hidden="true"><span class="u-bars"><i class="k-grow" style="--h:.35;--d:.1"></i><i class="k-grow" style="--h:.55;--d:.25"></i><i class="k-grow" style="--h:.45;--d:.4"></i><i class="k-grow" style="--h:.75;--d:.55"></i><i class="k-grow" style="--h:1;--d:.7"></i></span><span class="u-chip amber k" style="--d:1.4">₮ 2,450,000</span></div><h3><span class="uc-n">7</span>Орлого олно</h3><p>QPay-ээр орсон орлого, үзэлт, борлуулалтаа нэг дороос харна.</p></li>
-    </ol>
+  </div>
+        <p class="hd-cap"></p>
+      </div></div></template>
+    <template data-step="stu" data-branch="2"><span class="ex-k">Суралцагч · алхам 5/7</span><h3>Шалгалт, даалгавар</h3><p>Шалгалт өгч, даалгавраа илгээнэ — дүн нь шууд ирнэ.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-col"><span class="u-row k" style="--d:.2"><b>✓</b><i></i></span><span class="u-row k" style="--d:.7"><b>✓</b><i></i></span><span class="u-row k" style="--d:1.2"><b>✓</b><i></i></span></span><span class="u-chip ok k" style="--d:1.9">Дүн 18/20</span></div></div></template>
+    <template data-step="stu" data-branch="4"><span class="ex-k">Суралцагч · алхам 6/7</span><h3>Багштай уулзана</h3><p>Сул цагаас захиалж, шууд хичээлд Google Meet-ээр нэгдэнэ.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-cal"><i></i><i></i><i class="k-pick" style="--d:.4"></i><i></i><i></i><i></i></span><span class="u-col"><span class="u-tiles k" style="--d:1.3"><i>Б</i><i>Т</i><i>С</i></span><span class="u-chip bad k" style="--d:1.5">● LIVE</span></span></div></div></template>
+    <template data-step="stu" data-branch="7"><span class="ex-k">Суралцагч · алхам 7/7</span><h3>Цол ахина</h3><p>Ахиц, цол, сертификат нүүр хуудсанд тань хадгалагдана.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-ring"><i class="k-ring" style="--d:.2"></i><b>85%</b></span><span class="u-chip amber k" style="--d:1.7">🏅 Цол ахилаа</span></div></div></template>
+    <template data-step="tch" data-branch="0"><span class="ex-k">Багш · алхам 1/7</span><h3>Профайл, QR</h3><p>Профайлаа бүрдүүлж QR-аа тараана — хэн үзсэн, утас харсныг мэднэ.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-card k" style="--d:.2"><i class="u-av"></i><i></i><i></i></span><span class="u-col"><span class="u-qrbox sm k" style="--d:.8"><i class="u-qr"></i></span><span class="u-chip k" style="--d:1.5">📞 8811 ••••</span></span></div></div></template>
+    <template data-step="tch" data-branch="1"><span class="ex-k">Багш · алхам 2/7</span><h3>Сургалт угсарна</h3><p>Текст, видео, тест, файлыг блокоор угсарч, үнэ, нээх дүрмээ тавина.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-col"><span class="u-blk k" style="--d:.2">📝 Текст</span><span class="u-blk k" style="--d:.7">🎬 Видео</span><span class="u-blk k" style="--d:1.2">❓ Тест</span></span><span class="u-chip ok k" style="--d:1.9">Нийтлэв ✓</span></div></div></template>
+    <template data-step="tch" data-branch="4"><span class="ex-k">Багш · алхам 3/7</span><h3>Хуваарь гаргана</h3><p>Шууд хичээл товлож, сул цагаа тэмдэглэнэ — улирал, жилээр давтана.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-grid"><i class="k-cell" style="--d:.2"></i><i></i><i class="k-cell" style="--d:.5"></i><i></i><i class="k-cell" style="--d:.8"></i><i class="k-cell bk" style="--d:1.6"></i><i></i><i class="k-cell" style="--d:1.1"></i><i></i></span><span class="u-chip k" style="--d:1.8">📅 Захиалга ирлээ</span></div></div></template>
+    <template data-step="tch" data-branch="2"><span class="ex-k">Багш · алхам 4/7</span><h3>Хянаж, үнэлнэ</h3><p>Анхаарал, зөрчлийг харж, даалгаврыг рубрикаар дүгнэнэ — журнал автоматаар.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-rub"><i></i><i class="k-cell" style="--d:.3"></i><i></i><i class="k-cell" style="--d:.7"></i><i></i><i></i><i></i><i></i><i class="k-cell" style="--d:1.1"></i></span><span class="u-col"><span class="u-chip k" style="--d:1.6">Нийт 14/15</span><span class="u-chip ok k" style="--d:2">Журналд ✓</span></span></div></div></template>
+    <template data-step="tch" data-branch="1"><span class="ex-k">Багш · алхам 5/7</span><h3>Ном зарна</h3><p>Ном, өгүүллээ уншигчийн нэрийг хуудас бүрт шингээж хамгаалан зарна.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-book"><i></i><i class="k-flip"></i></span><span class="u-chip k" style="--d:1.2">🔏 Таны нэр шингэсэн</span></div></div></template>
+    <template data-step="tch" data-branch="6"><span class="ex-k">Багш · алхам 6/7</span><h3>Чатлана</h3><p>Суралцагч, бүлгээрээ бодит хугацаанд чатлана.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-col u-chat"><span class="u-bub k" style="--d:.2">Багш аа, асуулт байна</span><span class="u-bub me k" style="--d:1">Тэгье, бичээрэй 👍</span><span class="u-bub k" style="--d:1.8">Баярлалаа!</span></span></div></div></template>
+    <template data-step="tch" data-branch="5"><span class="ex-k">Багш · алхам 7/7</span><h3>Орлого олно</h3><p>QPay-ээр орсон орлого, үзэлт, борлуулалтаа нэг дороос харна.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-bars"><i class="k-grow" style="--h:.35;--d:.1"></i><i class="k-grow" style="--h:.55;--d:.25"></i><i class="k-grow" style="--h:.45;--d:.4"></i><i class="k-grow" style="--h:.75;--d:.55"></i><i class="k-grow" style="--h:1;--d:.7"></i></span><span class="u-chip amber k" style="--d:1.4">₮ 2,450,000</span></div></div></template>
   </section>
   </div>
 </main>

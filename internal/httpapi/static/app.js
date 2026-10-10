@@ -3746,145 +3746,112 @@ if (page === "home") {
     import(`/static/intro.js?v=${ver}`).then((m) => m.runIntro()).catch(() => document.documentElement.classList.remove("intro-on"));
   }
 }
-// Нүүр: «Систем хэрхэн ажилладаг вэ?» — багш → surgalt.mn → суралцагч тойрог. Утаснууд зангилааны байрлалаас
-// (өргөн дэлгэцэнд хажуу тийш, утсанд доош) тооцоологдож, мэдлэг (хөх) ба төлбөр (улбар шар ₮) урсана.
-function howMap() {
-  const map = $("#howMap"); if (!map) return;
-  const svg = $(".how-wires", map), NS = "http://www.w3.org/2000/svg", reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const nodes = [$(".how-teacher", map), $(".how-core", map), $(".how-student", map)];
-  const wires = [[0, 1, 0.3, "know", "Хичээл"], [1, 2, 0.3, "know", "Мэдлэг + хяналт"], [2, 1, 0.74, "pay", "Төлбөр ₮"], [1, 0, 0.74, "pay", "Орлого ₮"]];
-  svg.innerHTML = wires.map(([, , , k], i) => `<path id="hw${i}" class="how-wire ${k}" style="--i:${i}"/>`).join("") + wires.map(([, , , k, l], i) => `<text class="how-lbl ${k}" style="--i:${i}">${l}</text>`).join("");
-  const paths = $$(".how-wire", svg), labels = $$(".how-lbl", svg);
-  const layout = () => {
-    const box = map.getBoundingClientRect();
-    svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
-    const R = nodes.map((n) => { const b = n.getBoundingClientRect(); return { l: b.left - box.left, t: b.top - box.top, r: b.right - box.left, b: b.bottom - box.top }; });
-    const row = R[1].l >= R[0].r - 2; // өргөн дэлгэц: хажуу тийш; утас: доош
-    wires.forEach(([a, b, f, k], i) => {
-      const A = R[a], B = R[b];
-      let d;
-      if (row) {
-        const fwd = A.l < B.l, x1 = fwd ? A.r : A.l, x2 = fwd ? B.l : B.r, top = Math.max(A.t, B.t), y = top + (Math.min(A.b, B.b) - top) * f, dx = (x2 - x1) / 2;
-        d = `M${x1},${y} C${x1 + dx},${y} ${x2 - dx},${y} ${x2},${y}`;
-      } else {
-        const fwd = A.t < B.t, y1 = fwd ? A.b : A.t, y2 = fwd ? B.t : B.b, lft = Math.max(A.l, B.l), x = lft + (Math.min(A.r, B.r) - lft) * f, dy = (y2 - y1) / 2;
-        d = `M${x},${y1} C${x},${y1 + dy} ${x},${y2 - dy} ${x},${y2}`;
-      }
-      paths[i].setAttribute("d", d);
-      const len = paths[i].getTotalLength(), mid = paths[i].getPointAtLength(len / 2), lb = labels[i];
-      paths[i].style.setProperty("--len", len.toFixed(1));
-      if (row) { lb.setAttribute("x", mid.x); lb.setAttribute("y", mid.y + (k === "know" ? -12 : 22)); lb.setAttribute("text-anchor", "middle"); }
-      else { lb.setAttribute("x", mid.x + (k === "know" ? -12 : 12)); lb.setAttribute("y", mid.y + 4); lb.setAttribute("text-anchor", k === "know" ? "end" : "start"); }
-    });
-  };
-  const flow = () => wires.forEach(([, , , k], i) => {
-    for (let n = 0; n < 3; n++) {
-      const g = document.createElementNS(NS, "g"), am = document.createElementNS(NS, "animateMotion"), mp = document.createElementNS(NS, "mpath");
-      g.setAttribute("class", `how-dot ${k}`);
-      g.innerHTML = k === "pay" ? `<circle r="9"/><text dy="4" text-anchor="middle">₮</text>` : `<circle r="5"/>`;
-      am.setAttribute("dur", "3.6s"); am.setAttribute("repeatCount", "indefinite");
-      am.setAttribute("begin", `${(svg.getCurrentTime() - n * 1.2 - i * 0.45).toFixed(2)}s`); // эхэндээ (0,0)-д харагдахгүй — аль хэдийн замдаа
-      mp.setAttribute("href", `#hw${i}`); am.append(mp); g.append(am); svg.append(g);
-    }
-  });
-  const count = (el) => {
-    const to = +el.dataset.to, t0 = performance.now();
-    const step = (t) => { const p = Math.min(1, (t - t0) / 1800); el.textContent = Math.round(to * (1 - (1 - p) ** 3)).toLocaleString("en-US") + "₮"; if (p < 1) requestAnimationFrame(step); };
-    requestAnimationFrame(step);
-  };
-  new ResizeObserver(layout).observe(map);
-  const io = new IntersectionObserver(([e]) => {
-    if (!e.isIntersecting) return;
-    io.disconnect(); layout(); map.classList.add("in");
-    if (reduce) { $$(".how-count", map).forEach((c) => (c.textContent = (+c.dataset.to).toLocaleString("en-US") + "₮")); return; }
-    setTimeout(() => $$(".how-count", map).forEach(count), 900);
-    setTimeout(flow, 1400);
-  }, { threshold: 0.2 });
-  io.observe(map);
-}
-// Нүүр: сахилга батын амьд жишээ — анхааралтай → таб сольсон (1/3) → хөндийрсөн (2/3) → хичээл хаагдсан (3/3) →
-// багшид мэдэгдэл; давтагдан тоглоно, дэлгэцээс гарвал зогсоно, алхам дээр дарж харж болно.
-function howDemo() {
-  const el = $("#howDemo"); if (!el) return;
-  const att = $(".hd-att", el), dots = $$(".hd-strikes i", el), steps = $$(".hd-steps li", el);
-  const ATT = [96, 71, 48, 12, 12], HITS = [0, 1, 2, 3, 3], HOLD = [2600, 2800, 2800, 3000, 3600];
-  let s = 0, timer = 0, on = false, shown = 96;
-  const tween = (to) => {
-    const from = shown, t0 = performance.now(); shown = to;
-    const step = (t) => { const p = Math.min(1, (t - t0) / 600); att.textContent = Math.round(from + (to - from) * p) + "%"; if (p < 1) requestAnimationFrame(step); };
-    requestAnimationFrame(step);
-  };
+// Сахилга батын хуурамч цонх: анхааралтай → таб сольсон (1/3) → хөндийрсөн (2/3) → хаагдсан (3/3) → багшид мэдэгдэл.
+function startDemo(el, still) {
+  const att = $(".hd-att", el), dots = $$(".hd-strikes i", el), cap = $(".hd-cap", el);
+  const ATT = [96, 71, 48, 12, 12], HITS = [0, 1, 2, 3, 3], HOLD = [2200, 2500, 2500, 2700, 3000];
+  const CAP = ["Анхааралтай үзэж байна — идэвхтэй минут тоологдоно", "Таб сольсон — улаан дохио, дуут сануулга · 1/3", "Хичээлээс хөндийрсөн — курсор гарсан · 2/3",
+    "Хичээл түр хаагдлаа — 3/3, багшийн тогтоосон хугацаагаар", "Багшид мэдэгдэл очлоо — шалгаад дахин нээж болно"];
+  let s = 0, t = 0, shown = 96;
   const set = (n) => {
-    s = n; el.dataset.s = n;
-    steps.forEach((li, i) => { li.classList.toggle("on", i === n); li.classList.toggle("done", i < n); });
-    dots.forEach((d, i) => d.classList.toggle("hit", i < HITS[n]));
-    el.style.setProperty("--att", ATT[n] / 100); tween(ATT[n]);
+    s = n; el.dataset.s = n; dots.forEach((d, i) => d.classList.toggle("hit", i < HITS[n]));
+    el.style.setProperty("--att", ATT[n] / 100); if (cap) cap.textContent = `${n + 1}/5 · ${CAP[n]}`;
+    const from = shown, t0 = performance.now(); shown = ATT[n];
+    const step = (x) => { const p = Math.min(1, (x - t0) / 600); att.textContent = Math.round(from + (ATT[n] - from) * p) + "%"; if (p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
   };
-  const loop = () => { timer = setTimeout(() => { set((s + 1) % 5); loop(); }, HOLD[s]); };
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { set(3); return; }
-  set(0);
-  new IntersectionObserver(([e]) => {
-    if (e.isIntersecting && !on) { on = true; loop(); }
-    else if (!e.isIntersecting && on) { on = false; clearTimeout(timer); }
-  }, { threshold: 0.35 }).observe(el);
-  steps.forEach((li, i) => li.addEventListener("click", () => { clearTimeout(timer); set(i); if (on) loop(); }));
+  if (still) { set(3); return () => {}; }
+  const loop = () => { t = setTimeout(() => { set((s + 1) % 5); loop(); }, HOLD[s]); };
+  set(0); loop();
+  return () => clearTimeout(t);
 }
-// Нүүр: «Хэрхэн ашиглах вэ?» — суралцагч/багшийн аялал; хөдөлгөөн хэсэг дэлгэцэнд байхад л тоглоно.
-function useCases() {
-  const sec = $("#uses"); if (!sec) return;
-  const tabs = $$(".uc-tabs [data-uc]", sec), lists = $$(".uc-list", sec);
-  const pick = (b) => {
-    tabs.forEach((x) => { x.setAttribute("aria-selected", String(x === b)); x.tabIndex = x === b ? 0 : -1; });
-    lists.forEach((l) => (l.hidden = l.dataset.uc !== b.dataset.uc));
-  };
-  tabs.forEach((b, i) => {
-    b.addEventListener("click", () => pick(b));
-    b.addEventListener("keydown", (e) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const n = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]; pick(n); n.focus(); } });
-  });
-  new IntersectionObserver(([e]) => sec.classList.toggle("run", e.isIntersecting), { threshold: 0.12 }).observe(sec);
-}
-// Нүүр: оюуны зураглал — өргөн дэлгэцэнд (≥900px) төвийн эргэн тойронд 8 салбар (тус бүр 3 дэд зангилаа) тойргоор
-// байрлаж утас нь ургана; салбар дээр очиход тэр салбар тодорч төвд тайлбар гарна. Нарийн дэлгэцэнд мод бүтэц (CSS).
-function mindMap() {
-  const mm = $("#mindMap"); if (!mm) return;
-  const svg = $(".mm-wires", mm), core = $(".mm-core", mm), desc = $(".mm-desc", mm), base = desc.textContent, bs = $$(".mm-b", mm);
-  const placed = [...$$(".mm-bn", mm), ...$$(".mm-b li", mm)];
+
+// Нүүр: «surgalt.mn хэрхэн ажилладаг вэ?» — нэгтгэсэн хэсэг. Зүүнд оюуны зураглал (төв + 8 салбар; сонгосон салбарын дэд
+// зангилаа гадагшаа гарна), баруунд дэлгэрэнгүй самбар (хөдөлгөөнт жишээ). Горим: бүтэц, суралцагчийн/багшийн аялал (алхам
+// бүрт холбогдох салбар тодорно). Өөрөө аялуулж тоглоно; хэрэглэгч сонговол зогсоно (▶ дахин); дэлгэцээс гарвал түр зогсоно.
+// #explore, #explore=stu, #explore=tch холбоосоор шууд очно.
+function explore() {
+  const ex = $("#explore"); if (!ex) return;
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const map = $(".ex-map", ex), svg = $(".ex-wires", ex), leaves = $(".ex-leaves", ex), core = $(".ex-core", ex), brs = $$(".ex-br", ex);
+  const panel = $(".ex-panel", ex), chips = $(".ex-chips", ex), bar = $(".ex-prog i", ex), play = $(".ex-play", ex), tabs = $$(".ex-modes [data-mode]", ex);
+  const tpl = { map: ["core", ...brs.map((b) => b.dataset.node)].map((n) => $(`template[data-node="${n}"]`, ex)), stu: $$('template[data-step="stu"]', ex), tch: $$('template[data-step="tch"]', ex) };
+  const HOLD = 6500;
+  let mode = "map", i = 0, timer = 0, stopDemo = null, inView = false, playing = !still;
+  const sel = () => (mode === "map" ? (i === 0 ? "core" : String(i - 1)) : tpl[mode][i].dataset.branch);
+  const geo = () => { const W = map.clientWidth, H = map.clientHeight; return { W, H, cx: W / 2, cy: H / 2, rx: Math.min(175, W / 2 - 160), ry: Math.min(170, H / 2 - 120) }; };
   const layout = () => {
-    const W = mm.clientWidth, radial = W >= 900;
-    mm.classList.toggle("radial", radial);
-    if (!radial) { svg.innerHTML = ""; placed.forEach((x) => { x.style.left = x.style.top = ""; }); return; }
-    const H = mm.clientHeight, cx = W / 2, cy = H / 2, rx2 = W / 2 - 96, ry2 = H / 2 - 42, rx1 = rx2 * .54, ry1 = ry2 * .56;
-    const pt = (rx, ry, deg) => [cx + rx * Math.cos(deg * Math.PI / 180), cy + ry * Math.sin(deg * Math.PI / 180)];
-    let wires = "";
-    bs.forEach((b, i) => {
-      const th = -90 + i * 360 / bs.length, [bx, by] = pt(rx1, ry1, th), bn = $(".mm-bn", b);
-      bn.style.left = bx + "px"; bn.style.top = by + "px"; bn.style.setProperty("--d", (0.35 + i * 0.09).toFixed(2) + "s");
-      wires += `<path class="mm-w" data-b="${i}" pathLength="1" style="--d:${(0.25 + i * 0.09).toFixed(2)}s" d="M${cx},${cy} Q${(cx + bx) / 2 + (by - cy) * 0.14},${(cy + by) / 2 - (bx - cx) * 0.14} ${bx},${by}"/>`;
-      $$("li", b).forEach((li, k, all) => {
-        const [lx, ly] = pt(rx2, ry2, th + (k - (all.length - 1) / 2) * 16);
-        li.style.left = lx + "px"; li.style.top = ly + "px"; li.style.setProperty("--d", (0.95 + i * 0.09 + k * 0.06).toFixed(2) + "s");
-        wires += `<path class="mm-w leaf" data-b="${i}" pathLength="1" style="--d:${(0.8 + i * 0.09 + k * 0.06).toFixed(2)}s" d="M${bx},${by} Q${(bx + lx) / 2},${(by + ly) / 2} ${lx},${ly}"/>`;
-      });
+    const g = geo(); if (!g.W) return;
+    core.style.left = g.cx + "px"; core.style.top = g.cy + "px";
+    let w = "";
+    brs.forEach((b, k) => {
+      const a = (-90 + k * 45) * Math.PI / 180, x = g.cx + g.rx * Math.cos(a), y = g.cy + g.ry * Math.sin(a);
+      Object.assign(b.dataset, { a, x, y }); b.style.left = x + "px"; b.style.top = y + "px";
+      w += `<path class="ex-w" data-b="${k}" pathLength="1" d="M${g.cx},${g.cy} Q${(g.cx + x) / 2 + (y - g.cy) * 0.12},${(g.cy + y) / 2 - (x - g.cx) * 0.12} ${x},${y}"/>`;
     });
-    svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.innerHTML = wires;
+    svg.setAttribute("viewBox", `0 0 ${g.W} ${g.H}`); svg.innerHTML = w + `<g class="ex-lw"></g>`;
+    mark();
   };
-  const focus = (b) => {
-    mm.classList.toggle("focus", !!b); core.classList.toggle("tell", !!b);
-    bs.forEach((x) => x.classList.toggle("on", x === b));
-    $$(".mm-w", svg).forEach((w) => w.classList.toggle("on", !!b && +w.dataset.b === bs.indexOf(b)));
-    desc.textContent = b ? b.dataset.desc : base;
+  const mark = () => {
+    const s = sel(), b = brs.find((x) => x.dataset.node === s), lw = $(".ex-lw", svg);
+    core.classList.toggle("on", s === "core"); brs.forEach((x) => x.classList.toggle("on", x === b));
+    $$(".ex-w[data-b]", svg).forEach((p) => p.classList.toggle("on", p.dataset.b === s));
+    leaves.innerHTML = ""; if (lw) lw.innerHTML = "";
+    const g = geo(); if (!b || !g.W || !lw) return;
+    // Дэд зангилаа салбарын гадна талд: хэвтээ чиглэлд хол, босоо дагуу нягт; босоо чиглэлд ойр, хэвтээ дагуу сийрэг.
+    const L = b.dataset.leaves.split("|"), bx = +b.dataset.x, by = +b.dataset.y, a0 = +b.dataset.a, c = Math.abs(Math.cos(a0)), sn = Math.abs(Math.sin(a0));
+    const out = 112 * c + 54 * sn, gap = 36 * c + 100 * sn;
+    L.forEach((t, k) => {
+      const o = (k - (L.length - 1) / 2) * gap, x = bx + Math.cos(a0) * out - Math.sin(a0) * o, y = by + Math.sin(a0) * out + Math.cos(a0) * o;
+      leaves.insertAdjacentHTML("beforeend", `<span class="ex-leaf" style="left:${x}px;top:${y}px;--d:${k * 0.08}s">${esc(t)}</span>`);
+      lw.insertAdjacentHTML("beforeend", `<path class="ex-w leaf" pathLength="1" style="--d:${k * 0.08}s" d="M${bx},${by} L${x},${y}"/>`);
+    });
+    requestAnimationFrame(() => requestAnimationFrame(() => { $$(".ex-leaf", leaves).forEach((x) => x.classList.add("in")); $$(".leaf", lw).forEach((x) => x.classList.add("in")); }));
   };
-  bs.forEach((b) => {
-    const bn = $(".mm-bn", b);
-    b.addEventListener("mouseenter", () => focus(b)); b.addEventListener("mouseleave", () => focus(null));
-    bn.addEventListener("focus", () => focus(b)); bn.addEventListener("blur", () => focus(null));
-  });
-  new ResizeObserver(layout).observe(mm); layout();
+  const bars = () => { bar.style.animation = "none"; void bar.offsetWidth; bar.style.animation = playing && inView ? `ex-bar ${HOLD}ms linear forwards` : "none"; };
+  const tick = () => { clearTimeout(timer); bars(); if (playing && inView) timer = setTimeout(() => go(i + 1), HOLD); };
+  const show = () => {
+    stopDemo?.(); stopDemo = null;
+    panel.replaceChildren(tpl[mode][i].content.cloneNode(true));
+    panel.classList.remove("swap"); void panel.offsetWidth; panel.classList.add("swap");
+    const d = $(".how-demo", panel); if (d && inView) stopDemo = startDemo(d, still);
+    $$("button", chips).forEach((c, k) => { c.setAttribute("aria-selected", String(k === i)); if (k === i) c.scrollIntoView({ block: "nearest", inline: "nearest" }); });
+    mark();
+  };
+  const go = (n) => { const len = tpl[mode].length; i = ((n % len) + len) % len; show(); tick(); };
+  const setPlay = (on) => { playing = on && !still; play.textContent = playing ? "❚❚" : "▶"; play.setAttribute("aria-label", playing ? "Түр зогсоох" : "Тоглуулах"); tick(); };
+  const setMode = (m, n = 0) => {
+    mode = m; ex.dataset.mode = m;
+    tabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.mode === m)));
+    const names = m === "map" ? ["surgalt.mn", ...brs.map((b) => b.textContent.trim())] : tpl[m].map((t, k) => `${k + 1}. ${$("h3", t.content).textContent}`);
+    chips.innerHTML = names.map((x, k) => `<button type="button" role="tab" data-i="${k}">${esc(x)}</button>`).join("");
+    go(n);
+  };
+  tabs.forEach((t) => t.addEventListener("click", () => { setMode(t.dataset.mode); setPlay(true); }));
+  chips.addEventListener("click", (e) => { const c = e.target.closest("[data-i]"); if (c) { setPlay(false); go(+c.dataset.i); } });
+  const pickNode = (n) => { setPlay(false); if (mode !== "map") setMode("map", n); else go(n); };
+  core.addEventListener("click", () => pickNode(0));
+  brs.forEach((b, k) => { b.addEventListener("click", () => pickNode(k + 1)); b.addEventListener("mouseenter", () => { if (mode === "map") pickNode(k + 1); }); });
+  $(".ex-prev", ex).onclick = () => { setPlay(false); go(i - 1); };
+  $(".ex-next", ex).onclick = () => { setPlay(false); go(i + 1); };
+  play.onclick = () => setPlay(!playing);
+  new ResizeObserver(layout).observe(map);
   new IntersectionObserver(([e]) => {
-    if (e.isIntersecting && !mm.classList.contains("in")) { mm.classList.add("in"); setTimeout(() => mm.classList.add("ready"), 2600); }
-  }, { threshold: 0.2 }).observe(mm);
+    inView = e.isIntersecting; ex.classList.toggle("run", inView); if (inView) ex.classList.add("seen");
+    stopDemo?.(); stopDemo = null;
+    const d = $(".how-demo", panel); if (d && inView) stopDemo = startDemo(d, still);
+    tick();
+  }, { threshold: 0.25 }).observe(ex);
+  // Нүүрнээс шууд очих: #explore, #explore=stu, #explore=tch
+  const fromHash = () => {
+    const m = location.hash.match(/^#explore(?:=(stu|tch|map))?$/); if (!m) return;
+    setMode(m[1] || "map"); setPlay(true);
+    ex.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+  };
+  setMode("map"); setPlay(!still); layout();
+  addEventListener("hashchange", fromHash); fromHash();
 }
-if (page === "home") { homePage(); howMap(); howDemo(); mindMap(); useCases(); }
+if (page === "home") { homePage(); explore(); }
 if (page === "profile") profilePage();
 if (page === "profile" || page === "course") chatWidget();
 if (page === "course") coursePage();
