@@ -3746,7 +3746,63 @@ if (page === "home") {
     import(`/static/intro.js?v=${ver}`).then((m) => m.runIntro()).catch(() => document.documentElement.classList.remove("intro-on"));
   }
 }
-if (page === "home") homePage();
+// Нүүр: «Систем хэрхэн ажилладаг вэ?» — багш → surgalt.mn → суралцагч тойрог. Утаснууд зангилааны байрлалаас
+// (өргөн дэлгэцэнд хажуу тийш, утсанд доош) тооцоологдож, мэдлэг (хөх) ба төлбөр (улбар шар ₮) урсана.
+function howMap() {
+  const map = $("#howMap"); if (!map) return;
+  const svg = $(".how-wires", map), NS = "http://www.w3.org/2000/svg", reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const nodes = [$(".how-teacher", map), $(".how-core", map), $(".how-student", map)];
+  const wires = [[0, 1, 0.3, "know", "Хичээл"], [1, 2, 0.3, "know", "Мэдлэг + хяналт"], [2, 1, 0.74, "pay", "Төлбөр ₮"], [1, 0, 0.74, "pay", "Орлого ₮"]];
+  svg.innerHTML = wires.map(([, , , k], i) => `<path id="hw${i}" class="how-wire ${k}" style="--i:${i}"/>`).join("") + wires.map(([, , , k, l], i) => `<text class="how-lbl ${k}" style="--i:${i}">${l}</text>`).join("");
+  const paths = $$(".how-wire", svg), labels = $$(".how-lbl", svg);
+  const layout = () => {
+    const box = map.getBoundingClientRect();
+    svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+    const R = nodes.map((n) => { const b = n.getBoundingClientRect(); return { l: b.left - box.left, t: b.top - box.top, r: b.right - box.left, b: b.bottom - box.top }; });
+    const row = R[1].l >= R[0].r - 2; // өргөн дэлгэц: хажуу тийш; утас: доош
+    wires.forEach(([a, b, f, k], i) => {
+      const A = R[a], B = R[b];
+      let d;
+      if (row) {
+        const fwd = A.l < B.l, x1 = fwd ? A.r : A.l, x2 = fwd ? B.l : B.r, top = Math.max(A.t, B.t), y = top + (Math.min(A.b, B.b) - top) * f, dx = (x2 - x1) / 2;
+        d = `M${x1},${y} C${x1 + dx},${y} ${x2 - dx},${y} ${x2},${y}`;
+      } else {
+        const fwd = A.t < B.t, y1 = fwd ? A.b : A.t, y2 = fwd ? B.t : B.b, lft = Math.max(A.l, B.l), x = lft + (Math.min(A.r, B.r) - lft) * f, dy = (y2 - y1) / 2;
+        d = `M${x},${y1} C${x},${y1 + dy} ${x},${y2 - dy} ${x},${y2}`;
+      }
+      paths[i].setAttribute("d", d);
+      const len = paths[i].getTotalLength(), mid = paths[i].getPointAtLength(len / 2), lb = labels[i];
+      paths[i].style.setProperty("--len", len.toFixed(1));
+      if (row) { lb.setAttribute("x", mid.x); lb.setAttribute("y", mid.y + (k === "know" ? -12 : 22)); lb.setAttribute("text-anchor", "middle"); }
+      else { lb.setAttribute("x", mid.x + (k === "know" ? -12 : 12)); lb.setAttribute("y", mid.y + 4); lb.setAttribute("text-anchor", k === "know" ? "end" : "start"); }
+    });
+  };
+  const flow = () => wires.forEach(([, , , k], i) => {
+    for (let n = 0; n < 3; n++) {
+      const g = document.createElementNS(NS, "g"), am = document.createElementNS(NS, "animateMotion"), mp = document.createElementNS(NS, "mpath");
+      g.setAttribute("class", `how-dot ${k}`);
+      g.innerHTML = k === "pay" ? `<circle r="9"/><text dy="4" text-anchor="middle">₮</text>` : `<circle r="5"/>`;
+      am.setAttribute("dur", "3.6s"); am.setAttribute("repeatCount", "indefinite");
+      am.setAttribute("begin", `${(svg.getCurrentTime() - n * 1.2 - i * 0.45).toFixed(2)}s`); // эхэндээ (0,0)-д харагдахгүй — аль хэдийн замдаа
+      mp.setAttribute("href", `#hw${i}`); am.append(mp); g.append(am); svg.append(g);
+    }
+  });
+  const count = (el) => {
+    const to = +el.dataset.to, t0 = performance.now();
+    const step = (t) => { const p = Math.min(1, (t - t0) / 1800); el.textContent = Math.round(to * (1 - (1 - p) ** 3)).toLocaleString("en-US") + "₮"; if (p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  };
+  new ResizeObserver(layout).observe(map);
+  const io = new IntersectionObserver(([e]) => {
+    if (!e.isIntersecting) return;
+    io.disconnect(); layout(); map.classList.add("in");
+    if (reduce) { $$(".how-count", map).forEach((c) => (c.textContent = (+c.dataset.to).toLocaleString("en-US") + "₮")); return; }
+    setTimeout(() => $$(".how-count", map).forEach(count), 900);
+    setTimeout(flow, 1400);
+  }, { threshold: 0.2 });
+  io.observe(map);
+}
+if (page === "home") { homePage(); howMap(); }
 if (page === "profile") profilePage();
 if (page === "profile" || page === "course") chatWidget();
 if (page === "course") coursePage();

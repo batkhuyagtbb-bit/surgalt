@@ -37,6 +37,42 @@
     <div class="skeleton" style="height:220px;margin-top:24px"></div>
   </div>
   <div class="landing">
+  {{/* Систем хэрхэн ажилладаг: багш → surgalt.mn → суралцагч тойрог. Утаснууд, урсах цэгүүдийг app.js (howMap) зурна. */}}
+  <section class="how" id="how" aria-labelledby="howTitle">
+    <div class="how-head">
+      <p class="eyebrow">Нэг тойрог · гурван ялалт</p>
+      <h2 id="howTitle">Систем хэрхэн ажилладаг вэ?</h2>
+      <p class="lead">Багш мэдлэгээ хуваалцаж <b>орлого</b> олно. Суралцагч хяналттай орчинд <b>сахилга баттай</b>, <b>хариуцлагатай</b>, <b>идэвхтэй</b> суралцана.</p>
+    </div>
+    <div class="how-map" id="howMap">
+      <svg class="how-wires" aria-hidden="true"></svg>
+      <article class="how-node how-teacher" style="--i:0">
+        <header><span class="how-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h10M12 16v4M7 12l3-3 2 2 4-4"/></svg></span>
+          <div><b>Багш</b><small>Мэдлэгээ хуваалцана</small></div></header>
+        <ul class="how-list"><li>Сургалт, хичээл, ном</li><li>Шууд хичээл, цаг захиалга</li><li>Шалгалт, даалгавар, рубрик</li></ul>
+        <div class="how-income">
+          <span class="how-out-k"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>Орлого</span>
+          <b class="how-count" data-to="2450000">0₮</b><small>сарын орлого — жишээ</small>
+          <span class="how-bars" aria-hidden="true"><i style="--h:.32;--k:0"></i><i style="--h:.45;--k:1"></i><i style="--h:.4;--k:2"></i><i style="--h:.62;--k:3"></i><i style="--h:.8;--k:4"></i><i style="--h:1;--k:5"></i></span>
+        </div>
+      </article>
+      <article class="how-node how-core" style="--i:1">
+        <span class="how-pulse" aria-hidden="true"></span>
+        <span class="how-logo">surgalt<b>.mn</b></span>
+        <small class="how-core-sub">Нэг дороос — найдвартай</small>
+        <ul class="how-chips"><li>QPay төлбөр</li><li>Анхаарлын хяналт</li><li>Хугацаа, сануулга</li><li>Ахиц, цол</li><li>Google Meet</li></ul>
+      </article>
+      <article class="how-node how-student" style="--i:2">
+        <header><span class="how-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5M22 9v5"/></svg></span>
+          <div><b>Суралцагч</b><small>Хяналттай орчинд суралцана</small></div></header>
+        <ul class="how-meters">
+          <li style="--v:.92;--k:0"><span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Сахилга бат</span><small>Анхаарлаа хадгална · таб солих хяналт</small><i></i></li>
+          <li style="--v:.87;--k:1"><span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 12l2 2 4-4"/></svg>Хариуцлага</span><small>Даалгавар, шалгалт хугацаандаа</small><i></i></li>
+          <li style="--v:.95;--k:2"><span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4 0 7-2.7 7-6.5 0-3.3-2.2-5.4-3.6-7.2-.6 1.6-1.6 2.6-2.9 2.9.4-3-1-5.9-3.5-8.2-.2 3.4-3 5.5-4.2 8.2A7 7 0 0 0 12 22z"/></svg>Идэвхтэй</span><small>Цол ахиж, ахиц харагдана</small><i></i></li>
+        </ul>
+      </article>
+    </div>
+  </section>
   <section class="section features">
     <div class="feature glass tilt reveal" style="--d:0"><span class="f-ico">{{icon "user"}}</span><h3>Ухаалаг профайл</h3><p class="muted">Профайл тань юу дутууг өөрөө хэлж, суралцагчид итгэл төрүүлнэ.</p></div>
     <div class="feature glass tilt reveal" style="--d:1"><span class="f-ico">{{icon "qr"}}</span><h3>QR-аар шууд</h3><p class="muted">Уншуулахад профайл тань шууд нээгдэнэ.</p></div>
