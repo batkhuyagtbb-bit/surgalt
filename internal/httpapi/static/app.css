@@ -184,7 +184,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 /* ===== багшийн профайл: нүүр зураг → нэр, үйлдэл → таб → хоёр багана ===== */
 .pf{position:relative;z-index:2;padding-top:62px}
 .pf-head{background:var(--surface);border-bottom:1px solid var(--line);box-shadow:var(--shadow-sm)}
-.pf-cover{position:relative;max-width:1100px;margin:0 auto;height:clamp(170px,30vw,360px);border-radius:0 0 var(--radius) var(--radius);overflow:hidden;
+.pf-cover{position:relative;max-width:1424px;margin:0 auto;height:clamp(170px,30vw,360px);border-radius:0 0 var(--radius) var(--radius);overflow:hidden;
   background:radial-gradient(circle at 14% 0%,#5b8df0,transparent 48%),radial-gradient(circle at 88% 110%,#3a63d0,transparent 50%),linear-gradient(120deg,#172c6b,#1f3c8f 55%,#24449f);border-bottom:6px solid var(--accent)}
 .pf-cover::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,transparent 0 26px,rgba(255,255,255,.06) 26px 27px)}
 .pf-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:cover-in .8s var(--ease) both}
@@ -206,7 +206,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 .pf-cover-tools{position:absolute;right:16px;bottom:16px;z-index:2;display:flex;align-items:center;gap:10px}
 .pf-cover-btn{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border:0;border-radius:10px;background:#fff;color:var(--text);font-weight:700;font-size:.9rem;cursor:pointer;box-shadow:var(--shadow);transition:.2s}
 .pf-cover-btn:hover{background:var(--accent);color:#1b1305}
-.pf-bar{position:relative;max-width:1036px;margin:0 auto;padding:0 16px 16px;display:flex;align-items:flex-start;gap:8px 20px;flex-wrap:wrap}
+.pf-bar{position:relative;max-width:1360px;margin:0 auto;padding:0 16px 16px;display:flex;align-items:flex-start;gap:8px 20px;flex-wrap:wrap}
 .pf-avatar{position:relative;margin-top:-72px;flex:none}
 .pf-avatar .avatar{width:168px;height:168px;font:800 3.4rem var(--sans);border:5px solid var(--surface);box-shadow:var(--shadow);transition:transform .4s var(--spring)}
 .pf-avatar:hover .avatar{transform:scale(1.03)}
@@ -222,7 +222,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 .pf-actions{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;padding-top:18px;align-self:flex-end}
 .pf-actions .btn{padding:10px 16px}
 .pf-actions .btn-icon{width:44px;padding:0}
-.pf-tabs{position:sticky;top:0;z-index:40;max-width:1036px;margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:4px;border-top:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.pf-tabs{position:sticky;top:0;z-index:40;max-width:1360px;margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:4px;border-top:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
 .pf-tabs::-webkit-scrollbar{display:none}
 .pf-tab{position:relative;flex:none;padding:16px 16px;border:0;background:none;font-weight:700;color:var(--muted);cursor:pointer;border-radius:10px;transition:color .2s,background .2s}
 .pf-tab:hover{background:var(--ink-2);color:var(--text)}
@@ -232,10 +232,10 @@ button,input,textarea,select{font:inherit;color:inherit}
 .pf-ink{position:absolute;bottom:0;left:0;height:3px;width:0;border-radius:3px 3px 0 0;background:var(--accent);transition:transform .35s var(--ease),width .35s var(--ease)}
 .pf-mini{display:none;align-items:center;gap:10px;margin-right:8px;padding-right:12px;border-right:1px solid var(--line);white-space:nowrap}
 /* Толгой гүйлгэхэд цэс дээд талд наалдаж, багшийн нэр зурагтайгаа гарч ирнэ. */
-.pf-stuck .pf-tabs{position:fixed;top:0;left:0;right:0;max-width:none;padding:0 max(16px,calc((100vw - 1036px)/2 + 16px));background:var(--surface);border-top:0;border-bottom:1px solid var(--line);box-shadow:var(--shadow);z-index:52;animation:tabs-in .25s var(--ease)}
+.pf-stuck .pf-tabs{position:fixed;top:0;left:0;right:0;max-width:none;padding:0 max(16px,calc((100vw - 1360px)/2 + 16px));background:var(--surface);border-top:0;border-bottom:1px solid var(--line);box-shadow:var(--shadow);z-index:52;animation:tabs-in .25s var(--ease)}
 .pf-stuck .pf-mini{display:flex}
 @keyframes tabs-in{from{transform:translateY(-100%)}}
-.pf-body{max-width:1036px;margin:0 auto;padding:18px 16px 56px;display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:18px;align-items:start}
+.pf-body{max-width:1360px;margin:0 auto;padding:18px 16px 56px;display:grid;grid-template-columns:minmax(0,400px) minmax(0,1fr);gap:18px;align-items:start}
 .pf-side{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;position:sticky;top:70px}
 .pf-main,.pf-panel{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;min-width:0}
 .pf-panel{animation:panel-in .35s var(--ease) both}
@@ -766,7 +766,7 @@ body[data-page=home] main{min-height:calc(100svh - 82px)}
 .quick b{font-size:.95rem;letter-spacing:-.01em}
 .quick small{color:var(--muted);font-size:.78rem;line-height:1.3}
 @media (max-width:560px){ .quick{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px} .quick>*{padding:12px 6px} .quick small{display:none} .quick i{width:40px;height:40px} }
-/* Профайл дээрх удирдлагын горим: хажуу баганыг нууж, илүү өргөн талбайд (хичээл бичихэд чөлөөтэй) */
+/* Профайл дээрх удирдлагын горим: хажуу баганыг нууж, бүтэн өргөнөөр (зочны харагдах өргөнтэй ижил — 1360px) */
 .pf.manage .pf-body{grid-template-columns:minmax(0,1fr);max-width:1360px}
 .pf.manage .pf-tabs,.pf.manage .pf-bar{max-width:1360px}
 .pf.manage .pf-cover{max-width:1424px}
