@@ -3843,7 +3843,48 @@ function useCases() {
   });
   new IntersectionObserver(([e]) => sec.classList.toggle("run", e.isIntersecting), { threshold: 0.12 }).observe(sec);
 }
-if (page === "home") { homePage(); howMap(); howDemo(); useCases(); }
+// Нүүр: оюуны зураглал — өргөн дэлгэцэнд (≥900px) төвийн эргэн тойронд 8 салбар (тус бүр 3 дэд зангилаа) тойргоор
+// байрлаж утас нь ургана; салбар дээр очиход тэр салбар тодорч төвд тайлбар гарна. Нарийн дэлгэцэнд мод бүтэц (CSS).
+function mindMap() {
+  const mm = $("#mindMap"); if (!mm) return;
+  const svg = $(".mm-wires", mm), core = $(".mm-core", mm), desc = $(".mm-desc", mm), base = desc.textContent, bs = $$(".mm-b", mm);
+  const placed = [...$$(".mm-bn", mm), ...$$(".mm-b li", mm)];
+  const layout = () => {
+    const W = mm.clientWidth, radial = W >= 900;
+    mm.classList.toggle("radial", radial);
+    if (!radial) { svg.innerHTML = ""; placed.forEach((x) => { x.style.left = x.style.top = ""; }); return; }
+    const H = mm.clientHeight, cx = W / 2, cy = H / 2, rx2 = W / 2 - 96, ry2 = H / 2 - 42, rx1 = rx2 * .54, ry1 = ry2 * .56;
+    const pt = (rx, ry, deg) => [cx + rx * Math.cos(deg * Math.PI / 180), cy + ry * Math.sin(deg * Math.PI / 180)];
+    let wires = "";
+    bs.forEach((b, i) => {
+      const th = -90 + i * 360 / bs.length, [bx, by] = pt(rx1, ry1, th), bn = $(".mm-bn", b);
+      bn.style.left = bx + "px"; bn.style.top = by + "px"; bn.style.setProperty("--d", (0.35 + i * 0.09).toFixed(2) + "s");
+      wires += `<path class="mm-w" data-b="${i}" pathLength="1" style="--d:${(0.25 + i * 0.09).toFixed(2)}s" d="M${cx},${cy} Q${(cx + bx) / 2 + (by - cy) * 0.14},${(cy + by) / 2 - (bx - cx) * 0.14} ${bx},${by}"/>`;
+      $$("li", b).forEach((li, k, all) => {
+        const [lx, ly] = pt(rx2, ry2, th + (k - (all.length - 1) / 2) * 16);
+        li.style.left = lx + "px"; li.style.top = ly + "px"; li.style.setProperty("--d", (0.95 + i * 0.09 + k * 0.06).toFixed(2) + "s");
+        wires += `<path class="mm-w leaf" data-b="${i}" pathLength="1" style="--d:${(0.8 + i * 0.09 + k * 0.06).toFixed(2)}s" d="M${bx},${by} Q${(bx + lx) / 2},${(by + ly) / 2} ${lx},${ly}"/>`;
+      });
+    });
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.innerHTML = wires;
+  };
+  const focus = (b) => {
+    mm.classList.toggle("focus", !!b); core.classList.toggle("tell", !!b);
+    bs.forEach((x) => x.classList.toggle("on", x === b));
+    $$(".mm-w", svg).forEach((w) => w.classList.toggle("on", !!b && +w.dataset.b === bs.indexOf(b)));
+    desc.textContent = b ? b.dataset.desc : base;
+  };
+  bs.forEach((b) => {
+    const bn = $(".mm-bn", b);
+    b.addEventListener("mouseenter", () => focus(b)); b.addEventListener("mouseleave", () => focus(null));
+    bn.addEventListener("focus", () => focus(b)); bn.addEventListener("blur", () => focus(null));
+  });
+  new ResizeObserver(layout).observe(mm); layout();
+  new IntersectionObserver(([e]) => {
+    if (e.isIntersecting && !mm.classList.contains("in")) { mm.classList.add("in"); setTimeout(() => mm.classList.add("ready"), 2600); }
+  }, { threshold: 0.2 }).observe(mm);
+}
+if (page === "home") { homePage(); howMap(); howDemo(); mindMap(); useCases(); }
 if (page === "profile") profilePage();
 if (page === "profile" || page === "course") chatWidget();
 if (page === "course") coursePage();

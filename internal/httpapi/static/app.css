@@ -3632,3 +3632,52 @@ input.ml-ok{border-color:#1d8a52;box-shadow:0 0 0 3px rgba(29,138,82,.15)}
 .uc:not(.run) .uc-stage *{animation-play-state:paused!important}
 @media (prefers-reduced-motion:reduce){ .uc .uc-stage *{animation:none!important;opacity:1!important;transform:none!important} }
 @media (max-width:560px){ .uc-tabs button{padding:0 16px} .uc-list{grid-template-columns:minmax(0,1fr)} }
+
+/* ---- Нүүр: оюуны зураглал — утсанд мод бүтэц, өргөн дэлгэцэнд (.radial) төвөөс салаалсан тойрог ---- */
+.mm-sec{position:relative;z-index:2;max-width:1220px;margin:0 auto;padding:clamp(48px,7vw,88px) clamp(16px,4vw,40px) 8px}
+.mm{position:relative}
+.mm-wires{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.mm-core{display:grid;justify-items:center;gap:6px;max-width:360px;margin:0 auto 18px;padding:18px 22px;border-bottom:4px solid var(--accent);border-radius:20px;color:#fff;text-align:center;
+  background:var(--dots),linear-gradient(140deg,#172c6b,#1f3c8f 60%,#2a4fb0);box-shadow:0 22px 44px -24px rgba(31,60,143,.7)}
+.mm-core b{font:800 1.6rem/1 var(--sans);letter-spacing:-.03em}
+.mm-core b i{color:var(--accent);font-style:normal}
+.mm-desc{color:rgba(255,255,255,.8);font-size:.86rem;line-height:1.45}
+.mm-core.tell .mm-desc{color:#fff}
+.mm-branches{display:grid;gap:12px;margin:0;padding:0 0 0 18px;border-left:2px solid var(--line);list-style:none}
+.mm-b{position:relative;display:grid;gap:8px;padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--shadow-sm);transition:opacity .25s}
+.mm-b::before{content:"";position:absolute;left:-20px;top:24px;width:18px;height:2px;background:var(--line)}
+.mm-b::after{content:attr(data-desc);grid-row:2;color:var(--muted);font-size:.82rem;line-height:1.45}
+.mm-bn{display:inline-flex;align-items:center;gap:8px;color:var(--brand);font-weight:800;outline:none}
+.mm-b[data-tone="amber"] .mm-bn{color:#8a5a00}
+.mm-b[data-tone="red"] .mm-bn{color:#b42f2f}
+.mm-b ul{display:flex;flex-wrap:wrap;grid-row:3;gap:6px;margin:0;padding:0;list-style:none}
+.mm-b li{padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2);font-size:.8rem;font-weight:600;transition:background .25s,border-color .25s}
+/* тойрог */
+.mm.radial{height:720px}
+.mm.radial .mm-core{position:absolute;left:50%;top:50%;z-index:3;width:240px;margin:0;opacity:0;transform:translate(-50%,-50%) scale(.6);transition:transform .6s var(--ease),opacity .5s}
+.mm.radial.in .mm-core{opacity:1;transform:translate(-50%,-50%)}
+.mm.radial .mm-branches{display:block;padding:0;border:0}
+.mm.radial .mm-b{display:block;padding:0;border:0;background:none;box-shadow:none}
+.mm.radial .mm-b::before,.mm.radial .mm-b::after{display:none}
+.mm.radial .mm-b ul{display:block}
+.mm.radial .mm-bn{position:absolute;z-index:2;padding:10px 16px;border:1.5px solid var(--brand);border-radius:999px;background:var(--surface);white-space:nowrap;cursor:default;
+  box-shadow:0 10px 24px -14px rgba(31,60,143,.55);opacity:0;transform:translate(-50%,-50%) scale(.5);transition:transform .55s var(--ease),opacity .4s,background .25s,color .25s;transition-delay:var(--d,0s)}
+.mm.radial.in .mm-bn{opacity:1;transform:translate(-50%,-50%)}
+.mm.radial .mm-b[data-tone="amber"] .mm-bn{border-color:var(--accent)}
+.mm.radial .mm-b[data-tone="red"] .mm-bn{border-color:#d93a3a}
+.mm.radial .mm-b li{position:absolute;z-index:1;background:var(--surface);white-space:nowrap;opacity:0;transform:translate(-50%,-50%) scale(.8);transition:transform .5s var(--ease),opacity .4s,background .25s,border-color .25s;transition-delay:var(--d,0s)}
+.mm.radial.in .mm-b li{opacity:1;transform:translate(-50%,-50%)}
+.mm-w{fill:none;stroke:color-mix(in srgb,var(--brand) 35%,transparent);stroke-width:2;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .8s var(--ease),stroke .25s,opacity .25s;transition-delay:var(--d,0s)}
+.mm-w.leaf{stroke:color-mix(in srgb,var(--brand) 22%,transparent);stroke-width:1.4}
+.mm.in .mm-w{stroke-dashoffset:0}
+.mm.ready .mm-w,.mm.ready .mm-bn,.mm.ready .mm-b li{transition-delay:0s}
+/* сонгосон салбар тодорно */
+.mm.focus .mm-b:not(.on){opacity:.28}
+.mm.focus .mm-w:not(.on){opacity:.12}
+.mm-w.on{stroke:var(--brand)}
+.mm-b.on .mm-bn{background:var(--brand);color:#fff}
+.mm.radial .mm-b.on[data-tone="amber"] .mm-bn{background:var(--accent);color:#1b2240}
+.mm.radial .mm-b.on[data-tone="red"] .mm-bn{background:#d93a3a;color:#fff}
+.mm-b.on li{border-color:var(--brand);background:var(--brand-soft)}
+.mm:not(.radial) .mm-b.on .mm-bn{background:none;color:var(--brand)}
+@media (prefers-reduced-motion:reduce){ .mm *{transition:none!important} }
