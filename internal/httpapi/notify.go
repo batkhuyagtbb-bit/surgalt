@@ -21,6 +21,7 @@ const (
 	NotifMessage     = "message"
 	NotifStorage     = "storage"
 	NotifPhoneView   = "phone_view"
+	NotifBooking     = "booking" // цаг захиалга (booking.go)
 )
 
 type viewKey struct{ teacher, kind, id string }
@@ -225,6 +226,10 @@ var mnLoc = time.FixedZone("ULAT", 8*3600)
 
 // notifyPaid нь төлбөр баталгаажсаны дараа багш болон худалдан авагчид мэдэгдэнэ.
 func (s *Server) notifyPaid(ctx context.Context, o *store.Order) {
+	if o.Kind == store.OrderKindSlot {
+		s.slotPaid(ctx, o)
+		return
+	}
 	if o.Kind == store.OrderKindStorage {
 		s.notify(ctx, &store.Notification{UserID: o.UserID, Type: NotifStorage, Count: 1,
 			Title: "💾 Файлын сангийн багтаамж нэмэгдлээ", Body: fmt.Sprintf("%s · %d сар", sizeLabel(o.StorageMB), o.Months), Link: "/me#files"})

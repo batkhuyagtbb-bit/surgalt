@@ -163,6 +163,7 @@ var chMigrations = []string{
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS meeting_id String DEFAULT ''",
 	"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS rubric String DEFAULT ''",
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS phone String DEFAULT ''",
+	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS slot_id String DEFAULT ''",
 }
 
 var chTables = []chTable{
@@ -187,6 +188,14 @@ var chTables = []chTable{
 	// Уншсан тэмдэглэгээ: user_id -> уншсан хамгийн сүүлийн мэдэгдлийн id (ID цаг хугацаагаар өсдөг).
 	{"notification_reads", `(user_id String, upto String, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY user_id`},
+	// Цаг захиалга: багшийн сул цаг ба захиалга нэг мөрөнд (slots.go).
+	{"slots", `(id String, teacher_id String, starts_at ` + tsType + `, duration_min Int32, mode String, price Int64,
+		location String, student_id String, student_name String, note String, hold_by String,
+		hold_until Nullable(` + tsType + `), meeting_id String, meet_url String, created_at ` + tsType + `,
+		ver UInt64, deleted Bool DEFAULT false,
+		INDEX ix_id id TYPE bloom_filter GRANULARITY 1,
+		INDEX ix_student student_id TYPE bloom_filter GRANULARITY 1)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (teacher_id, id)`},
 	{"meetings", `(id String, teacher_id String, course_id String, title String, starts_at ` + tsType + `,
 		duration_min Int32, meet_url String, event_id String, created_at ` + tsType + `, price Int64 DEFAULT 0,
 		members_free Bool DEFAULT false, ver UInt64,
@@ -222,7 +231,7 @@ var chTables = []chTable{
 		created_at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, lesson_id)`},
 	{"orders", `(id String, kind String, storage_mb Int64, months Int32, user_id String, course_id String,
-		lesson_id String, book_id String, meeting_id String DEFAULT '', teacher_id String, title String, amount Int64, status String,
+		lesson_id String, book_id String, meeting_id String DEFAULT '', slot_id String DEFAULT '', teacher_id String, title String, amount Int64, status String,
 		created_at ` + tsType + `, paid_at Nullable(` + tsType + `), applied Bool DEFAULT false, ver UInt64,
 		INDEX ix_user user_id TYPE bloom_filter GRANULARITY 1,
 		INDEX ix_teacher teacher_id TYPE bloom_filter GRANULARITY 1)

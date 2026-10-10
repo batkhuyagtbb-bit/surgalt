@@ -220,6 +220,11 @@ type HomeMeeting struct {
 	Price       int64     `json:"price,omitempty"` // төлбөртэй шууд хичээл
 	MembersFree bool      `json:"members_free,omitempty"`
 	Bought      bool      `json:"bought,omitempty"`
+	// Багштай захиалсан уулзах цаг (booking.go): онлайн бол Meet холбоос, биечлэн бол хаяг.
+	Booking         bool   `json:"booking,omitempty"`
+	Mode            string `json:"mode,omitempty"`
+	Location        string `json:"location,omitempty"`
+	TeacherUsername string `json:"teacher_username,omitempty"`
 }
 
 type HomeChat struct {
@@ -452,6 +457,21 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		}
 		out.Meetings = append(out.Meetings, HomeMeeting{ID: m.ID, Title: m.Title, CourseID: m.CourseID, CourseTitle: title, StartsAt: m.StartsAt,
 			DurationMin: m.DurationMin, MeetURL: m.MeetURL, Price: m.Price, Bought: true})
+	}
+	// Багштай захиалсан уулзах цагууд — «Шууд хичээл»-тэй нэг жагсаалтад.
+	if bs, err := s.store.StudentSlots(ctx, c.UID, time.Now().Add(-4*time.Hour)); err == nil {
+		for i := range bs {
+			b := &bs[i]
+			if b.End().Before(time.Now()) {
+				continue
+			}
+			hm := HomeMeeting{ID: b.ID, Title: "Уулзалт", StartsAt: b.StartsAt, DurationMin: b.DurationMin, MeetURL: b.MeetURL,
+				Price: b.Price, Bought: b.Price > 0, Booking: true, Mode: b.Mode, Location: b.Location}
+			if t, err := s.store.UserByID(ctx, b.TeacherID); err == nil {
+				hm.Title, hm.TeacherUsername = "Уулзалт: "+t.DisplayName, t.Username
+			}
+			out.Meetings = append(out.Meetings, hm)
+		}
 	}
 	sort.SliceStable(out.Meetings, func(i, j int) bool { return out.Meetings[i].StartsAt.Before(out.Meetings[j].StartsAt) })
 

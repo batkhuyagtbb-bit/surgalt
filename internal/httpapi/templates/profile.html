@@ -27,6 +27,7 @@
       </div>
       <div class="pf-actions" data-visitor>
         <button class="btn btn-gold magnetic" data-open-chat>{{icon "chat"}}Чатлах</button>
+        {{if $t.SlotCount}}<button class="btn btn-glass pf-appt" data-appt>{{icon "cal"}}Цаг авах</button>{{end}}
         {{with $t.PhoneHint}}<a class="btn btn-glass pf-phone" href="#" data-phone="{{$t.Username}}" rel="nofollow" aria-label="Утасны дугаар харах">{{icon "phone"}}<span class="pf-phone-n">{{.}} ••••</span><small>Харах</small></a>{{end}}
         <a class="btn btn-glass" href="#courses" data-tab-go="courses">{{icon "courses"}}Сургалтууд</a>
         <button class="btn btn-glass btn-icon" data-open-qr aria-label="QR код" title="QR код">{{icon "qr"}}</button>
@@ -153,6 +154,7 @@
         {{else}}<p class="empty">Ном, өгүүлэл хараахан алга.</p>{{end}}</div>
       </div>
       <div class="pf-panel" data-panel="live" id="live" hidden>
+        {{if $t.SlotCount}}<div class="ap-card"><span class="ap-ico">{{icon "cal" 22}}</span><span class="grow"><strong>Багштай уулзах цаг авах</strong><small>{{$t.SlotCount}} сул цаг · онлайн эсвэл биечлэн</small></span><button class="btn btn-gold" data-appt>Цаг сонгох</button></div>{{end}}
         {{if .D.Meetings}}
         <div class="meet-list">
           {{range .D.Meetings}}

@@ -43,6 +43,8 @@ type PublicTeacher struct {
 	FreeLessonCount int          `json:"free_lesson_count"`
 	// Утасны эхний 4 орон (бүтэн дугаарыг POST /api/teachers/{username}/phone өгнө — хуудас кэштэй тул энд хэзээ ч орохгүй).
 	PhoneHint string `json:"phone_hint,omitempty"`
+	// SlotCount — захиалж болох сул цагийн тоо (0 бол «Цаг авах» товч гарахгүй).
+	SlotCount int `json:"slot_count"`
 }
 
 // PublicLink нь профайл дээрх гадаад холбоос (store.LinkKeys-ийн дарааллаар).
@@ -222,7 +224,7 @@ func (s *Server) publicProfile(ctx context.Context, username string) (*Rendered[
 			return nil, err
 		}
 		t := publicTeacher(u)
-		t.StudentCount, t.CourseCount = students, len(courses)
+		t.StudentCount, t.CourseCount, t.SlotCount = students, len(courses), s.freeSlotCount(ctx, u.ID)
 		for _, c := range courses {
 			t.LessonCount += c.LessonCount
 			t.FreeLessonCount += c.FreeLessonCount

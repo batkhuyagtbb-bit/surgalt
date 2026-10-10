@@ -1607,13 +1607,100 @@ function fileCard(f, perMB, used) {
     <button class="btn btn-danger btn-sm" data-del="${esc(f.visibility)}/${encodeURIComponent(f.name)}">🗑</button></div></div>`;
 }
 
+/* ---------- Цаг захиалга: багш календарьтаа сул цагаа тэмдэглэнэ (дарж нэмнэ, дахин дарж хасна) ---------- */
+const SC = { week: 0, dur: 60, mode: "online", price: 0, loc: "" }; // таб солиход тохиргоо хадгалагдана
+const SC_FROM = 7, SC_TO = 22, SC_ROW = 22; // 07:00–22:00, 30 минут тутам нэг мөр
+const scDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const scHM = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+function slotsPanel() {
+  return `<div class="panel-head"><h2>${ico("cal", 20)}Цаг захиалга</h2><span class="muted small">Сул цагаа тэмдэглэ — суралцагчид профайлаас тань сонгож захиална</span></div>
+    <div class="sc-tools">
+      <label>Үргэлжлэх<select id="scDur">${[[30, "30 мин"], [45, "45 мин"], [60, "1 цаг"], [90, "1.5 цаг"], [120, "2 цаг"]].map(([v, t]) => `<option value="${v}" ${v === SC.dur ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+      <div class="sc-seg" role="group" aria-label="Уулзах хэлбэр">${[["online", "Онлайн"], ["offline", "Биечлэн"]].map(([v, t]) => `<button type="button" data-scmode="${v}" aria-pressed="${SC.mode === v}">${t}</button>`).join("")}</div>
+      <label>Үнэ (₮, 0 = үнэгүй)<input id="scPrice" type="number" min="0" step="1000" value="${SC.price}"></label>
+      <label class="sc-loc" ${SC.mode === "offline" ? "" : "hidden"}>Уулзах газар<input id="scLoc" maxlength="120" value="${esc(SC.loc || me.location || "")}" placeholder="Номын сан, 2 давхар"></label>
+    </div>
+    ${me.meet_connected ? "" : `<p class="sc-warn" ${SC.mode === "online" ? "" : "hidden"}>${ico("live", 15)}Google Meet холбоогүй байна — онлайн уулзалтын холбоос автоматаар үүсэхгүй. Доороос «Google Meet холбох»-оор холбоорой.</p>`}
+    <div class="sc-nav"><button type="button" class="icon-btn" data-wk="-1" aria-label="Өмнөх долоо хоног">${ico("chevron", 16)}</button><b id="scRange"></b><button type="button" class="icon-btn" data-wk="1" aria-label="Дараагийн долоо хоног">${ico("chevron", 16)}</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-wk="0">Энэ долоо хоног</button>
+      <span class="sc-legend"><i class="free"></i>Сул <i class="held"></i>Төлбөр хүлээгдэж буй <i class="booked"></i>Захиалсан <i class="meet"></i>Шууд хичээл</span></div>
+    <p class="muted small sc-hint">Хүснэгтэн дээр дарж сул цаг нэмнэ · сул цаг дээр дахин дарж хасна · захиалсан цаг дээр дарж дэлгэрэнгүйг харна.</p>
+    <div class="sc-wrap"><div class="sc-grid" id="scGrid"></div></div>`;
+}
+async function mountSlots(meetings) {
+  const grid = $("#scGrid"); if (!grid) return;
+  const rows = (SC_TO - SC_FROM) * 2;
+  const mon = new Date(); mon.setHours(0, 0, 0, 0); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7) + SC.week * 7);
+  const days = [...Array(7)].map((_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
+  $("#scRange").textContent = `${days[0].getMonth() + 1}/${days[0].getDate()} – ${days[6].getMonth() + 1}/${days[6].getDate()}`;
+  let slots = [];
+  try { slots = await api(`/api/me/slots?from=${scDay(mon)}&days=7`); } catch (e) { grid.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
+  const linked = new Set(slots.map((x) => x.meeting_id).filter(Boolean));
+  const pos = (start, min) => { const m = (start.getHours() - SC_FROM) * 60 + start.getMinutes(); return `top:${m / 30 * SC_ROW}px;height:${Math.max(SC_ROW, min / 30 * SC_ROW) - 2}px`; };
+  const today = scDay(new Date()), now = Date.now();
+  grid.style.setProperty("--rows", rows); grid.style.setProperty("--row", SC_ROW + "px"); grid.style.setProperty("--hours", SC_TO - SC_FROM);
+  grid.innerHTML = `<div class="sc-corner"></div>${days.map((d) => `<div class="sc-dh ${scDay(d) === today ? "today" : ""}"><b>${WEEKDAYS_SHORT[d.getDay()]}</b><span>${d.getMonth() + 1}/${d.getDate()}</span></div>`).join("")}
+    <div class="sc-times">${[...Array(SC_TO - SC_FROM)].map((_, i) => `<span>${String(SC_FROM + i).padStart(2, "0")}:00</span>`).join("")}</div>
+    ${days.map((d) => {
+      const key = scDay(d), past = d.getTime() + 86400e3 <= now;
+      const blocks = slots.filter((x) => scDay(new Date(x.starts_at)) === key).map((x) => {
+        const st = new Date(x.starts_at), state = x.student_id ? "booked" : x.held ? "held" : "free", gone = st.getTime() < now;
+        const what = `${x.mode === "offline" ? "Биечлэн" : "Онлайн"} · ${x.price ? money(x.price) : "Үнэгүй"}`;
+        return `<button type="button" class="sc-slot ${state} ${gone ? "gone" : ""} ${x.duration_min < 60 ? "short" : ""}" data-slot="${esc(x.id)}" style="${pos(st, x.duration_min)}" title="${scHM(st)} · ${x.duration_min} мин · ${what}">
+          <b>${scHM(st)}</b><small>${state === "booked" ? esc(x.student_name || "Захиалсан") : state === "held" ? "Төлбөр хүлээгдэж байна" : what}</small></button>`;
+      }).join("");
+      const meets = meetings.filter((m) => !linked.has(m.id) && scDay(new Date(m.starts_at)) === key).map((m) => {
+        const st = new Date(m.starts_at);
+        return `<div class="sc-meet" style="${pos(st, m.duration_min)}" title="${esc(m.title)}"><b>${scHM(st)}</b><small>${esc(m.title)}</small></div>`;
+      }).join("");
+      return `<div class="sc-col ${past ? "past" : ""}" data-day="${key}">${blocks}${meets}</div>`;
+    }).join("")}`;
+  grid.onclick = async (e) => {
+    const b = e.target.closest(".sc-slot");
+    if (b) {
+      const x = slots.find((y) => y.id === b.dataset.slot); if (!x) return;
+      if (x.student_id) return slotInfo(x, meetings);
+      if (x.held) return toast("Энэ цагийг захиалж, төлбөрөө төлж байна — түр хүлээнэ үү");
+      try { await api(`/api/me/slots/${x.id}`, { method: "DELETE" }); toast("Сул цаг хасагдлаа"); mountSlots(meetings); } catch (err) { toast(err.message, true); }
+      return;
+    }
+    const col = e.target.closest(".sc-col"); if (!col || e.target.closest(".sc-meet")) return;
+    const y = e.clientY - col.getBoundingClientRect().top, [Y, M, D] = col.dataset.day.split("-").map(Number);
+    const st = new Date(Y, M - 1, D, SC_FROM, Math.floor(y / SC_ROW) * 30);
+    if (st.getTime() < Date.now() + 5 * 60e3) return toast("Өнгөрсөн цагт тэмдэглэх боломжгүй", true);
+    try {
+      await api("/api/me/slots", { method: "POST", body: { starts: [st.toISOString()], duration_min: SC.dur, mode: SC.mode, price: SC.price, location: SC.mode === "offline" ? SC.loc : "" } });
+      mountSlots(meetings);
+    } catch (err) { toast(err.message, true); }
+  };
+}
+function slotInfo(x, meetings) {
+  const st = new Date(x.starts_at), en = new Date(st.getTime() + x.duration_min * 60e3);
+  document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="scModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+    <span class="eyebrow">Захиалсан цаг</span><h3 class="h3">${WEEKDAYS[st.getDay()]}, ${st.getMonth() + 1}/${st.getDate()} · ${scHM(st)}–${scHM(en)}</h3>
+    <div class="sc-who">${avatar({ username: x.student_name, display_name: x.student_name }, "avatar-sm")}<b>${esc(x.student_name || "Суралцагч")}</b></div>
+    <p class="muted">${x.mode === "offline" ? `Биечлэн · ${esc(x.location)}` : "Онлайн · Google Meet"} · ${x.price ? money(x.price) + " · төлсөн" : "Үнэгүй"}</p>
+    ${x.note ? `<blockquote class="sc-note">${esc(x.note)}</blockquote>` : ""}
+    <div class="hero-cta" style="margin:0;justify-content:flex-end">${x.meet_url ? `<a class="btn btn-gold" href="${esc(x.meet_url)}" target="_blank" rel="noopener">${ico("live", 16)}Meet нээх</a>` : ""}
+      <button type="button" class="btn btn-danger" data-cancel>Цуцлах</button></div></div></div>`);
+  const md = $("#scModal");
+  SG.openModal(md);
+  const close = () => { SG.closeModal(md); setTimeout(() => md.remove(), 300); };
+  md.addEventListener("click", async (ev) => {
+    if (ev.target === md || ev.target.closest("[data-close]")) { ev.preventDefault(); close(); return; }
+    if (!ev.target.closest("[data-cancel]")) return;
+    if (!confirm(`${x.student_name || "Суралцагч"}-ийн захиалгыг цуцлах уу? Түүнд мэдэгдэл очно.${x.price ? "\n\nТөлсөн мөнгийг та буцаан олгоно." : ""}`)) return;
+    try { await api(`/api/me/slots/${x.id}`, { method: "DELETE" }); toast("Захиалга цуцлагдлаа"); close(); live(); } catch (err) { toast(err.message, true); }
+  });
+}
+
 /* ---------- Шууд хичээл (Google Meet) ---------- */
 async function live() {
   const [meetings, list] = await Promise.all([api("/api/me/meetings"), api("/api/me/courses")]);
   const fresh = await api("/api/me"); me = fresh;
   const dt = new Date(Date.now() + 3600e3); dt.setMinutes(0, 0, 0);
   const local = new Date(dt - dt.getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
-  main.innerHTML = panel(`<div class="panel-head"><h2>Google Meet</h2>${me.meet_connected ? `<span class="chip chip-teal">✓ Холбогдсон</span>` : `<span class="chip">Холбогдоогүй</span>`}</div>
+  main.innerHTML = panel(slotsPanel(), 0, "sc-panel") + panel(`<div class="panel-head"><h2>Google Meet</h2>${me.meet_connected ? `<span class="chip chip-teal">✓ Холбогдсон</span>` : `<span class="chip">Холбогдоогүй</span>`}</div>
       <p class="muted">Холбосноор шууд хичээл товлоход болон чатаас нэг товчоор Google Meet холбоос автоматаар үүснэ. Холбоос таны Google Calendar-т хадгалагдана.</p>
       ${me.meet_connected ? `<button class="btn btn-ghost btn-sm" id="meetOff">Салгах</button>` : `<button class="btn btn-gold" id="meetOn">📹 Google Meet холбох</button>`}`) +
     panel(`<h2>Шууд хичээл товлох</h2><form class="form" id="meetForm">
@@ -1623,10 +1710,23 @@ async function live() {
       <label>Сургалт (элссэн суралцагчид харна)<select name="course"><option value="">— Ерөнхий —</option>${list.map((c) => `<option value="${c.id}">${esc(c.title)}</option>`).join("")}</select></label>
       <div class="form-row"><label>Үнэ (₮, 0 = үнэгүй)<input name="price" type="number" min="0" step="500" value="0"><small class="muted">Төлбөртэй бол зөвхөн худалдаж авсан хүн Meet холбоосыг харна. Сургалттай холбоно.</small></label>
         <label class="check" style="align-self:center"><input type="checkbox" name="members_free"> Сургалтад элссэн суралцагчдад үнэгүй</label></div>
-      <button class="btn btn-gold" ${me.meet_connected ? "" : "disabled"}>Товлох</button></form>`, 1) +
+      <button class="btn btn-gold" ${me.meet_connected ? "" : "disabled"}>Товлох</button></form>`, 2) +
     panel(`<h2>Удахгүй болох</h2><div class="meet-list" id="meetMine">${meetings.map((m) => `<div class="meet-item"><time>${fmtDate(m.starts_at)}</time><span style="flex:1">${esc(m.title)} · ${m.duration_min} мин
-        ${m.price ? `<span class="chip chip-amber">${money(m.price)}${m.members_free ? " · элссэнд үнэгүй" : ""}</span> <span class="muted small">${m.buyers || 0} худалдаж авсан</span>` : `<span class="chip">Үнэгүй</span>`}</span>
-        ${m.course_id ? `<button class="btn btn-ghost btn-sm" data-meet-price="${esc(m.id)}">${ico("money", 15)}Үнэ</button>` : ""}<a class="btn btn-glass btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">${ico("live", 15)}Нээх</a></div>`).join("") || `<div class="empty">Товлосон хичээл алга</div>`}</div>`, 2);
+        ${m.title.startsWith("Цаг захиалга: ") && !m.course_id ? `<span class="chip chip-teal">${m.title.endsWith("биечлэн") ? "Биечлэн" : "Онлайн"}</span>`
+          : m.price ? `<span class="chip chip-amber">${money(m.price)}${m.members_free ? " · элссэнд үнэгүй" : ""}</span> <span class="muted small">${m.buyers || 0} худалдаж авсан</span>` : `<span class="chip">Үнэгүй</span>`}</span>
+        ${m.course_id ? `<button class="btn btn-ghost btn-sm" data-meet-price="${esc(m.id)}">${ico("money", 15)}Үнэ</button>` : ""}${m.meet_url ? `<a class="btn btn-glass btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">${ico("live", 15)}Нээх</a>` : ""}</div>`).join("") || `<div class="empty">Товлосон хичээл алга</div>`}</div>`, 3);
+  // Цаг захиалгын тохиргоо ба календарь
+  const scLoc = $(".sc-loc"), scWarn = $(".sc-warn");
+  $("#scDur").onchange = (e) => { SC.dur = +e.target.value; };
+  $("#scPrice").oninput = (e) => { SC.price = Math.max(0, Math.round(+e.target.value || 0)); };
+  $("#scLoc").oninput = (e) => { SC.loc = e.target.value; };
+  SC.loc = $("#scLoc").value;
+  $$("[data-scmode]").forEach((b) => b.addEventListener("click", () => {
+    SC.mode = b.dataset.scmode; $$("[data-scmode]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    scLoc.hidden = SC.mode !== "offline"; if (scWarn) scWarn.hidden = SC.mode !== "online";
+  }));
+  $$("[data-wk]").forEach((b) => b.addEventListener("click", () => { SC.week = +b.dataset.wk === 0 ? 0 : SC.week + +b.dataset.wk; mountSlots(meetings); }));
+  mountSlots(meetings);
   $("#meetOn")?.addEventListener("click", async () => { try { const d = await api("/api/me/meet/connect", { method: "POST" }); location.href = d.url; } catch (e) { toast(e.message, true); } });
   $("#meetOff")?.addEventListener("click", async () => { await api("/api/me/meet", { method: "DELETE" }); live(); });
   const f = $("#meetForm");

@@ -218,6 +218,12 @@ func (s *Server) Handler() http.Handler {
 	// Нээлттэй профайл
 	mux.HandleFunc("GET /api/teachers/{username}", s.handlePublicProfile)
 	mux.HandleFunc("POST /api/teachers/{username}/phone", s.handleRevealPhone)
+	// Цаг захиалга: багшийн календарь ба захиалга
+	mux.HandleFunc("GET /api/teachers/{username}/slots", s.handleTeacherSlots)
+	mux.HandleFunc("POST /api/slots/{id}/book", s.handleBookSlot)
+	mux.HandleFunc("GET /api/me/slots", s.handleMySlots)
+	mux.HandleFunc("POST /api/me/slots", s.handleAddSlots)
+	mux.HandleFunc("DELETE /api/me/slots/{id}", s.handleDeleteSlot)
 	mux.HandleFunc("POST /api/views", s.handleTrackView)
 	mux.HandleFunc("POST /api/views/{id}/end", s.handleVisitEnd)
 	mux.HandleFunc("GET /api/me/visits", s.handleMyVisits)

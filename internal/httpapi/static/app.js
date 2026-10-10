@@ -9,6 +9,8 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const money = (n) => (n ? Number(n).toLocaleString("en-US") + "₮" : "Үнэгүй");
 // Бүтцийн дүрс (самбар, гарчиг, жагсаалт): нэг хэв маягийн шугаман SVG — emoji шиг төхөөрөмжөөс хамаарч өөрчлөгдөхгүй.
 const UI_ICONS = {
+  cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
   courses: '<path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/>',
   book: '<path d="M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h7"/>',
   live: '<rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/>',
@@ -2455,6 +2457,10 @@ function profilePage() {
     try { await navigator.clipboard.writeText(location.origin + location.pathname); toast("Холбоос хуулагдлаа ✓"); } catch { toast(location.href); }
   }));
   $$("[data-share]").forEach((b) => b.addEventListener("click", () => share(b.dataset.title)));
+  // Цаг авах: багшийн календарьт тэмдэглэсэн сул цагаас сонгож захиална (#appt холбоосоор шууд нээгдэнэ).
+  const apptOpen = () => apptWindow(root.dataset.teacher, $(".pf-id h1")?.firstChild?.textContent.trim() || "Багш");
+  $$("[data-appt]").forEach((b) => b.addEventListener("click", apptOpen));
+  root._appt = apptOpen;
   // Утас: эхний 4 орон харагдана → дарахад бүтэн дугаар (багшид мэдэгдэнэ) → дахин дарахад tel: холбоосоор шууд залгана.
   $$("[data-phone]").forEach((a) => a.addEventListener("click", async (e) => {
     if (a.dataset.tel) return;
@@ -2517,6 +2523,7 @@ function profilePage() {
       return showTab("overview") || showTab("courses");
     }
     if (h.has("meet")) { toast(h.get("meet") === "connected" ? "✓ Google Meet холбогдлоо" : "Google Meet холбож чадсангүй", h.get("meet") !== "connected"); return showTab("live"); }
+    if (h.has("appt")) { setTimeout(() => root._appt?.(), 0); return showTab(root.classList.contains("is-owner") ? "courses" : "live"); }
     courseArg = null;
     const key = [...h.keys()][0] || "";
     const owner = root.classList.contains("is-owner");
@@ -2882,7 +2889,9 @@ async function homePage() {
         ${todo.length ? `<ul class="tips">${todo.map((t) => `<li><a class="tip" href="/t/${esc(u.username)}${esc(t.link)}"><i>✓</i><span><strong>${esc(t.title)}</strong><small>${esc(t.hint)}</small></span><span class="chip chip-gold">Хийх →</span></a></li>`).join("")}</ul>` : ""}</div>`));
   }
 
-  if (h.meetings.length) parts.push(sec("my-live", "Шууд хичээл", `<ul class="items">${h.meetings.map((m) => `
+  if (h.meetings.length) parts.push(sec("my-live", "Шууд хичээл", `<ul class="items">${h.meetings.map((m) => m.booking ? `
+      <li><div class="item live"><span class="item-ico">${icon("cal", 20)}</span><span class="grow"><strong>${esc(m.title)}</strong><small>${fmtDate(m.starts_at)} · ${m.duration_min} мин · ${m.mode === "offline" ? "Биечлэн · " + esc(m.location || "") : "Онлайн"}${m.price ? " · ✓ төлсөн" : ""}</small></span><span class="chip chip-amber">${until(m.starts_at)}</span>
+      ${m.meet_url ? `<a class="btn btn-accent btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">Нэгдэх</a>` : `<a class="btn btn-ghost btn-sm" href="/t/${esc(m.teacher_username || "")}">Багш</a>`}</div></li>` : `
       <li><div class="item live"><span class="item-ico">${icon("live", 20)}</span><span class="grow"><strong>${esc(m.title)}</strong><small>${fmtDate(m.starts_at)} · ${m.duration_min} мин · ${esc(m.course_title)}${m.price ? ` · ${m.bought ? "✓ худалдаж авсан" : money(m.price)}` : ""}</small></span><span class="chip chip-amber">${until(m.starts_at)}</span>
       ${m.meet_url ? `<a class="btn btn-accent btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">Нэгдэх</a>`
         : m.price ? `<a class="btn btn-gold btn-sm" href="/c/${esc(m.course_id)}#meet=${esc(m.id)}">Худалдаж авах · ${money(m.price)}</a>`
@@ -3489,6 +3498,76 @@ function payWindow(order, payment, label, onPaid, extra = {}) {
   return { close: shut };
 }
 window.SG_pay = payWindow; // шалгалт, даалгаврын төлбөр, шууд хичээл, ном, багтаамж — бүгд ижил цонх
+
+/* ---------- Цаг авах: багшийн сул цагаас сонгож захиална (үнэгүй бол шууд, төлбөртэй бол QR) ---------- */
+function apptWindow(username, tname) {
+  $("#apptWin")?.remove();
+  const el = document.createElement("div");
+  el.className = "modal ap-win"; el.id = "apptWin"; el.setAttribute("aria-hidden", "true");
+  el.innerHTML = `<div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
+    <span class="eyebrow">Цаг авах</span><h3 class="h3">${esc(tname)}-тай уулзах</h3><div class="ap-body"><div class="pw-load"><span class="loader"></span></div></div></div>`;
+  document.body.append(el); openModal(el);
+  const body = $(".ap-body", el), shut = () => { closeModal(el); setTimeout(() => el.remove(), 300); };
+  const hm = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const dkey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  const dayName = (d) => { const t = new Date(); t.setHours(0, 0, 0, 0); const n = Math.round((new Date(d).setHours(0, 0, 0, 0) - t) / 864e5); return n === 0 ? "Өнөөдөр" : n === 1 ? "Маргааш" : WEEKDAYS_SHORT[d.getDay()]; };
+  const when = (d, min) => `${WEEKDAYS[d.getDay()]}, ${d.getMonth() + 1}/${d.getDate()} · ${hm(d)}–${hm(new Date(d.getTime() + min * 6e4))}`;
+  const place = (x) => x.mode === "offline" ? `${icon("pin", 14)} Биечлэн · ${esc(x.location || "")}` : `${icon("live", 14)} Онлайн · Google Meet`;
+  let data = null, day = "", pick = null;
+  const mineHTML = () => data.mine.length ? `<div class="ap-mine"><b>Таны захиалга</b>${data.mine.map((x) => `<div class="ap-mine-row"><span>${when(new Date(x.starts_at), x.duration_min)}<small>${place(x)}</small></span>
+    ${x.meet_url ? `<a class="btn btn-accent btn-sm" href="${esc(x.meet_url)}" target="_blank" rel="noopener">Нэгдэх</a>` : ""}</div>`).join("")}</div>` : "";
+  const draw = () => {
+    if (!data.slots.length) {
+      body.innerHTML = mineHTML() + `<div class="empty">Одоогоор сул цаг алга.<br>Багштай чатаар тохиролцоорой.</div><div class="hero-cta" style="justify-content:center"><button type="button" class="btn btn-gold" data-chat>${icon("chat", 16)}Чатлах</button></div>`;
+      return;
+    }
+    const days = [...new Map(data.slots.map((x) => [dkey(x.d), x.d])).entries()];
+    const list = data.slots.filter((x) => dkey(x.d) === day), sel = data.slots.find((x) => x.id === pick);
+    body.innerHTML = mineHTML() + `<div class="ap-days" role="tablist" aria-label="Өдөр">${days.map(([k, d]) => `<button type="button" class="ap-day" role="tab" aria-selected="${k === day}" data-day="${k}"><b>${dayName(d)}</b><span>${d.getMonth() + 1}/${d.getDate()}</span></button>`).join("")}</div>
+      <div class="ap-times">${list.map((x) => `<button type="button" class="ap-time" aria-pressed="${x.id === pick}" data-pick="${x.id}"><b>${hm(x.d)}</b><small>${x.duration_min} мин · ${x.mode === "offline" ? "Биечлэн" : "Онлайн"}</small><em>${x.price ? money(x.price) : "Үнэгүй"}</em></button>`).join("")}</div>
+      ${sel ? `<div class="ap-pick"><div class="ap-sum"><b>${when(sel.d, sel.duration_min)}</b><small>${place(sel)}</small></div>
+        <label class="ap-note"><span>Юу ярилцах вэ? <small class="muted">заавал биш</small></span><textarea maxlength="500" rows="2" placeholder="Жишээ нь: ЭЕШ-ийн бэлтгэл, логарифмын бодлого"></textarea></label>
+        <button type="button" class="btn btn-gold btn-block btn-lg" data-go>${Auth.token ? (sel.price ? `Төлөөд захиалах · ${money(sel.price)}` : "Цаг захиалах") : "Нэвтэрч захиалах"}</button></div>`
+      : `<p class="muted small ap-hint">Тохирох цагаа сонгоно уу.</p>`}`;
+  };
+  const load = async () => {
+    try { data = await api(`/api/teachers/${encodeURIComponent(username)}/slots`); }
+    catch (e) { body.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
+    data.slots.forEach((x) => (x.d = new Date(x.starts_at)));
+    if (!data.slots.some((x) => dkey(x.d) === day)) day = data.slots[0] ? dkey(data.slots[0].d) : "";
+    if (!data.slots.some((x) => x.id === pick)) pick = null;
+    draw();
+  };
+  const done = (x) => {
+    body.innerHTML = `<div class="ap-done"><span class="ap-ok" aria-hidden="true">✓</span><h4>Цаг баталгаажлаа</h4><p><b>${when(new Date(x.starts_at), x.duration_min)}</b></p><p class="muted">${place(x)}</p>
+      ${x.meet_url ? `<a class="btn btn-accent" href="${esc(x.meet_url)}" target="_blank" rel="noopener">${icon("live", 16)}Google Meet холбоос</a>` : x.mode === "online" ? `<p class="muted small">Meet холбоосыг багш илгээнэ.</p>` : ""}
+      <p class="muted small">Таны нүүр хуудасны «Шууд хичээл» хэсэгт хадгалагдлаа.</p>
+      <div class="hero-cta" style="justify-content:center"><a class="btn btn-ghost" href="/#my-live">Миний хуваарь</a><button type="button" class="btn btn-gold" data-close>Болсон</button></div></div>`;
+  };
+  el.addEventListener("click", async (e) => {
+    if (e.target === el || e.target.closest("[data-close]")) { e.preventDefault(); shut(); return; }
+    const dy = e.target.closest("[data-day]"), pk = e.target.closest("[data-pick]");
+    if (dy) { day = dy.dataset.day; pick = null; draw(); return; }
+    if (pk) { pick = pk.dataset.pick; draw(); $(".ap-pick", body)?.scrollIntoView({ block: "nearest", behavior: "smooth" }); return; }
+    if (e.target.closest("[data-chat]")) { shut(); $("[data-open-chat]")?.click(); return; }
+    const go = e.target.closest("[data-go]"); if (!go) return;
+    if (!Auth.token) { location.href = `/login?next=${encodeURIComponent(location.pathname + "#appt")}`; return; }
+    const sel = data.slots.find((x) => x.id === pick); if (!sel) return;
+    go.disabled = true;
+    try {
+      const r = await api(`/api/slots/${sel.id}/book`, { method: "POST", body: { note: $("textarea", body)?.value || "" } });
+      if (r.booked) { done(r.slot); return; }
+      payWindow(r.order, r.payment, "Уулзах цаг", async () => {
+        const d2 = await api(`/api/teachers/${encodeURIComponent(username)}/slots`).catch(() => null);
+        const mine = d2?.mine.find((x) => x.id === sel.id);
+        if (mine) done(mine); else load();
+      }, { name: "Уулзах цаг", sub: when(sel.d, sel.duration_min) });
+      go.disabled = false;
+    } catch (x) { toast(x.message, true); go.disabled = false; if (x.status === 409 || x.status === 410) { pick = null; load(); } }
+  });
+  load();
+}
+window.SG_appt = apptWindow;
 
 function celebrate() {
   if (reduce) return;

@@ -405,6 +405,7 @@ type Order struct {
 	LessonID  string      `json:"lesson_id,omitempty"`
 	BookID    string      `json:"book_id,omitempty"`
 	MeetingID string      `json:"meeting_id,omitempty"`
+	SlotID    string      `json:"slot_id,omitempty"` // багштай уулзах цаг (slots.go)
 	TeacherID string      `json:"teacher_id,omitempty"`
 	Title     string      `json:"title,omitempty"`
 	Amount    int64       `json:"amount"`
@@ -579,6 +580,19 @@ type Store interface {
 	MeetingBuyers(ctx context.Context, teacherID string) (map[string]int, error)
 	// Meetings нь from-оос хойшхи уулзалтууд (courseID хоосон бол багшийн бүх).
 	Meetings(ctx context.Context, teacherID, courseID string, from time.Time, limit int) ([]Meeting, error)
+	DeleteMeeting(ctx context.Context, id string) error
+	// Цаг захиалга (slots.go): багшийн сул цагууд ба тэдгээрийн захиалга.
+	AddSlots(ctx context.Context, slots []*Slot) error
+	SlotByID(ctx context.Context, id string) (*Slot, error)
+	// Slots — багшийн [from, to) хооронд эхлэх цагууд, эхлэх цагаар эрэмбэлсэн.
+	Slots(ctx context.Context, teacherID string, from, to time.Time) ([]Slot, error)
+	// StudentSlots — тухайн хүний захиалсан, from-оос хойш эхлэх цагууд.
+	StudentSlots(ctx context.Context, userID string, from time.Time) ([]Slot, error)
+	// UpdateSlot — түгжээтэй уншиж fn-ээр өөрчлөөд хадгална; fn алдаа буцаавал хадгалахгүй.
+	UpdateSlot(ctx context.Context, id string, fn func(*Slot) error) (*Slot, error)
+	DeleteSlot(ctx context.Context, id string) error
+	// CreateOrGetPendingSlotOrder — хэрэглэгч+цаг дээр хүлээгдэж буй нэг л захиалга.
+	CreateOrGetPendingSlotOrder(ctx context.Context, userID string, s *Slot, title string) (*Order, error)
 	// Гадаад нэвтрэлт (Google, Facebook ...): provider+subject -> хэрэглэгч.
 	UserByIdentity(ctx context.Context, provider, subject string) (*User, error)
 	LinkIdentity(ctx context.Context, userID, provider, subject string) error

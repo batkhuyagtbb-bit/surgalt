@@ -28,6 +28,7 @@ type Memory struct {
 	identities  map[string]string // provider:subject -> user id
 	applied     map[string]bool   // хэрэгжсэн багтаамжийн захиалга
 	meetings    []*Meeting
+	slots       map[string]*Slot              // цаг захиалга
 	meetAcc     map[[2]string]string          // (user, meeting) → багш: худалдаж авсан шууд хичээл
 	lessonAcc   map[[2]string]string          // (user, lesson) -> course
 	pendingL    map[[2]string]string          // (user, lesson) -> order
@@ -51,7 +52,7 @@ func NewMemory() *Memory {
 		courses: map[string]*Course{}, lessons: map[string][]*Lesson{}, orders: map[string]*Order{},
 		pending: map[[2]string]string{}, enrollments: map[[2]string]time.Time{},
 		convs: map[string]*Conversation{}, convByKey: map[string]string{}, messages: map[string][]*Message{}, identities: map[string]string{}, applied: map[string]bool{}, notifs: map[string][]*Notification{}, progress: map[[2]string]*LessonProgress{}, lessonAcc: map[[2]string]string{}, pendingL: map[[2]string]string{},
-		invoices: map[string]*PaymentInvoice{}, visits: map[string]*PageVisit{},
+		invoices: map[string]*PaymentInvoice{}, visits: map[string]*PageVisit{}, slots: map[string]*Slot{},
 	}
 }
 
@@ -418,6 +419,7 @@ func (m *Memory) MarkOrderPaid(_ context.Context, orderID string, amount int64) 
 		}
 	case OrderKindBook:
 		m.books.grant(o.UserID, o.BookID, o.ID, o.Amount)
+	case OrderKindSlot: // захиалгыг API давхарга баталгаажуулна (Meet үүсгэх, мэдэгдэх)
 	case OrderKindMeeting:
 		if m.meetAcc == nil {
 			m.meetAcc = map[[2]string]string{}
