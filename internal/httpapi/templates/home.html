@@ -72,6 +72,35 @@
         </ul>
       </article>
     </div>
+    {{/* Сахилга бат — амьд жишээ: идэвхгүй бол дохио → сануулга → хичээл түр хаагдах → багшид мэдэгдэл. app.js (howDemo) тоглуулна. */}}
+    <div class="how-demo" id="howDemo" data-s="0">
+      <div class="hd-copy">
+        <p class="eyebrow">Сахилга бат · амьд жишээ</p>
+        <h3>Идэвхгүй бол систем өөрөө дохиолж, хичээлийг түр хаана</h3>
+        <ol class="hd-steps">
+          <li data-s="0"><b>Анхааралтай үзэж байна</b><small>Идэвхтэй минут, анхаарал тоологдоно</small></li>
+          <li data-s="1"><b>Таб сольсон</b><small>Улаан дохио, дуут сануулга · 1/3</small></li>
+          <li data-s="2"><b>Хичээлээс хөндийрсөн</b><small>Курсор гарсан · 2/3</small></li>
+          <li data-s="3"><b>Хичээл түр хаагдлаа</b><small>3/3 — багшийн тогтоосон хугацаагаар</small></li>
+          <li data-s="4"><b>Багшид мэдэгдэл очно</b><small>Багш шалгаад дахин нээж болно</small></li>
+        </ol>
+      </div>
+      <div class="hd-screen" aria-hidden="true">
+        <div class="hd-bar"><i></i><i></i><i></i><span>surgalt.mn · Логарифмын шинж чанар</span></div>
+        <div class="hd-body">
+          <div class="hd-video"><svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5.5 3.5-5.5 3.5z"/></svg><span class="hd-lines"><i></i><i></i><i></i></span></div>
+          <div class="hd-stats">
+            <div class="hd-meter"><span>Анхаарал</span><b class="hd-att">96%</b><i><em></em></i></div>
+            <div class="hd-strikes"><span>Зөрчил</span><i></i><i></i><i></i></div>
+          </div>
+          <div class="hd-alert hd-a1"><b>⚠️ Таб сольсон байна!</b><span>Хичээл рүүгээ буцна уу · 1/3</span><em class="hd-snd">🔊</em></div>
+          <div class="hd-alert hd-a2"><b>🖱 Хичээлээс гарсан байна</b><span>Анхаарлаа хандуулна уу · 2/3</span></div>
+          <div class="hd-lock"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path class="hd-shackle" d="M8 11V8a4 4 0 0 1 8 0v3"/><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M12 15v2"/></svg>
+            <b>Хичээл түр хаагдлаа</b><span>3 удаа зөрчил гаргасан · 30 минутын дараа нээгдэнэ</span></div>
+          <div class="hd-notif"><span class="hd-notif-ico">⛔</span><span><small class="hd-notif-k">Багшид ирсэн мэдэгдэл</small><b>Бат: «Логарифм» хаагдсан</b><small>Таб 2 удаа сольсон · курсор 1 удаа гарсан</small></span></div>
+        </div>
+      </div>
+    </div>
   </section>
   <section class="section features">
     <div class="feature glass tilt reveal" style="--d:0"><span class="f-ico">{{icon "user"}}</span><h3>Ухаалаг профайл</h3><p class="muted">Профайл тань юу дутууг өөрөө хэлж, суралцагчид итгэл төрүүлнэ.</p></div>

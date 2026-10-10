@@ -3802,7 +3802,34 @@ function howMap() {
   }, { threshold: 0.2 });
   io.observe(map);
 }
-if (page === "home") { homePage(); howMap(); }
+// Нүүр: сахилга батын амьд жишээ — анхааралтай → таб сольсон (1/3) → хөндийрсөн (2/3) → хичээл хаагдсан (3/3) →
+// багшид мэдэгдэл; давтагдан тоглоно, дэлгэцээс гарвал зогсоно, алхам дээр дарж харж болно.
+function howDemo() {
+  const el = $("#howDemo"); if (!el) return;
+  const att = $(".hd-att", el), dots = $$(".hd-strikes i", el), steps = $$(".hd-steps li", el);
+  const ATT = [96, 71, 48, 12, 12], HITS = [0, 1, 2, 3, 3], HOLD = [2600, 2800, 2800, 3000, 3600];
+  let s = 0, timer = 0, on = false, shown = 96;
+  const tween = (to) => {
+    const from = shown, t0 = performance.now(); shown = to;
+    const step = (t) => { const p = Math.min(1, (t - t0) / 600); att.textContent = Math.round(from + (to - from) * p) + "%"; if (p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  };
+  const set = (n) => {
+    s = n; el.dataset.s = n;
+    steps.forEach((li, i) => { li.classList.toggle("on", i === n); li.classList.toggle("done", i < n); });
+    dots.forEach((d, i) => d.classList.toggle("hit", i < HITS[n]));
+    el.style.setProperty("--att", ATT[n] / 100); tween(ATT[n]);
+  };
+  const loop = () => { timer = setTimeout(() => { set((s + 1) % 5); loop(); }, HOLD[s]); };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { set(3); return; }
+  set(0);
+  new IntersectionObserver(([e]) => {
+    if (e.isIntersecting && !on) { on = true; loop(); }
+    else if (!e.isIntersecting && on) { on = false; clearTimeout(timer); }
+  }, { threshold: 0.35 }).observe(el);
+  steps.forEach((li, i) => li.addEventListener("click", () => { clearTimeout(timer); set(i); if (on) loop(); }));
+}
+if (page === "home") { homePage(); howMap(); howDemo(); }
 if (page === "profile") profilePage();
 if (page === "profile" || page === "course") chatWidget();
 if (page === "course") coursePage();
