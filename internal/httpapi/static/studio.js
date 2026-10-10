@@ -1622,7 +1622,7 @@ function slotsPanel() {
       <label>Давтах<select id="scWeeks">${[[1, "Давтахгүй"], [13, "Улирал · 13 долоо хоног"], [52, "Жил · 52 долоо хоног"]].map(([v, t]) => `<option value="${v}" ${v === SC.weeks ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       <label class="sc-loc" ${SC.mode === "offline" ? "" : "hidden"}>Уулзах газар<input id="scLoc" maxlength="120" value="${esc(SC.loc || me.location || "")}" placeholder="Номын сан, 2 давхар"></label>
     </div>
-    ${me.meet_connected ? "" : `<p class="sc-warn" ${SC.mode === "online" ? "" : "hidden"}>${ico("live", 15)}Google Meet холбоогүй тул холбоос автоматаар үүсэхгүй — захиалга ирэхэд «Захиалгууд»-аас «Холбоос нэмэх» дарж meet.new-ээс хуулж тавина (эсвэл доороос холбоно уу).</p>`}
+    ${me.meet_connected ? "" : `<p class="sc-warn" ${SC.mode === "online" ? "" : "hidden"}>${ico("live", 15)}Google Meet холбоогүй тул холбоос автоматаар үүсэхгүй — захиалга ирэхэд «Захиалгууд»-аас «Холбоос нэмэх» → «Шинэ Google Meet үүсгэх» дарна (эсвэл доороос холбоно уу).</p>`}
     <div class="sc-nav"><button type="button" class="icon-btn" data-wk="-1" aria-label="Өмнөх долоо хоног">${ico("chevron", 16)}</button><b id="scRange"></b><button type="button" class="icon-btn" data-wk="1" aria-label="Дараагийн долоо хоног">${ico("chevron", 16)}</button>
       <button type="button" class="btn btn-ghost btn-sm" data-wk="0">Энэ долоо хоног</button>
       <span class="sc-legend"><i class="free"></i>Сул <i class="held"></i>Төлбөр хүлээгдэж буй <i class="booked"></i>Захиалсан <i class="meet"></i>Шууд хичээл</span></div>
@@ -1717,21 +1717,49 @@ const pasteInto = async (input) => {
   try { const t = (await navigator.clipboard.readText()).trim(); if (t) { input.value = t; return; } } catch {}
   input.focus(); toast("⌘V / Ctrl+V дарж холбоосоо тавина уу");
 };
+// Шинэ Google Meet: meet.google.com/new шинэ цонхонд нээгдэж уулзалт үүснэ → багш тэнд холбоосыг хуулаад буцаж ирэхэд
+// санах ойгоос автоматаар авч талбарт тавина (хөтөч өөр сайтын цонхны хаягийг уншуулдаггүй тул санах ойгоор).
+const MEET_RE = /https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}/i;
+function meetAuto(input, onGot) {
+  window.open("https://meet.google.com/new", "_blank", "noopener");
+  let done = false;
+  const stop = () => { done = true; removeEventListener("focus", grab); document.removeEventListener("visibilitychange", grab); };
+  async function grab() {
+    if (done || document.visibilityState !== "visible") return;
+    try {
+      const m = (await navigator.clipboard.readText()).match(MEET_RE);
+      if (m && m[0] !== input.value.trim()) { input.value = m[0]; stop(); onGot?.(m[0]); }
+    } catch {} // зөвшөөрөлгүй бол гараар тавина
+  }
+  addEventListener("focus", grab); document.addEventListener("visibilitychange", grab);
+  return stop;
+}
 function meetLinkModal({ title, sub = "", value = "", onSave }) {
   $("#mlModal")?.remove();
   document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="mlModal"><div class="modal-card ml-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
     <span class="eyebrow">${ico("live", 13)} Уулзалтын холбоос</span><h3 class="h3">${esc(title)}</h3>${sub ? `<p class="muted small" style="margin:0">${esc(sub)}</p>` : ""}
-    <ol class="ml-steps"><li><a class="btn btn-gold btn-sm" href="https://meet.new" target="_blank" rel="noopener">${ico("live", 15)}Google Meet нээх</a><span>Шинэ уулзалт шууд үүснэ</span></li>
-      <li><span>Хаягийн мөрөөс холбоосыг хуулж аваад доор тавина уу</span></li></ol>
+    <button type="button" class="btn btn-gold btn-lg btn-block ml-big" data-new>${ico("live", 22)}Шинэ Google Meet үүсгэх</button>
+    <p class="ml-wait" hidden><span class="loader"></span><span>Meet шинэ цонхонд нээгдлээ. Тэнд холбоосыг <b>хуулаад</b> (⧉ товч) энд буцаж ирэхэд автоматаар орж ирнэ.</span></p>
+    <p class="ml-got" hidden></p>
+    <div class="ml-or"><span>эсвэл холбоосоо гараар тавина</span></div>
     <form class="ml-form" id="mlForm"><input name="url" inputmode="url" autocomplete="off" value="${esc(value)}" placeholder="https://meet.google.com/abc-defg-hij" required>
       <button type="button" class="btn btn-ghost" data-paste>Тавих</button><button class="btn btn-gold">Хадгалах</button></form>
     <p class="form-error" role="alert"></p><p class="muted small" style="margin:0">Zoom, Teams-ийн холбоос ч болно.</p></div></div>`);
-  const md = $("#mlModal"), f = $("#mlForm", md);
+  const md = $("#mlModal"), f = $("#mlForm", md), save = $("button.btn-gold", f);
   SG.openModal(md);
-  const close = () => { SG.closeModal(md); setTimeout(() => md.remove(), 300); };
+  let stop = null;
+  const close = () => { stop?.(); SG.closeModal(md); setTimeout(() => md.remove(), 300); };
   md.addEventListener("click", (ev) => {
     if (ev.target === md || ev.target.closest("[data-close]")) { ev.preventDefault(); close(); }
     else if (ev.target.closest("[data-paste]")) pasteInto(f.url);
+    else if (ev.target.closest("[data-new]")) {
+      stop?.(); $(".ml-wait", md).hidden = false; $(".ml-got", md).hidden = true;
+      stop = meetAuto(f.url, (u) => {
+        $(".ml-wait", md).hidden = true;
+        const got = $(".ml-got", md); got.hidden = false; got.innerHTML = `✓ Шинэ уулзалтын холбоос орж ирлээ: <b>${esc(u.replace("https://", ""))}</b>`;
+        save.classList.add("ml-pulse"); save.focus();
+      });
+    }
   });
   f.onsubmit = async (ev) => {
     ev.preventDefault();
@@ -1836,7 +1864,7 @@ async function live() {
   main.innerHTML = panel(slotsPanel(), 0, "sc-panel") +
     panel(`<div class="panel-head"><h2>${ico("users", 20)}Захиалгууд<i class="ab-n" id="abN"></i></h2><span class="muted small">Нэг нэгээр, сонгож эсвэл бүгдийг нь цуцалж болно</span></div><div id="abBox"><div class="pw-load"><span class="loader"></span></div></div>`, 1) +
     panel(`<div class="panel-head"><h2>Google Meet</h2>${me.meet_connected ? `<span class="chip chip-teal">✓ Холбогдсон</span>` : `<span class="chip">Холбогдоогүй</span>`}</div>
-      <p class="muted">Холбосноор шууд хичээл товлоход болон чатаас нэг товчоор Google Meet холбоос автоматаар үүснэ. Холбоос таны Google Calendar-т хадгалагдана. Холбохгүйгээр ч meet.new-ээр уулзалт нээж, холбоосыг нь хуулж тавьж болно.</p>
+      <p class="muted">Холбосноор шууд хичээл товлоход болон чатаас нэг товчоор Google Meet холбоос автоматаар үүснэ. Холбоос таны Google Calendar-т хадгалагдана. Холбохгүйгээр ч «Шинэ Google Meet үүсгэх» товчоор уулзалт нээж, хуулсан холбоос автоматаар орж ирнэ.</p>
       ${me.meet_connected ? `<button class="btn btn-ghost btn-sm" id="meetOff">Салгах</button>` : `<button class="btn btn-gold" id="meetOn">📹 Google Meet холбох</button>`}`) +
     panel(`<h2>Шууд хичээл товлох</h2><form class="form" id="meetForm">
       <label>Сэдэв<input name="title" required maxlength="200" placeholder="ЭЕШ давтлага — Логарифм"></label>
@@ -1846,8 +1874,8 @@ async function live() {
       <div class="form-row"><label>Үнэ (₮, 0 = үнэгүй)<input name="price" type="number" min="0" step="500" value="0"><small class="muted">Төлбөртэй бол зөвхөн худалдаж авсан хүн Meet холбоосыг харна. Сургалттай холбоно.</small></label>
         <label class="check" style="align-self:center"><input type="checkbox" name="members_free"> Сургалтад элссэн суралцагчдад үнэгүй</label></div>
       ${me.meet_connected ? "" : `<div class="ml-row"><label>Meet холбоос<input name="meet_url" inputmode="url" autocomplete="off" placeholder="https://meet.google.com/abc-defg-hij" required></label>
-        <a class="btn btn-ghost" href="https://meet.new" target="_blank" rel="noopener">${ico("live", 15)}Google Meet нээх</a><button type="button" class="btn btn-ghost" data-paste>Тавих</button></div>
-        <p class="muted small" style="margin:0">«Google Meet нээх» дарахад шинэ уулзалт үүснэ — хаягийн мөрөөс холбоосыг хуулж аваад энд тавина.</p>`}
+        <button type="button" class="btn btn-gold" data-new>${ico("live", 16)}Шинэ Google Meet үүсгэх</button><button type="button" class="btn btn-ghost" data-paste>Тавих</button></div>
+        <p class="muted small ml-hint" style="margin:0">«Шинэ Google Meet үүсгэх» дарахад уулзалт үүснэ — тэнд холбоосыг хуулаад энд буцаж ирэхэд автоматаар орж ирнэ.</p>`}
       <button class="btn btn-gold">Товлох</button></form>`, 2) +
     panel(`<h2>Удахгүй болох</h2><div class="meet-list" id="meetMine">${meetings.map((m) => `<div class="meet-item"><time>${fmtDate(m.starts_at)}</time><span style="flex:1">${esc(m.title)} · ${m.duration_min} мин
         ${m.title.startsWith("Цаг захиалга: ") && !m.course_id ? `<span class="chip chip-teal">${m.title.endsWith("биечлэн") ? "Биечлэн" : "Онлайн"}</span>`
@@ -1870,6 +1898,10 @@ async function live() {
   $("#meetOff")?.addEventListener("click", async () => { await api("/api/me/meet", { method: "DELETE" }); live(); });
   const f = $("#meetForm");
   $("[data-paste]", f)?.addEventListener("click", () => pasteInto(f.meet_url));
+  $("[data-new]", f)?.addEventListener("click", () => {
+    $(".ml-hint", f).textContent = "Meet шинэ цонхонд нээгдлээ — тэнд холбоосыг хуулаад энд буцаж ирнэ үү…";
+    meetAuto(f.meet_url, (u) => { $(".ml-hint", f).innerHTML = `✓ Шинэ уулзалтын холбоос орж ирлээ: <b>${esc(u.replace("https://", ""))}</b> — «Товлох» дарна уу`; f.meet_url.classList.add("ml-ok"); });
+  });
   f.onsubmit = async (e) => {
     e.preventDefault();
     try {
