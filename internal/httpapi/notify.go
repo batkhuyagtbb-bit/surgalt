@@ -21,7 +21,8 @@ const (
 	NotifMessage     = "message"
 	NotifStorage     = "storage"
 	NotifPhoneView   = "phone_view"
-	NotifBooking     = "booking" // цаг захиалга (booking.go)
+	NotifBooking     = "booking"  // цаг захиалга (booking.go)
+	NotifGuardian    = "guardian" // эцэг эх, асран хамгаалагчийн зөвшөөрөл (legal.go)
 )
 
 type viewKey struct{ teacher, kind, id string }

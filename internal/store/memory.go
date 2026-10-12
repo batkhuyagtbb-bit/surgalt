@@ -583,16 +583,18 @@ func (m *Memory) LinkIdentity(_ context.Context, userID, provider, subject strin
 	return nil
 }
 
-func (m *Memory) SetConsent(_ context.Context, userID, version string) error {
+func (m *Memory) UpdateUser(_ context.Context, id string, fn func(*User) error) (*User, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	u, ok := m.users[userID]
-	if !ok {
-		return ErrNotFound
+	u, err := m.userLocked(id)
+	if err != nil {
+		return nil, err
 	}
-	now := time.Now()
-	u.ConsentVersion, u.ConsentAt = version, &now
-	return nil
+	if err := fn(u); err != nil {
+		return nil, err
+	}
+	m.users[id] = u
+	return m.userLocked(id) // дуудагчид тусдаа хуулбар
 }
 
 func (m *Memory) SetGoogleToken(_ context.Context, userID, encrypted string) error {

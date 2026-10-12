@@ -38,6 +38,10 @@ type User struct {
 	// Google/Facebook-ээр эсвэл өмнө бүртгүүлсэн хэрэглэгч нэвтрэхдээ зөвшөөрнө.
 	ConsentVersion string     `json:"-"`
 	ConsentAt      *time.Time `json:"-"`
+	// Нас: суралцагч бүртгүүлэхдээ сонгоно ("" — асуугаагүй). 18 хүрээгүй бол эцэг, эх эсвэл асран
+	// хамгаалагчийнхаа зөвшөөрөлтэйгээр ашиглана (Guardian).
+	AgeGroup string   `json:"-"`
+	Guardian Guardian `json:"-"`
 	// Нээлттэй профайлын нэмэлт мэдээлэл (багш).
 	Subjects  []string          `json:"subjects"` // заадаг чиглэлүүд
 	Location  string            `json:"location"` // хот / байршил
@@ -51,6 +55,22 @@ type User struct {
 	MeetConnected bool   `json:"meet_connected"`
 	ProfileViews  int64  `json:"profile_views"`
 }
+
+const (
+	AgeAdult = "adult" // 18 ба түүнээс дээш
+	AgeMinor = "minor" // 18 хүрээгүй
+)
+
+// Guardian — 18 хүрээгүй суралцагчийн эцэг, эх эсвэл асран хамгаалагчийн өгсөн зөвшөөрөл (At == nil — өгөөгүй).
+type Guardian struct {
+	Name     string     `json:"name"`
+	Relation string     `json:"relation"` // эцэг | эх | асран хамгаалагч
+	Phone    string     `json:"phone"`
+	At       *time.Time `json:"at,omitempty"`
+}
+
+// NeedsGuardian — 18 хүрээгүй бөгөөд эцэг эх, асран хамгаалагчийн зөвшөөрөл аваагүй.
+func (u *User) NeedsGuardian() bool { return u.AgeGroup == AgeMinor && u.Guardian.At == nil }
 
 // LinkKeys — профайл дээр зөвшөөрөгдсөн гадаад холбоосын төрлүүд (харуулах дарааллаар).
 var LinkKeys = []string{"website", "facebook", "instagram", "youtube"}
@@ -566,8 +586,9 @@ type Store interface {
 	UsersByIDs(ctx context.Context, ids []string) ([]User, error)
 	TeacherStudentCount(ctx context.Context, teacherID string) (int64, error)
 	SetGoogleToken(ctx context.Context, userID, encrypted string) error
-	// SetConsent — хэрэглэгч нөхцөл, нууцлалын бодлогын тухайн хувилбарыг зөвшөөрсөн.
-	SetConsent(ctx context.Context, userID, version string) error
+	// UpdateUser — хэрэглэгчийн мөрийг түгжиж уншаад fn-ээр өөрчилж хадгална (зөвшөөрөл, нас, асран хамгаалагч г.м.).
+	// Имэйл, нэр (username) солиход ашиглахгүй — тэдгээр нь өвөрмөц байх ёстой.
+	UpdateUser(ctx context.Context, id string, fn func(*User) error) (*User, error)
 	// Үзэлтийн тоолуурууд (нэгтгэж, багцаар нэмэгдүүлнэ).
 	IncViews(ctx context.Context, profile map[string]int64, course map[string]int64) error
 	// Мэдэгдэл

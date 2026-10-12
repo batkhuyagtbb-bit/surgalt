@@ -3740,3 +3740,53 @@ input.ml-ok{border-color:#1d8a52;box-shadow:0 0 0 3px rgba(29,138,82,.15)}
   .cg-act{flex-direction:column-reverse}
   .cg-act .btn{width:100%}
 }
+
+/* ===== Нас ба эцэг эх, асран хамгаалагчийн зөвшөөрөл ===== */
+/* насны сонголт (бүртгэл, зөвшөөрлийн цонх) ба хамаарлын сонголт: товчлуур маягийн радио */
+.age-pick,.gd-rel{display:grid;gap:8px;margin:0;padding:0;border:0}
+.age-pick{grid-template-columns:repeat(2,minmax(0,1fr))}
+.gd-rel{grid-template-columns:repeat(3,minmax(0,1fr))}
+.age-pick legend,.gd-rel legend{margin:0;padding:0 0 6px;font-size:.9rem;font-weight:700;color:var(--text-2)}
+.age-pick label,.gd-rel label{display:block;position:relative;cursor:pointer}
+.age-pick input,.gd-rel input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.age-pick span,.gd-rel span{display:grid;place-items:center;min-height:44px;padding:8px 10px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface);font-weight:700;font-size:.9rem;color:var(--text-2);text-align:center;line-height:1.25;transition:background .2s,border-color .2s,color .2s}
+.age-pick label:hover span,.gd-rel label:hover span{border-color:var(--brand-tint);background:var(--surface-2)}
+.age-pick input:checked+span,.gd-rel input:checked+span{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.age-pick input:focus-visible+span,.gd-rel input:focus-visible+span{outline:3px solid var(--brand-glow);outline-offset:2px}
+.cg .age-pick{margin:0 0 12px}
+/* багшийн захиалгын жагсаалт: 18 хүрээгүй суралцагч */
+.ab-minor{display:inline-block;justify-self:start;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:2px 0 0;padding:1px 8px;border-radius:999px;background:var(--amber-soft);color:var(--amber);font-size:.72rem;font-weight:700;font-style:normal}
+.ab-minor.ok{background:var(--brand-soft);color:var(--brand)}
+/* 18 хүрээгүй суралцагчийн нүүр: зөвшөөрлийн холбоос */
+.gb{display:flex;gap:14px;align-items:flex-start;margin:16px 0 0;padding:18px 20px;border:1px solid #f3d28a;border-radius:var(--radius-lg);background:var(--accent-soft)}
+.gb-ico{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:12px;background:#fff;color:var(--accent-ink)}
+.gb-body{display:grid;gap:6px;min-width:0;flex:1}
+.gb-body>b{color:var(--text);font-size:1rem}
+.gb-body p{margin:0;color:var(--text-2);font-size:.9rem;line-height:1.5}
+.gb-link{display:flex;gap:8px;margin-top:4px}
+.gb-link input{flex:1;min-width:0;padding:8px 12px;font-size:.85rem;background:#fff}
+@media (max-width:560px){ .gb{flex-direction:column;padding:16px} .gb-link{flex-wrap:wrap} .gb-link input{flex-basis:100%} }
+/* эцэг эх, асран хамгаалагчийн зөвшөөрлийн хуудас */
+.gd{position:relative;z-index:2;display:grid;place-items:center;min-height:100svh;padding:92px 16px 48px;background:linear-gradient(180deg,#fff,var(--ink))}
+.gd-card{width:min(580px,100%);padding:clamp(22px,4vw,34px);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--surface);box-shadow:var(--shadow-lg)}
+.gd-ico{display:grid;place-items:center;width:54px;height:54px;margin-bottom:14px;border-radius:16px;background:var(--brand-soft);color:var(--brand)}
+.gd-eyebrow{margin:0 0 6px;font-size:.74rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink)}
+.gd h1{margin:0 0 10px;font-size:clamp(1.3rem,3.4vw,1.6rem);font-weight:800;line-height:1.25;letter-spacing:-.01em;color:var(--text)}
+.gd h1 b{color:var(--brand)}
+.gd-lede{margin:0 0 14px;color:var(--text-2);line-height:1.6}
+.gd-pts{display:grid;gap:8px;margin:0 0 12px;padding:14px 16px 14px 34px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
+.gd-pts li{color:var(--text-2);font-size:.92rem;line-height:1.5}
+.gd-pts li::marker{color:var(--accent)}
+.gd-pts b{color:var(--text)}
+.gd-links{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0 0 18px}
+.gd-links a,.gd-contact a{color:var(--brand);font-weight:700;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--brand-tint)}
+.gd-form{padding-top:18px;border-top:1px solid var(--line)}
+.gd-note{display:block;color:var(--muted);font-size:.8rem;line-height:1.45;text-align:center}
+.gd-ok{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border:1px solid #cde7d9;border-radius:14px;background:var(--teal-soft)}
+.gd-ok p{margin:0;color:var(--text-2)}
+.gd-ok b{color:var(--teal)}
+.gd-contact{margin:16px 0 0;font-size:.85rem;color:var(--muted);text-align:center}
+@media (max-width:420px){ .gd-rel{grid-template-columns:minmax(0,1fr)} }
+.ap-guard{display:flex;gap:10px;align-items:flex-start;margin:0;padding:12px 14px;border:1px solid #f3d28a;border-radius:12px;background:var(--accent-soft);color:var(--text-2);font-size:.9rem;line-height:1.5}
+.ap-guard svg{flex:none;margin-top:1px;color:var(--accent-ink)}
+.ap-guard a{color:var(--brand);font-weight:700;text-decoration:underline;text-underline-offset:2px}

@@ -36,6 +36,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		Role        string `json:"role"`
 		DisplayName string `json:"display_name"`
 		AcceptTerms bool   `json:"accept_terms"` // нөхцөл, нууцлалын бодлогыг зөвшөөрсөн (заавал)
+		AgeGroup    string `json:"age_group"`    // суралцагч: adult | minor (заавал)
 	}
 	if !decode(w, r, &in) {
 		return
@@ -56,6 +57,9 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	case !in.AcceptTerms:
 		writeErr(w, http.StatusBadRequest, "үйлчилгээний нөхцөл, нууцлалын бодлогыг зөвшөөрнө үү")
+		return
+	case in.Role != string(store.RoleTeacher) && !validAge(in.AgeGroup):
+		writeErr(w, http.StatusBadRequest, "насаа сонгоно уу")
 		return
 	}
 	role := store.RoleStudent
@@ -96,6 +100,9 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		}
 		u = &store.User{Username: uname, Email: in.Email, PasswordHash: hash, Role: role, DisplayName: in.DisplayName}
 		consentNow(u)
+		if role == store.RoleStudent {
+			u.AgeGroup = in.AgeGroup
+		}
 		err := s.store.CreateUser(r.Context(), u)
 		if err == nil {
 			break
@@ -115,7 +122,7 @@ func (s *Server) issue(w http.ResponseWriter, status int, u *store.User) {
 		writeErr(w, http.StatusInternalServerError, "токен үүсгэж чадсангүй")
 		return
 	}
-	writeJSON(w, status, authResp{Token: tok, User: me(u)})
+	writeJSON(w, status, authResp{Token: tok, User: s.me(u)})
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -184,7 +191,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, me(u))
+	writeJSON(w, http.StatusOK, s.me(u))
 }
 
 func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
@@ -257,7 +264,7 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, me(u))
+	writeJSON(w, http.StatusOK, s.me(u))
 }
 
 // handleUpdateUsername: багш профайлын холбоосоо (/t/<нэр>) солино.

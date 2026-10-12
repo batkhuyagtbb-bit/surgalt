@@ -246,7 +246,7 @@ type HomeTeacherPanel struct {
 }
 
 type Home struct {
-	User     *store.User       `json:"user"`
+	User     meView            `json:"user"`
 	Courses  []HomeCourse      `json:"courses"`
 	Lessons  []HomeLesson      `json:"lessons"`
 	Pending  []HomeOrder       `json:"pending"`
@@ -302,7 +302,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	convs = append(append(convs, dms...), teams...)
 	sort.SliceStable(convs, func(i, j int) bool { return convs[i].LastMessageAt.After(convs[j].LastMessageAt) })
 
-	out := Home{User: u, Courses: []HomeCourse{}, Lessons: []HomeLesson{}, Pending: []HomeOrder{},
+	out := Home{User: s.me(u), Courses: []HomeCourse{}, Lessons: []HomeLesson{}, Pending: []HomeOrder{},
 		Meetings: []HomeMeeting{}, Teachers: []TeacherBrief{}, Chats: []HomeChat{}}
 
 	// Сургалтууд: элссэн + дангаар хичээл авсан (нийтлэгдсэн нь л).

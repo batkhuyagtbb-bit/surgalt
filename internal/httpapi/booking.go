@@ -336,7 +336,9 @@ func (s *Server) handleMyBookings(w http.ResponseWriter, r *http.Request) {
 	}
 	type booking struct {
 		store.Slot
-		Held bool `json:"held,omitempty"` // төлбөр хүлээгдэж буй
+		Held         bool `json:"held,omitempty"`          // төлбөр хүлээгдэж буй
+		StudentMinor bool `json:"student_minor,omitempty"` // 18 хүрээгүй суралцагч
+		GuardianOK   bool `json:"guardian_ok,omitempty"`   // эцэг эх, асран хамгаалагч нь зөвшөөрсөн
 	}
 	out := []booking{}
 	for i := range ss {
@@ -345,6 +347,25 @@ func (s *Server) handleMyBookings(w http.ResponseWriter, r *http.Request) {
 		}
 		if held := ss[i].StudentID == "" && !ss[i].Free(now); ss[i].StudentID != "" || held {
 			out = append(out, booking{Slot: ss[i], Held: held})
+		}
+	}
+	ids := []string{}
+	for _, b := range out {
+		if b.StudentID != "" {
+			ids = append(ids, b.StudentID)
+		}
+	}
+	if us, err := s.store.UsersByIDs(r.Context(), ids); err == nil {
+		minors := map[string]*store.User{}
+		for i := range us {
+			if us[i].AgeGroup == store.AgeMinor {
+				minors[us[i].ID] = &us[i]
+			}
+		}
+		for i := range out {
+			if u := minors[out[i].StudentID]; u != nil {
+				out[i].StudentMinor, out[i].GuardianOK = true, u.Guardian.At != nil
+			}
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -489,6 +510,16 @@ func (s *Server) handleBookSlot(w http.ResponseWriter, r *http.Request) {
 	case sl.StartsAt.Before(now.Add(slotLead)):
 		writeErr(w, http.StatusGone, "энэ цаг өнгөрсөн байна")
 		return
+	}
+	if sl.Mode == store.SlotOffline { // 18 хүрээгүй суралцагч биечлэн уулзахад эцэг эхийн зөвшөөрөл хэрэгтэй
+		u, err := s.store.UserByID(ctx, c.UID)
+		if s.storeErr(w, r, err) {
+			return
+		}
+		if msg := offlineBlocked(u); msg != "" {
+			writeErr(w, http.StatusForbidden, msg)
+			return
+		}
 	}
 	name := s.displayName(ctx, c.UID, c.Name)
 	fresh := false
