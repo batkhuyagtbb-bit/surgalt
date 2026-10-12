@@ -71,7 +71,10 @@ func (s *Server) principal(r *http.Request) (auth.Claims, bool) {
 		return auth.Claims{}, false
 	}
 	c, err := s.tokens.Verify(tok)
-	return c, err == nil
+	if err != nil || (!c.IsGuest() && !s.liveUser(r.Context(), c.UID)) { // бүртгэлээ устгасан бол хуучин токен хүчингүй
+		return auth.Claims{}, false
+	}
+	return c, true
 }
 
 // requireUser нь зөвхөн бүртгэлтэй хэрэглэгч (зочин биш).

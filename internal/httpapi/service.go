@@ -251,6 +251,9 @@ func (s *Server) VerifyToken(tok string) (uid, role, name string, err error) {
 	if c.IsGuest() {
 		return "", c.Role, c.Name, nil
 	}
+	if !s.liveUser(context.Background(), c.UID) {
+		return "", "", "", store.ErrNotFound
+	}
 	return c.UID, c.Role, c.Name, nil
 }
 

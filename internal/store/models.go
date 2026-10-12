@@ -593,6 +593,8 @@ type Store interface {
 	// Чатын хориг: side нь хориглосон тал (SenderTeacher | SenderVisitor).
 	SetConversationBlock(ctx context.Context, convID, side string, on bool) error
 	ConversationBlocks(ctx context.Context, convID string) (map[string]bool, error)
+	// DeleteUserData — бүртгэлээ устгасан хэрэглэгчийн хувийн мэдээллийг устгаж, мөрийг нэргүй болгоно (erase.go).
+	DeleteUserData(ctx context.Context, userID string) error
 	// UpdateUser — хэрэглэгчийн мөрийг түгжиж уншаад fn-ээр өөрчилж хадгална (зөвшөөрөл, нас, асран хамгаалагч г.м.).
 	// Имэйл, нэр (username) солиход ашиглахгүй — тэдгээр нь өвөрмөц байх ёстой.
 	UpdateUser(ctx context.Context, id string, fn func(*User) error) (*User, error)

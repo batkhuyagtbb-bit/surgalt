@@ -91,6 +91,15 @@ func (s *Store) teacherDir(teacherID string) (string, error) {
 	return filepath.Join(s.root, "teachers", teacherID), nil
 }
 
+// DeleteOwner нь бүртгэлээ устгасан хэрэглэгчийн бүх файлыг (хавтсыг нь бүхэлд) устгана.
+func (s *Store) DeleteOwner(ownerID string) error {
+	dir, err := s.teacherDir(ownerID)
+	if err != nil {
+		return err
+	}
+	return os.RemoveAll(dir)
+}
+
 // EnsureTeacherDir нь багшийн public/private хавтсыг үүсгэнэ (давтан дуудахад аюулгүй).
 func (s *Store) EnsureTeacherDir(teacherID string) error {
 	dir, err := s.teacherDir(teacherID)

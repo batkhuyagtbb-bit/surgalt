@@ -3022,7 +3022,7 @@ async function homePage() {
 
   dash.innerHTML = parts.join("") + (tp ? "" : `<div class="modal" id="stuModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
       <h3 class="h3">Профайл засах</h3><form class="form" id="stuForm"><label>Нэр<input name="display_name" required maxlength="80" value="${esc(u.display_name)}"></label>
-      <p class="muted small" style="margin:0">Имэйл: ${esc(u.email || "")}</p><p class="form-error" role="alert"></p>
+      <p class="muted small" style="margin:0">Имэйл: ${esc(u.email || "")} · <a class="link" href="/privacy#my-data">Өгөгдлөө татах, бүртгэлээ устгах →</a></p><p class="form-error" role="alert"></p>
       <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`);
   $("[data-student-settings]")?.addEventListener("click", () => openModal($("#stuModal")));
   $("#stuForm")?.addEventListener("submit", async (e) => {
@@ -3917,8 +3917,62 @@ function adminPage() {
   load();
 }
 
+// Бүртгэлээ устгах: юу устахыг тайлбарлаж «УСТГАХ» гэж бичүүлнэ (буцаах боломжгүй).
+function deleteAccountDialog() {
+  if ($(".rp")) return;
+  const el = document.createElement("div");
+  el.className = "rp"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "daT");
+  el.innerHTML = `<form class="rp-card">
+    <h3 id="daT">Бүртгэлээ устгах уу?</h3>
+    <ul class="da-list">
+      <li>Нэр, имэйл, профайл, суралцсан явц, дүн, хичээлийн хяналтын бүртгэл, мэдэгдэл бүрмөсөн устна.</li>
+      <li>Чатын мессежүүд тань «устгагдсан» болж, нэр тань арилна.</li>
+      <li>Удахгүй болох цагийн захиалга цуцлагдаж, багшид мэдэгдэнэ.</li>
+      <li>Худалдан авсан сургалт, номдоо дахин хандах боломжгүй. Төлбөрийн баримт хуулийн дагуу нэргүйгээр хадгалагдана.</li>
+    </ul>
+    <p class="rp-note">Устгахаас өмнө өгөгдлөө татаж авахыг зөвлөж байна. Энэ үйлдлийг буцаах боломжгүй.</p>
+    <label>Баталгаажуулахын тулд «УСТГАХ» гэж бичнэ үү<input name="confirm" autocomplete="off" spellcheck="false"></label>
+    <div class="rp-act"><button type="button" class="btn btn-ghost" data-rp-x>Болих</button><button class="btn btn-danger" disabled>Бүртгэлээ устгах</button></div>
+  </form>`;
+  document.body.append(el);
+  const f = $("form", el), go = $(".btn-danger", f), onKey = (e) => { if (e.key === "Escape") close(); };
+  const close = () => { el.remove(); document.removeEventListener("keydown", onKey); };
+  document.addEventListener("keydown", onKey);
+  el.addEventListener("click", (e) => { if (e.target === el || e.target.closest("[data-rp-x]")) close(); });
+  f.confirm.addEventListener("input", () => (go.disabled = f.confirm.value.trim().toUpperCase() !== "УСТГАХ"));
+  f.confirm.focus();
+  f.onsubmit = async (e) => {
+    e.preventDefault(); if (go.disabled) return;
+    go.disabled = true;
+    try { await api("/api/me/delete", { method: "POST", body: { confirm: f.confirm.value } }); Auth.clear(); location.href = "/?deleted=1"; }
+    catch (x) { toast(x.message, true); go.disabled = false; }
+  };
+}
+
 // Нууцлал, нөхцөлийн хуудас: уншиж буй хэсгийг агуулгын жагсаалтад тодруулна.
 function legalPage() {
+  // «Таны өгөгдөл»: нэвтэрсэн бол өгөгдлөө татах, бүртгэлээ устгах.
+  const mine = $("#my-data");
+  if (mine && Auth.token) {
+    mine.hidden = false;
+    mine.innerHTML = `<b>Таны өгөгдөл</b><p>Нэвтэрсэн бүртгэл: ${esc(Auth.user?.email || Auth.user?.display_name || "")}</p>
+      <div class="pv-mine-act"><button type="button" class="btn btn-gold btn-sm" data-export>⬇ Өгөгдлөө татах (JSON)</button><button type="button" class="btn btn-danger btn-sm" data-delete-account>Бүртгэлээ устгах</button></div>`;
+    mine.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-delete-account]")) { deleteAccountDialog(); return; }
+      const b = e.target.closest("[data-export]"); if (!b) return;
+      b.disabled = true;
+      try {
+        const res = await api("/api/me/export", { raw: true });
+        if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Татаж чадсангүй");
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(await res.blob());
+        a.download = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "")?.[1] || "surgalt.json";
+        document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        toast("Өгөгдөл тань татагдлаа ✓");
+      } catch (x) { toast(x.message, true); }
+      b.disabled = false;
+    });
+  }
   const links = $$(".pv-toc a"), byId = new Map(links.map((a) => [a.hash.slice(1), a]));
   if (!links.length || !("IntersectionObserver" in window)) return;
   const io = new IntersectionObserver((es) => es.forEach((e) => {
@@ -4083,6 +4137,10 @@ if (page === "home") findCourses();
 }
 if (page === "book") bookPage();
 if (page === "legal") legalPage();
+if (new URLSearchParams(location.search).has("deleted")) { // бүртгэлээ устгасны дараа
+  toast("Бүртгэл тань устгагдлаа. surgalt.mn-ийг ашигласанд баярлалаа.");
+  history.replaceState(null, "", location.pathname + location.hash);
+}
 if (page === "guardian") guardianPage();
 if (page === "admin") adminPage();
 })();

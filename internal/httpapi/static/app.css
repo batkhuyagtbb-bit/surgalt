@@ -3836,3 +3836,15 @@ input.ml-ok{border-color:#1d8a52;box-shadow:0 0 0 3px rgba(29,138,82,.15)}
 .ad-act .check{font-weight:600;font-size:.88rem}
 .ad-done{margin:0;color:var(--teal);font-weight:600;font-size:.9rem}
 @media (max-width:560px){ .ad-ctx li{grid-template-columns:minmax(0,1fr)} .ad-ctx li time{justify-self:start} }
+
+/* ===== Өгөгдлөө татах, бүртгэлээ устгах ===== */
+.pv-mine{display:grid;gap:6px;margin-top:14px;padding:16px 18px;border:1px solid var(--brand-tint);border-radius:14px;background:var(--brand-soft)}
+.pv-mine>b{color:var(--brand)}
+.pv-mine p{margin:0!important;font-size:.9rem}
+.pv-mine-act{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.pv-doc .pv-mine-act .btn{text-decoration:none}
+.da-list{display:grid;gap:6px;margin:0;padding-left:20px;color:var(--text-2);font-size:.9rem;line-height:1.5}
+.da-list li::marker{color:var(--coral)}
+.em-data{margin:12px 0 0;text-align:right;font-size:.85rem}
+.em-data a{color:var(--muted);text-decoration:underline;text-underline-offset:2px}
+.em-data a:hover{color:var(--brand)}

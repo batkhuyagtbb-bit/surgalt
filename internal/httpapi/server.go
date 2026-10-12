@@ -52,6 +52,7 @@ type Server struct {
 	profiles *cache.Cache[*Rendered[PublicProfile]]
 	courses  *cache.Cache[*Rendered[PublicCourse]]
 	qrs      *cache.Cache[[]byte]
+	alive    *cache.Cache[bool] // токены эзэн бүртгэлээ устгаагүй эсэх (account.go)
 	notif    *notifier
 	search   *searchIndex
 
@@ -81,6 +82,7 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 		profiles: cache.New[*Rendered[PublicProfile]](30*time.Second, 5*time.Second, isNF),
 		courses:  cache.New[*Rendered[PublicCourse]](30*time.Second, 5*time.Second, isNF),
 		qrs:      cache.New[[]byte](time.Hour, 5*time.Second, isNF),
+		alive:    cache.New[bool](5*time.Minute, 5*time.Minute, isNF),
 	}
 	s.notif = newNotifier()
 	s.search = &searchIndex{}
@@ -93,6 +95,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.profiles.Janitor(ctx, time.Minute)
 	go s.courses.Janitor(ctx, time.Minute)
 	go s.qrs.Janitor(ctx, 10*time.Minute)
+	go s.alive.Janitor(ctx, 10*time.Minute)
 	go s.limiter.Janitor(ctx)
 	go s.authLim.Janitor(ctx)
 	go s.chatLim.Janitor(ctx)
@@ -121,6 +124,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/profile/insights", s.handleProfileInsights)
 	mux.HandleFunc("PUT /api/me/profile", s.handleUpdateProfile)
 	mux.HandleFunc("POST /api/me/consent", s.handleConsent)
+	mux.HandleFunc("GET /api/me/export", s.handleExport)
+	mux.HandleFunc("POST /api/me/delete", s.handleDeleteAccount)
 	mux.HandleFunc("GET /guardian/{token}", s.pageGuardian)
 	mux.HandleFunc("POST /api/guardian/{token}", s.handleGuardianConsent)
 	mux.HandleFunc("DELETE /api/guardian/{token}", s.handleGuardianRevoke)
