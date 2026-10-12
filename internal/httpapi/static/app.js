@@ -397,7 +397,49 @@ function authNav() {
   document.documentElement.classList.toggle("authed", !!u);
   $$("[data-auth-hide]").forEach((el) => (el.hidden = !!u));
   $$("[data-logout]").forEach((b) => b.addEventListener("click", () => { Auth.clear(); location.href = "/"; }));
-  if (u && Auth.token) bell();
+  if (u && Auth.token) { bell(); consentGate(); }
+}
+
+// Нөхцөл, нууцлалын бодлогын одоогийн хувилбарыг зөвшөөрөөгүй бол (Google г.м.-ээр шинээр орсон, эсвэл бодлого шинэчлэгдсэн)
+// зөвшөөрөх хүртэл сайтыг хааж асууна. Хуудсуудыг өөрсдийг нь уншихад саад болохгүйн тулд тэнд асуухгүй.
+async function consentGate() {
+  const ver = $('meta[name="terms-version"]')?.content;
+  if (!ver || page === "legal" || Auth.user?.consent_version === ver) return;
+  let u; try { u = await api("/api/me"); } catch { return; }
+  Auth.set(Auth.token, u);
+  if (!u.consent_needed || $(".cg")) return;
+  const teacher = u.role === "teacher", again = !!u.consent_version;
+  const pts = teacher
+    ? ["Оруулсан агуулгынхаа зохиогчийн эрхийг та хариуцна.", "Суралцагчдын мэдээллийг зөвхөн сургалт явуулахад ашиглана.", "Профайлаа үзсэн, дугаараа нээсэн хүний нэр танд харагдана."]
+    : ["Хичээл, шалгалтын үеэр идэвх тань тэмдэглэгдэнэ — камер, микрофон ашиглахгүй.", "Багш зөвхөн өөрийн сургалтын суралцагчдын ахиц, дүнг харна.", "Таны мэдээллийг худалдахгүй, зар сурталчилгаанд ашиглахгүй."];
+  const el = document.createElement("div");
+  el.className = "cg"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "cgT");
+  el.innerHTML = `<div class="cg-card">
+    <span class="cg-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.3 7.5 9.5 4.3-1.2 7.5-4.9 7.5-9.5V6L12 3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+    <h3 id="cgT">${again ? "Нөхцөл шинэчлэгдлээ" : "Нөхцөл ба нууцлал"}</h3>
+    <p>${again ? "Үйлчилгээний нөхцөл, нууцлалын бодлого шинэчлэгдсэн тул" : "surgalt.mn-ийг ашиглахын тулд"} доорх баримтуудыг уншиж, зөвшөөрнө үү.</p>
+    <ul>${pts.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+    <p class="cg-links"><a href="/terms" target="_blank" rel="noopener">Үйлчилгээний нөхцөл ↗</a><a href="/privacy" target="_blank" rel="noopener">Нууцлалын бодлого ↗</a></p>
+    <p class="cg-err" role="alert"></p>
+    <div class="cg-act"><button type="button" class="btn btn-ghost" data-cg-out>Гарах</button><button type="button" class="btn btn-gold" data-cg-ok>Зөвшөөрч байна</button></div>
+  </div>`;
+  const behind = [...document.body.children];
+  behind.forEach((c) => (c.inert = true));
+  document.body.append(el); document.documentElement.classList.add("cg-open");
+  const ok = $("[data-cg-ok]", el); ok.focus();
+  $("[data-cg-out]", el).onclick = () => { Auth.clear(); location.href = "/"; };
+  ok.onclick = async () => {
+    ok.disabled = true;
+    try {
+      Auth.set(Auth.token, await api("/api/me/consent", { method: "POST", body: { version: ver } }));
+      behind.forEach((c) => (c.inert = false));
+      el.remove(); document.documentElement.classList.remove("cg-open");
+      toast("Баярлалаа! Зөвшөөрлийг тань хадгаллаа.");
+    } catch (x) {
+      if (x.status === 409) return location.reload(); // хуудас хуучирсан — шинэ хувилбарыг ачаална
+      $(".cg-err", el).textContent = x.message; ok.disabled = false;
+    }
+  };
 }
 
 function bell() {
@@ -867,8 +909,12 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
   const card = $(".modal-card", modal);
   const badge = document.createElement("div");
   badge.className = "watch-badge";
-  const paint = () => { badge.innerHTML = `👁 Анхаарлын горим · өөр таб руу шилжвэл сануулга <b>${warns}/${WATCH_MAX_WARN}</b>`; badge.classList.toggle("warned", warns > 0); };
-  paint(); card.prepend(badge);
+  // «Юуг тэмдэглэдэг вэ?» — шинэ таб нээвэл таб сольсонд тооцогдох тул тайлбарыг хичээлийн цонхон дотор харуулна.
+  const why = document.createElement("div"); why.className = "wb-info"; why.id = "wbInfo"; why.hidden = true;
+  why.innerHTML = `<b>Хичээлийн цонх нээлттэй үед л</b> таб, цонх сольсон, курсор цонхноос гарсан, 2 минутаас удаан хөдөлгөөнгүй байсан, хуулах гэсэн үйлдлийг тэмдэглэнэ. Камер, микрофон ашиглахгүй, дэлгэц бичихгүй. Тэмдэглэлийг тухайн сургалтын багш харж, 180 хоногийн дараа устна.`;
+  const paint = () => { badge.innerHTML = `👁 Анхаарлын горим · <span class="wb-long">өөр таб руу шилжвэл </span>сануулга <b>${warns}/${WATCH_MAX_WARN}</b><button type="button" class="wb-why" aria-controls="wbInfo" aria-expanded="${!why.hidden}">Юуг тэмдэглэдэг вэ?</button>`; badge.classList.toggle("warned", warns > 0); };
+  badge.addEventListener("click", (e) => { const b = e.target.closest(".wb-why"); if (!b) return; why.hidden = !why.hidden; b.setAttribute("aria-expanded", String(!why.hidden)); });
+  paint(); card.prepend(badge); badge.after(why);
   const wm = document.createElement("div"); wm.className = "wm"; wm.setAttribute("aria-hidden", "true");
   const playing = () => $$("video, audio", modal).some((v) => !v.paused && !v.ended) || !!modal._ytPlaying;
   const tick = () => {
@@ -3717,12 +3763,24 @@ function loginPage() {
     return ok;
   };
   rf.password.addEventListener("input", checkMatch); rf.password2.addEventListener("input", checkMatch);
+  rf.accept.addEventListener("invalid", () => rf.accept.setCustomValidity("Үргэлжлүүлэхийн тулд нөхцөл, нууцлалын бодлогыг зөвшөөрнө үү"));
+  rf.accept.addEventListener("change", () => rf.accept.setCustomValidity(""));
   rf.addEventListener("submit", async (e) => {
     e.preventDefault(); err.textContent = "";
     if (!checkMatch()) { err.textContent = "Нууц үг таарахгүй байна"; rf.password2.focus(); return; }
-    const body = { email: rf.email.value, password: rf.password.value, role: teacher.checked ? "teacher" : "student" };
+    const body = { email: rf.email.value, password: rf.password.value, role: teacher.checked ? "teacher" : "student", accept_terms: rf.accept.checked };
     try { done(await api("/api/auth/register", { method: "POST", body, token: null })); } catch (x) { err.textContent = x.message; }
   });
+}
+
+// Нууцлал, нөхцөлийн хуудас: уншиж буй хэсгийг агуулгын жагсаалтад тодруулна.
+function legalPage() {
+  const links = $$(".pv-toc a"), byId = new Map(links.map((a) => [a.hash.slice(1), a]));
+  if (!links.length || !("IntersectionObserver" in window)) return;
+  const io = new IntersectionObserver((es) => es.forEach((e) => {
+    if (e.isIntersecting) links.forEach((a) => a.classList.toggle("on", a === byId.get(e.target.id)));
+  }), { rootMargin: "-25% 0px -65% 0px" });
+  $$(".pv-doc > section[id]").forEach((s) => io.observe(s));
 }
 
 /* ---------- эхлүүлэх ---------- */
@@ -3880,4 +3938,5 @@ if (page === "home") findCourses();
   }
 }
 if (page === "book") bookPage();
+if (page === "legal") legalPage();
 })();

@@ -165,6 +165,21 @@ var chMigrations = []string{
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS phone String DEFAULT ''",
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS slot_id String DEFAULT ''",
 	"ALTER TABLE slots ADD COLUMN IF NOT EXISTS series_id String DEFAULT ''",
+	"ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version String DEFAULT ''",
+	"ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_at Nullable(" + tsType + ")",
+}
+
+// chTTLs — хувийн мэдээллийг хадгалах хугацаа (нууцлалын бодлогод заасан). Хүснэгтэд TTL байхгүй үед л нэг удаа тавина
+// (давтан MODIFY TTL хийвэл өгөгдлийг дахин шалгах ачаалалтай тул).
+var chTTLs = []struct{ table, ttl string }{
+	{"activity_events", "toDateTime(at) + INTERVAL 180 DAY"}, // хичээлийн хяналтын үйл явдал (таб солих г.м.)
+	{"page_visits", "toDateTime(at) + INTERVAL 365 DAY"},     // профайл, сургалтын үзэлт
+	{"quiz_logs", "toDateTime(at) + INTERVAL 365 DAY"},       // асуулт бүрийн оролдлого
+}
+
+// chColTTLs — мөрийг (суралцсан цагийг) үлдээж, зөвхөн хувийн баганыг хугацааны дараа хоосолно.
+var chColTTLs = []struct{ table, col, typ, ttl string }{
+	{"study_sessions", "ip", "String", "toDateTime(started_at) + INTERVAL 180 DAY"}, // хичээл үзсэн IP хаяг
 }
 
 var chTables = []chTable{
@@ -173,7 +188,8 @@ var chTables = []chTable{
 		display_name String, headline String, bio String, avatar_url String, cover_url String,
 		subjects Array(String), location String, links Map(String, String),
 		created_at ` + tsType + `, storage_extra_bytes Int64, storage_expires_at Nullable(` + tsType + `),
-		google_token String, phone String DEFAULT '', ver UInt64, deleted Bool DEFAULT false,
+		google_token String, phone String DEFAULT '', consent_version String DEFAULT '', consent_at Nullable(` + tsType + `),
+		ver UInt64, deleted Bool DEFAULT false,
 		INDEX ix_email email TYPE bloom_filter GRANULARITY 1,
 		INDEX ix_username username TYPE bloom_filter GRANULARITY 1
 	) ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
@@ -317,6 +333,30 @@ func (c *ClickHouse) ensureSchema(ctx context.Context) error {
 			return fmt.Errorf("clickhouse migrate: %w", err)
 		}
 	}
+	for _, t := range chTTLs {
+		var ddl string
+		if err := c.conn.QueryRow(ctx, "SELECT create_table_query FROM system.tables WHERE database = currentDatabase() AND name = ?", t.table).Scan(&ddl); err != nil {
+			return fmt.Errorf("clickhouse ttl %s: %w", t.table, err)
+		}
+		if strings.Contains(ddl, " TTL ") {
+			continue
+		}
+		if err := c.conn.Exec(ctx, "ALTER TABLE "+t.table+" MODIFY TTL "+t.ttl); err != nil {
+			return fmt.Errorf("clickhouse ttl %s: %w", t.table, err)
+		}
+	}
+	for _, t := range chColTTLs {
+		var ddl string
+		if err := c.conn.QueryRow(ctx, "SELECT create_table_query FROM system.tables WHERE database = currentDatabase() AND name = ?", t.table).Scan(&ddl); err != nil {
+			return fmt.Errorf("clickhouse ttl %s.%s: %w", t.table, t.col, err)
+		}
+		if strings.Contains(ddl, "`"+t.col+"` "+t.typ+" TTL ") {
+			continue
+		}
+		if err := c.conn.Exec(ctx, "ALTER TABLE "+t.table+" MODIFY COLUMN "+t.col+" "+t.typ+" TTL "+t.ttl); err != nil {
+			return fmt.Errorf("clickhouse ttl %s.%s: %w", t.table, t.col, err)
+		}
+	}
 	return nil
 }
 
@@ -425,7 +465,7 @@ func (c *ClickHouse) counters(ctx context.Context, entity string, ids []string) 
 // ---- хэрэглэгч ----
 
 const userCols = `id, username, email, password_hash, role, display_name, headline, bio, avatar_url, cover_url,
-	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, deleted`
+	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, consent_version, consent_at, deleted`
 
 func scanUser(r driver.Rows) (*User, bool, error) {
 	var u User
@@ -434,7 +474,7 @@ func scanUser(r driver.Rows) (*User, bool, error) {
 	var exp *time.Time
 	if err := r.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &role, &u.DisplayName, &u.Headline, &u.Bio,
 		&u.AvatarURL, &u.CoverURL, &u.Subjects, &u.Location, &u.Links, &u.CreatedAt, &u.StorageExtraBytes, &exp,
-		&u.GoogleToken, &u.Phone, &deleted); err != nil {
+		&u.GoogleToken, &u.Phone, &u.ConsentVersion, &u.ConsentAt, &deleted); err != nil {
 		return nil, false, err
 	}
 	u.Role = Role(role)
@@ -452,10 +492,10 @@ func scanUser(r driver.Rows) (*User, bool, error) {
 func (c *ClickHouse) writeUser(ctx context.Context, u *User, deleted bool) error {
 	return c.insert(ctx, "users", []string{"id", "username", "email", "password_hash", "role", "display_name", "headline", "bio",
 		"avatar_url", "cover_url", "subjects", "location", "links", "created_at", "storage_extra_bytes", "storage_expires_at",
-		"google_token", "phone", "ver", "deleted"},
+		"google_token", "phone", "consent_version", "consent_at", "ver", "deleted"},
 		u.ID, u.Username, u.Email, u.PasswordHash, string(u.Role), u.DisplayName, u.Headline, u.Bio,
 		u.AvatarURL, u.CoverURL, nzStrings(u.Subjects), u.Location, nzLinks(u.Links), u.CreatedAt.UTC(), u.StorageExtraBytes,
-		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, ver(), deleted)
+		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, u.ConsentVersion, nullTime(u.ConsentAt), ver(), deleted)
 }
 
 func (c *ClickHouse) userWhere(ctx context.Context, where string, args ...any) (*User, error) {
@@ -596,6 +636,21 @@ func (c *ClickHouse) TeacherStudentCount(ctx context.Context, teacherID string) 
 	return c.count(ctx, `SELECT uniqExact(user_id) FROM (
 		SELECT user_id FROM enrollments FINAL WHERE teacher_id = ?
 		UNION ALL SELECT user_id FROM lesson_access FINAL WHERE teacher_id = ?)`, teacherID, teacherID)
+}
+
+func (c *ClickHouse) SetConsent(ctx context.Context, userID, version string) error {
+	unlock, err := c.lock(ctx, "user:"+userID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	u, err := c.UserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	u.ConsentVersion, u.ConsentAt = version, &now
+	return c.writeUser(ctx, u, false)
 }
 
 func (c *ClickHouse) SetGoogleToken(ctx context.Context, userID, encrypted string) error {

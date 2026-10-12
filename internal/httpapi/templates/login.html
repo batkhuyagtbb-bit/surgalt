@@ -21,9 +21,11 @@
         <small class="muted" id="pwHint">Дор хаяж 6 тэмдэгт</small></label>
       <label>Нууц үг давтах<span class="pw"><input type="password" name="password2" required minlength="6" maxlength="72" autocomplete="new-password" aria-describedby="pwMatch"><button type="button" class="pw-eye" data-pw-toggle aria-label="Нууц үг харуулах">{{icon "eye"}}</button></span>
         <small class="pw-match" id="pwMatch" aria-live="polite"></small></label>
+      <label class="consent"><input type="checkbox" name="accept" required><span><a href="/terms" target="_blank" rel="noopener">Үйлчилгээний нөхцөл</a>, <a href="/privacy" target="_blank" rel="noopener">нууцлалын бодлогыг</a> уншиж, зөвшөөрч байна</span></label>
       <button class="btn btn-gold btn-block">Бүртгүүлэх</button>
     </form>
     <p class="form-error" id="authError" role="alert"></p>
+    <p class="auth-legal"><a href="/terms">Үйлчилгээний нөхцөл</a> · <a href="/privacy">Нууцлалын бодлого</a></p>
   </div>
 </main>
 {{template "foot" (dict "Page" "login")}}

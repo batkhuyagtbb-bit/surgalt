@@ -20,8 +20,8 @@ var usernameRe = regexp.MustCompile(`^[a-z0-9_]{3,32}$`)
 const minPassword = 6
 
 type authResp struct {
-	Token string      `json:"token"`
-	User  *store.User `json:"user"`
+	Token string `json:"token"`
+	User  meView `json:"user"`
 }
 
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +35,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		Password    string `json:"password"`
 		Role        string `json:"role"`
 		DisplayName string `json:"display_name"`
+		AcceptTerms bool   `json:"accept_terms"` // нөхцөл, нууцлалын бодлогыг зөвшөөрсөн (заавал)
 	}
 	if !decode(w, r, &in) {
 		return
@@ -52,6 +53,9 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	case len(in.Password) < minPassword || len(in.Password) > 72:
 		writeErr(w, http.StatusBadRequest, "нууц үг 6-72 тэмдэгт")
+		return
+	case !in.AcceptTerms:
+		writeErr(w, http.StatusBadRequest, "үйлчилгээний нөхцөл, нууцлалын бодлогыг зөвшөөрнө үү")
 		return
 	}
 	role := store.RoleStudent
@@ -91,6 +95,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 			uname = base + "_" + randHex(2) // нэр давхардвал богино дагавар нэмнэ
 		}
 		u = &store.User{Username: uname, Email: in.Email, PasswordHash: hash, Role: role, DisplayName: in.DisplayName}
+		consentNow(u)
 		err := s.store.CreateUser(r.Context(), u)
 		if err == nil {
 			break
@@ -110,7 +115,7 @@ func (s *Server) issue(w http.ResponseWriter, status int, u *store.User) {
 		writeErr(w, http.StatusInternalServerError, "токен үүсгэж чадсангүй")
 		return
 	}
-	writeJSON(w, status, authResp{Token: tok, User: u})
+	writeJSON(w, status, authResp{Token: tok, User: me(u)})
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -179,13 +184,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, meView{u, u.Phone})
-}
-
-// meView: өөрийн мэдээлэл — нээлттэй JSON-д гардаггүй утасны дугаарыг эзэмшигчид л нэмж өгнө.
-type meView struct {
-	*store.User
-	Phone string `json:"phone"`
+	writeJSON(w, http.StatusOK, me(u))
 }
 
 func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
@@ -258,7 +257,7 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, meView{u, u.Phone})
+	writeJSON(w, http.StatusOK, me(u))
 }
 
 // handleUpdateUsername: багш профайлын холбоосоо (/t/<нэр>) солино.

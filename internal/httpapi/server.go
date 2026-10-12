@@ -33,6 +33,7 @@ type Config struct {
 	RateBurst     float64
 	StorageFreeMB int64         // багш бүрт үнэгүй багтаамж
 	StoragePlans  []StoragePlan // худалдаж авах багцууд
+	ContactEmail  string        // нууцлал, нөхцөлийн хуудсанд харагдах холбоо барих имэйл
 }
 
 type Server struct {
@@ -118,6 +119,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/home", s.handleHome)
 	mux.HandleFunc("GET /api/me/profile/insights", s.handleProfileInsights)
 	mux.HandleFunc("PUT /api/me/profile", s.handleUpdateProfile)
+	mux.HandleFunc("POST /api/me/consent", s.handleConsent)
 	mux.HandleFunc("PUT /api/me/username", s.handleUpdateUsername)
 	mux.HandleFunc("GET /api/me/courses", s.handleMyCourses)
 	mux.HandleFunc("GET /api/me/courses/{id}", s.handleMyCourse)
@@ -254,6 +256,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /c/{id}", s.pageCourse)
 	mux.HandleFunc("GET /b/{id}", s.pageBook)
 	mux.HandleFunc("GET /login", s.pageStatic("login"))
+	mux.HandleFunc("GET /privacy", s.pageStatic("privacy"))
+	mux.HandleFunc("GET /terms", s.pageStatic("terms"))
 	// /me — нэвтэрсэн хүний өөрийн хуудас руу шилжүүлнэ (багш: /t/<нэр>, суралцагч: /). Хуучин /studio холбоос ч мөн.
 	mux.HandleFunc("GET /me", s.pageStatic("me"))
 	mux.HandleFunc("GET /studio", s.pageStatic("me"))

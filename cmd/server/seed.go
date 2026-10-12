@@ -7,6 +7,7 @@ import (
 
 	"surgalt/internal/auth"
 	"surgalt/internal/files"
+	"surgalt/internal/httpapi"
 	"surgalt/internal/store"
 )
 
@@ -27,6 +28,7 @@ func seedDemo(ctx context.Context, st store.Store, fs *files.Store) error {
 		Bio:      "Сайн байна уу! Би МУИС-ийн Математикийн ангийг төгсөж, 12 жил ахлах ангийн сурагчдад хичээл заасан.\n\n800+ сурагчийг ЭЕШ-д бэлдсэн бөгөөд тэдний дундаж оноо 680+ байдаг. Хичээл бүр богино, ойлгомжтой, дасгалтай.",
 		Subjects: []string{"Математик", "ЭЕШ бэлтгэл", "Геометр", "Логик"}, Location: "Улаанбаатар",
 		Links: map[string]string{"youtube": "https://www.youtube.com/@surgalt", "facebook": "https://www.facebook.com/surgalt"}}
+	httpapi.ConsentDemo(u)
 	if err := st.CreateUser(ctx, u); err != nil {
 		return err
 	}
@@ -102,6 +104,7 @@ func seedDemo(ctx context.Context, st store.Store, fs *files.Store) error {
 // нэг хичээл дангаар авсан, багштай чатласан, маргааш шууд хичээлтэй.
 func seedStudent(ctx context.Context, st store.Store, teacher *store.User, courses []store.Course, paid *store.Lesson, hash string) error {
 	s := &store.User{Username: "suragch", Email: "suragch@surgalt.mn", PasswordHash: hash, Role: store.RoleStudent, DisplayName: "Тэмүүлэн Ганбат"}
+	httpapi.ConsentDemo(s)
 	if err := st.CreateUser(ctx, s); err != nil {
 		return err
 	}

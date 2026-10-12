@@ -583,6 +583,18 @@ func (m *Memory) LinkIdentity(_ context.Context, userID, provider, subject strin
 	return nil
 }
 
+func (m *Memory) SetConsent(_ context.Context, userID, version string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u, ok := m.users[userID]
+	if !ok {
+		return ErrNotFound
+	}
+	now := time.Now()
+	u.ConsentVersion, u.ConsentAt = version, &now
+	return nil
+}
+
 func (m *Memory) SetGoogleToken(_ context.Context, userID, encrypted string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

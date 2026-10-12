@@ -109,14 +109,14 @@ func callList(t *testing.T, srv *httptest.Server, method, path, token string) (i
 func TestPurchaseFlow(t *testing.T) {
 	srv, _ := newTestServer(t)
 	defer srv.Close()
-	_, tr := call(t, srv, "POST", "/api/auth/register", "", `{"username":"teach","email":"t@x.mn","password":"password1","role":"teacher"}`)
+	_, tr := call(t, srv, "POST", "/api/auth/register", "", `{"username":"teach","email":"t@x.mn","password":"password1","role":"teacher","accept_terms":true}`)
 	tt := tr["token"].(string)
 	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Курс","price":1000,"published":true}`)
 	cid := c["id"].(string)
 	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Төлбөртэй"}`)
 	lid := l["id"].(string)
 
-	_, sr := call(t, srv, "POST", "/api/auth/register", "", `{"username":"stud","email":"s@x.mn","password":"password1"}`)
+	_, sr := call(t, srv, "POST", "/api/auth/register", "", `{"username":"stud","email":"s@x.mn","password":"password1","accept_terms":true}`)
 	st := sr["token"].(string)
 	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid, st, ""); code != http.StatusPaymentRequired {
 		t.Fatalf("402 хүлээсэн, %d", code)
@@ -140,7 +140,7 @@ func TestPurchaseFlow(t *testing.T) {
 func TestSingleLessonPurchase(t *testing.T) {
 	srv, _ := newTestServer(t)
 	defer srv.Close()
-	_, tr := call(t, srv, "POST", "/api/auth/register", "", `{"username":"teach","email":"t@x.mn","password":"password1","role":"teacher"}`)
+	_, tr := call(t, srv, "POST", "/api/auth/register", "", `{"username":"teach","email":"t@x.mn","password":"password1","role":"teacher","accept_terms":true}`)
 	tt := tr["token"].(string)
 	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Хичээлээр","price":0,"published":true}`)
 	cid := c["id"].(string)
@@ -151,7 +151,7 @@ func TestSingleLessonPurchase(t *testing.T) {
 	_, b := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"B","price":7000}`)
 	la, lb := a["id"].(string), b["id"].(string)
 
-	_, sr := call(t, srv, "POST", "/api/auth/register", "", `{"username":"stud","email":"s@x.mn","password":"password1"}`)
+	_, sr := call(t, srv, "POST", "/api/auth/register", "", `{"username":"stud","email":"s@x.mn","password":"password1","accept_terms":true}`)
 	st := sr["token"].(string)
 	call(t, srv, "POST", "/api/courses/"+cid+"/enroll", st, "") // үнэгүй "элсэлт" төлбөртэйг нээхгүй
 	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+la, st, ""); code != 402 {
@@ -174,7 +174,7 @@ func TestSingleLessonPurchase(t *testing.T) {
 func register(t *testing.T, srv *httptest.Server, username, role string) (token, id string) {
 	t.Helper()
 	code, r := call(t, srv, "POST", "/api/auth/register", "",
-		`{"username":"`+username+`","email":"`+username+`@x.mn","password":"password1","role":"`+role+`"}`)
+		`{"username":"`+username+`","email":"`+username+`@x.mn","password":"password1","role":"`+role+`","accept_terms":true}`)
 	if code != http.StatusCreated {
 		t.Fatalf("бүртгэл %s: %d %v", username, code, r)
 	}
@@ -367,7 +367,7 @@ func TestSmartProfile(t *testing.T) {
 func TestRegisterWithoutUsername(t *testing.T) {
 	srv, _ := newTestServer(t)
 	defer srv.Close()
-	code, a := call(t, srv, "POST", "/api/auth/register", "", `{"email":"Bat.Erdene@x.mn","password":"password1","role":"teacher"}`)
+	code, a := call(t, srv, "POST", "/api/auth/register", "", `{"email":"Bat.Erdene@x.mn","password":"password1","role":"teacher","accept_terms":true}`)
 	if code != http.StatusCreated {
 		t.Fatalf("бүртгэл: %d %v", code, a)
 	}
@@ -379,17 +379,17 @@ func TestRegisterWithoutUsername(t *testing.T) {
 		t.Fatal("автомат нэртэй багшийн профайл нээгдсэнгүй")
 	}
 	// Өөр домэйн, ижил нэр -> дагавартай өөр хэрэглэгчийн нэр.
-	code, b := call(t, srv, "POST", "/api/auth/register", "", `{"email":"bat.erdene@y.mn","password":"password1"}`)
+	code, b := call(t, srv, "POST", "/api/auth/register", "", `{"email":"bat.erdene@y.mn","password":"password1","accept_terms":true}`)
 	ub, _ := b["user"].(map[string]any)
 	if code != http.StatusCreated || ub["username"] == "bat_erdene" || !strings.HasPrefix(ub["username"].(string), "bat_erdene_") {
 		t.Fatalf("давхардсан нэр шийдэгдээгүй: %d %v", code, b)
 	}
 	// Ижил имэйл -> ойлгомжтой 409.
-	if code, r := call(t, srv, "POST", "/api/auth/register", "", `{"email":"bat.erdene@x.mn","password":"password1"}`); code != http.StatusConflict || !strings.Contains(r["error"].(string), "имэйл") {
+	if code, r := call(t, srv, "POST", "/api/auth/register", "", `{"email":"bat.erdene@x.mn","password":"password1","accept_terms":true}`); code != http.StatusConflict || !strings.Contains(r["error"].(string), "имэйл") {
 		t.Fatalf("давхар имэйл: %d %v", code, r)
 	}
 	// Богино/кирилл нэртэй имэйл ч бүртгэгдэнэ.
-	if code, r := call(t, srv, "POST", "/api/auth/register", "", `{"email":"a@x.mn","password":"password1"}`); code != http.StatusCreated {
+	if code, r := call(t, srv, "POST", "/api/auth/register", "", `{"email":"a@x.mn","password":"password1","accept_terms":true}`); code != http.StatusCreated {
 		t.Fatalf("богино имэйл: %d %v", code, r)
 	}
 }
@@ -398,7 +398,7 @@ func TestRegisterWithoutUsername(t *testing.T) {
 func TestChangeUsername(t *testing.T) {
 	srv, _ := newTestServer(t)
 	defer srv.Close()
-	_, a := call(t, srv, "POST", "/api/auth/register", "", `{"email":"bagsh@x.mn","password":"password1","role":"teacher"}`)
+	_, a := call(t, srv, "POST", "/api/auth/register", "", `{"email":"bagsh@x.mn","password":"password1","role":"teacher","accept_terms":true}`)
 	tok := a["token"].(string)
 	register(t, srv, "taken", "student")
 	_, c := call(t, srv, "POST", "/api/courses", tok, `{"title":"Курс","price":0,"published":true}`)
@@ -451,10 +451,10 @@ func TestChangeUsername(t *testing.T) {
 func TestPasswordLength(t *testing.T) {
 	srv, _ := newTestServer(t)
 	defer srv.Close()
-	if code, _ := call(t, srv, "POST", "/api/auth/register", "", `{"email":"a1@x.mn","password":"12345"}`); code != http.StatusBadRequest {
+	if code, _ := call(t, srv, "POST", "/api/auth/register", "", `{"email":"a1@x.mn","password":"12345","accept_terms":true}`); code != http.StatusBadRequest {
 		t.Fatalf("5 тэмдэгттэй нууц үг татгалзагдах ёстой, %d", code)
 	}
-	if code, r := call(t, srv, "POST", "/api/auth/register", "", `{"email":"a2@x.mn","password":"123456"}`); code != http.StatusCreated {
+	if code, r := call(t, srv, "POST", "/api/auth/register", "", `{"email":"a2@x.mn","password":"123456","accept_terms":true}`); code != http.StatusCreated {
 		t.Fatalf("6 тэмдэгттэй нууц үг зөвшөөрөгдөх ёстой, %d %v", code, r)
 	}
 	if code, _ := call(t, srv, "POST", "/api/auth/login", "", `{"email":"a2@x.mn","password":"123456"}`); code != 200 {
@@ -1426,7 +1426,7 @@ func TestRegisterDuplicateEmailConcurrent(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			body := `{"email":"same@x.mn","password":"password1","role":"student"}`
+			body := `{"email":"same@x.mn","password":"password1","role":"student","accept_terms":true}`
 			req, _ := http.NewRequest("POST", srv.URL+"/api/auth/register", strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("X-Real-IP", fmt.Sprintf("10.9.0.%d", i+1)) // 20 өөр хэрэглэгч (IP) яг нэг мөчид

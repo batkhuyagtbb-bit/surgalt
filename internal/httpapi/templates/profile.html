@@ -28,7 +28,7 @@
       <div class="pf-actions" data-visitor>
         <button class="btn btn-gold magnetic" data-open-chat>{{icon "chat"}}Чатлах</button>
         {{if $t.SlotCount}}<button class="btn btn-glass pf-appt" data-appt>{{icon "cal"}}Цаг авах</button>{{end}}
-        {{with $t.PhoneHint}}<a class="btn btn-glass pf-phone" href="#" data-phone="{{$t.Username}}" rel="nofollow" aria-label="Утасны дугаар харах">{{icon "phone"}}<span class="pf-phone-n">{{.}} ••••</span><small>Харах</small></a>{{end}}
+        {{with $t.PhoneHint}}<a class="btn btn-glass pf-phone" href="#" data-phone="{{$t.Username}}" rel="nofollow" title="Дугаарыг нээхэд багшид мэдэгдэл очно" aria-label="Утасны дугаар харах — нээхэд багшид мэдэгдэл очно">{{icon "phone"}}<span class="pf-phone-n">{{.}} ••••</span><small>Харах</small></a>{{end}}
         <a class="btn btn-glass" href="#courses" data-tab-go="courses">{{icon "courses"}}Сургалтууд</a>
         <button class="btn btn-glass btn-icon" data-open-qr aria-label="QR код" title="QR код">{{icon "qr"}}</button>
         <button class="btn btn-glass btn-icon" data-share data-title="{{$t.DisplayName}}" aria-label="Хуваалцах" title="Хуваалцах">{{icon "share"}}</button>
@@ -256,6 +256,6 @@
 <input type="file" id="pfFile" accept="image/*" hidden>
 <div class="viewas-bar" id="viewAsBar" hidden><span>{{icon "eye"}}Та профайлаа зочны нүдээр харж байна</span><button class="btn btn-sm" data-view-as>Засах горим руу буцах</button></div>
 
-<footer class="footer"><span class="slogan">Сур, сур, бас дахин сур</span><span>© surgalt.mn</span><a href="/login?role=teacher">Та ч бас багш уу? Профайлаа нээ →</a></footer>
+<footer class="footer"><span class="slogan">Сур, сур, бас дахин сур</span><span>© surgalt.mn</span><span class="footer-links"><a href="/privacy">Нууцлал</a><a href="/terms">Нөхцөл</a></span><a href="/login?role=teacher">Та ч бас багш уу? Профайлаа нээ →</a></footer>
 {{template "chat" $t}}
 {{template "foot" (dict "Page" "profile")}}

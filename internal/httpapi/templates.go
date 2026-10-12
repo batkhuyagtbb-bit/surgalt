@@ -108,6 +108,10 @@ var iconPaths = map[string]string{
 	"plus":    `<path d="M12 5v14M5 12h14"/>`,
 	"down":    `<path d="M12 4v12M7 11l5 5 5-5M5 20h14"/>`,
 	"link":    `<path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1"/><path d="M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"/>`,
+	"lock":    `<rect x="4.500" y="10.500" width="15" height="10" rx="2"/><path d="M8 10.500V7a4 4 0 0 1 8 0v3.500"/>`,
+	"clock":   `<circle cx="12" cy="12" r="8.500"/><path d="M12 7.500V12l3 2"/>`,
+	"card":    `<rect x="2.500" y="5" width="19" height="14" rx="2"/><path d="M2.500 10h19M6.500 15h4"/>`,
+	"shield":  `<path d="M12 3 4.500 6v5.500c0 4.600 3.200 8.300 7.500 9.500 4.300-1.200 7.500-4.900 7.500-9.500V6L12 3Z"/><path d="m9 12 2 2 4-4"/>`,
 }
 
 // icon нь загварт <svg> оруулна. Нэр нь кодод тогтмол бичигддэг тул HTML аюулгүй.
@@ -123,7 +127,7 @@ func icon(name string, size ...int) template.HTML {
 
 func parseTemplates() *template.Template {
 	funcs := template.FuncMap{
-		"money": money, "initials": initials, "hue": hue, "icon": icon, "v": func() string { return assetVersion },
+		"money": money, "initials": initials, "hue": hue, "icon": icon, "v": func() string { return assetVersion }, "terms": func() string { return TermsVersion },
 		"inc": func(i int) int { return i + 1 },
 		// recent: сүүлийн 14 хоногт үүссэн эсэх ("Шинэ" тэмдэг). Хуудас 30 секунд л кэшлэгдэнэ.
 		"recent":   func(t time.Time) bool { return time.Since(t) < 14*24*time.Hour },

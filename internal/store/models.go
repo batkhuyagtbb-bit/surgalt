@@ -34,6 +34,10 @@ type User struct {
 	// Утас: нээлттэй профайлд зөвхөн эхний 4 орон харагдана; бүтэн дугаарыг зочин дарж нээхэд л
 	// (багшид мэдэгдэж, бүртгэгдэнэ) өгнө — тиймээс JSON-д автоматаар гарахгүй.
 	Phone string `json:"-"`
+	// Үйлчилгээний нөхцөл, нууцлалын бодлогыг зөвшөөрсөн хувилбар ба цаг (Хувь хүний мэдээлэл хамгаалах тухай хууль).
+	// Google/Facebook-ээр эсвэл өмнө бүртгүүлсэн хэрэглэгч нэвтрэхдээ зөвшөөрнө.
+	ConsentVersion string     `json:"-"`
+	ConsentAt      *time.Time `json:"-"`
 	// Нээлттэй профайлын нэмэлт мэдээлэл (багш).
 	Subjects  []string          `json:"subjects"` // заадаг чиглэлүүд
 	Location  string            `json:"location"` // хот / байршил
@@ -562,6 +566,8 @@ type Store interface {
 	UsersByIDs(ctx context.Context, ids []string) ([]User, error)
 	TeacherStudentCount(ctx context.Context, teacherID string) (int64, error)
 	SetGoogleToken(ctx context.Context, userID, encrypted string) error
+	// SetConsent — хэрэглэгч нөхцөл, нууцлалын бодлогын тухайн хувилбарыг зөвшөөрсөн.
+	SetConsent(ctx context.Context, userID, version string) error
 	// Үзэлтийн тоолуурууд (нэгтгэж, багцаар нэмэгдүүлнэ).
 	IncViews(ctx context.Context, profile map[string]int64, course map[string]int64) error
 	// Мэдэгдэл

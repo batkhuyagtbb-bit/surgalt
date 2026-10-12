@@ -182,6 +182,7 @@ func run(log *slog.Logger) error {
 		RateBurst:     envFloat("RATE_BURST", 60),
 		StorageFreeMB: envInt("STORAGE_FREE_MB", 300),
 		StoragePlans:  parsePlans(env("STORAGE_PLANS", "300:5000,500:8000,1024:14000,2048:25000,5120:55000")),
+		ContactEmail:  os.Getenv("CONTACT_EMAIL"),
 	}, st, tokens, hub, fstore, log)
 
 	base := env("PUBLIC_URL", "http://localhost"+env("ADDR", ":8080"))
