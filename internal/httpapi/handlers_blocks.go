@@ -185,11 +185,11 @@ func (s *Server) handleAnswerQuiz(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "олдсонгүй")
 		return
 	}
+	if uid == "" { // хичээл (үнэгүйг ч) нэвтэрсэн хэрэглэгч л үзэж, хариулна
+		writeErr(w, http.StatusUnauthorized, "нэвтэрнэ үү")
+		return
+	}
 	if !l.IsFree {
-		if uid == "" {
-			writeErr(w, http.StatusUnauthorized, "нэвтэрнэ үү")
-			return
-		}
 		has, err := s.lessonAccess(r.Context(), uid, course, l)
 		if s.storeErr(w, r, err) {
 			return

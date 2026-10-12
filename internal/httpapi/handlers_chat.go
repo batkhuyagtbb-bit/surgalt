@@ -16,13 +16,14 @@ import (
 	"surgalt/internal/store"
 )
 
-// requirePrincipal: нэвтэрсэн хэрэглэгч ЭСВЭЛ зочин.
+// requirePrincipal: чат зөвхөн бүртгэлтэй, нэвтэрсэн хэрэглэгчид — нэвтрээгүй зочин (хуучин зочны токен ч) чатлахгүй.
 func (s *Server) requirePrincipal(w http.ResponseWriter, r *http.Request) (auth.Claims, bool) {
 	c, ok := s.principal(r)
-	if !ok {
-		writeErr(w, http.StatusUnauthorized, "нэвтрэх эсвэл нэрээ оруулна уу")
+	if !ok || c.IsGuest() {
+		writeErr(w, http.StatusUnauthorized, "чатлахын тулд нэвтэрнэ үү")
+		return c, false
 	}
-	return c, ok
+	return c, true
 }
 
 // convRole нь дуудагч энэ ярианд хэн болохыг (багш/зочин) тодорхойлно.
@@ -430,7 +431,7 @@ func (s *Server) handleMyConversations(w http.ResponseWriter, r *http.Request) {
 // Мессеж илгээхдээ HTTP POST ашиглана (баталгаатай, rate-limit-тэй).
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	c, err := s.tokens.Verify(r.URL.Query().Get("token"))
-	if err != nil {
+	if err != nil || c.IsGuest() || !s.liveUser(r.Context(), c.UID) { // зочин чатлахгүй; бүртгэлээ устгасан бол хүчингүй
 		writeErr(w, http.StatusUnauthorized, "токен хүчингүй")
 		return
 	}

@@ -50,12 +50,10 @@
     <button class="icon-btn" data-chat-close aria-label="Хаах">✕</button>
   </header>
   <div class="chat-body" id="chatBody">
-    <form class="chat-intro" id="chatIntro">
-      <p>Сайн байна уу! 👋 Асуух зүйлээ бичээрэй, багш шууд хариулна.</p>
-      <label>Таны нэр<input name="name" maxlength="40" required placeholder="Жишээ: Болд"></label>
-      <button class="btn btn-gold btn-block">Чат эхлэх</button>
-      <a href="/login?next={{printf "/t/%s%%23chat" .Username}}" class="muted small">эсвэл нэвтэрч чатлах</a>
-    </form>
+    <div class="chat-intro" id="chatIntro">
+      <p>Сайн байна уу! 👋 Багштай чатлахын тулд нэвтэрнэ үү. Бүртгэлгүй бол нэг минутад бүртгүүлнэ.</p>
+      <a class="btn btn-gold btn-block" href="/login?next=/t/{{.Username}}%23chat">Нэвтрэх эсвэл бүртгүүлэх</a>
+    </div>
     <ol class="chat-msgs" id="chatMsgs" hidden></ol>
   </div>
   <form class="chat-input" id="chatForm" hidden></form>

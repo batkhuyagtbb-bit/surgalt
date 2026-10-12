@@ -61,11 +61,8 @@ const store = {
 const Auth = {
   get token() { return store.get("sg_token"); },
   get user() { return store.get("sg_user"); },
-  get guest() { return store.get("sg_guest"); },
   set(token, user) { store.set("sg_token", token); store.set("sg_user", user); },
   clear() { store.set("sg_token", null); store.set("sg_user", null); },
-  // Чатад: нэвтэрсэн бол хэрэглэгчийн, үгүй бол зочны токен
-  get chatToken() { return this.token || this.guest?.token || null; },
 };
 
 async function api(path, { method = "GET", body, token = Auth.token, raw } = {}) {
@@ -213,7 +210,7 @@ const Live = {
   ws: null, token: null, tries: 0, handlers: new Set(),
   on(fn) { this.handlers.add(fn); },
   // Бүлэгт шинээр орсны дараа (сувгууд холбогдох үед тооцогддог) дахин холбогдоно.
-  reconnect() { const t = this.token || Auth.chatToken; const ws = this.ws; this.ws = null; try { ws?.close(); } catch {} this.token = null; this.connect(t); },
+  reconnect() { const t = this.token || Auth.token; const ws = this.ws; this.ws = null; try { ws?.close(); } catch {} this.token = null; this.connect(t); },
   connect(token) {
     if (!token || (this.ws && this.token === token && this.ws.readyState <= 1)) return;
     this.token = token;
@@ -2472,12 +2469,12 @@ function chatWidget() {
   const courseId = $(".course-page")?.dataset.course;
   let conv = null, group = false;
   const headText = $(".chat-head > div:nth-child(2)", panel);
-  const thread = new ChatThread({ ol: msgs, body, form, token: () => (group ? Auth.token : Auth.chatToken), convId: () => conv?.id, role: () => "visitor", group: () => group });
+  const thread = new ChatThread({ ol: msgs, body, form, token: () => Auth.token, convId: () => conv?.id, role: () => "visitor", group: () => group });
   const scroll = () => (body.scrollTop = body.scrollHeight);
   const open = async () => {
     panel.classList.add("open"); panel.setAttribute("aria-hidden", "false"); $(".chat-fab-dot").hidden = true;
     if (conv) return;
-    if (!Auth.chatToken) { intro.hidden = false; intro.querySelector("input").focus(); return; }
+    if (!Auth.token) { intro.hidden = false; $("a", intro)?.focus(); return; } // чат зөвхөн нэвтэрсэн хэрэглэгчид
     await start();
   };
   // Сургалтын бүлэг чат: зөвхөн нэвтэрсэн, элссэн суралцагч. Багш нээгээгүй бол хэлнэ.
@@ -2495,14 +2492,14 @@ function chatWidget() {
   };
   const start = async () => {
     try {
-      const d = await api(`/api/teachers/${teacher}/chat`, { method: "POST", token: Auth.chatToken });
+      const d = await api(`/api/teachers/${teacher}/chat`, { method: "POST" });
       conv = d.conversation; group = false;
       intro.hidden = true; msgs.hidden = false; form.hidden = false;
       thread.set(d);
-      Live.connect(Auth.chatToken);
+      Live.connect(Auth.token);
       form.body.focus();
     } catch (e) {
-      if (e.status === 401) { store.set("sg_guest", null); intro.hidden = false; return; }
+      if (e.status === 401) { intro.hidden = false; return; }
       intro.hidden = true; msgs.hidden = false; msgs.innerHTML = `<li class="muted">${esc(e.message)}</li>`;
     }
   };
@@ -2518,14 +2515,6 @@ function chatWidget() {
     openGroup();
   }));
   if (Auth.user) fab.hidden = true; // нэвтэрсэн хүнд баруун талын самбар байна
-  intro.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    try {
-      const d = await api("/api/auth/guest", { method: "POST", body: { name: intro.name.value.trim() }, token: null });
-      store.set("sg_guest", { token: d.token, name: d.guest.name });
-      await start();
-    } catch (err) { toast(err.message, true); }
-  });
   Live.on((d) => {
     if (!conv) return;
     if (THREAD_EVENTS.includes(d.type)) { thread.event(d); return; }
@@ -2537,7 +2526,7 @@ function chatWidget() {
   if (location.hash === "#chat=group" && courseId) { history.replaceState(null, "", location.pathname + location.search); window.railStartGroup ? window.railStartGroup(courseId).catch((e) => toast(e.message, true)) : openGroup(); }
   else if (location.hash === "#chat") { history.replaceState(null, "", location.pathname + location.search); window.railStartDirect ? window.railStartDirect(teacher).catch((e) => toast(e.message, true)) : open(); }
   // Өмнө нь чатласан бол шинэ хариуг сонсохын тулд шууд холбогдоно.
-  if (Auth.chatToken && store.get("sg_chat:" + teacher)) start();
+  if (Auth.token && store.get("sg_chat:" + teacher)) start();
   panel.addEventListener("click", () => store.set("sg_chat:" + teacher, 1), { once: true });
 }
 
@@ -3142,6 +3131,7 @@ async function coursePage() {
     $$(".lesson").forEach((l) => unlockLesson(l.dataset.lesson));
   };
   const ready = Auth.token ? refreshAccess().then((a) => { if (!a) return; if (a.all) unlockAll(); a.lessons.forEach(unlockLesson); if (mode === "free" && a.enrolled) buy.textContent = "✓ Та элссэн — үзэж эхлэх"; drawStage(); }) : Promise.resolve();
+  if (!Auth.token) $$(".lesson.is-free [data-play]").forEach((b) => (b.textContent = "▶ Нэвтэрч үзэх")); // үнэгүй хичээлийг ч нэвтэрч үзнэ
   if (!Auth.token && drip) $$(".lesson:not(.is-free)").forEach((li) => { const lbl = $(".lesson-state", li); if (lbl && +li.dataset.unlock && li.dataset.always !== "1") { lbl.hidden = false; lbl.textContent = `⏱ Өмнөхийг үзснээс ${humanHours(li.dataset.unlock)}-ийн дараа`; } });
   // Товлосон шууд хичээлүүд (Google Meet): үнэгүй нь сургалтын дүрмээр, төлбөртэйг тусад нь худалдаж авна.
   const meetsHTML = (d) => `<div class="section-head reveal in" id="meetHead"><span class="eyebrow">Шууд хичээл</span></div><div class="meet-list" id="meetList">${d.meetings.map((m) => `
@@ -3169,7 +3159,7 @@ async function coursePage() {
     } catch (err) { toast(err.message, true); } finally { b.disabled = false; }
   });
 
-  const needLogin = () => { if (Auth.token) return false; location.href = "/login?next=" + encodeURIComponent(location.pathname); return true; };
+  const needLogin = (lid) => { if (Auth.token) return false; location.href = "/login?next=" + encodeURIComponent(location.pathname + (lid ? "#l=" + lid : "")); return true; };
 
   // Төлбөр: захиалга → «Та төлбөрөө төлнө үү» цонх (QR) → төлөгдмөгц автоматаар нээнэ.
   const pay = (order, payment, label, onPaid, extra) => payWindow(order, payment, label, onPaid, extra);
@@ -3304,6 +3294,7 @@ async function coursePage() {
     $("[data-dp-go], [data-dp-close]", pop)?.focus();
   };
   const expandRow = async (row, opts) => {
+    if (needLogin(row.dataset.lesson)) return; // хичээл (үнэгүйг ч) нэвтэрсэн хэрэглэгч л үзнэ
     const blk = access?.blocks?.[row.dataset.lesson];
     if (blk) { // сануулгын хязгаар хэтэрсэн: орж болохгүй
       $(".drip-pop")?.remove();
@@ -3493,7 +3484,7 @@ async function coursePage() {
   if (want) {
     const li = rowById(want);
     if (li) ready.then(() => {
-      if (!Auth.token && isLocked(li)) { li.scrollIntoView({ block: "center" }); li.animate([{ boxShadow: "0 0 0 4px rgba(31,60,143,.35)" }, { boxShadow: "0 0 0 0 transparent" }], { duration: 1600 }); return; }
+      if (!Auth.token) { li.scrollIntoView({ block: "center" }); li.animate([{ boxShadow: "0 0 0 4px rgba(31,60,143,.35)" }, { boxShadow: "0 0 0 0 transparent" }], { duration: 1600 }); return; }
       expandRow(li, { push: false });
     });
   }
@@ -3931,6 +3922,7 @@ function legalPage() {
 }
 
 /* ---------- эхлүүлэх ---------- */
+store.set("sg_guest", null); // зочны чат хасагдсан — хуучин зочны токеныг устгана
 window.SG = { THREAD_EVENTS, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();

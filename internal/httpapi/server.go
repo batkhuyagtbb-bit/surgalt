@@ -113,7 +113,6 @@ func (s *Server) Handler() http.Handler {
 	// Нэвтрэлт
 	mux.HandleFunc("POST /api/auth/register", s.handleRegister)
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
-	mux.HandleFunc("POST /api/auth/guest", s.handleGuest)
 	mux.HandleFunc("GET /api/auth/providers", s.handleProviders)
 	mux.HandleFunc("GET /auth/{provider}/start", s.handleOAuthStart)
 	mux.HandleFunc("GET /auth/{provider}/callback", s.handleOAuthCallback)

@@ -150,31 +150,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	s.issue(w, http.StatusOK, u)
 }
 
-// handleGuest нь нэвтрээгүй зочинд чатлах токен өгнө.
-func (s *Server) handleGuest(w http.ResponseWriter, r *http.Request) {
-	if !s.authLim.Allow(s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон оролдлого")
-		return
-	}
-	var in struct {
-		Name string `json:"name"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	in.Name = strings.TrimSpace(in.Name)
-	if n := utf8.RuneCountInString(in.Name); n < 1 || n > 40 {
-		writeErr(w, http.StatusBadRequest, "нэр 1-40 тэмдэгт")
-		return
-	}
-	tok, c, err := s.tokens.SignGuest(in.Name)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "токен үүсгэж чадсангүй")
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]any{"token": tok, "guest": map[string]string{"id": c.GID, "name": c.Name}})
-}
-
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireUser(w, r)
 	if !ok {

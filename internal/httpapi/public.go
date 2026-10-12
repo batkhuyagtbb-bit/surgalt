@@ -75,7 +75,7 @@ type PublicProfile struct {
 	Books       []PublicBook    `json:"books"`
 }
 
-// PublicLesson: үнэгүй хичээлийн агуулга нээлттэй, төлбөртэйн зөвхөн гарчиг.
+// PublicLesson: хичээлийн гарчиг, тохиргоо (агуулга нь нэвтэрсэн хэрэглэгчид л — handleGetLesson).
 type PublicLesson struct {
 	ID       string `json:"id"`
 	Title    string `json:"title"`
@@ -88,14 +88,11 @@ type PublicLesson struct {
 	Format       string            `json:"format,omitempty"`
 	Mode         string            `json:"mode,omitempty"`
 	Section      string            `json:"section,omitempty"`
-	Content      string            `json:"content,omitempty"`
-	Blocks       []store.Block     `json:"blocks,omitempty"`
 	ActiveMin    int               `json:"active_min,omitempty"`
 	Exam         *store.Exam       `json:"exam,omitempty"`
 	Assignment   *store.Assignment `json:"assignment,omitempty"`
 	Discussion   bool              `json:"discussion"`
 	UnlockRule   string            `json:"unlock_rule,omitempty"`
-	VideoURL     string            `json:"video_url,omitempty"`
 }
 
 // PublicSection — хөтөлбөрийн нэг бүлэг (модуль). Бүлэггүй хичээлүүд хоосон гарчигтай бүлэгт орно.
@@ -264,10 +261,6 @@ func (s *Server) publicCourse(ctx context.Context, id string) (*Rendered[PublicC
 		pls := make([]PublicLesson, len(lessons))
 		for i, l := range lessons {
 			pls[i] = PublicLesson{ID: l.ID, Title: l.Title, IsFree: l.IsFree, Price: l.Price, Position: l.Position, UnlockAfterH: l.UnlockAfterH, AlwaysOpen: l.AlwaysOpen, Format: l.Format, Mode: l.Mode, Section: l.Section, ActiveMin: l.ActiveMin, Exam: l.Exam, Assignment: l.Assignment, Discussion: l.Discussion, UnlockRule: l.UnlockRule}
-			if l.IsFree {
-				// Кэш 30 секунд тул 6 цагийн гарын үсэг үргэлж хүчинтэй байна.
-				pls[i].Content, pls[i].VideoURL, pls[i].Blocks = l.Content, s.viewerMedia(l.VideoURL, ""), s.viewerBlocks(examIntro(&l))
-			}
 		}
 		secs, grouped := groupLessons(pls)
 		return render(s, PublicCourse{Course: *c, Teacher: publicTeacher(u), Lessons: pls, Sections: secs, Grouped: grouped}, "course.html")

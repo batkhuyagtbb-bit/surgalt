@@ -700,45 +700,9 @@ func (s *Server) handleCourseAccess(w http.ResponseWriter, r *http.Request) {
 		"max_warnings": maxWarnings(course)})
 }
 
-// handleGetLesson: үнэгүй хичээлийг хэн ч, бусдыг зөвхөн элссэн хүн эсвэл багш үзнэ.
+// handleGetLesson: хичээлийн агуулга — бүх хичээлийг (үнэгүйг ч) зөвхөн бүртгэлтэй, нэвтэрсэн хэрэглэгч үзнэ.
 func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 	cid, lid := r.PathValue("id"), r.PathValue("lid")
-	pc, err := s.publicCourse(r.Context(), cid)
-	if err == nil {
-		found := false
-		for _, l := range pc.Data.Lessons {
-			if l.ID == lid {
-				if l.IsFree {
-					if p, ok := s.principal(r); !ok || p.IsGuest() || p.UID != pc.Data.Course.TeacherID { // багш өөрийн хичээлээ үзвэл тоолохгүй
-						s.trackView(r, pc.Data.Course.TeacherID, NotifLessonView, l.ID, l.Title, "/c/"+cid)
-					}
-					if p, ok := s.principal(r); ok && !p.IsGuest() { // нэвтэрсэн бол явцад тэмдэглэнэ (дараалалд хэрэгтэй)
-						if co, err := s.store.CourseByID(r.Context(), cid); err == nil {
-							if b := s.lessonBlocked(r.Context(), p.UID, co, l.ID); b != nil {
-								b.Title = l.Title
-								s.apiErr(w, r, blockedErr(b))
-								return
-							}
-						}
-						_ = s.store.MarkLessonViewed(r.Context(), p.UID, cid, l.ID)
-					}
-					writeJSON(w, http.StatusOK, l)
-					return
-				}
-				found = true
-				break
-			}
-		}
-		if !found { // нийтийн жагсаалтад байхгүй (устгасан эсвэл хаалттай) — багш л цааш (хаалттай хичээлээ ч үзнэ)
-			if p, ok := s.principal(r); !ok || p.IsGuest() || p.UID != pc.Data.Course.TeacherID {
-				writeErr(w, http.StatusNotFound, "хичээл олдсонгүй")
-				return
-			}
-		}
-	} else if err != store.ErrNotFound {
-		s.storeErr(w, r, err)
-		return
-	}
 	c, ok := s.requireUser(w, r)
 	if !ok {
 		return
@@ -767,8 +731,8 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusPaymentRequired, map[string]any{"error": "энэ хичээл төлбөртэй", "lesson_price": l.Price, "course_price": course.Price})
 		return
 	}
-	// Дараалсан нээлт: өмнөх хичээлээ үзсэн, хүлээх хугацаа нь өнгөрсөн байх ёстой.
-	if course.Drip && !l.AlwaysOpen && course.TeacherID != c.UID {
+	// Дараалсан нээлт: өмнөх хичээлээ үзсэн, хүлээх хугацаа нь өнгөрсөн байх ёстой (үнэгүй хичээл үргэлж нээлттэй).
+	if course.Drip && !l.AlwaysOpen && !l.IsFree && course.TeacherID != c.UID {
 		lessons, err := s.store.LessonsByCourse(r.Context(), course.ID)
 		if s.storeErr(w, r, err) {
 			return
@@ -810,6 +774,9 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 	}
 	if course.TeacherID != c.UID {
 		_ = s.store.MarkLessonViewed(r.Context(), c.UID, course.ID, l.ID)
+		if l.IsFree { // үнэгүй хичээл үзсэнийг багшид мэдэгдэнэ (нэгтгэж)
+			s.trackView(r, course.TeacherID, NotifLessonView, l.ID, l.Title, "/c/"+cid)
+		}
 	}
 	l.VideoURL = s.viewerMedia(l.VideoURL, c.UID)
 	l.Blocks = s.viewerBlocks(examIntro(l))
