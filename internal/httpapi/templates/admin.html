@@ -1,0 +1,13 @@
+{{template "head" (dict "Title" "Мэдүүлэг — surgalt.mn" "Desc" "Чатын мэдүүлэг шийдвэрлэх хянагчийн хуудас" "Page" "admin")}}
+<main class="ad">
+  <header class="ad-head">
+    <div>
+      <p class="pv-eyebrow">Хянагч</p>
+      <h1>Чатын мэдүүлэг</h1>
+      <p class="muted">Мэдүүлсэн мессеж ба түүний өмнөх хэдэн мессежийг л харуулна. Шийдвэрлэхэд бүртгэлтэй мэдүүлэгчид мэдэгдэнэ.</p>
+    </div>
+    <nav class="ad-tabs" aria-label="Төлөв"><button type="button" class="on" data-st="open">Нээлттэй</button><button type="button" data-st="resolved">Шийдвэрлэсэн</button></nav>
+  </header>
+  <div id="adList" class="ad-list" aria-live="polite"><p class="ad-empty">Ачаалж байна…</p></div>
+</main>
+{{template "foot" (dict "Page" "admin")}}

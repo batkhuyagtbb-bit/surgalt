@@ -2026,7 +2026,7 @@ async function chat(openId) {
   });
   const append = (m) => thread.append(m);
   const handler = async (d) => {
-    if (["reaction", "read", "typing"].includes(d.type)) { thread.event(d); return; }
+    if (SG.THREAD_EVENTS.includes(d.type)) { thread.event(d); return; }
     if (d.type !== "message") return;
     const m = d.message;
     if (m.conversation_id === cur) append(m);

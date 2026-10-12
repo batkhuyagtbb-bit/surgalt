@@ -29,6 +29,8 @@ type Memory struct {
 	applied     map[string]bool   // хэрэгжсэн багтаамжийн захиалга
 	meetings    []*Meeting
 	slots       map[string]*Slot              // цаг захиалга
+	reports     map[string]*Report            // чатын мэдүүлэг
+	blocks      map[[2]string]bool            // (яриа, хориглосон тал)
 	meetAcc     map[[2]string]string          // (user, meeting) → багш: худалдаж авсан шууд хичээл
 	lessonAcc   map[[2]string]string          // (user, lesson) -> course
 	pendingL    map[[2]string]string          // (user, lesson) -> order
@@ -53,6 +55,7 @@ func NewMemory() *Memory {
 		pending: map[[2]string]string{}, enrollments: map[[2]string]time.Time{},
 		convs: map[string]*Conversation{}, convByKey: map[string]string{}, messages: map[string][]*Message{}, identities: map[string]string{}, applied: map[string]bool{}, notifs: map[string][]*Notification{}, progress: map[[2]string]*LessonProgress{}, lessonAcc: map[[2]string]string{}, pendingL: map[[2]string]string{},
 		invoices: map[string]*PaymentInvoice{}, visits: map[string]*PageVisit{}, slots: map[string]*Slot{},
+		reports: map[string]*Report{}, blocks: map[[2]string]bool{},
 	}
 }
 

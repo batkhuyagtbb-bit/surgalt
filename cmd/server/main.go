@@ -66,6 +66,17 @@ func parsePlans(v string) []httpapi.StoragePlan {
 
 func envBool(k string) bool { b, _ := strconv.ParseBool(os.Getenv(k)); return b }
 
+// emailList — таслалаар тусгаарласан имэйлүүд (жижиг үсгээр, хоосныг алгасна).
+func emailList(s string) []string {
+	var out []string
+	for _, e := range strings.Split(s, ",") {
+		if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
 // loadDotEnv нь ажлын хавтас дахь .env файлыг уншина (байвал). Аль хэдийн тохируулсан
 // орчны хувьсагчийг дарж бичихгүй — Docker/systemd-ийн тохиргоо үргэлж давуу.
 func loadDotEnv(path string) (int, error) {
@@ -183,6 +194,7 @@ func run(log *slog.Logger) error {
 		StorageFreeMB: envInt("STORAGE_FREE_MB", 300),
 		StoragePlans:  parsePlans(env("STORAGE_PLANS", "300:5000,500:8000,1024:14000,2048:25000,5120:55000")),
 		ContactEmail:  os.Getenv("CONTACT_EMAIL"),
+		AdminEmails:   emailList(os.Getenv("ADMIN_EMAILS")),
 	}, st, tokens, hub, fstore, log)
 
 	base := env("PUBLIC_URL", "http://localhost"+env("ADDR", ":8080"))

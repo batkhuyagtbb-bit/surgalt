@@ -586,6 +586,13 @@ type Store interface {
 	UsersByIDs(ctx context.Context, ids []string) ([]User, error)
 	TeacherStudentCount(ctx context.Context, teacherID string) (int64, error)
 	SetGoogleToken(ctx context.Context, userID, encrypted string) error
+	// Чатын мэдүүлэг (reports.go): нэг хүн нэг мессежийг давтан мэдүүлбэл ErrConflict.
+	CreateReport(ctx context.Context, r *Report) error
+	Reports(ctx context.Context, status string, limit int) ([]Report, error) // status хоосон бол бүгд, шинэ нь эхэндээ
+	UpdateReport(ctx context.Context, id string, fn func(*Report) error) (*Report, error)
+	// Чатын хориг: side нь хориглосон тал (SenderTeacher | SenderVisitor).
+	SetConversationBlock(ctx context.Context, convID, side string, on bool) error
+	ConversationBlocks(ctx context.Context, convID string) (map[string]bool, error)
 	// UpdateUser — хэрэглэгчийн мөрийг түгжиж уншаад fn-ээр өөрчилж хадгална (зөвшөөрөл, нас, асран хамгаалагч г.м.).
 	// Имэйл, нэр (username) солиход ашиглахгүй — тэдгээр нь өвөрмөц байх ёстой.
 	UpdateUser(ctx context.Context, id string, fn func(*User) error) (*User, error)

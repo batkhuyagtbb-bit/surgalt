@@ -376,7 +376,7 @@ function chatRail() {
     catch (x) { toast(x.message, true); }
   });
   Live.on((d) => {
-    if (["reaction", "read", "typing"].includes(d.type)) { th.event(d); return; }
+    if (THREAD_EVENTS.includes(d.type)) { th.event(d); return; }
     if (d.type !== "message") return;
     const m = d.message;
     if (m.conversation_id === cur) append(m);
@@ -398,6 +398,7 @@ function authNav() {
   document.documentElement.classList.toggle("authed", !!u);
   $$("[data-auth-hide]").forEach((el) => (el.hidden = !!u));
   $$("[data-logout]").forEach((b) => b.addEventListener("click", () => { Auth.clear(); location.href = "/"; }));
+  if (u?.is_admin && !$(".nav-admin")) $(".nav-links")?.insertAdjacentHTML("afterbegin", `<a href="/admin" class="nav-link nav-admin">Мэдүүлэг</a>`);
   if (u && Auth.token) { bell(); consentGate(); }
 }
 
@@ -2279,6 +2280,10 @@ function dayLabel(t) {
   if (diff < 7) return WEEKDAYS?.[d.getDay()] || fmtDate(t);
   return fmtDate(t).replace(/\s\d{1,2}:\d{2}$/, "");
 }
+// Ярианы цонхонд (ChatThread.event) дамжуулах үйл явдлууд.
+const THREAD_EVENTS = ["reaction", "read", "typing", "edit", "delete", "block"];
+const REPORT_REASONS = [["harass", "Доромжилсон, дарамталсан"], ["inappropriate", "Зохисгүй агуулга"], ["spam", "Спам, залилан"], ["other", "Бусад"]];
+
 class ChatThread {
   // opts: {ol, body, form, token(): string, convId(): string, role(): "teacher"|"visitor", group(): bool}
   constructor(o) {
@@ -2296,7 +2301,7 @@ class ChatThread {
     if (this.form) this.bindForm();
   }
   mine(m) { const myId = Auth.user?.id; return this.group() && myId ? m.sender_id === myId : m.sender === this.role(); }
-  set(d) { this.list = d.messages || []; this.reads = d.reads || {}; this.meKey = d.me_key || this.meKey; this.replyTo = null; this.render(); this.scroll(true); this.markRead(); }
+  set(d) { this.list = d.messages || []; this.reads = d.reads || {}; this.meKey = d.me_key || this.meKey; this.replyTo = null; this.block = d.block || {}; this.render(); this.renderBlock(); this.scroll(true); this.markRead(); }
   append(m) {
     if (this.list.some((x) => x.id === m.id)) return;
     this.list.push(m); this.typing.delete(m.sender_id ? "u:" + m.sender_id : m.sender_name); this._animLast = true;
@@ -2307,6 +2312,7 @@ class ChatThread {
   event(d) {
     if (d.conversation_id !== this.convId()) return;
     if (d.type === "reaction") { const m = this.list.find((x) => x.id === d.message_id); if (m) { m.reactions = d.reactions; this.render(); } }
+    if (d.type === "block") { this.block = d.block || {}; this.renderBlock(); }
     if (d.type === "read" && d.key !== this.meKey) { this.reads[d.key] = d.last_id; this.render(); }
     if (d.type === "edit") { const m = this.list.find((x) => x.id === d.message.id); if (m) { Object.assign(m, d.message); this.render(); } }
     if (d.type === "delete") { const m = this.list.find((x) => x.id === d.message_id); if (m) { m.deleted = true; m.body = ""; m.attachment_url = ""; m.reactions = {}; this.render(); } }
@@ -2350,7 +2356,7 @@ class ChatThread {
       const content = m.deleted ? `<span class="msg-text msg-deleted">Мессеж устгагдсан</span>` : editing ? `<form class="msg-edit"><textarea rows="2" maxlength="2000">${esc(m.body)}</textarea><div><button type="submit" class="btn btn-gold btn-sm">Хадгалах</button><button type="button" class="btn btn-ghost btn-sm" data-edit-cancel>Болих</button></div></form>` : sticker ? `<span class="msg-sticker">${esc(sticker[1])}</span>` : imgUrl ? `<a class="msg-img" href="${esc(imgUrl)}" target="_blank" rel="noopener"><img src="${esc(imgUrl)}" alt="" loading="lazy"></a>${m.attachment_url && m.body && m.body !== "📷 Зураг" ? `<span class="msg-text">${linkify(m.body)}</span>` : ""}` : `<span class="msg-text">${linkify(m.body)}</span>`;
       out.push(`<li class="msg ${mine ? "me" : "them"} ${first ? "first" : ""} ${last ? "last" : ""} ${sticker ? "is-sticker" : ""} ${imgUrl ? "has-img" : ""}" data-id="${esc(m.id)}">${av}<div class="msg-col">${name}
         <div class="msg-row"><div class="bubble" title="${fmtDate(m.created_at)}">${quote}${content}</div>
-          <div class="msg-tools">${m.deleted ? "" : `<button type="button" data-react="${esc(m.id)}" title="Реакц">☺</button>`}${m.deleted ? "" : `<button type="button" data-reply="${esc(m.id)}" title="Хариулах">↩</button>`}${mine && !m.deleted ? `<button type="button" data-edit="${esc(m.id)}" title="Засах">✎</button>` : ""}${(mine || this.role() === "teacher") && !m.deleted ? `<button type="button" data-del="${esc(m.id)}" title="Устгах">🗑</button>` : ""}</div></div>
+          <div class="msg-tools">${m.deleted ? "" : `<button type="button" data-react="${esc(m.id)}" title="Реакц">☺</button>`}${m.deleted ? "" : `<button type="button" data-reply="${esc(m.id)}" title="Хариулах">↩</button>`}${mine && !m.deleted ? `<button type="button" data-edit="${esc(m.id)}" title="Засах">✎</button>` : ""}${(mine || this.role() === "teacher") && !m.deleted ? `<button type="button" data-del="${esc(m.id)}" title="Устгах">🗑</button>` : ""}${!mine && !m.deleted ? `<button type="button" data-report="${esc(m.id)}" title="Мэдүүлэх" aria-label="Мэдүүлэх">⚑</button>` : ""}</div></div>
         ${reacts}${foot}</div></li>`);
     });
     for (const [, v] of this.typing) out.push(`<li class="msg them typing"><span class="msg-av"></span><div class="msg-col"><div class="bubble"><span class="dots"><i></i><i></i><i></i></span></div><small class="muted">${esc(v.name)} бичиж байна…</small></div></li>`);
@@ -2374,6 +2380,13 @@ class ChatThread {
     if (t.closest("[data-edit-cancel]")) { this.editing = null; this.render(); return; }
     const del = t.closest("[data-del]");
     if (del && confirm("Мессежийг устгах уу?")) { try { await api(`/api/chat/${conv}/messages/${del.dataset.del}`, { method: "DELETE", token: this.token() }); const m = this.list.find((x) => x.id === del.dataset.del); if (m) { m.deleted = true; m.body = ""; m.attachment_url = ""; m.reactions = {}; } this.render(); } catch (x) { toast(x.message, true); } return; }
+    const rpt = t.closest("[data-report]");
+    if (rpt) { this.reportDialog(rpt.dataset.report); return; }
+    if (t.closest("[data-unblock]")) {
+      try { const r = await api(`/api/chat/${conv}/block`, { method: "DELETE", token: this.token() }); this.block = r.block || {}; this.renderBlock(); toast("Хоригийг цуцаллаа"); }
+      catch (x) { toast(x.message, true); }
+      return;
+    }
     const go = t.closest("[data-goto]");
     if (go) { const el = this.ol.querySelector(`[data-id="${CSS.escape(go.dataset.goto)}"]`); if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1200); } return; }
     if (t.closest("[data-cancel-reply]")) { this.replyTo = null; this.renderReply(); }
@@ -2381,6 +2394,49 @@ class ChatThread {
   async react(id, emoji) {
     try { const r = await api(`/api/chat/${this.convId()}/react`, { method: "POST", body: { message_id: id, emoji }, token: this.token() }); const m = this.list.find((x) => x.id === id); if (m) { m.reactions = r.reactions; this.render(); } }
     catch (x) { toast(x.message, true); }
+  }
+  // 1:1 ярианд аль нэг тал хориглосон бол бичих мөрийн оронд тайлбар (өөрөө хориглосон бол цуцлах товч).
+  renderBlock() {
+    if (!this.form) return;
+    const me = this.role() === "teacher" ? "teacher" : "visitor", them = me === "teacher" ? "visitor" : "teacher";
+    const byMe = !!this.block?.[me], byThem = !!this.block?.[them];
+    let bar = this.form.parentElement?.querySelector(":scope > .chat-blocked");
+    this.form.classList.toggle("is-blocked", byMe || byThem);
+    if (!byMe && !byThem) { bar?.remove(); return; }
+    if (!bar) { bar = document.createElement("div"); bar.className = "chat-blocked"; this.form.before(bar); }
+    bar.innerHTML = byMe ? `<span>🚫 Та энэ хүнийг хориглосон — хоёулаа мессеж бичихгүй.</span><button type="button" class="btn btn-ghost btn-sm" data-unblock>Хоригоо цуцлах</button>`
+      : `<span>Энэ ярианд мессеж илгээх боломжгүй.</span>`;
+    const ub = bar.querySelector("[data-unblock]"); if (ub) ub.onclick = (e) => this.click({ target: e.target });
+  }
+  // «⚑ Мэдүүлэх»: шалтгаан, тайлбар; 1:1 ярианд мөн хориглож болно. Хянагч мэдүүлсэн хэсгийг л харна.
+  reportDialog(id) {
+    const m = this.list.find((x) => x.id === id); if (!m || $(".rp")) return;
+    const one = !this.group(), el = document.createElement("div");
+    el.className = "rp"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "rpT");
+    el.innerHTML = `<form class="rp-card">
+      <h3 id="rpT">⚑ Мессеж мэдүүлэх</h3>
+      <blockquote class="rp-quote"><b>${esc(m.sender_name || (m.sender === "teacher" ? "Багш" : "Зочин"))}</b><span>${esc((m.body || "").replace(/^::sticker::/, "").slice(0, 240))}</span></blockquote>
+      <fieldset class="rp-reasons"><legend>Шалтгаан</legend>${REPORT_REASONS.map(([k, t], i) => `<label><input type="radio" name="reason" value="${k}" ${i ? "" : "required"}><span>${t}</span></label>`).join("")}</fieldset>
+      <label>Тайлбар <small class="muted">заавал биш</small><textarea name="note" rows="2" maxlength="500" placeholder="Юу болсныг товч бичнэ үү"></textarea></label>
+      ${one ? `<label class="consent"><input type="checkbox" name="block"><span>Мөн энэ хүнийг хориглох — цаашид хоёулаа энэ ярианд бичихгүй</span></label>` : ""}
+      <p class="rp-note">Мэдүүлсэн мессеж ба түүний өмнөх хэдэн мессежийг surgalt.mn-ийн хянагч харж шийдвэрлэнэ. Мэдүүлснийг тань нөгөө хүнд хэлэхгүй.</p>
+      <div class="rp-act"><button type="button" class="btn btn-ghost" data-rp-x>Болих</button><button class="btn btn-gold">Мэдүүлэх</button></div>
+    </form>`;
+    document.body.append(el);
+    const f = $("form", el), onKey = (e) => { if (e.key === "Escape") close(); };
+    const close = () => { el.remove(); document.removeEventListener("keydown", onKey); };
+    document.addEventListener("keydown", onKey);
+    el.addEventListener("click", (e) => { if (e.target === el || e.target.closest("[data-rp-x]")) close(); });
+    $("input[name=reason]", el).focus();
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      const b = $("button.btn-gold", f); b.disabled = true;
+      try {
+        const r = await api(`/api/chat/${this.convId()}/report`, { method: "POST", token: this.token(), body: { message_id: id, reason: f.reason.value, note: f.note.value, block: !!f.block?.checked } });
+        close(); this.block = r.block || {}; this.renderBlock();
+        toast(r.duplicate ? "Энэ мессежийг өмнө нь мэдүүлсэн байна" : "Мэдүүлэг хүлээн авлаа — хянагч шалгана. Баярлалаа!");
+      } catch (x) { toast(x.message, true); b.disabled = false; }
+    };
   }
   renderReply() {
     if (!this.form) return;
@@ -2476,7 +2532,7 @@ function chatWidget() {
   });
   Live.on((d) => {
     if (!conv) return;
-    if (["reaction", "read", "typing"].includes(d.type)) { thread.event(d); return; }
+    if (THREAD_EVENTS.includes(d.type)) { thread.event(d); return; }
     if (d.type !== "message" || d.message.conversation_id !== conv.id) return;
     thread.append(d.message);
     if (!panel.classList.contains("open")) $(".chat-fab-dot").hidden = false;
@@ -3825,6 +3881,42 @@ function guardianPage() {
   });
 }
 
+// Хянагчийн хуудас (/admin): чатын мэдүүлгийг харж шийдвэрлэнэ (сонговол мэдүүлсэн мессежийг устгана).
+function adminPage() {
+  const list = $("#adList"); if (!list) return;
+  if (!Auth.token) { location.href = "/login?next=/admin"; return; }
+  const KIND = { group: "Сургалтын бүлэг чат", team: "Сурагчдын бүлэг", dm: "Ангийн найзын чат", "": "Багштай чат" };
+  let st = "open";
+  const card = (r) => `<article class="ad-card" data-id="${esc(r.id)}">
+    <header><span class="chip ${r.status === "open" ? "chip-amber" : ""}">${esc(r.reason_label || r.reason)}</span><small class="muted">${esc(KIND[r.conv_kind] ?? "Чат")}</small><time>${fmtDate(r.created_at)}</time></header>
+    <p class="ad-who"><b>${esc(r.reporter_name || "Зочин")}</b> мэдүүлэв <span aria-hidden="true">→</span> <b>${esc(r.target_name || "Зочин")}</b></p>
+    ${r.note ? `<p class="ad-note">«${esc(r.note)}»</p>` : ""}
+    <ol class="ad-ctx">${(r.context || []).map((m) => `<li class="${m.reported ? "hit" : ""}"><b>${esc(m.name || "?")}</b><span>${esc(m.body)}</span><time>${fmtTime(m.at)}</time></li>`).join("")}</ol>
+    ${r.status === "open" ? `<form class="ad-act"><input name="resolution" maxlength="500" placeholder="Шийдвэр (ж: сануулсан, мессежийг устгасан)" aria-label="Шийдвэр"><label class="check"><input type="checkbox" name="del">Мессежийг устгах</label><button class="btn btn-gold btn-sm">Шийдвэрлэх</button></form>`
+      : `<p class="ad-done">✓ ${esc(r.resolved_by || "")}${r.resolved_at ? " · " + fmtDate(r.resolved_at) : ""}${r.resolution ? ` — ${esc(r.resolution)}` : ""}</p>`}
+  </article>`;
+  const load = async () => {
+    try {
+      const rs = await api("/api/admin/reports?status=" + st);
+      if (st === "open") $("[data-st=open]").textContent = `Нээлттэй${rs.length ? ` (${rs.length})` : ""}`;
+      list.innerHTML = rs.length ? rs.map(card).join("") : `<p class="ad-empty">${st === "open" ? "Нээлттэй мэдүүлэг алга 🎉" : "Шийдвэрлэсэн мэдүүлэг алга"}</p>`;
+    } catch (x) {
+      list.innerHTML = `<p class="ad-empty">${x.status === 403 ? "Энэ хуудас зөвхөн хянагчид нээлттэй. Хянагч нь ADMIN_EMAILS-д бүртгэлтэй, Google эсвэл Microsoft-оор нэвтэрсэн бүртгэл байна." : esc(x.message)}</p>`;
+    }
+  };
+  $$(".ad-tabs button").forEach((b) => b.addEventListener("click", () => { st = b.dataset.st; $$(".ad-tabs button").forEach((x) => x.classList.toggle("on", x === b)); list.innerHTML = `<p class="ad-empty">Ачаалж байна…</p>`; load(); }));
+  list.addEventListener("submit", async (e) => {
+    const f = e.target.closest(".ad-act"); if (!f) return;
+    e.preventDefault();
+    const b = $("button", f); b.disabled = true;
+    try {
+      await api(`/api/admin/reports/${f.closest(".ad-card").dataset.id}/resolve`, { method: "POST", body: { resolution: f.resolution.value, delete_message: f.del.checked } });
+      toast("Шийдвэрлэлээ ✓"); load();
+    } catch (x) { toast(x.message, true); b.disabled = false; }
+  });
+  load();
+}
+
 // Нууцлал, нөхцөлийн хуудас: уншиж буй хэсгийг агуулгын жагсаалтад тодруулна.
 function legalPage() {
   const links = $$(".pv-toc a"), byId = new Map(links.map((a) => [a.hash.slice(1), a]));
@@ -3836,7 +3928,7 @@ function legalPage() {
 }
 
 /* ---------- эхлүүлэх ---------- */
-window.SG = { pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
+window.SG = { THREAD_EVENTS, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх
@@ -3992,4 +4084,5 @@ if (page === "home") findCourses();
 if (page === "book") bookPage();
 if (page === "legal") legalPage();
 if (page === "guardian") guardianPage();
+if (page === "admin") adminPage();
 })();

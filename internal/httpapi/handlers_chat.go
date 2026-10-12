@@ -116,7 +116,8 @@ func (s *Server) handleStartChat(w http.ResponseWriter, r *http.Request) {
 	}
 	s.signAttachments(msgs)
 	reads, _ := s.store.ConversationReads(r.Context(), conv.ID)
-	writeJSON(w, http.StatusOK, map[string]any{"conversation": conv, "messages": msgs, "me": store.SenderVisitor, "me_key": c.VisitorKey(), "reads": reads})
+	writeJSON(w, http.StatusOK, map[string]any{"conversation": conv, "messages": msgs, "me": store.SenderVisitor, "me_key": c.VisitorKey(), "reads": reads,
+		"block": s.convBlock(r.Context(), conv)})
 }
 
 func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +137,8 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"conversation": conv, "messages": msgs, "me": role, "me_key": c.VisitorKey(), "reads": reads})
+	writeJSON(w, http.StatusOK, map[string]any{"conversation": conv, "messages": msgs, "me": role, "me_key": c.VisitorKey(), "reads": reads,
+		"block": s.convBlock(r.Context(), conv)})
 }
 
 // attachReactions — мессежүүдэд реакцуудыг нь бөглөнө.
@@ -251,6 +253,10 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.chatLim.Allow(c.VisitorKey()) {
 		writeErr(w, http.StatusTooManyRequests, "хэт хурдан бичиж байна")
+		return
+	}
+	if s.convBlock(r.Context(), conv).any() { // 1:1 ярианд аль нэг тал хориглосон
+		writeErr(w, http.StatusForbidden, errBlocked.Error())
 		return
 	}
 	var in struct {

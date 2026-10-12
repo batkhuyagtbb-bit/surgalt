@@ -34,6 +34,7 @@ type Config struct {
 	StorageFreeMB int64         // багш бүрт үнэгүй багтаамж
 	StoragePlans  []StoragePlan // худалдаж авах багцууд
 	ContactEmail  string        // нууцлал, нөхцөлийн хуудсанд харагдах холбоо барих имэйл
+	AdminEmails   []string      // чатын мэдүүлэг шийдвэрлэх хянагчид (жижиг үсгээр; moderation.go)
 }
 
 type Server struct {
@@ -248,6 +249,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/chat/{id}/read", s.handleRead)
 	mux.HandleFunc("POST /api/chat/{id}/typing", s.handleTyping)
 	mux.HandleFunc("POST /api/chat/{id}/upload", s.handleChatUpload)
+	mux.HandleFunc("POST /api/chat/{id}/report", s.handleReport)
+	mux.HandleFunc("POST /api/chat/{id}/block", s.handleBlock)
+	mux.HandleFunc("DELETE /api/chat/{id}/block", s.handleBlock)
+	mux.HandleFunc("GET /admin", s.pageStatic("admin"))
+	mux.HandleFunc("GET /api/admin/reports", s.handleAdminReports)
+	mux.HandleFunc("POST /api/admin/reports/{id}/resolve", s.handleAdminResolve)
 	mux.HandleFunc("GET /api/me/classmates", s.handleClassmates)
 	mux.HandleFunc("POST /api/me/dm/{uid}", s.handleStartDM)
 	mux.HandleFunc("POST /api/me/teams", s.handleCreateTeam)

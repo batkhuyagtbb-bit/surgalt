@@ -73,14 +73,20 @@ func newTestStore(t *testing.T) store.Store {
 	return ch
 }
 
-func newTestServer(t *testing.T) (*httptest.Server, store.Store) {
+func newTestServer(t *testing.T) (*httptest.Server, store.Store) { return newTestServerWith(t, nil) }
+
+// newTestServerWith — тохиргоог (жишээ нь ADMIN_EMAILS) өөрчилж туршина.
+func newTestServerWith(t *testing.T, mod func(*Config)) (*httptest.Server, store.Store) {
 	st := newTestStore(t)
 	fs, err := files.New(t.TempDir(), []byte("k"), 10<<20)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := New(Config{TrustProxy: true, DevPayments: true, WebhookSecret: "wh", StorageFreeMB: 10, StoragePlans: []StoragePlan{{MB: 300, Price: 5000}}},
-		st, auth.NewSigner("test", time.Hour), chat.NewHub(), fs, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	cfg := Config{TrustProxy: true, DevPayments: true, WebhookSecret: "wh", StorageFreeMB: 10, StoragePlans: []StoragePlan{{MB: 300, Price: 5000}}}
+	if mod != nil {
+		mod(&cfg)
+	}
+	s := New(cfg, st, auth.NewSigner("test", time.Hour), chat.NewHub(), fs, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	return httptest.NewServer(s.Handler()), st
 }
 

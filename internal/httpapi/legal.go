@@ -26,10 +26,11 @@ type meView struct {
 	AgeGroup       string          `json:"age_group,omitempty"`
 	Guardian       *store.Guardian `json:"guardian,omitempty"`      // 18 хүрээгүй: эцэг эх, асран хамгаалагчийн өгсөн зөвшөөрөл
 	GuardianLink   string          `json:"guardian_link,omitempty"` // 18 хүрээгүй: эцэг эхдээ илгээх зөвшөөрлийн холбоос
+	IsAdmin        bool            `json:"is_admin,omitempty"`      // чатын мэдүүлэг шийдвэрлэх хянагч (moderation.go)
 }
 
 func (s *Server) me(u *store.User) meView {
-	v := meView{User: u, Phone: u.Phone, ConsentVersion: u.ConsentVersion, AgeGroup: u.AgeGroup,
+	v := meView{User: u, Phone: u.Phone, ConsentVersion: u.ConsentVersion, AgeGroup: u.AgeGroup, IsAdmin: s.isAdmin(u),
 		ConsentNeeded: u.ConsentVersion != TermsVersion || (u.Role == store.RoleStudent && u.AgeGroup == "")}
 	if u.AgeGroup == store.AgeMinor {
 		v.GuardianLink = "/guardian/" + s.guardianToken(u.ID)

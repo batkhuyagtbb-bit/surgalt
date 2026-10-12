@@ -177,9 +177,10 @@ var chMigrations = []string{
 // chTTLs — хувийн мэдээллийг хадгалах хугацаа (нууцлалын бодлогод заасан). Хүснэгтэд TTL байхгүй үед л нэг удаа тавина
 // (давтан MODIFY TTL хийвэл өгөгдлийг дахин шалгах ачаалалтай тул).
 var chTTLs = []struct{ table, ttl string }{
-	{"activity_events", "toDateTime(at) + INTERVAL 180 DAY"}, // хичээлийн хяналтын үйл явдал (таб солих г.м.)
-	{"page_visits", "toDateTime(at) + INTERVAL 365 DAY"},     // профайл, сургалтын үзэлт
-	{"quiz_logs", "toDateTime(at) + INTERVAL 365 DAY"},       // асуулт бүрийн оролдлого
+	{"activity_events", "toDateTime(at) + INTERVAL 180 DAY"},      // хичээлийн хяналтын үйл явдал (таб солих г.м.)
+	{"page_visits", "toDateTime(at) + INTERVAL 365 DAY"},          // профайл, сургалтын үзэлт
+	{"quiz_logs", "toDateTime(at) + INTERVAL 365 DAY"},            // асуулт бүрийн оролдлого
+	{"chat_reports", "toDateTime(created_at) + INTERVAL 730 DAY"}, // чатын мэдүүлэг
 }
 
 // chColTTLs — мөрийг (суралцсан цагийг) үлдээж, зөвхөн хувийн баганыг хугацааны дараа хоосолно.
@@ -278,6 +279,13 @@ var chTables = []chTable{
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (message_id, user_key)`},
 	{"conversation_reads", `(conversation_id String, user_key String, last_id String, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (conversation_id, user_key)`},
+	{"chat_reports", `(id String, conversation_id String, conv_kind String, teacher_id String, message_id String,
+		reporter_key String, reporter_id String, reporter_name String, target_key String, target_id String, target_name String,
+		reason String, note String, context String, status String, resolution String, resolved_by String,
+		created_at ` + tsType + `, resolved_at Nullable(` + tsType + `), ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
+	{"conversation_blocks", `(conversation_id String, side String, deleted Bool, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (conversation_id, side)`},
 	{"rank_points", `(user_id String, course_id String, points Int32, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, course_id)`},
 	{"rank_levels", `(user_id String, level Int32, awarded_at ` + tsType + `, ver UInt64)
