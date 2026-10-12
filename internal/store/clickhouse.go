@@ -167,11 +167,12 @@ var chMigrations = []string{
 	"ALTER TABLE slots ADD COLUMN IF NOT EXISTS series_id String DEFAULT ''",
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version String DEFAULT ''",
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_at Nullable(" + tsType + ")",
-	"ALTER TABLE users ADD COLUMN IF NOT EXISTS age_group String DEFAULT ''",
-	"ALTER TABLE users ADD COLUMN IF NOT EXISTS guardian_name String DEFAULT ''",
-	"ALTER TABLE users ADD COLUMN IF NOT EXISTS guardian_relation String DEFAULT ''",
-	"ALTER TABLE users ADD COLUMN IF NOT EXISTS guardian_phone String DEFAULT ''",
-	"ALTER TABLE users ADD COLUMN IF NOT EXISTS guardian_at Nullable(" + tsType + ")",
+	// Эцэг эхийн зөвшөөрлийн боломжийг хассан: хадгалсан нас, эцэг эхийн нэр, утсыг устгана.
+	"ALTER TABLE users DROP COLUMN IF EXISTS age_group",
+	"ALTER TABLE users DROP COLUMN IF EXISTS guardian_name",
+	"ALTER TABLE users DROP COLUMN IF EXISTS guardian_relation",
+	"ALTER TABLE users DROP COLUMN IF EXISTS guardian_phone",
+	"ALTER TABLE users DROP COLUMN IF EXISTS guardian_at",
 }
 
 // chTTLs — хувийн мэдээллийг хадгалах хугацаа (нууцлалын бодлогод заасан). Хүснэгтэд TTL байхгүй үед л нэг удаа тавина
@@ -195,8 +196,6 @@ var chTables = []chTable{
 		subjects Array(String), location String, links Map(String, String),
 		created_at ` + tsType + `, storage_extra_bytes Int64, storage_expires_at Nullable(` + tsType + `),
 		google_token String, phone String DEFAULT '', consent_version String DEFAULT '', consent_at Nullable(` + tsType + `),
-		age_group String DEFAULT '', guardian_name String DEFAULT '', guardian_relation String DEFAULT '',
-		guardian_phone String DEFAULT '', guardian_at Nullable(` + tsType + `),
 		ver UInt64, deleted Bool DEFAULT false,
 		INDEX ix_email email TYPE bloom_filter GRANULARITY 1,
 		INDEX ix_username username TYPE bloom_filter GRANULARITY 1
@@ -480,8 +479,7 @@ func (c *ClickHouse) counters(ctx context.Context, entity string, ids []string) 
 // ---- хэрэглэгч ----
 
 const userCols = `id, username, email, password_hash, role, display_name, headline, bio, avatar_url, cover_url,
-	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, consent_version, consent_at,
-	age_group, guardian_name, guardian_relation, guardian_phone, guardian_at, deleted`
+	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, consent_version, consent_at, deleted`
 
 func scanUser(r driver.Rows) (*User, bool, error) {
 	var u User
@@ -490,8 +488,7 @@ func scanUser(r driver.Rows) (*User, bool, error) {
 	var exp *time.Time
 	if err := r.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &role, &u.DisplayName, &u.Headline, &u.Bio,
 		&u.AvatarURL, &u.CoverURL, &u.Subjects, &u.Location, &u.Links, &u.CreatedAt, &u.StorageExtraBytes, &exp,
-		&u.GoogleToken, &u.Phone, &u.ConsentVersion, &u.ConsentAt,
-		&u.AgeGroup, &u.Guardian.Name, &u.Guardian.Relation, &u.Guardian.Phone, &u.Guardian.At, &deleted); err != nil {
+		&u.GoogleToken, &u.Phone, &u.ConsentVersion, &u.ConsentAt, &deleted); err != nil {
 		return nil, false, err
 	}
 	u.Role = Role(role)
@@ -509,12 +506,10 @@ func scanUser(r driver.Rows) (*User, bool, error) {
 func (c *ClickHouse) writeUser(ctx context.Context, u *User, deleted bool) error {
 	return c.insert(ctx, "users", []string{"id", "username", "email", "password_hash", "role", "display_name", "headline", "bio",
 		"avatar_url", "cover_url", "subjects", "location", "links", "created_at", "storage_extra_bytes", "storage_expires_at",
-		"google_token", "phone", "consent_version", "consent_at",
-		"age_group", "guardian_name", "guardian_relation", "guardian_phone", "guardian_at", "ver", "deleted"},
+		"google_token", "phone", "consent_version", "consent_at", "ver", "deleted"},
 		u.ID, u.Username, u.Email, u.PasswordHash, string(u.Role), u.DisplayName, u.Headline, u.Bio,
 		u.AvatarURL, u.CoverURL, nzStrings(u.Subjects), u.Location, nzLinks(u.Links), u.CreatedAt.UTC(), u.StorageExtraBytes,
-		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, u.ConsentVersion, nullTime(u.ConsentAt),
-		u.AgeGroup, u.Guardian.Name, u.Guardian.Relation, u.Guardian.Phone, nullTime(u.Guardian.At), ver(), deleted)
+		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, u.ConsentVersion, nullTime(u.ConsentAt), ver(), deleted)
 }
 
 func (c *ClickHouse) userWhere(ctx context.Context, where string, args ...any) (*User, error) {

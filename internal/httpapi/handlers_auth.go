@@ -36,7 +36,6 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		Role        string `json:"role"`
 		DisplayName string `json:"display_name"`
 		AcceptTerms bool   `json:"accept_terms"` // нөхцөл, нууцлалын бодлогыг зөвшөөрсөн (заавал)
-		AgeGroup    string `json:"age_group"`    // суралцагч: adult | minor (заавал)
 	}
 	if !decode(w, r, &in) {
 		return
@@ -57,9 +56,6 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	case !in.AcceptTerms:
 		writeErr(w, http.StatusBadRequest, "үйлчилгээний нөхцөл, нууцлалын бодлогыг зөвшөөрнө үү")
-		return
-	case in.Role != string(store.RoleTeacher) && !validAge(in.AgeGroup):
-		writeErr(w, http.StatusBadRequest, "насаа сонгоно уу")
 		return
 	}
 	role := store.RoleStudent
@@ -100,9 +96,6 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		}
 		u = &store.User{Username: uname, Email: in.Email, PasswordHash: hash, Role: role, DisplayName: in.DisplayName}
 		consentNow(u)
-		if role == store.RoleStudent {
-			u.AgeGroup = in.AgeGroup
-		}
 		err := s.store.CreateUser(r.Context(), u)
 		if err == nil {
 			break

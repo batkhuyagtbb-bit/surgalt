@@ -115,7 +115,7 @@ func TestExportAndDeleteAccount(t *testing.T) {
 	if ts := strings.Join(notifTitles(ns, NotifBooking), "|"); !strings.Contains(ts, "бүртгэлээ устгасан") {
 		t.Fatalf("багшид мэдэгдэл: %v", ts)
 	}
-	if code, _ := call(t, srv, "POST", "/api/auth/register", "", `{"email":"stud1@x.mn","password":"password2","accept_terms":true,"age_group":"adult"}`); code != http.StatusCreated {
+	if code, _ := call(t, srv, "POST", "/api/auth/register", "", `{"email":"stud1@x.mn","password":"password2","accept_terms":true}`); code != http.StatusCreated {
 		t.Fatalf("имэйлээр дахин бүртгүүлж болно: %d", code)
 	}
 

@@ -67,7 +67,6 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me := s.me(u)
-	me.GuardianLink = ""
 	out := map[string]any{
 		"exported_at": time.Now(),
 		"about":       "surgalt.mn дээрх таны хувийн мэдээлэл (Хувь хүний мэдээлэл хамгаалах тухай хууль). Нууцлалын бодлого: /privacy",

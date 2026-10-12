@@ -19,5 +19,4 @@ func anonymize(u *User) {
 	u.Email, u.Username, u.DisplayName = "deleted+"+u.ID+"@users.noreply.surgalt", "deleted_"+tail, DeletedName
 	u.PasswordHash, u.Headline, u.Bio, u.AvatarURL, u.CoverURL = "", "", "", "", ""
 	u.Subjects, u.Location, u.Links, u.Phone, u.GoogleToken, u.MeetConnected = nil, "", nil, "", "", false
-	u.AgeGroup, u.Guardian = "", Guardian{}
 }

@@ -406,11 +406,11 @@ function authNav() {
 // зөвшөөрөх хүртэл сайтыг хааж асууна. Хуудсуудыг өөрсдийг нь уншихад саад болохгүйн тулд тэнд асуухгүй.
 async function consentGate() {
   const ver = $('meta[name="terms-version"]')?.content;
-  if (!ver || page === "legal" || page === "guardian" || (Auth.user?.consent_version === ver && (Auth.user.role !== "student" || Auth.user.age_group))) return;
+  if (!ver || page === "legal" || Auth.user?.consent_version === ver) return;
   let u; try { u = await api("/api/me"); } catch { return; }
   Auth.set(Auth.token, u);
   if (!u.consent_needed || $(".cg")) return;
-  const teacher = u.role === "teacher", again = !!u.consent_version && u.consent_version !== ver, askAge = !teacher && !u.age_group;
+  const teacher = u.role === "teacher", again = !!u.consent_version && u.consent_version !== ver;
   const pts = teacher
     ? ["Оруулсан агуулгынхаа зохиогчийн эрхийг та хариуцна.", "Суралцагчдын мэдээллийг зөвхөн сургалт явуулахад ашиглана.", "Профайлаа үзсэн, дугаараа нээсэн хүний нэр танд харагдана."]
     : ["Хичээл, шалгалтын үеэр идэвх тань тэмдэглэгдэнэ — камер, микрофон ашиглахгүй.", "Багш зөвхөн өөрийн сургалтын суралцагчдын ахиц, дүнг харна.", "Таны мэдээллийг худалдахгүй, зар сурталчилгаанд ашиглахгүй."];
@@ -422,7 +422,6 @@ async function consentGate() {
     <p>${again ? "Үйлчилгээний нөхцөл, нууцлалын бодлого шинэчлэгдсэн тул" : "surgalt.mn-ийг ашиглахын тулд"} доорх баримтуудыг уншиж, зөвшөөрнө үү.</p>
     <ul>${pts.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
     <p class="cg-links"><a href="/terms" target="_blank" rel="noopener">Үйлчилгээний нөхцөл ↗</a><a href="/privacy" target="_blank" rel="noopener">Нууцлалын бодлого ↗</a></p>
-    ${askAge ? agePickHTML("cgAge") : ""}
     <p class="cg-err" role="alert"></p>
     <div class="cg-act"><button type="button" class="btn btn-ghost" data-cg-out>Гарах</button><button type="button" class="btn btn-gold" data-cg-ok>Зөвшөөрч байна</button></div>
   </div>`;
@@ -430,14 +429,11 @@ async function consentGate() {
   behind.forEach((c) => (c.inert = true));
   document.body.append(el); document.documentElement.classList.add("cg-open");
   const ok = $("[data-cg-ok]", el); ok.focus();
-  el.addEventListener("change", () => ($(".cg-err", el).textContent = ""));
   $("[data-cg-out]", el).onclick = () => { Auth.clear(); location.href = "/"; };
   ok.onclick = async () => {
-    const age = $("input[name=cgAge]:checked", el)?.value || "";
-    if (askAge && !age) { $(".cg-err", el).textContent = "Насаа сонгоно уу"; $("input[name=cgAge]", el).focus(); return; }
     ok.disabled = true;
     try {
-      Auth.set(Auth.token, await api("/api/me/consent", { method: "POST", body: { version: ver, age_group: age } }));
+      Auth.set(Auth.token, await api("/api/me/consent", { method: "POST", body: { version: ver } }));
       behind.forEach((c) => (c.inert = false));
       el.remove(); document.documentElement.classList.remove("cg-open");
       toast("Баярлалаа! Зөвшөөрлийг тань хадгаллаа.");
@@ -2887,7 +2883,6 @@ async function homePage() {
       ${h.rank ? `<a class="tile tile-rank" href="#my-rank"><em class="rank-shine" data-level="${h.rank.level}">${esc(h.rank.insignia)}</em><b>${esc(h.rank.name)}</b><span>Миний цол · ${h.rank.points} оноо</span></a>` : ""}
       ${h.tasks?.length ? `<a class="tile" href="#my-tasks"><em>${icon("exam")}</em><b>${h.tasks.filter((t) => ["open", "need_pay"].includes(t.status)).length}</b><span>Хийх даалгавар, шалгалт</span></a>` : ""}
     </div>`];
-  if (u.age_group === "minor" && !u.guardian && u.guardian_link) parts.splice(1, 0, guardianBanner(u));
   // Цол: систем шинэ цол олгосон бол баяр хүргэж салют буудуулна.
   if (h.rank) {
     const lvlKey = "sg_rank_lvl_" + (u.id || "u");
@@ -3633,9 +3628,7 @@ function apptWindow(username, tname) {
     const list = data.slots.filter((x) => dkey(x.d) === day), sel = data.slots.find((x) => x.id === pick);
     body.innerHTML = mineHTML() + `<div class="ap-days" role="tablist" aria-label="Өдөр">${days.map(([k, d]) => `<button type="button" class="ap-day" role="tab" aria-selected="${k === day}" data-day="${k}"><b>${dayName(d)}</b><span>${d.getMonth() + 1}/${d.getDate()}</span></button>`).join("")}</div>
       <div class="ap-times">${list.map((x) => `<button type="button" class="ap-time" aria-pressed="${x.id === pick}" data-pick="${x.id}"><b>${hm(x.d)}</b><small>${x.duration_min} мин · ${x.mode === "offline" ? "Биечлэн" : "Онлайн"}</small><em>${x.price ? money(x.price) : "Үнэгүй"}</em></button>`).join("")}</div>
-      ${sel && sel.mode === "offline" && Auth.user?.age_group === "minor" && !Auth.user.guardian ? `<div class="ap-pick"><div class="ap-sum"><b>${when(sel.d, sel.duration_min)}</b><small>${place(sel)}</small></div>
-        <p class="ap-guard">${icon("shield", 18)}<span>18 хүрээгүй суралцагч биечлэн уулзахад эцэг эх, асран хамгаалагчийн зөвшөөрөл хэрэгтэй. Онлайн цагийг одоо ч захиалж болно. <a href="/">Зөвшөөрлийн холбоосоо авах →</a></span></p></div>`
-      : sel ? `<div class="ap-pick"><div class="ap-sum"><b>${when(sel.d, sel.duration_min)}</b><small>${place(sel)}</small></div>
+      ${sel ? `<div class="ap-pick"><div class="ap-sum"><b>${when(sel.d, sel.duration_min)}</b><small>${place(sel)}</small></div>
         <label class="ap-note"><span>Юу ярилцах вэ? <small class="muted">заавал биш</small></span><textarea maxlength="500" rows="2" placeholder="Жишээ нь: ЭЕШ-ийн бэлтгэл, логарифмын бодлого"></textarea></label>
         <button type="button" class="btn btn-gold btn-block btn-lg" data-go>${Auth.token ? (sel.price ? `Төлөөд захиалах · ${money(sel.price)}` : "Цаг захиалах") : "Нэвтэрч захиалах"}</button></div>`
       : `<p class="muted small ap-hint">Тохирох цагаа сонгоно уу.</p>`}`;
@@ -3828,56 +3821,12 @@ function loginPage() {
   };
   rf.password.addEventListener("input", checkMatch); rf.password2.addEventListener("input", checkMatch);
   rf.accept.addEventListener("invalid", () => rf.accept.setCustomValidity("Үргэлжлүүлэхийн тулд нөхцөл, нууцлалын бодлогыг зөвшөөрнө үү"));
-  // Нас: зөвхөн суралцагчаас асууна.
-  const syncAge = () => { $("#agePick").hidden = teacher.checked; $$("#agePick input").forEach((i) => (i.required = !teacher.checked)); };
-  teacher.addEventListener("change", syncAge); syncAge();
   rf.accept.addEventListener("change", () => rf.accept.setCustomValidity(""));
   rf.addEventListener("submit", async (e) => {
     e.preventDefault(); err.textContent = "";
     if (!checkMatch()) { err.textContent = "Нууц үг таарахгүй байна"; rf.password2.focus(); return; }
-    const body = { email: rf.email.value, password: rf.password.value, role: teacher.checked ? "teacher" : "student", accept_terms: rf.accept.checked,
-      age_group: teacher.checked ? "" : rf.age.value };
+    const body = { email: rf.email.value, password: rf.password.value, role: teacher.checked ? "teacher" : "student", accept_terms: rf.accept.checked };
     try { done(await api("/api/auth/register", { method: "POST", body, token: null })); } catch (x) { err.textContent = x.message; }
-  });
-}
-
-// Насны сонголт (бүртгэл, зөвшөөрлийн цонх): 18 хүрээгүй бол эцэг эх, асран хамгаалагчийн зөвшөөрөл авна.
-const agePickHTML = (name) => `<fieldset class="age-pick"><legend>Таны нас</legend>
-  <label><input type="radio" name="${name}" value="adult" required><span>18 ба түүнээс дээш</span></label>
-  <label><input type="radio" name="${name}" value="minor"><span>18 хүрээгүй</span></label></fieldset>`;
-
-// 18 хүрээгүй суралцагчийн нүүрэнд: эцэг эх, асран хамгаалагчдаа илгээх зөвшөөрлийн холбоос (зөвшөөрөл ирэх хүртэл).
-function guardianBanner(u) {
-  const url = new URL(u.guardian_link, location.origin).href;
-  return `<section class="gb" aria-label="Эцэг эхийн зөвшөөрөл"><span class="gb-ico" aria-hidden="true">${icon("shield", 22)}</span>
-    <div class="gb-body"><b>Эцэг эх, асран хамгаалагчийн зөвшөөрөл хэрэгтэй</b>
-      <p>Та 18 хүрээгүй тул энэ холбоосыг эцэг эх, асран хамгаалагчдаа илгээгээрэй. Тэд зөвшөөрсний дараа багштай биечлэн уулзах цаг захиалах боломжтой болно.</p>
-      <div class="gb-link"><input readonly value="${esc(url)}" aria-label="Зөвшөөрлийн холбоос" data-gb-url>
-        <button type="button" class="btn btn-gold btn-sm" data-gb-copy>Хуулах</button>${navigator.share ? `<button type="button" class="btn btn-sm" data-gb-share>Илгээх</button>` : ""}</div></div></section>`;
-}
-document.addEventListener("click", async (e) => {
-  const b = e.target.closest("[data-gb-copy], [data-gb-share]"), inp = $("[data-gb-url]");
-  if (!b || !inp) return;
-  if (b.matches("[data-gb-share]")) { try { await navigator.share({ title: "surgalt.mn", text: "Намайг surgalt.mn-д суралцахыг зөвшөөрнө үү", url: inp.value }); } catch {} return; }
-  try { await navigator.clipboard.writeText(inp.value); toast("Холбоос хуулагдлаа ✓"); } catch { inp.select(); toast("Холбоосыг сонгоод хуулна уу"); }
-});
-
-// Эцэг эх, асран хамгаалагчийн зөвшөөрлийн хуудас (/guardian/<токен>) — нэвтрэхгүй, холбоосоор.
-function guardianPage() {
-  const card = $(".gd-card"); if (!card) return;
-  const url = "/api/guardian/" + encodeURIComponent(card.dataset.token), f = $("#gdForm");
-  f?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const err = $("#gdError"), btn = $("button.btn-gold", f); err.textContent = ""; btn.disabled = true;
-    try {
-      await api(url, { method: "POST", token: null, body: { name: f.fullname.value, relation: f.relation.value, phone: f.phone.value, accept: f.accept.checked } });
-      location.reload();
-    } catch (x) { err.textContent = x.message; btn.disabled = false; }
-  });
-  $("[data-gd-revoke]")?.addEventListener("click", async (e) => {
-    if (!confirm("Зөвшөөрлөө цуцлах уу? Хүүхэд тань багштай биечлэн уулзах цаг захиалах боломжгүй болно.")) return;
-    e.target.disabled = true;
-    try { await api(url, { method: "DELETE", token: null }); location.reload(); } catch (x) { toast(x.message, true); e.target.disabled = false; }
   });
 }
 
@@ -4141,6 +4090,5 @@ if (new URLSearchParams(location.search).has("deleted")) { // бүртгэлээ
   toast("Бүртгэл тань устгагдлаа. surgalt.mn-ийг ашигласанд баярлалаа.");
   history.replaceState(null, "", location.pathname + location.hash);
 }
-if (page === "guardian") guardianPage();
 if (page === "admin") adminPage();
 })();
