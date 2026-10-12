@@ -3828,7 +3828,7 @@ function loginPage() {
   };
   rf.password.addEventListener("input", checkMatch); rf.password2.addEventListener("input", checkMatch);
   rf.accept.addEventListener("invalid", () => rf.accept.setCustomValidity("Үргэлжлүүлэхийн тулд нөхцөл, нууцлалын бодлогыг зөвшөөрнө үү"));
-  // Нас: зөвхөн суралцагчаас асууна (багш 18 нас хүрсэн байх ёстой — нөхцөлд заасан).
+  // Нас: зөвхөн суралцагчаас асууна.
   const syncAge = () => { $("#agePick").hidden = teacher.checked; $$("#agePick input").forEach((i) => (i.required = !teacher.checked)); };
   teacher.addEventListener("change", syncAge); syncAge();
   rf.accept.addEventListener("change", () => rf.accept.setCustomValidity(""));
