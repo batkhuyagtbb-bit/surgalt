@@ -23,6 +23,7 @@ import (
 	"surgalt/internal/chat"
 	"surgalt/internal/files"
 	"surgalt/internal/httpapi"
+	"surgalt/internal/mail"
 	"surgalt/internal/meet"
 	"surgalt/internal/oauth"
 	"surgalt/internal/qpay"
@@ -181,6 +182,27 @@ func run(log *slog.Logger) error {
 
 	fstore.StartTranscoder(ctx, int(envInt("VIDEO_WORKERS", 1)), log)
 
+	// Имэйл (нууц үг сэргээх): SMTP_HOST тохируулсан бол идэвхжинэ.
+	var mailer mail.Sender
+	if host := os.Getenv("SMTP_HOST"); host != "" {
+		user := os.Getenv("SMTP_USER")
+		from := os.Getenv("SMTP_FROM")
+		if from == "" {
+			from = "surgalt.mn <no-reply@surgalt.mn>"
+			if strings.Contains(user, "@") {
+				from = "surgalt.mn <" + user + ">" // Gmail г.м. нэвтэрсэн хаягаараа л илгээдэг
+			}
+		}
+		m, err := mail.NewSMTP(host, int(envInt("SMTP_PORT", 587)), user, os.Getenv("SMTP_PASS"), from)
+		if err != nil {
+			return err
+		}
+		mailer = m
+		log.Info("SMTP имэйл идэвхтэй", "host", host, "from", m.From.Address)
+	} else {
+		log.Warn("SMTP тохируулаагүй — нууц үг сэргээх имэйл илгээгдэхгүй (демо горимд холбоосыг логт гаргана)")
+	}
+
 	hub := chat.NewHub()
 	tokens := auth.NewSigner(secret, 7*24*time.Hour)
 	srv := httpapi.New(httpapi.Config{
@@ -195,6 +217,7 @@ func run(log *slog.Logger) error {
 		StoragePlans:  parsePlans(env("STORAGE_PLANS", "300:5000,500:8000,1024:14000,2048:25000,5120:55000")),
 		ContactEmail:  os.Getenv("CONTACT_EMAIL"),
 		AdminEmails:   emailList(os.Getenv("ADMIN_EMAILS")),
+		Mail:          mailer,
 	}, st, tokens, hub, fstore, log)
 
 	base := env("PUBLIC_URL", "http://localhost"+env("ADDR", ":8080"))

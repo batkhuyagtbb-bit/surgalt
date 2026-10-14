@@ -431,7 +431,7 @@ func (s *Server) handleMyConversations(w http.ResponseWriter, r *http.Request) {
 // Мессеж илгээхдээ HTTP POST ашиглана (баталгаатай, rate-limit-тэй).
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	c, err := s.tokens.Verify(r.URL.Query().Get("token"))
-	if err != nil || c.IsGuest() || !s.liveUser(r.Context(), c.UID) { // зочин чатлахгүй; бүртгэлээ устгасан бол хүчингүй
+	if err != nil || c.IsGuest() || !s.liveUser(r.Context(), c.UID, c.Iat) { // зочин чатлахгүй; бүртгэлээ устгасан бол хүчингүй
 		writeErr(w, http.StatusUnauthorized, "токен хүчингүй")
 		return
 	}

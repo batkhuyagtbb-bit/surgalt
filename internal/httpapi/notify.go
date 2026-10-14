@@ -23,6 +23,7 @@ const (
 	NotifPhoneView   = "phone_view"
 	NotifBooking     = "booking" // цаг захиалга (booking.go)
 	NotifReport      = "report"  // чатын мэдүүлэг (moderation.go)
+	NotifAccount     = "account" // бүртгэлийн аюулгүй байдал (нууц үг солигдсон г.м.; reset.go)
 )
 
 type viewKey struct{ teacher, kind, id string }

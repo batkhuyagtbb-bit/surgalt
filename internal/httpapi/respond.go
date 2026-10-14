@@ -71,7 +71,7 @@ func (s *Server) principal(r *http.Request) (auth.Claims, bool) {
 		return auth.Claims{}, false
 	}
 	c, err := s.tokens.Verify(tok)
-	if err != nil || (!c.IsGuest() && !s.liveUser(r.Context(), c.UID)) { // бүртгэлээ устгасан бол хуучин токен хүчингүй
+	if err != nil || (!c.IsGuest() && !s.liveUser(r.Context(), c.UID, c.Iat)) { // бүртгэлээ устгасан бол хуучин токен хүчингүй
 		return auth.Claims{}, false
 	}
 	return c, true

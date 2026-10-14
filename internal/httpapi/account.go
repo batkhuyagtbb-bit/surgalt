@@ -12,14 +12,23 @@ import (
 
 // ---- Хууль, итгэл: өгөгдлөө татаж авах, бүртгэлээ устгах (Хувь хүний мэдээлэл хамгаалах тухай хууль) ----
 
-// liveUser — токены эзэн бүртгэлээ устгаагүй эсэх (5 минут кэшлэнэ; устгахад шууд хасна). Түр зуурын алдаанд
-// нэвтрэлтийг хаахгүй.
-func (s *Server) liveUser(ctx context.Context, uid string) bool {
-	_, err := s.alive.GetOrLoad(ctx, uid, func(ctx context.Context) (bool, error) {
-		_, err := s.store.UserByID(ctx, uid)
-		return err == nil, err
+// liveUser — токены эзэн бүртгэлээ устгаагүй, токен нь нууц үг сэргээхээс өмнө олгогдоогүй эсэх (5 минут
+// кэшлэнэ; устгах, сэргээхэд шууд хасна). Түр зуурын алдаанд нэвтрэлтийг хаахгүй.
+func (s *Server) liveUser(ctx context.Context, uid string, iat int64) bool {
+	after, err := s.alive.GetOrLoad(ctx, uid, func(ctx context.Context) (int64, error) {
+		u, err := s.store.UserByID(ctx, uid)
+		if err != nil {
+			return 0, err
+		}
+		if u.TokensAfter != nil {
+			return u.TokensAfter.UnixMilli(), nil
+		}
+		return 0, nil
 	})
-	return !errors.Is(err, store.ErrNotFound)
+	if errors.Is(err, store.ErrNotFound) {
+		return false
+	}
+	return err != nil || iat >= after
 }
 
 const (

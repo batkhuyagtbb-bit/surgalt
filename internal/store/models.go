@@ -38,6 +38,8 @@ type User struct {
 	// Google/Facebook-ээр эсвэл өмнө бүртгүүлсэн хэрэглэгч нэвтрэхдээ зөвшөөрнө.
 	ConsentVersion string     `json:"-"`
 	ConsentAt      *time.Time `json:"-"`
+	// TokensAfter — энэ цагаас өмнө олгосон нэвтрэлтийн токен хүчингүй (нууц үгээ сэргээсэн).
+	TokensAfter *time.Time `json:"-"`
 	// Нээлттэй профайлын нэмэлт мэдээлэл (багш).
 	Subjects  []string          `json:"subjects"` // заадаг чиглэлүүд
 	Location  string            `json:"location"` // хот / байршил

@@ -27,6 +27,7 @@ type Claims struct {
 	Role string `json:"role"`
 	Name string `json:"name,omitempty"`
 	Exp  int64  `json:"exp"`
+	Iat  int64  `json:"iat,omitempty"` // олгосон цаг, миллисекунд (нууц үг сэргээсний өмнөх токеныг хүчингүй болгоход)
 }
 
 func (c Claims) IsGuest() bool { return c.Role == RoleGuest }
@@ -69,7 +70,8 @@ func (s *Signer) MAC(purpose, msg string) string {
 }
 
 func (s *Signer) SignUser(uid, role, name string) (string, error) {
-	return s.sign(Claims{UID: uid, Role: role, Name: name, Exp: time.Now().Add(s.ttl).Unix()})
+	now := time.Now()
+	return s.sign(Claims{UID: uid, Role: role, Name: name, Exp: now.Add(s.ttl).Unix(), Iat: now.UnixMilli()})
 }
 
 // SignGuest нь нэвтрээгүй зочинд 30 хоногийн чатын токен өгнө.

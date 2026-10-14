@@ -16,6 +16,7 @@ import (
 	"surgalt/internal/cache"
 	"surgalt/internal/chat"
 	"surgalt/internal/files"
+	"surgalt/internal/mail"
 	"surgalt/internal/meet"
 	"surgalt/internal/oauth"
 	"surgalt/internal/qpay"
@@ -35,6 +36,7 @@ type Config struct {
 	StoragePlans  []StoragePlan // худалдаж авах багцууд
 	ContactEmail  string        // нууцлал, нөхцөлийн хуудсанд харагдах холбоо барих имэйл
 	AdminEmails   []string      // чатын мэдүүлэг шийдвэрлэх хянагчид (жижиг үсгээр; moderation.go)
+	Mail          mail.Sender   // нууц үг сэргээх имэйл (nil бол илгээхгүй; демо горимд холбоосыг логт гаргана)
 }
 
 type Server struct {
@@ -49,10 +51,11 @@ type Server struct {
 	authLim  *ratelimit.Limiter // нэвтрэлт/бүртгэл/зочин токен — илүү чанга
 	chatLim  *ratelimit.Limiter // мессеж илгээх
 	phoneLim *ratelimit.Limiter // багшийн утасны дугаар нээх — дугаар хусуурдахаас сэргийлнэ
+	resetLim *ratelimit.Limiter // нэг имэйл рүү нууц үг сэргээх захидал (2 минутад 1 орчим)
 	profiles *cache.Cache[*Rendered[PublicProfile]]
 	courses  *cache.Cache[*Rendered[PublicCourse]]
 	qrs      *cache.Cache[[]byte]
-	alive    *cache.Cache[bool] // токены эзэн бүртгэлээ устгаагүй эсэх (account.go)
+	alive    *cache.Cache[int64] // хэрэглэгч бүрийн «энэ цагаас өмнөх токен хүчингүй» (миллисекунд; account.go)
 	notif    *notifier
 	search   *searchIndex
 
@@ -79,10 +82,11 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 		authLim:  ratelimit.New(1, 10),
 		chatLim:  ratelimit.New(2, 10),
 		phoneLim: ratelimit.New(0.05, 8),
+		resetLim: ratelimit.New(1.0/120, 2),
 		profiles: cache.New[*Rendered[PublicProfile]](30*time.Second, 5*time.Second, isNF),
 		courses:  cache.New[*Rendered[PublicCourse]](30*time.Second, 5*time.Second, isNF),
 		qrs:      cache.New[[]byte](time.Hour, 5*time.Second, isNF),
-		alive:    cache.New[bool](5*time.Minute, 5*time.Minute, isNF),
+		alive:    cache.New[int64](5*time.Minute, 5*time.Minute, isNF),
 	}
 	s.notif = newNotifier()
 	s.search = &searchIndex{}
@@ -100,6 +104,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.authLim.Janitor(ctx)
 	go s.chatLim.Janitor(ctx)
 	go s.phoneLim.Janitor(ctx)
+	go s.resetLim.Janitor(ctx)
 	go s.notifyLoop(ctx)
 }
 
@@ -123,6 +128,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/profile/insights", s.handleProfileInsights)
 	mux.HandleFunc("PUT /api/me/profile", s.handleUpdateProfile)
 	mux.HandleFunc("POST /api/me/consent", s.handleConsent)
+	mux.HandleFunc("POST /api/auth/forgot", s.handleForgot)
+	mux.HandleFunc("POST /api/auth/reset", s.handleReset)
+	mux.HandleFunc("GET /reset", s.pageStatic("reset"))
 	mux.HandleFunc("GET /api/me/export", s.handleExport)
 	mux.HandleFunc("POST /api/me/delete", s.handleDeleteAccount)
 	mux.HandleFunc("PUT /api/me/username", s.handleUpdateUsername)

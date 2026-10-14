@@ -474,6 +474,9 @@ label small{font-weight:500}
 .consent a,.auth-legal a{color:var(--brand);font-weight:700;text-decoration:underline;text-underline-offset:2px;text-decoration-color:var(--brand-tint)}
 .auth-legal{margin:14px 0 0;text-align:center;font-size:.8rem;color:var(--muted)}
 .auth-legal a{font-weight:600;text-decoration:none}
+.auth-forgot{justify-self:center;padding:2px 4px;border:0;background:none;font:inherit;font-size:.86rem;font-weight:600;color:var(--brand);cursor:pointer}
+.auth-forgot:hover{text-decoration:underline;text-underline-offset:3px}
+.forgot-lede{margin:0;color:var(--text-2);font-size:.92rem;line-height:1.55}
 fieldset{border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:0;display:grid;gap:14px}
 legend{padding:0 8px;font-weight:800;font-size:.9rem;color:var(--text-2)}
 

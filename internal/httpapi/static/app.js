@@ -3769,7 +3769,7 @@ function loginPage() {
   $$(".tab").forEach((t) => t.addEventListener("click", () => {
     $$(".tab").forEach((x) => x.classList.toggle("active", x === t));
     tabs.dataset.active = t.dataset.tab;
-    lf.hidden = t.dataset.tab !== "login"; rf.hidden = t.dataset.tab !== "register"; err.textContent = "";
+    lf.hidden = t.dataset.tab !== "login"; rf.hidden = t.dataset.tab !== "register"; $("#forgotForm").hidden = true; err.textContent = "";
   }));
   if (q.get("role") === "teacher") $$(".tab")[1].click();
   // Нэвтрэх товчны таних тэмдгүүд (үйлчилгээ тус бүрийн албан ёсны өнгөөр).
@@ -3796,11 +3796,26 @@ function loginPage() {
     try { done(await api("/api/auth/login", { method: "POST", body: { email: lf.email.value, password: lf.password.value }, token: null })); }
     catch (x) { err.textContent = x.message; $(".auth-card").animate([{ transform: "translateX(0)" }, { transform: "translateX(-10px)" }, { transform: "translateX(10px)" }, { transform: "translateX(0)" }], { duration: 350 }); }
   });
-  // Нууц үг харуулах/нуух
-  $$("[data-pw-toggle]").forEach((b) => b.addEventListener("click", () => {
-    const i = b.previousElementSibling, show = i.type === "password";
-    i.type = show ? "text" : "password"; b.classList.toggle("on", show); b.setAttribute("aria-label", show ? "Нууц үг нуух" : "Нууц үг харуулах");
-  }));
+  // Нууц үг мартсан: имэйл рүү сэргээх холбоос.
+  const ff = $("#forgotForm");
+  const showForgot = (on) => {
+    ff.hidden = !on; lf.hidden = on; rf.hidden = true; tabs.hidden = on; err.textContent = "";
+    $(".role-toggle").hidden = on; $("#social").hidden = on; $(".divider").hidden = on || !providers.length;
+    if (on) { ff.email.value = lf.email.value; ff.email.focus(); }
+  };
+  $("[data-forgot]").addEventListener("click", () => showForgot(true));
+  $("[data-forgot-back]").addEventListener("click", () => showForgot(false));
+  ff.addEventListener("submit", async (e) => {
+    e.preventDefault(); err.textContent = "";
+    const b = $("button.btn-gold", ff); b.disabled = true;
+    try {
+      await api("/api/auth/forgot", { method: "POST", body: { email: ff.email.value }, token: null });
+      $(".forgot-lede", ff).innerHTML = `<b>Имэйлээ шалгана уу.</b> Хэрэв <b>${esc(ff.email.value)}</b> хаягаар бүртгэл байвал нууц үг сэргээх холбоос илгээлээ (Spam хавтсыг ч харна уу). Холбоос 1 цаг хүчинтэй.`;
+      b.textContent = "Дахин илгээх";
+    } catch (x) { err.textContent = x.message; }
+    b.disabled = false;
+  });
+  if (location.hash === "#forgot") showForgot(true);
   // Давтсан нууц үгийг бичих зуур шалгана.
   const match = $("#pwMatch");
   const checkMatch = () => {
@@ -3919,6 +3934,31 @@ function legalPage() {
     if (e.isIntersecting) links.forEach((a) => a.classList.toggle("on", a === byId.get(e.target.id)));
   }), { rootMargin: "-25% 0px -65% 0px" });
   $$(".pv-doc > section[id]").forEach((s) => io.observe(s));
+}
+
+// Нууц үг харуулах/нуух — бүх хуудсанд (нэвтрэх, бүртгүүлэх, сэргээх).
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pw-toggle]"); if (!b) return;
+  const i = b.previousElementSibling, show = i.type === "password";
+  i.type = show ? "text" : "password"; b.classList.toggle("on", show); b.setAttribute("aria-label", show ? "Нууц үг нуух" : "Нууц үг харуулах");
+});
+
+// Шинэ нууц үг тавих (/reset#t=<токен> — имэйлийн холбоос).
+function resetPage() {
+  const f = $("#resetForm"), err = $("#resetError"); if (!f) return;
+  const tok = new URLSearchParams(location.hash.slice(1)).get("t");
+  if (tok) history.replaceState(null, "", location.pathname); // токеныг хаягийн мөрөөс арилгана
+  else { f.hidden = true; err.innerHTML = `Холбоос дутуу байна. <a href="/login#forgot">Дахин сэргээх хүсэлт илгээх</a>`; return; }
+  f.addEventListener("submit", async (e) => {
+    e.preventDefault(); err.textContent = "";
+    if (f.password.value !== f.password2.value) { err.textContent = "Нууц үг таарахгүй байна"; f.password2.focus(); return; }
+    const b = $("button.btn-gold", f); b.disabled = true;
+    try {
+      const d = await api("/api/auth/reset", { method: "POST", body: { token: tok, password: f.password.value }, token: null });
+      Auth.set(d.token, d.user); toast("Нууц үг солигдлоо ✓");
+      setTimeout(() => (location.href = d.user.role === "teacher" && d.user.username ? "/t/" + d.user.username : "/"), 600);
+    } catch (x) { err.innerHTML = `${esc(x.message)} <a href="/login#forgot">Дахин хүсэлт илгээх</a>`; b.disabled = false; }
+  });
 }
 
 /* ---------- эхлүүлэх ---------- */
@@ -4083,4 +4123,5 @@ if (new URLSearchParams(location.search).has("deleted")) { // бүртгэлээ
   history.replaceState(null, "", location.pathname + location.hash);
 }
 if (page === "admin") adminPage();
+if (page === "reset") resetPage();
 })();

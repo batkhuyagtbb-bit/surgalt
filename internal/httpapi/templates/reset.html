@@ -1,0 +1,16 @@
+{{template "head" (dict "Title" "Нууц үг сэргээх — surgalt.mn" "Desc" "Шинэ нууц үг тавих" "Page" "reset")}}
+<main class="auth">
+  <div class="auth-card glass">
+    <div class="auth-brand"><span class="wordmark">surgalt<b>.mn</b></span><span class="slogan">Шинэ нууц үг тавих</span></div>
+    <form id="resetForm" class="form">
+      <label>Шинэ нууц үг<span class="pw"><input type="password" name="password" required minlength="6" maxlength="72" autocomplete="new-password"><button type="button" class="pw-eye" data-pw-toggle aria-label="Нууц үг харуулах">{{icon "eye"}}</button></span>
+        <small class="muted">Дор хаяж 6 тэмдэгт</small></label>
+      <label>Нууц үг давтах<span class="pw"><input type="password" name="password2" required minlength="6" maxlength="72" autocomplete="new-password"><button type="button" class="pw-eye" data-pw-toggle aria-label="Нууц үг харуулах">{{icon "eye"}}</button></span></label>
+      <button class="btn btn-gold btn-block">Нууц үгээ солих</button>
+      <small class="muted">Солимогц бусад төхөөрөмж дээрх нэвтрэлт хаагдана.</small>
+    </form>
+    <p class="form-error" id="resetError" role="alert"></p>
+    <p class="auth-legal"><a href="/login">← Нэвтрэх рүү буцах</a></p>
+  </div>
+</main>
+{{template "foot" (dict "Page" "reset")}}

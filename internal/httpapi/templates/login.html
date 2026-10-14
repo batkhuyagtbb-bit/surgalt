@@ -14,6 +14,13 @@
       <label>Имэйл<input type="email" name="email" required autocomplete="email"></label>
       <label>Нууц үг<span class="pw"><input type="password" name="password" required minlength="6" autocomplete="current-password"><button type="button" class="pw-eye" data-pw-toggle aria-label="Нууц үг харуулах">{{icon "eye"}}</button></span></label>
       <button class="btn btn-gold btn-block">Нэвтрэх</button>
+      <button type="button" class="auth-forgot" data-forgot>Нууц үгээ мартсан уу?</button>
+    </form>
+    <form id="forgotForm" class="form" hidden>
+      <p class="forgot-lede">Бүртгэлтэй имэйлээ бичнэ үү. Нууц үг сэргээх холбоос илгээнэ.</p>
+      <label>Имэйл<input type="email" name="email" required autocomplete="email"></label>
+      <button class="btn btn-gold btn-block">Сэргээх холбоос илгээх</button>
+      <button type="button" class="auth-forgot" data-forgot-back>← Нэвтрэх рүү буцах</button>
     </form>
     <form id="registerForm" class="form" hidden>
       <label>Имэйл<input type="email" name="email" required autocomplete="email"></label>
