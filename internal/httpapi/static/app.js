@@ -862,7 +862,8 @@ function readingRuler(box) {
    Тодруулга зөвхөн тухайн суралцагчид (сервер дээр өөрийнх нь нэр дээр) хадгалагдана. Маркер асаалттай үед
    л текст сонгогдоно; хуулах, тайрах, баруун товч хамгаалалттай хэвээр. */
 const HL_COLORS = [["y", "Чухал"], ["g", "Ойлгосон"], ["r", "Ойлгоогүй"], ["b", "Нэр томьёо"]];
-function lessonMarker(body, base) {
+// ctx.teacher — багшийн нэр (хоосон бол «Багшаас асуух» харагдахгүй), ctx.title — хичээлийн нэр.
+function lessonMarker(body, base, ctx = {}) {
   const card = body.parentElement;
   $$(".hl-bar, .hl-pop", card).forEach((x) => x.remove());
   body.classList.remove("hl-on", "hl-quiz");
@@ -871,14 +872,38 @@ function lessonMarker(body, base) {
   if (!units().length) return () => {};
   let hs = [], color = "y", saveT = 0, dirty = false, pop = null;
   const bar = document.createElement("div"); bar.className = "hl-bar";
-  bar.innerHTML = `<button type="button" class="hl-btn hl-toggle" aria-pressed="false" title="Асаагаад тодруулах текстээ чирж сонгоно">🖍 Маркер</button>
-    <span class="hl-colors" role="radiogroup" aria-label="Маркерын өнгө" hidden>${HL_COLORS.map(([c, t], i) => `<button type="button" role="radio" class="hl-sw" data-c="${c}" aria-checked="${i === 0}"><i class="hl-dot hl-${c}"></i>${t}</button>`).join("")}</span>
+  bar.innerHTML = `<button type="button" class="hl-btn hl-toggle" aria-pressed="false" title="Асаагаад тодруулах текстээ чирж сонгоно" aria-label="Маркер">🖍<span class="hl-lbl"> Маркер</span></button>
+    <span class="hl-colors" role="radiogroup" aria-label="Маркерын өнгө" hidden>${HL_COLORS.map(([c, t], i) => `<button type="button" role="radio" class="hl-sw" data-c="${c}" aria-checked="${i === 0}" title="${t}" aria-label="${t}"><i class="hl-dot hl-${c}"></i><span class="hl-lbl">${t}</span></button>`).join("")}</span>
     <span class="grow"></span>
-    <button type="button" class="hl-btn hl-quiz-btn" aria-pressed="false" title="Тодруулсан хэсгүүдийг нууна — санаж байгаад дарж шалгана" disabled>🧠 Давтах</button>
-    <button type="button" class="hl-btn hl-list-btn" aria-expanded="false" disabled>📝 Миний тэмдэглэл <b>0</b></button>
-    <div class="hl-list" hidden></div>`;
+    <button type="button" class="hl-btn hl-quiz-btn" aria-pressed="false" title="Тодруулсан хэсгүүдийг нууна — санаж байгаад дарж шалгана" aria-label="Давтах" disabled>🧠<span class="hl-lbl"> Давтах</span></button>
+    <button type="button" class="hl-btn hl-list-btn" aria-expanded="false" title="Миний тэмдэглэл" aria-label="Миний тэмдэглэл" disabled>📝<span class="hl-lbl"> Миний тэмдэглэл</span> <b>0</b></button>
+    ${ctx.teacher ? `<button type="button" class="hl-btn hl-ask-btn" title="Ойлгоогүй зүйлээ багшаасаа асууна — шууд багшийн чат руу очно" aria-label="Багшаас асуух">💬<span class="hl-lbl"> Багшаас асуух</span></button>` : ""}
+    <div class="hl-list" hidden></div><div class="hl-ask" hidden></div>`;
   body.before(bar);
-  const listBox = $(".hl-list", bar);
+  const listBox = $(".hl-list", bar), askBox = $(".hl-ask", bar);
+  // Багшаас асуух: асуулт (сонгосон тодруулгыг ишлэл болгон) шууд багштай чат руу илгээгдэнэ.
+  const clip = (s, n) => (s.length > n ? s.slice(0, n) + "…" : s);
+  const openAsk = (quote = "") => {
+    if (!ctx.teacher) return;
+    closePop(); listBox.hidden = true; askBox.hidden = false; askBox.dataset.quote = quote;
+    askBox.innerHTML = `<b>💬 Багшаас асуух</b>${quote ? `<blockquote>${esc(clip(quote, 300))}</blockquote>` : ""}
+      <textarea rows="3" maxlength="1500" placeholder="Юуг ойлгосонгүй вэ? Асуултаа бичнэ үү…"></textarea>
+      <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-ask-x>Болих</button><button type="button" class="btn btn-gold btn-sm" data-ask-send>Илгээх</button></div>`;
+    $("textarea", askBox).focus();
+  };
+  const sendAsk = async () => {
+    const ta = $("textarea", askBox), q = ta?.value.trim(); if (!q) { ta?.focus(); return; }
+    const btn = $("[data-ask-send]", askBox); btn.disabled = true;
+    const quote = askBox.dataset.quote || "";
+    const msg = `❓ «${ctx.title || "Хичээл"}» хичээлээс асуулт${quote ? `\n> ${clip(quote.replace(/\s+/g, " "), 300)}` : ""}\n\n${q}`;
+    try {
+      const d = await api(`/api/teachers/${encodeURIComponent(ctx.teacher)}/chat`, { method: "POST" });
+      await api(`/api/chat/${d.conversation.id}/messages`, { method: "POST", body: { body: msg } });
+      askBox.innerHTML = `<b>✓ Багшид илгээлээ</b><p class="muted small" style="margin:6px 0 0">Хариуг чатаас харна. Хичээлээ үргэлжлүүлээрэй.</p>
+        <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-ask-x>Хаах</button><button type="button" class="btn btn-glass btn-sm" data-ask-open="${esc(d.conversation.id)}">Чат нээх</button></div>`;
+    } catch (e) { btn.disabled = false; toast(e.message, true); }
+  };
+  askBox.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendAsk(); } });
   // Блокийн текст доторх байрлал (тэмдэгтээр) — тэмдэглэгээ (mark) байсан ч ижил.
   const offsetIn = (u, node, off) => { const r = document.createRange(); r.setStart(u, 0); r.setEnd(node, off); return r.toString().length; };
   const textNodes = (u) => { const w = document.createTreeWalker(u, NodeFilter.SHOW_TEXT), out = []; while (w.nextNode()) out.push(w.currentNode); return out; };
@@ -945,7 +970,7 @@ function lessonMarker(body, base) {
     pop = document.createElement("div"); pop.className = "hl-pop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Тодруулга");
     pop.innerHTML = `<div class="hl-pop-colors">${HL_COLORS.map(([c, t]) => `<button type="button" class="hl-sw" data-pc="${c}" aria-pressed="${h.c === c}" title="${t}"><i class="hl-dot hl-${c}"></i>${t}</button>`).join("")}</div>
       <textarea rows="3" maxlength="1000" placeholder="Тэмдэглэл: өөрийн үгээр тайлбарлах, асуулт, жишээ…">${esc(h.n || "")}</textarea>
-      <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-pdel>🗑 Устгах</button><button type="button" class="btn btn-gold btn-sm" data-pok>Болсон</button></div>`;
+      <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-pdel>🗑 Устгах</button>${ctx.teacher ? `<button type="button" class="btn btn-glass btn-sm" data-pask>💬 Багшаас асуух</button>` : ""}<button type="button" class="btn btn-gold btn-sm" data-pok>Болсон</button></div>`;
     card.append(pop);
     const rc = mark.getBoundingClientRect(), cr = card.getBoundingClientRect();
     pop.style.top = `${rc.bottom - cr.top + card.scrollTop + 6}px`;
@@ -956,6 +981,7 @@ function lessonMarker(body, base) {
       const c = e.target.closest("[data-pc]");
       if (c) { h.c = c.dataset.pc; $$("[data-pc]", pop).forEach((x) => x.setAttribute("aria-pressed", x === c)); paint(); save(); return; }
       if (e.target.closest("[data-pdel]")) { hs = hs.filter((x) => x !== h); closePop(); paint(); save(); return; }
+      if (e.target.closest("[data-pask]")) { paint(); openAsk(h.t); return; }
       if (e.target.closest("[data-pok]")) { closePop(); paint(); }
     };
     ta.focus();
@@ -969,7 +995,7 @@ function lessonMarker(body, base) {
   };
   const setOn = (on) => {
     body.classList.toggle("hl-on", on);
-    const t = $(".hl-toggle", bar); t.setAttribute("aria-pressed", on); t.textContent = on ? "🖍 Маркер асаалттай" : "🖍 Маркер";
+    const t = $(".hl-toggle", bar); t.setAttribute("aria-pressed", on); $(".hl-lbl", t).textContent = on ? " Маркер асаалттай" : " Маркер";
     $(".hl-colors", bar).hidden = !on;
     if (on) { setQuiz(false); toast("Тодруулах текстээ хулганаар чирж (утсанд удаан дарж) сонгоно уу"); }
   };
@@ -983,7 +1009,12 @@ function lessonMarker(body, base) {
     const sw = e.target.closest("[data-c]");
     if (sw) { color = sw.dataset.c; $$("[data-c]", bar).forEach((x) => x.setAttribute("aria-checked", x === sw)); return; }
     if (e.target.closest(".hl-quiz-btn")) return setQuiz(!body.classList.contains("hl-quiz"));
-    if (e.target.closest(".hl-list-btn")) { listBox.hidden = !listBox.hidden; $(".hl-list-btn", bar).setAttribute("aria-expanded", !listBox.hidden); if (!listBox.hidden) renderList(); return; }
+    if (e.target.closest(".hl-ask-btn")) { if (askBox.hidden) openAsk(); else askBox.hidden = true; return; }
+    if (e.target.closest("[data-ask-x]")) { askBox.hidden = true; return; }
+    if (e.target.closest("[data-ask-send]")) return sendAsk();
+    const oc = e.target.closest("[data-ask-open]");
+    if (oc) { askBox.hidden = true; window.openRailChat?.(oc.dataset.askOpen); return; }
+    if (e.target.closest(".hl-list-btn")) { askBox.hidden = true; listBox.hidden = !listBox.hidden; $(".hl-list-btn", bar).setAttribute("aria-expanded", !listBox.hidden); if (!listBox.hidden) renderList(); return; }
     const go = e.target.closest("[data-go]");
     if (go) { const m = $(`mark.hl[data-hid="${CSS.escape(go.dataset.go)}"]`, body); listBox.hidden = true; if (m) { m.scrollIntoView({ behavior: "smooth", block: "center" }); m.classList.remove("flash"); void m.offsetWidth; m.classList.add("flash"); } }
   };
@@ -3582,7 +3613,8 @@ async function coursePage() {
     hydrateBooks(player); hydrateBooks(body); readingRuler(body);
     stopMarker?.(); // маркер: шалгалтаас бусад хичээлд, нэвтэрсэн суралцагчид (тодруулга зөвхөн өөрт нь)
     $$(".hl-bar, .hl-pop", body.parentElement).forEach((x) => x.remove());
-    stopMarker = Auth.token && !l.exam ? lessonMarker(body, `/api/courses/${id}/lessons/${lid}/highlights`) : null;
+    const tHref = $(".teacher-chip")?.getAttribute("href") || "", tUser = tHref.startsWith("/t/") ? tHref.slice(3) : "";
+    stopMarker = Auth.token && !l.exam ? lessonMarker(body, `/api/courses/${id}/lessons/${lid}/highlights`, { teacher: tUser && Auth.user?.username !== tUser ? tUser : "", title: l.title }) : null;
     const modal = $("#lessonModal");
     const isOwner = !!Auth.user?.username && $(".teacher-chip")?.getAttribute("href") === "/t/" + Auth.user.username;
     if (l.exam) { // шалгалт: асуултууд зөвхөн "эхлүүлэх"-ээр ирнэ
