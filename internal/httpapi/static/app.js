@@ -1000,7 +1000,8 @@ function readingRuler(box) {
    Тодруулга зөвхөн тухайн суралцагчид (сервер дээр өөрийнх нь нэр дээр) хадгалагдана. Маркер асаалттай үед
    л текст сонгогдоно; хуулах, тайрах, баруун товч хамгаалалттай хэвээр. */
 const HL_COLORS = [["y", "Чухал"], ["g", "Ойлгосон"], ["r", "Ойлгоогүй"], ["b", "Нэр томьёо"]];
-// ctx.teacher — багшийн нэр (хоосон бол «Багшаас асуух» харагдахгүй), ctx.title — хичээлийн нэр.
+// ctx.teacher — багшийн нэр (хоосон бол «Багшаас асуух» харагдахгүй), ctx.title — хичээлийн нэр,
+// ctx.self — багш өөрийн хичээлээ үзэж байна: «Багшаас асуух» урьдчилан харах байдлаар (илгээхгүй, тайлбар өгнө).
 function lessonMarker(body, base, ctx = {}) {
   const card = body.parentElement;
   $$(".hl-bar, .hl-pop", card).forEach((x) => x.remove());
@@ -1033,7 +1034,7 @@ function lessonMarker(body, base, ctx = {}) {
     const note = items[0].n && !items[0].n.startsWith("❓ ") ? items[0].n : "";
     askBox.innerHTML = `<b><i class="hl-dot hl-r"></i> Ойлгоогүй хэсэг</b><blockquote>${esc(clip(items.map((h) => h.t).join(" … "), 300))}</blockquote>
       <textarea rows="2" maxlength="1000" placeholder="${ctx.teacher ? "Юуг ойлгосонгүй вэ? Багшаасаа асуух асуулт эсвэл өөртөө тэмдэглэл…" : "Өөртөө тэмдэглэл…"}">${esc(note)}</textarea>
-      ${ctx.teacher ? `<p class="muted small hl-ask-hint">«Багшаас асуух» дарвал асуулт тань ишлэлтэйгээ багшийн чат руу шууд очно.</p>` : ""}
+      ${ctx.teacher ? `<p class="muted small hl-ask-hint">${ctx.self ? "Урьдчилан харах: суралцагч «Багшаас асуух» дарвал асуулт нь ишлэлтэйгээ танд чатаар шууд ирнэ." : "«Багшаас асуух» дарвал асуулт тань ишлэлтэйгээ багшийн чат руу шууд очно."}</p>` : ""}
       <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-ask-keep>📌 Зөвхөн тэмдэглэх</button>${ctx.teacher ? `<button type="button" class="btn btn-gold btn-sm" data-ask-send>💬 Багшаас асуух</button>` : ""}</div>`;
     $("textarea", askBox).focus();
   };
@@ -1044,6 +1045,7 @@ function lessonMarker(body, base, ctx = {}) {
   };
   const sendAsk = async () => {
     const ta = $("textarea", askBox), q = ta?.value.trim(); if (!q) { ta?.focus(); toast("Багшаасаа асуух асуултаа бичнэ үү"); return; }
+    if (ctx.self) { keepAsk(); toast("Энэ таны өөрийн хичээл — суралцагч асуувал асуулт нь ишлэлтэйгээ танд чатаар ирнэ"); return; }
     const btn = $("[data-ask-send]", askBox); btn.disabled = true;
     const items = askHs(), quote = items.map((h) => h.t).join(" … ");
     const msg = `❓ «${ctx.title || "Хичээл"}» хичээлээс асуулт${quote ? `\n> ${clip(quote.replace(/\s+/g, " "), 300)}` : ""}\n\n${q}`;
@@ -3879,7 +3881,7 @@ async function coursePage() {
     stopMarker?.(); // маркер: шалгалтаас бусад хичээлд, нэвтэрсэн суралцагчид (тодруулга зөвхөн өөрт нь)
     $$(".hl-bar, .hl-pop", body.parentElement).forEach((x) => x.remove());
     const tHref = $(".teacher-chip")?.getAttribute("href") || "", tUser = tHref.startsWith("/t/") ? tHref.slice(3) : "";
-    stopMarker = Auth.token && !l.exam ? lessonMarker(body, `/api/courses/${id}/lessons/${lid}/highlights`, { teacher: tUser && Auth.user?.username !== tUser ? tUser : "", title: l.title }) : null;
+    stopMarker = Auth.token && !l.exam ? lessonMarker(body, `/api/courses/${id}/lessons/${lid}/highlights`, { teacher: tUser, self: !!tUser && Auth.user?.username === tUser, title: l.title }) : null;
     const modal = $("#lessonModal");
     const isOwner = !!Auth.user?.username && $(".teacher-chip")?.getAttribute("href") === "/t/" + Auth.user.username;
     mountClouds(body, Auth.token ? `/api/courses/${id}/lessons/${lid}` : "", isOwner);
