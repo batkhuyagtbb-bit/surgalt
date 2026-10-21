@@ -403,7 +403,7 @@ function beBlockHTML(b) {
       <button type="button" data-cmd="quote" title="Ишлэл">❝</button><button type="button" data-cmd="link" title="Холбоос">${ico("link", 15)}</button><button type="button" data-cmd="removeFormat" title="Хэлбэр арилгах">⨯</button></div>
     <div class="be-rt rb-text" contenteditable="true" data-ph="Текстээ бичнэ үү… (сонгоод дээрх товчоор хэлбэржүүлнэ)">${SG.richHTML(b.text || "")}</div>`;
   else if (b.type === "heading") body = `<input class="be-h" maxlength="200" placeholder="Гарчиг бичнэ үү" value="${esc(b.text || "")}">`;
-  else if (b.type === "embed") body = `<textarea class="be-embed" rows="5" maxlength="60000" spellcheck="false" placeholder="HTML код буулгана уу — жишээ: <iframe src=&quot;https://…&quot;></iframe>, Google Forms, Canva, GeoGebra, Desmos, Padlet, Quizlet…">${esc(b.text || "")}</textarea>
+  else if (b.type === "embed") body = `<textarea class="be-embed" rows="5" maxlength="60000" spellcheck="false" placeholder="Холбоос (https://…) эсвэл HTML код буулгана уу — Google Docs/Slides/Forms, Canva, YouTube, GeoGebra, Desmos, Padlet, Quizlet… Холбоос хичээл дотроо шууд ажиллана.">${esc(b.text || "")}</textarea>
       <div class="be-embed-bar"><label class="small">Өндөр<input class="be-embed-h" type="number" min="80" max="2000" step="20" value="${b.height || 420}"> px</label><button type="button" class="btn btn-glass btn-sm" data-embed-preview>Урьдчилан харах</button><span class="muted small">Тусгаарлагдсан хүрээнд аюулгүй ажиллана</span></div>
       <div class="be-embed-prev"></div>`;
   else if (b.type === "quiz") {
@@ -594,7 +594,8 @@ function mountBlockEditor(f, blocks) {
     const c = t.closest("[data-cmd]"); if (c && el) return exec(c.dataset.cmd, $(".be-rt", el));
     if (t.closest("[data-import]")) { const fi = $(".be-xlsx", box); fi.value = ""; fi.click(); return; }
     const ep = t.closest("[data-embed-preview]");
-    if (ep) { const el = ep.closest(".be-block"), html = $(".be-embed", el).value.trim(), box = $(".be-embed-prev", el); box.innerHTML = html ? `<iframe sandbox="allow-scripts allow-popups allow-forms allow-presentation" allowfullscreen scrolling="no" style="width:100%;height:${+$(".be-embed-h", el).value || 420}px;border:1px solid var(--line);border-radius:12px" srcdoc="${esc(SG.embedDoc(html))}"></iframe>` : ""; return; }
+    // Суралцагчид харагдах яг тэр байдлаар (холбоос бол хичээл дотор шууд, HTML бол тусгаарласан хүрээнд).
+    if (ep) { const el = ep.closest(".be-block"), text = $(".be-embed", el).value.trim(), box = $(".be-embed-prev", el); box.innerHTML = text ? SG.blocksHTML([{ id: "prev", type: "embed", text, height: +$(".be-embed-h", el).value || 420 }]) : ""; return; }
     const a = t.closest("[data-add]"); if (a) { const nb = add(a.dataset.add); if (["image", "audio", "video", "file"].includes(a.dataset.add) && a.dataset.add !== "video") pick(nb); return; }
     if (!el) return;
     if (t.closest("[data-be-del]")) { if ((el.dataset.type === "text" && $(".be-rt", el).textContent.trim()) || el.dataset.type === "quiz") { if (!confirm("Энэ хэсгийг устгах уу?")) return; } el.remove(); return; }

@@ -555,7 +555,39 @@ const fmtBytes = (b) => !b ? "" : b >= 1 << 20 ? (b / (1 << 20)).toFixed(1) + " 
 // Embed-ийн HTML-ийг бүтэн баримт болгоно (хоосон зай, хэмжээ тохируулна). Scroll-гүй: агуулгын өндрийг
 // эх хуудас руу postMessage-ээр илгээж, iframe өөрөө тэр өндөртэй болно. Өндөр (height) заасан дотоод
 // iframe (Google Forms гэх мэт) тэр өндрөөрөө; өндөргүй ганц iframe багшийн тавьсан өндрийг дүүргэнэ.
-const embedDoc = (html) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;overflow:hidden;font-family:system-ui,sans-serif}body{display:flow-root}iframe,video,img{max-width:100%}iframe[height]{width:100%;border:0;display:block}body>iframe:only-child:not([height]){width:100%;height:100vh;border:0;display:block}</style></head><body>${html}<script>(function(){var l=0;function s(){var h=Math.ceil(document.body.scrollHeight);if(h&&h!==l){l=h;parent.postMessage({sgEmbedH:h},"*")}}addEventListener("load",s);if(window.ResizeObserver)new ResizeObserver(s).observe(document.body);setInterval(s,1000);s()})()</script></body></html>`;
+// HTML embed доторх маркер: эх хуудасны lessonMarker-тэй postMessage-ээр ажиллана (sandbox тул DOM-д хүрэхгүй).
+// эх → embed: {sgHL:{list, marking, quiz}}; embed → эх: {sgHLready}, {sgHLsel:{s,e,t}}, {sgHLclick:{id,x,y}}.
+const EMBED_HL_JS = `(function(){var list=[],marking=false,B=document.body;
+var st=document.createElement("style");st.textContent="mark.hl{color:inherit;border-radius:3px;padding:0 1px;cursor:pointer;-webkit-box-decoration-break:clone;box-decoration-break:clone}.hl-y{background:rgba(255,214,0,.45)}.hl-g{background:rgba(52,199,89,.35)}.hl-r{background:rgba(255,69,58,.3)}.hl-b{background:rgba(10,132,255,.3)}mark.has-note{border-bottom:2px dotted currentColor}.hlq mark.hl:not(.shown){color:transparent;background:repeating-linear-gradient(135deg,#cbd2e1 0 6px,#e1e6f0 6px 12px)}.hlq mark.hl:not(.shown) *{visibility:hidden}.hlm,.hlm *{user-select:text;-webkit-user-select:text;cursor:text}.hlm ::selection{background:rgba(255,214,0,.6)}";document.head.appendChild(st);
+function tn(){var w=document.createTreeWalker(B,NodeFilter.SHOW_TEXT,{acceptNode:function(n){return n.parentNode.closest("script,style")?2:1}}),o=[];while(w.nextNode())o.push(w.currentNode);return o}
+function txt(){return tn().map(function(n){return n.data}).join("")}
+function off(node,o){var r=document.createRange();r.setStart(B,0);r.setEnd(node,o);var n=0,a=tn();for(var i=0;i<a.length;i++){var t=a[i];if(t===node)return n+o;if(r.comparePoint(t,t.length)===0)n+=t.length;else break}return n}
+function unwrap(){[].slice.call(document.querySelectorAll("mark.hl")).forEach(function(m){var p=m.parentNode;while(m.firstChild)p.insertBefore(m.firstChild,m);m.remove();p.normalize()})}
+function wrap(h){var pos=0;tn().forEach(function(t){var a=pos,b=pos+t.data.length;pos=b;if(b<=h.s||a>=h.e)return;var node=t,s=Math.max(h.s,a)-a,e=Math.min(h.e,b)-a;if(e<node.data.length)node.splitText(e);if(s>0)node=node.splitText(s);var m=document.createElement("mark");m.className="hl hl-"+h.c+(h.n?" has-note":"");m.dataset.hid=h.id;if(h.n)m.title=h.n;node.parentNode.insertBefore(m,node);m.appendChild(node)})}
+function paint(){unwrap();var full=txt();list.forEach(function(h){if(full.slice(h.s,h.e)!==h.t){var i=full.indexOf(h.t);if(i<0)return;h.s=i;h.e=i+h.t.length}wrap(h)})}
+function isW(c){return!!c&&/[\\p{L}\\p{N}]/u.test(c)}
+function sel(){var g=getSelection();if(!marking||!g.rangeCount||g.isCollapsed)return;var r=g.getRangeAt(0),full=txt(),s=off(r.startContainer,r.startOffset),e=off(r.endContainer,r.endOffset);while(s<e&&/\\s/.test(full[s]))s++;while(e>s&&/\\s/.test(full[e-1]))e--;if(e>s){var lo=0,hi=full.length,pos=0,a=tn();for(var i=0;i<a.length;i++){var x=pos,y=pos+a[i].data.length;pos=y;if(x<=s&&s<y)lo=x;if(x<e&&e<=y){hi=y;break}}while(s>lo&&isW(full[s-1])&&isW(full[s]))s--;while(e<hi&&isW(full[e])&&isW(full[e-1]))e++}e=Math.min(e,s+5000);g.removeAllRanges();if(e-s>=1)parent.postMessage({sgHLsel:{s:s,e:e,t:full.slice(s,e)}},"*")}
+addEventListener("message",function(ev){var d=ev.data&&ev.data.sgHL;if(!d||ev.source!==parent)return;list=d.list||[];marking=!!d.marking;document.documentElement.classList.toggle("hlq",!!d.quiz);document.documentElement.classList.toggle("hlm",marking);paint()});
+document.addEventListener("pointerup",function(){if(marking)setTimeout(sel,0)});
+document.addEventListener("click",function(ev){var ln=ev.target.closest&&ev.target.closest("a[href]");if(ln&&/^https?:/i.test(ln.href)){ev.preventDefault();parent.postMessage({sgLink:ln.href},"*");return}var m=ev.target.closest&&ev.target.closest("mark.hl");if(!m)return;if(document.documentElement.classList.contains("hlq")){m.classList.toggle("shown");return}if(!getSelection().isCollapsed)return;var rc=m.getBoundingClientRect();parent.postMessage({sgHLclick:{id:m.dataset.hid,x:rc.left,y:rc.bottom}},"*")});
+parent.postMessage({sgHLready:1},"*")})()`;
+const embedDoc = (html) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;overflow:hidden;font-family:system-ui,sans-serif}body{display:flow-root}iframe,video,img{max-width:100%}iframe[height]{width:100%;border:0;display:block}body>iframe:only-child:not([height]){width:100%;height:100vh;border:0;display:block}</style></head><body>${html}<script>(function(){var l=0;function s(){var h=Math.ceil(document.body.scrollHeight);if(h&&h!==l){l=h;parent.postMessage({sgEmbedH:h},"*")}}addEventListener("load",s);if(window.ResizeObserver)new ResizeObserver(s).observe(document.body);setInterval(s,1000);s()})()</script><script>${EMBED_HL_JS}</script></body></html>`;
+// Embed-д зөвхөн холбоос (https://…) буулгасан бол: хичээл дотор шууд ажиллах хаяг. Түгээмэл үйлчилгээг
+// embed хэлбэрт нь хувиргана. Өөрийн сайтын хаягийг зөвшөөрөхгүй (sandbox-оос гарахаас сэргийлнэ).
+function embedLink(text) {
+  const t = (text || "").trim();
+  if (!/^https:\/\/[^\s<>"']+$/i.test(t)) return null;
+  let u; try { u = new URL(t); } catch { return null; }
+  if (u.host === location.host || u.hostname.endsWith("." + location.hostname)) return null;
+  const host = u.hostname.replace(/^www\./, ""), p = u.pathname;
+  if (/(^|\.)youtube\.com$|^youtu\.be$|(^|\.)vimeo\.com$/.test(host)) return { video: true, src: t, url: t };
+  let src = t, m;
+  if (host === "docs.google.com" && (m = p.match(/^\/forms\/d\/(e\/)?([\w-]+)/))) src = `https://docs.google.com/forms/d/${m[1] || ""}${m[2]}/viewform?embedded=true`;
+  else if (host === "docs.google.com" && (m = p.match(/^\/(document|spreadsheets|presentation)\/d\/([\w-]+)/))) src = `https://docs.google.com/${m[1]}/d/${m[2]}/${m[1] === "presentation" ? "embed" : "preview"}`;
+  else if (host === "drive.google.com" && (m = p.match(/^\/file\/d\/([\w-]+)/))) src = `https://drive.google.com/file/d/${m[1]}/preview`;
+  else if (host === "canva.com" && /^\/design\/[\w-]+/.test(p) && !u.searchParams.has("embed")) { u.search = u.search ? u.search + "&embed" : "?embed"; src = u.toString(); }
+  return { src, url: t };
+}
 // Embed iframe-ээс ирсэн өндрийг тухайн iframe-д тавина (scroll гаргахгүй).
 addEventListener("message", (e) => {
   const h = e.data && +e.data.sgEmbedH;
@@ -567,7 +599,14 @@ function blockHTML(b) {
   switch (b.type) {
     case "heading": return `<h3 class="rb-h">${esc(b.text)}</h3>`;
     // HTML embed: sandbox (allow-same-origin-гүй) — скрипт ажиллана, гэхдээ сайтын нэвтрэлт, өгөгдөлд хүрэхгүй.
-    case "embed": return `<figure class="rb-embed"><iframe sandbox="allow-scripts allow-popups allow-forms allow-presentation allow-popups-to-escape-sandbox" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" referrerpolicy="no-referrer" scrolling="no" style="height:${Math.max(80, Math.min(2000, +b.height || 420))}px" srcdoc="${esc(embedDoc(b.text))}" title="Embed"></iframe></figure>`;
+    case "embed": {
+      // Зөвхөн холбоос буулгасан бол: тухайн хуудсыг хичээл дотор шууд ажиллуулна (YouTube/Vimeo — видео тоглуулагчаар).
+      // Хичээлээс гадагш гаргахгүй: шинэ таб/цонх нээх (popup), эх хуудсыг шилжүүлэх эрхгүй.
+      const lk = embedLink(b.text), h = Math.max(80, Math.min(2000, +b.height || 420));
+      if (lk?.video) return `<figure class="rb-video"><div class="player">${mediaHTML(lk.src)}</div></figure>`;
+      if (lk) return `<figure class="rb-embed rb-embed-link"><iframe src="${esc(lk.src)}" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin" style="height:${h}px" title="Embed"></iframe></figure>`;
+      return `<figure class="rb-embed" data-bid="${esc(b.id || "")}"><iframe sandbox="allow-scripts allow-forms allow-presentation" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" referrerpolicy="no-referrer" scrolling="no" style="height:${Math.max(80, Math.min(2000, +b.height || 420))}px" srcdoc="${esc(embedDoc(b.text))}" title="Embed"></iframe></figure>`;
+    }
     case "text": return `<div class="rb-text" data-bid="${esc(b.id || "")}">${richHTML(b.text)}</div>`;
     case "image": return `<figure class="rb-fig"><img src="${esc(b.url)}" alt="${esc(b.text || "")}" loading="lazy">${cap}</figure>`;
     case "audio": return `<figure class="rb-audio"><span class="rb-audio-ico">🎧</span><div><b>${esc(b.name || "Дуу бичлэг")}</b><audio src="${esc(b.url)}" controls preload="metadata" controlslist="nodownload" oncontextmenu="return false"></audio></div>${cap}</figure>`;
@@ -869,7 +908,10 @@ function lessonMarker(body, base, ctx = {}) {
   body.classList.remove("hl-on", "hl-quiz");
   const units = () => (body.classList.contains("pre") ? [body] : $$(".rb-text[data-bid]", body));
   const bidOf = (u) => (u === body ? "content" : u.dataset.bid);
-  if (!units().length) return () => {};
+  // HTML embed-үүд (sandbox iframe): тодруулгыг postMessage-ээр дамжуулна (EMBED_HL_JS).
+  const frames = () => $$(".rb-embed[data-bid] > iframe[srcdoc]", body);
+  const frameBid = (f) => f.parentElement.dataset.bid;
+  if (!units().length && !frames().length) return () => {};
   let hs = [], color = "y", saveT = 0, dirty = false, pop = null;
   const bar = document.createElement("div"); bar.className = "hl-bar";
   bar.innerHTML = `<button type="button" class="hl-btn hl-toggle" aria-pressed="false" title="Асаагаад тодруулах текстээ чирж сонгоно" aria-label="Маркер">🖍<span class="hl-lbl"> Маркер</span></button>
@@ -942,7 +984,9 @@ function lessonMarker(body, base, ctx = {}) {
   };
   const paint = () => {
     unwrap();
-    for (const h of hs) { const u = locate(h); h._lost = !u; if (u) wrap(u, h); }
+    const fb = new Set(frames().map(frameBid));
+    for (const h of hs) { if (fb.has(h.b)) { h._lost = false; continue; } const u = locate(h); h._lost = !u; if (u) wrap(u, h); }
+    syncFrames();
     const n = hs.length; $(".hl-list-btn b", bar).textContent = n;
     $(".hl-list-btn", bar).disabled = $(".hl-quiz-btn", bar).disabled = !n;
     if (!listBox.hidden) renderList();
@@ -965,8 +1009,13 @@ function lessonMarker(body, base, ctx = {}) {
       let e = r.compareBoundaryPoints(Range.END_TO_END, ur) < 0 ? offsetIn(u, r.endContainer, r.endOffset) : txt.length;
       while (s < e && /\s/.test(txt[s])) s++;
       while (e > s && /\s/.test(txt[e - 1])) e--;
-      const isW = (ch) => !!ch && /[\p{L}\p{N}]/u.test(ch); // үгийн дундаас тасрахгүй — бүтэн үг хүртэл
-      if (e > s) { while (s > 0 && isW(txt[s - 1]) && isW(txt[s])) s--; while (e < txt.length && isW(txt[e]) && isW(txt[e - 1])) e++; }
+      // Үгийн дундаас тасрахгүй — бүтэн үг хүртэл, гэхдээ тухайн текст хэсгээс (гарчиг, догол мөр) хэтрэхгүй.
+      const isW = (ch) => !!ch && /[\p{L}\p{N}]/u.test(ch);
+      if (e > s) {
+        let lo = 0, hi = txt.length, pos = 0;
+        for (const t of textNodes(u)) { const a = pos, b = pos + t.data.length; pos = b; if (a <= s && s < b) lo = a; if (a < e && e <= b) { hi = b; break; } }
+        while (s > lo && isW(txt[s - 1]) && isW(txt[s])) s--; while (e < hi && isW(txt[e]) && isW(txt[e - 1])) e++;
+      }
       e = Math.min(e, s + 5000);
       if (e - s >= 1) out.push({ b: bidOf(u), s, e, t: txt.slice(s, e) });
     }
@@ -1014,15 +1063,51 @@ function lessonMarker(body, base, ctx = {}) {
         <span>${esc(h.t.length > 160 ? h.t.slice(0, 160) + "…" : h.t)}</span>${h.n ? `<small>📝 ${esc(h.n)}</small>` : ""}${h._lost ? `<small class="muted">Багш агуулгыг өөрчилсөн тул байршил олдсонгүй</small>` : ""}</button>`).join("")}</div>` : "";
     }).join("") || `<p class="muted small">Тэмдэглэл алга.</p>`;
   };
+  const syncFrames = () => frames().forEach((f) => {
+    const b = frameBid(f);
+    f.contentWindow?.postMessage({ sgHL: { list: hs.filter((h) => h.b === b).map(({ id, s, e, c, n, t }) => ({ id, s, e, c, n, t })), marking, quiz: body.classList.contains("hl-quiz") } }, "*");
+  });
+  // Гадны холбоос: шинэ таб биш, хичээлийн цонх дотор (курсор хичээлээс гарсанд тооцогдохгүй) нээнэ.
+  let lwKey = null;
+  const closeLink = () => { $(".lw", card)?.remove(); if (lwKey) { document.removeEventListener("keydown", lwKey, true); lwKey = null; } };
+  const openLink = (href) => {
+    let u; try { u = new URL(href, location.href); } catch { return; }
+    if (!/^https?:$/.test(u.protocol)) return;
+    closeLink();
+    const lk = embedLink(u.href.replace(/^http:/i, "https:"));
+    const w = document.createElement("div"); w.className = "lw"; w.setAttribute("role", "dialog"); w.setAttribute("aria-modal", "true"); w.setAttribute("aria-label", "Холбоос");
+    w.innerHTML = `<div class="lw-card"><div class="lw-head"><b>🔗 ${esc(u.hostname.replace(/^www\./, ""))}</b><span class="lw-url">${esc(clip(u.href, 90))}</span><button type="button" class="icon-btn" data-lw-x aria-label="Хаах">✕</button></div>
+      <div class="lw-body">${lk?.video ? `<div class="player">${mediaHTML(lk.src)}</div>` : lk ? `<iframe src="${esc(lk.src)}" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="Холбоос"></iframe>` : `<p class="muted lw-none">Энэ холбоосыг нээх боломжгүй.</p>`}</div>
+      <p class="muted small lw-foot">Хуудас харагдахгүй байвал тухайн сайт өөр сайт дотор харагдахыг хориглосон байна.</p></div>`;
+    card.append(w);
+    w.onclick = (e) => { if (e.target === w || e.target.closest("[data-lw-x]")) closeLink(); };
+    lwKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); closeLink(); } };
+    document.addEventListener("keydown", lwKey, true);
+    $("[data-lw-x]", w).focus();
+  };
+  const onMsg = (e) => {
+    const f = e.data && frames().find((x) => x.contentWindow === e.source); if (!f) return;
+    const b = frameBid(f), sl = e.data.sgHLsel, ck = e.data.sgHLclick;
+    if (e.data.sgHLready) return syncFrames();
+    if (typeof e.data.sgLink === "string") return openLink(e.data.sgLink);
+    if (sl && marking && Number.isInteger(sl.s) && Number.isInteger(sl.e) && sl.e > sl.s && typeof sl.t === "string") {
+      if (hs.length >= 1000) return toast("Нэг хичээл дээр 1000 хүртэл тодруулга хийнэ", true);
+      hs = hs.filter((h) => h.b !== b || h.e <= sl.s || h.s >= sl.e);
+      const id = hid(); hs.push({ id, b, s: sl.s, e: Math.min(sl.e, sl.s + 5000), t: sl.t.slice(0, 5000), c: color });
+      paint(); save(); if (color === "r") openAsk([id]);
+      return;
+    }
+    if (ck) { const h = hs.find((x) => x.id === ck.id && x.b === b); if (!h) return; const fr = f.getBoundingClientRect(); openPop(h, { getBoundingClientRect: () => ({ left: fr.left + (+ck.x || 0), bottom: fr.top + (+ck.y || 0) }) }); }
+  };
   const setOn = (on) => {
-    marking = on; body.classList.toggle("hl-on", on);
+    marking = on; body.classList.toggle("hl-on", on); syncFrames();
     const t = $(".hl-toggle", bar); t.setAttribute("aria-pressed", on); $(".hl-lbl", t).textContent = on ? " Маркер асаалттай" : " Маркер";
     $(".hl-colors", bar).hidden = !on;
     if (on) { setQuiz(false); toast("Тодруулах текстээ хулганаар чирж (утсанд удаан дарж) сонгоно уу"); }
   };
   const setQuiz = (q) => {
     body.classList.toggle("hl-quiz", q); $(".hl-quiz-btn", bar).setAttribute("aria-pressed", q);
-    $$("mark.hl.shown", body).forEach((m) => m.classList.remove("shown"));
+    $$("mark.hl.shown", body).forEach((m) => m.classList.remove("shown")); syncFrames();
     if (q) { setOn(false); closeAsk(); closePop(); toast("Тодруулсан хэсгүүд нуугдлаа — эхлээд өөрөө санаад, дараа нь дарж шалгаарай 🧠"); }
   };
   bar.onclick = (e) => {
@@ -1037,10 +1122,16 @@ function lessonMarker(body, base, ctx = {}) {
     if (oc) { closeAsk(); window.openRailChat?.(oc.dataset.askOpen); return; }
     if (e.target.closest(".hl-list-btn")) { closeAsk(); listBox.hidden = !listBox.hidden; $(".hl-list-btn", bar).setAttribute("aria-expanded", !listBox.hidden); if (!listBox.hidden) renderList(); return; }
     const go = e.target.closest("[data-go]");
-    if (go) { const m = $(`mark.hl[data-hid="${CSS.escape(go.dataset.go)}"]`, body); listBox.hidden = true; if (m) { m.scrollIntoView({ behavior: "smooth", block: "center" }); m.classList.remove("flash"); void m.offsetWidth; m.classList.add("flash"); } }
+    if (go) {
+      const m = $(`mark.hl[data-hid="${CSS.escape(go.dataset.go)}"]`, body), h = hs.find((x) => x.id === go.dataset.go); listBox.hidden = true;
+      if (m) { m.scrollIntoView({ behavior: "smooth", block: "center" }); m.classList.remove("flash"); void m.offsetWidth; m.classList.add("flash"); }
+      else if (h) $(`.rb-embed[data-bid="${CSS.escape(h.b)}"]`, body)?.scrollIntoView({ behavior: "smooth", block: "center" }); // embed доторх тодруулга
+    }
   };
   const onUp = () => { if (marking) setTimeout(fromSelection, 0); };
   const onClick = (e) => {
+    const a = e.target.closest?.("a[href]");
+    if (a && /^https?:/i.test(a.href)) { let ext = false; try { ext = new URL(a.href).host !== location.host; } catch {} if (ext) { e.preventDefault(); openLink(a.href); return; } }
     const m = e.target.closest?.("mark.hl"); if (!m) return;
     if (body.classList.contains("hl-quiz")) { m.classList.toggle("shown"); return; }
     if (!getSelection().isCollapsed) return;
@@ -1048,12 +1139,12 @@ function lessonMarker(body, base, ctx = {}) {
   };
   const onDoc = (e) => { if (pop && !pop.contains(e.target) && !e.target.closest?.("mark.hl")) { closePop(); paint(); } };
   body.addEventListener("pointerup", onUp); body.addEventListener("keyup", onUp); body.addEventListener("click", onClick);
-  document.addEventListener("pointerdown", onDoc);
+  document.addEventListener("pointerdown", onDoc); addEventListener("message", onMsg);
   api(base).then((d) => { hs = d.highlights || []; paint(); }).catch(() => {});
   return () => {
-    flush(); closePop();
+    flush(); closePop(); closeLink();
     body.removeEventListener("pointerup", onUp); body.removeEventListener("keyup", onUp); body.removeEventListener("click", onClick);
-    document.removeEventListener("pointerdown", onDoc);
+    document.removeEventListener("pointerdown", onDoc); removeEventListener("message", onMsg);
   };
 }
 
