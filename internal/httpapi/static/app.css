@@ -3991,3 +3991,28 @@ html.pre{opacity:0;transition:none;animation:pre-reveal 0s 2.5s forwards}
 a.card,.pv-card{transition:transform .18s ease,box-shadow .18s ease}
 a.card:hover,.pv-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px -18px rgba(18,24,41,.35)}
 @media (prefers-reduced-motion:reduce){html,html.pre{transition:none;opacity:1;animation:none}.fade-in{animation:none}.btn:hover,.btn:active,a.card:hover,.pv-card:hover{transform:none}}
+/* Чатын толгой: ганц бүтэн зураас (толгойн дотогш хүрээ + ярианы дээд хүрээ давхцахгүй) */
+#railThread{gap:10px}
+#railThread .rail-head{border-bottom:0;padding-bottom:0}
+#railThread .chat-body{border-top:1px solid var(--line)}
+/* Өдөр, цагийн шошго: зураасгүй, цэвэрхэн бичиг */
+ol.thread .msg-day span{background:none;padding:0;border:0}
+/* Бичих мөр: камер, талбар, 👍/➤ нэг өндөр (40px), нэг шугамд */
+form.composer-bar{align-items:flex-end;gap:6px;padding:8px 10px 10px}
+form.composer-bar .cb-left{padding:0;align-self:flex-end}
+form.composer-bar .cb-left .cb-ic{width:40px;height:40px;border-radius:50%;background:none;box-shadow:none;color:var(--brand)}
+form.composer-bar .cb-left .cb-ic:hover{background:#f0f2f5}
+form.composer-bar .cb-input{box-sizing:border-box;min-height:40px;padding:0 3px 0 14px;align-items:flex-end}
+form.composer-bar .cb-input textarea{min-height:38px;padding:9px 0;line-height:20px}
+form.composer-bar .cb-emoji{width:34px;height:34px;margin:2px 0}
+form.composer-bar .cb-send{width:40px;height:40px;flex:0 0 40px;margin:0;align-self:flex-end;font-size:1.4rem;line-height:1}
+form.composer-bar .cb-send .cb-like{display:block;line-height:1}
+/* «Бүлэг чат» товч: цагаан, хүрээтэй (хар/цэнхэр дэвсгэргүй) */
+#railNewGroup.rail-group-btn{background:var(--surface);color:var(--brand);border:1px solid var(--line);box-shadow:none}
+#railNewGroup.rail-group-btn:hover{background:#f0f2f5;color:var(--brand)}
+/* Өдрийн шошго: «ө» үсгийн дундах зураас холбогдож зураас мэт харагдахгүй */
+ol.thread .msg-day{letter-spacing:.03em}
+/* Emoji-ийн оронд орсон дүрсүүд бичвэртэй зэрэгцэнэ */
+.kind{display:inline-flex;align-items:center;gap:4px}
+.tn-ico,.rb-file-ico,.rb-audio-ico{display:inline-grid;place-items:center;color:var(--brand)}
+.kind-menu button>svg,.kind-menu button>.ai-ico{color:var(--brand)}

@@ -66,6 +66,8 @@ Object.assign(ICON, {
   alert: '<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5h.01"/>',
 });
 const ico = (n, size = 20) => `<svg data-ico="${n}" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n] || ""}</svg>`;
+// Хөдөлгөөнт дүрсэнд (animateIcons) шинээр ашигласан нэрсийн статик зам (байхгүй бол л нэмнэ).
+for (const [k, v] of Object.entries({"upload":"<path d=\"M12 3v12\"/><path d=\"m17 8-5-5-5 5\"/><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/>","exam":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\"/><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\"/><path d=\"m9 14 2 2 4-4\"/>","doc":"<path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M10 9H8M16 13H8M16 17H8\"/>","headphones":"<path d=\"M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3\"/>","folder":"<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/>","eye":"<path d=\"M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","live":"<path d=\"m16 13 5.22 3.48a.5.5 0 0 0 .78-.42V7.94a.5.5 0 0 0-.76-.43L16 10.5\"/><rect x=\"2\" y=\"6\" width=\"14\" height=\"12\" rx=\"2\"/>","book":"<path d=\"M12 7v14\"/><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\"/>","files":"<path d=\"M20 7h-3a2 2 0 0 1-2-2V2\"/><path d=\"M9 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l4 4v10a2 2 0 0 1-2 2Z\"/><path d=\"M3 7.6v12.8A1.6 1.6 0 0 0 4.6 22h9.8\"/>"})) ICON[k] ||= v;
 
 Live.connect(Auth.token);
 
@@ -709,7 +711,7 @@ async function courseEditor(id) {
   const mediaLabel = (u) => (!u ? "" : /youtu\.?be|vimeo/.test(u) ? "Видео холбоос" : u.startsWith("/files/") ? fileName(u) : u);
   const isImage = (u) => /\.(webp|jpe?g|png|gif)$/i.test(stripSig(u));
   const dueBadge = (due) => !due ? "" : `${due.start_at ? `<span class="aud">▶ ${fmtDate(due.start_at)}-с</span>` : ""}${due.at ? `<span class="aud">📅 ${fmtDate(due.at)} хүртэл${due.late === "paid" ? ` · хоцорвол ${money(due.late_fee)}` : due.late === "closed" ? " · дараа нь хаалттай" : ""}</span>` : ""}${due.fee ? `<span class="aud aud-paid">💳 ${money(due.fee)}</span>` : ""}`;
-  const kindBadge = (l) => (l.exam ? `<span class="kind kind-exam">📝 Шалгалт</span>${dueBadge(l.exam.due)}` : l.assignment ? `<span class="kind kind-asg">📎 Даалгавар</span>${dueBadge(l.assignment.due)}` : "") + (l.discussion && !l.exam ? `<span class="aud" title="Хэлэлцүүлэгтэй">💬${commentCounts[l.id] ? " " + commentCounts[l.id] : ""}</span>` : "");
+  const kindBadge = (l) => (l.exam ? `<span class="kind kind-exam">${ico("exam", 14)}Шалгалт</span>${dueBadge(l.exam.due)}` : l.assignment ? `<span class="kind kind-asg">${ico("clip", 14)}Даалгавар</span>${dueBadge(l.assignment.due)}` : "") + (l.discussion && !l.exam ? `<span class="aud" title="Хэлэлцүүлэгтэй">💬${commentCounts[l.id] ? " " + commentCounts[l.id] : ""}</span>` : "");
   const audience = (l) => l.is_free ? `<span class="aud aud-free">${ico("globe", 14)}Үнэгүй · бүгдэд нээлттэй</span>`
     : `<span class="aud aud-paid">${ico("lock", 14)}${l.price ? money(l.price) : "Зөвхөн багцаар"}</span>`;
   const libOptions = () => lib.files.filter((f) => f.status !== "failed").map((f) => `<option value="${esc(f.path)}">${esc(f.original_name)} · ${fmtSize(f.size)}${f.status === "processing" ? " (боловсруулж байна)" : ""}</option>`).join("");
@@ -767,9 +769,9 @@ async function courseEditor(id) {
   // Хичээл оруулах маягт: 1 Төрөл → 2 Нэр, бүлэг → 3 Агуулга → 4 Тохиргоо (төрлөөс хамаарна) → Нэмэлт → Нийтлэх.
   const editorHTML = (l, preset, kind) => { kind = kind || kindOf(l); const T = KIND_TXT[kind]; return `<form class="form post-editor pe-v2" ${l ? `data-edit="${esc(l.id)}"` : `id="composerForm"`} data-kind="${kind}">
       ${step(1, "Төрөл", `<div class="seg pe-kind" role="radiogroup" aria-label="Төрөл">
-        <label><input type="radio" name="kind" value="lesson" ${kind === "lesson" ? "checked" : ""}><span>📄 Хичээл</span></label>
-        <label><input type="radio" name="kind" value="exam" ${kind === "exam" ? "checked" : ""}><span>📝 Шалгалт</span></label>
-        <label><input type="radio" name="kind" value="assignment" ${kind === "assignment" ? "checked" : ""}><span>📎 Даалгавар</span></label></div>
+        <label><input type="radio" name="kind" value="lesson" ${kind === "lesson" ? "checked" : ""}><span>${ico("doc", 15)}Хичээл</span></label>
+        <label><input type="radio" name="kind" value="exam" ${kind === "exam" ? "checked" : ""}><span>${ico("exam", 15)}Шалгалт</span></label>
+        <label><input type="radio" name="kind" value="assignment" ${kind === "assignment" ? "checked" : ""}><span>${ico("clip", 15)}Даалгавар</span></label></div>
         <p class="pe-kind-hint muted small" data-k="lesson" ${kind === "lesson" ? "" : "hidden"}>Ердийн хичээл: үзэж, асуултад хариулж, дуусгана.</p>
         <p class="pe-kind-hint muted small" data-k="exam" ${kind === "exam" ? "" : "hidden"}>Хугацаатай, хамгаалалттай шалгалт. Оноогоор тэнцэнэ.</p>
         <p class="pe-kind-hint muted small" data-k="assignment" ${kind === "assignment" ? "" : "hidden"}>Суралцагч хариу илгээж, та дүгнэнэ.</p>`)}
@@ -959,7 +961,7 @@ async function courseEditor(id) {
     const secs = []; for (const l of L) { const k = l.section || ""; const last = secs[secs.length - 1]; if (last && last.name === k) last.n++; else secs.push({ name: k, n: 1 }); }
     const hasSecs = secs.some((x) => x.name);
     const head = `<thead>${hasSecs ? `<tr class="jr-secs"><th class="jr-name" rowspan="2">Суралцагч</th>${secs.map((x) => `<th colspan="${x.n}" title="${esc(x.name || "Бүлэггүй")}">${esc(x.name || "—")}</th>`).join("")}<th rowspan="2">Дууссан</th><th rowspan="2">Дундаж</th><th rowspan="2">Цол</th></tr>` : ""}
-      <tr>${hasSecs ? "" : `<th class="jr-name">Суралцагч</th>`}${L.map((l) => `<th class="jr-l ${l.hidden ? "is-hidden" : ""}" title="${esc(l.title)}${l.hidden ? " (хаалттай)" : ""}">${String(l.position).padStart(2, "0")}${l.kind === "exam" ? "<i>📝</i>" : l.kind === "assignment" ? "<i>📎</i>" : ""}</th>`).join("")}${hasSecs ? "" : "<th>Дууссан</th><th>Дундаж</th><th>Цол</th>"}</tr></thead>`;
+      <tr>${hasSecs ? "" : `<th class="jr-name">Суралцагч</th>`}${L.map((l) => `<th class="jr-l ${l.hidden ? "is-hidden" : ""}" title="${esc(l.title)}${l.hidden ? " (хаалттай)" : ""}">${String(l.position).padStart(2, "0")}${l.kind === "exam" ? `<i>${ico("exam", 14)}</i>` : l.kind === "assignment" ? "<i>📎</i>" : ""}</th>`).join("")}${hasSecs ? "" : "<th>Дууссан</th><th>Дундаж</th><th>Цол</th>"}</tr></thead>`;
     const body = S.map((s) => `<tr data-uid="${esc(s.user_id)}"><th class="jr-name" data-jr-student><span class="jr-who">${esc(s.name)}</span><small>${s.enrolled ? (s.username ? "@" + esc(s.username) : "") : "элсээгүй · үнэгүй хичээл"}</small></th>
       ${L.map((l) => { const [t, k] = jrCell(l, C[s.user_id]?.[l.id]); return `<td class="jr-c ${k}" data-lid="${esc(l.id)}">${t}</td>`; }).join("")}
       <td class="jr-sum">${s.done}/${L.filter((l) => !l.hidden).length}</td><td class="jr-sum">${s.avg || "—"}</td><td class="jr-rank" title="${s.rank.points} оноо">${esc(s.rank.insignia || "")} ${esc(s.rank.name)}</td></tr>`).join("");
@@ -1027,7 +1029,7 @@ async function courseEditor(id) {
       <tbody>${rub.criteria.map((cr) => `<tr><th>${esc(cr.name)}</th>${rub.levels.map((_, j) => `<td><label class="rb-cell ${s.rubric?.[cr.id] === j ? "on" : ""}"><input type="radio" name="rb_${esc(cr.id)}" value="${j}" ${s.rubric?.[cr.id] === j ? "checked" : ""} required><b>${cr.points[j]} оноо</b>${cr.desc[j] ? `<small>${esc(cr.desc[j])}</small>` : ""}</label></td>`).join("")}</tr>`).join("")}</tbody></table></div>
       <div class="rb-grade-foot"><span class="rb-total">Нийт <b>${s.score ?? 0}</b>/${max}</span><label class="grow">Тайлбар<input name="feedback" maxlength="5000" value="${esc(s.feedback || "")}" placeholder="Юу сайн, юуг сайжруулах вэ?"></label><button class="btn btn-gold btn-sm">${s.graded_at ? "Шинэчлэх" : "Дүгнэх"}</button></div></form>`;
     const row = (s) => `<article class="sub-item" data-uid="${esc(s.user_id)}"><header><b>${esc(s.user_name)}</b><small class="muted">${fmtDate(s.submitted_at)}${s.late ? ` · <span class="an-bad">хоцорсон</span>` : ""}</small></header>
-      ${s.text ? `<p class="sub-text">${SG.linkify(s.text)}</p>` : ""}${s.links?.length ? `<p class="sub-files">${s.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 70))}</a>`).join("<br>")}</p>` : ""}${s.files?.length ? `<p class="sub-files">${s.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`).join(" ")}</p>` : ""}
+      ${s.text ? `<p class="sub-text">${SG.linkify(s.text)}</p>` : ""}${s.links?.length ? `<p class="sub-files">${s.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 70))}</a>`).join("<br>")}</p>` : ""}${s.files?.length ? `<p class="sub-files">${s.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${ico("doc", 14)} ${esc(f.name)}</a>`).join(" ")}</p>` : ""}
       ${rub ? rbForm(s) : `<form class="sub-grade"><label>Оноо (0-${max})<input name="score" type="number" min="0" max="${max}" value="${s.score ?? ""}" required></label><label class="grow">Тайлбар<input name="feedback" maxlength="5000" value="${esc(s.feedback || "")}" placeholder="Юу сайн, юуг сайжруулах вэ?"></label><button class="btn btn-gold btn-sm">${s.graded_at ? "Шинэчлэх" : "Дүгнэх"}</button>${s.graded_at ? `<small class="muted">✓ ${fmtDate(s.graded_at)}</small>` : ""}</form>`}</article>`;
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="gradeModal"><div class="modal-card" style="width:min(820px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
       <h3 class="h3">${esc(d.lesson)} — хариунууд (${d.submissions.length})</h3>${d.assignment?.due?.at || d.assignment?.due?.start_at ? `<p class="muted small">${d.assignment.due.start_at ? `Эхлэх: ${fmtDate(d.assignment.due.start_at)} · ` : ""}${d.assignment.due.at ? `Дуусах: ${fmtDate(d.assignment.due.at)} · хоцорвол ${d.assignment.due.late === "paid" ? money(d.assignment.due.late_fee) : d.assignment.due.late === "closed" ? "хаалттай" : "төлбөргүй"}` : ""}${d.assignment.due.fee ? ` · оролцооны төлбөр ${money(d.assignment.due.fee)}` : ""}</p>` : ""}
@@ -1183,9 +1185,9 @@ async function courseEditor(id) {
     const kindMenu = (anchor, preset) => {
       $(".kind-menu")?.remove();
       const m = document.createElement("div"); m.className = "kind-menu"; m.setAttribute("role", "menu");
-      m.innerHTML = `<button type="button" role="menuitem" data-new-kind="lesson">📄 <b>Хичээл</b><small>текст, видео, файл, асуулт</small></button>
-        <button type="button" role="menuitem" data-new-kind="exam">📝 <b>Шалгалт</b><small>хугацаа, оролдлого, хоцорвол төлбөртэй/төлбөргүй</small></button>
-        <button type="button" role="menuitem" data-new-kind="assignment">📎 <b>Даалгавар</b><small>хариу илгээж дүгнүүлнэ, хоцорвол төлбөртэй/төлбөргүй</small></button>`;
+      m.innerHTML = `<button type="button" role="menuitem" data-new-kind="lesson">${ico("doc", 18)} <b>Хичээл</b><small>текст, видео, файл, асуулт</small></button>
+        <button type="button" role="menuitem" data-new-kind="exam">${ico("exam", 18)} <b>Шалгалт</b><small>хугацаа, оролдлого, хоцорвол төлбөртэй/төлбөргүй</small></button>
+        <button type="button" role="menuitem" data-new-kind="assignment">${ico("clip", 18)} <b>Даалгавар</b><small>хариу илгээж дүгнүүлнэ, хоцорвол төлбөртэй/төлбөргүй</small></button>`;
       document.body.append(m);
       const place = () => { const r = anchor.getBoundingClientRect(), w = 300; m.style.top = Math.min(r.bottom + 6, innerHeight - 190) + "px"; m.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px"; };
       place();
@@ -1357,7 +1359,7 @@ function scrollRows(box, items, rowFn, step = 20) {
 
 /* ---------- Ном, өгүүлэл: зарах, хамгаалах, лог ----------
    Файлыг багшийн хөтөч дээр хуудас бүрээр зураг болгож илгээнэ — эх PDF уншигчид огт очихгүй. */
-const BOOK_EVENTS = { view: ["👀", "Хуудсыг үзсэн"], preview: ["📖", "Үнэгүй хэсгийг уншсан"], read: ["📚", "Бүтнээр уншсан"], interest: ["♥", "Сонирхсон"],
+const BOOK_EVENTS = { view: [ico("eye", 14), "Хуудсыг үзсэн"], preview: [ico("book", 14), "Үнэгүй хэсгийг уншсан"], read: [ico("check", 14), "Бүтнээр уншсан"], interest: ["♥", "Сонирхсон"],
   paywall: ["🔒", "Төлбөрийн хананд хүрсэн"], purchase: ["💰", "Худалдаж авсан"], limit: ["⚠️", "Хэт хурдан татах гэсэн"] };
 async function books() {
   let [list, evs] = await Promise.all([api("/api/me/books"), api("/api/me/book-events?limit=1000")]);
@@ -1372,7 +1374,7 @@ async function books() {
           <span class="bc-cover">${cover(b) ? `<img src="${esc(cover(b))}" alt="" loading="lazy">` : ""}</span>
           <div class="grow"><strong>${esc(b.title)}</strong><small class="muted">${b.kind === "article" ? "Өгүүлэл" : "Ном"}${b.author ? " · " + esc(b.author) : ""} · ${b.pages ? b.pages + " хуудас" : "<b style='color:var(--coral)'>файл оруулаагүй</b>"}</small>
             <span class="find-tagrow"><span class="ftag ${b.price ? "ftag-paid" : "ftag-free"}">${b.price ? money(b.price) : "Үнэгүй"}</span><span class="ftag ${b.published ? "ftag-free" : ""}">${b.published ? "Нийтлэгдсэн" : "Ноорог"}</span>${b.price ? `<span class="ftag">Эхний ${b.preview_pages} хуудас үнэгүй</span>` : ""}</span>
-            <small class="muted">👀 ${b.views} · 📖 ${b.previews} · 📚 ${b.reads} · ♥ ${b.interest} · 💰 ${b.sales} (${money(b.revenue)})</small></div>
+            <small class="muted">${ico("eye", 13)} ${b.views} · ${ico("book", 13)} ${b.previews} · ${ico("check", 13)} ${b.reads} · ♥ ${b.interest} · 💰 ${b.sales} (${money(b.revenue)})</small></div>
           <div class="bk-acts"><button class="btn btn-glass btn-sm" data-edit>${ico("edit", 15)}Засах</button>${b.published ? `<a class="btn btn-glass btn-sm" href="/b/${esc(b.id)}" target="_blank" rel="noopener">${ico("eye", 15)}Харах</a>` : ""}<button class="btn btn-ghost btn-sm" data-log>Лог</button></div></article>`).join("") || `<div class="empty">Ном хараахан алга.<br>PDF, Word (DOC, DOCX) файлаа оруулж зарж эхлээрэй.</div>`}</div>
       <section class="card"><div class="card-head"><h2>Үйлдлийн лог</h2><select id="bkLogFilter" aria-label="Номоор шүүх"><option value="">Бүх ном</option>${list.map((b) => `<option value="${esc(b.id)}">${esc(b.title)}</option>`).join("")}</select></div>
         <div class="bk-log" id="bkLog"></div></section>`;
@@ -1386,7 +1388,7 @@ async function books() {
   const reload = async () => { list = await api("/api/me/books"); evs = await api("/api/me/book-events?limit=1000" + ($("#bkLogFilter")?.value ? "&book=" + $("#bkLogFilter").value : "")); render(); };
 
   const formHTML = (b = {}) => `<form class="form" id="bkForm">
-      <div class="seg" role="radiogroup" aria-label="Төрөл"><label><input type="radio" name="kind" value="book" ${b.kind !== "article" ? "checked" : ""}><span>📕 Ном</span></label><label><input type="radio" name="kind" value="article" ${b.kind === "article" ? "checked" : ""}><span>📄 Өгүүлэл</span></label></div>
+      <div class="seg" role="radiogroup" aria-label="Төрөл"><label><input type="radio" name="kind" value="book" ${b.kind !== "article" ? "checked" : ""}><span>📕 Ном</span></label><label><input type="radio" name="kind" value="article" ${b.kind === "article" ? "checked" : ""}><span>${ico("doc", 15)}Өгүүлэл</span></label></div>
       <label>Нэр<input name="title" required maxlength="200" value="${esc(b.title || "")}"></label>
       <label>Зохиогч<input name="author" maxlength="120" value="${esc(b.author || me.display_name || "")}"></label>
       <label>Тайлбар<textarea name="description" rows="4" placeholder="Энэ номонд юу байгаа вэ?">${esc(b.description || "")}</textarea></label>
@@ -1489,7 +1491,7 @@ async function files() {
       <div class="meter"><i id="fMeter"></i></div>
       <p class="muted small">Үнэгүй ${plans.free_label}${st.plan_active ? ` + ${esc(String(st.plan_mb >= 1024 ? st.plan_mb / 1024 + "GB" : st.plan_mb + "MB"))} багц (${fmtDate(st.expires_at)} хүртэл)` : ""}.
       Зураг автоматаар <b>WebP</b> болж ${plans.max_image_side}px хүртэл багасна, видео <b>WebM</b>, Word/PowerPoint <b>PDF (3D ном)</b> болно.</p>
-      <div class="dropzone" id="drop" tabindex="0"><strong>📤 Файлаа энд чирж оруулах эсвэл дарж сонгох</strong><span class="muted small">Видео, PDF, Word, PowerPoint, зураг, аудио</span>
+      <div class="dropzone" id="drop" tabindex="0"><strong>${ico("upload", 18)} Файлаа энд чирж оруулах эсвэл дарж сонгох</strong><span class="muted small">Видео, PDF, Word, PowerPoint, зураг, аудио</span>
         <select id="vis" style="width:auto" onclick="event.stopPropagation()"><option value="private">🔒 Хаалттай (төлбөртэй хичээлд)</option><option value="public">🌐 Нээлттэй (профайл зураг г.м)</option></select>
         <input type="file" id="fileIn" multiple hidden></div>
       <div id="uploads" class="list" style="margin-top:12px"></div>`) +
@@ -1581,7 +1583,7 @@ async function files() {
   cleanup = () => { clearInterval(t); main.onclick = null; };
 }
 
-const FILE_TYPES = [["all", "Бүгд"], ["video", "🎬 Видео"], ["image", "🖼 Зураг"], ["audio", "🎧 Дуу"], ["doc", "📄 Баримт"], ["other", "📦 Бусад"]];
+const FILE_TYPES = [["all", "Бүгд"], ["video", ico("live", 15) + " Видео"], ["image", ico("image", 15) + " Зураг"], ["audio", ico("headphones", 15) + " Дуу"], ["doc", ico("doc", 15) + " Баримт"], ["other", "📦 Бусад"]];
 const fstate = { type: "all", q: "", sort: "new", use: "", view: (() => { try { return localStorage.getItem("sg_files_view") || "tree"; } catch { return "tree"; } })() };
 const FICON = { video: "🎬", image: "🖼", audio: "🎧", doc: "📄", other: "📦" };
 const FGROUP = { video: "Видео", image: "Зураг", audio: "Дуу", doc: "Баримт", other: "Бусад" };
@@ -1610,22 +1612,22 @@ function filesTree(files, usage, books) {
     }
   }
   const lessonsHTML = (sec) => [...sec.values()].sort((a, b) => a.pos - b.pos)
-    .map((l) => treeNode("📝", l.title, l.files.length, l.files.map(treeFile).join(""), few)).join("");
+    .map((l) => treeNode(ico("doc", 16), l.title, l.files.length, l.files.map(treeFile).join(""), few)).join("");
   const courseHTML = [...courses.values()].map((c) => {
     const n = [...c.sections.values()].reduce((k, s) => k + [...s.values()].reduce((m, l) => m + l.files.length, 0), 0);
     const inner = [...c.sections.entries()].map(([name, sec]) => name
-      ? treeNode("📂", name, [...sec.values()].reduce((m, l) => m + l.files.length, 0), lessonsHTML(sec), true)
+      ? treeNode(ico("folder", 16), name, [...sec.values()].reduce((m, l) => m + l.files.length, 0), lessonsHTML(sec), true)
       : lessonsHTML(sec)).join("");
-    return treeNode("📘", c.title, n, inner, true);
+    return treeNode(ico("book", 16), c.title, n, inner, true);
   }).join("");
   const unused = files.filter((f) => !used.has(f.path));
   const byType = Object.keys(FGROUP).map((t) => [t, unused.filter((f) => fileType(f) === t)]).filter(([, fs]) => fs.length);
   const unusedHTML = byType.map(([t, fs]) => treeNode(FICON[t], FGROUP[t], fs.length, fs.map(treeFile).join(""), few)).join("");
   const bookHTML = books.map((b) => `<li class="tf"><span class="tf-ico">📗</span><span class="tf-name">${esc(b.title)}</span><span class="tf-meta">${b.pages} хуудас · 🔒 хамгаалагдсан</span><span class="tf-acts">${b.published ? `<a class="icon-btn" href="/b/${esc(b.id)}" target="_blank" rel="noopener" title="Харах">↗</a>` : ""}</span></li>`).join("");
-  return `<ul class="ftree">${treeNode("🗂", "Бүх файл", files.length, [
-    courseHTML ? treeNode("📚", "Сургалтууд", used.size, courseHTML, true) : "",
-    books.length ? treeNode("📕", "Номууд", books.length, bookHTML, false) : "",
-    unused.length ? treeNode("🗃", "Ашиглаагүй файлууд", unused.length, unusedHTML, true) : "",
+  return `<ul class="ftree">${treeNode(ico("folder", 16), "Бүх файл", files.length, [
+    courseHTML ? treeNode(ico("book", 16), "Сургалтууд", used.size, courseHTML, true) : "",
+    books.length ? treeNode(ico("book", 16), "Номууд", books.length, bookHTML, false) : "",
+    unused.length ? treeNode(ico("files", 16), "Ашиглаагүй файлууд", unused.length, unusedHTML, true) : "",
   ].join("") || `<li class="muted small">Файл алга</li>`, true)}</ul>`;
 }
 const fileType = (f) => { const t = f.content_type || "", e = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();

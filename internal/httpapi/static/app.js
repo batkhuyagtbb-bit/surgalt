@@ -39,6 +39,8 @@ const UI_ICONS = {
   expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
 };
 const icon = (n, size = 18) => `<svg data-ico="${n}" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI_ICONS[n] || ""}</svg>`;
+// Хөдөлгөөнт дүрсэнд (animateIcons) шинээр ашигласан нэрсийн статик зам (байхгүй бол л нэмнэ).
+for (const [k, v] of Object.entries({"exam":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\"/><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\"/><path d=\"m9 14 2 2 4-4\"/>","doc":"<path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M10 9H8M16 13H8M16 17H8\"/>","headphones":"<path d=\"M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3\"/>","folder":"<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/>","eye":"<path d=\"M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","live":"<path d=\"m16 13 5.22 3.48a.5.5 0 0 0 .78-.42V7.94a.5.5 0 0 0-.76-.43L16 10.5\"/><rect x=\"2\" y=\"6\" width=\"14\" height=\"12\" rx=\"2\"/>","book":"<path d=\"M12 7v14\"/><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\"/>","files":"<path d=\"M20 7h-3a2 2 0 0 1-2-2V2\"/><path d=\"M9 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l4 4v10a2 2 0 0 1-2 2Z\"/><path d=\"M3 7.6v12.8A1.6 1.6 0 0 0 4.6 22h9.8\"/>"})) UI_ICONS[k] ||= v;
 // Огноог өөрсдөө хэлбэржүүлнэ: олон браузерт mn-MN локаль байхгүй тул англиар гардаг.
 const WEEKDAYS = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"];
 const WEEKDAYS_SHORT = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"];
@@ -243,15 +245,15 @@ function chatRail() {
   }
   const teacher = u.role === "teacher";
   const I = {
-    chat: `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>`,
-    x: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>`,
-    back: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>`,
-    search: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`,
-    live: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/></svg>`,
-    group: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.2 2.7-5 6-5s6 1.8 6 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.3c3-.3 5.5 1.5 5.5 4.2"/></svg>`,
-    people: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5M10.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/></svg>`,
-    plus: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
-    collapse: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 6 6 6-6 6M13 6l6 6-6 6"/></svg>`,
+    chat: `<svg data-ico="chat" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>`,
+    x: `<svg data-ico="x" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>`,
+    back: `<svg data-ico="back" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>`,
+    search: `<svg data-ico="search" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`,
+    live: `<svg data-ico="live" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/></svg>`,
+    group: `<svg data-ico="group" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.2 2.7-5 6-5s6 1.8 6 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.3c3-.3 5.5 1.5 5.5 4.2"/></svg>`,
+    people: `<svg data-ico="people" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5M10.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/></svg>`,
+    plus: `<svg data-ico="plus" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+    collapse: `<svg data-ico="collapse" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 6 6 6-6 6M13 6l6 6-6 6"/></svg>`,
   };
   for (const k in I) I[k] = I[k].replace("<svg ", `<svg data-ico="${k}" `); // хөдөлгөөнт дүрсэнд тааруулах нэр
   const sameDay = (t) => new Date(t).toDateString() === new Date().toDateString();
@@ -477,7 +479,7 @@ function bell() {
   const links = $(".nav-links");
   if (!links || $("#bell")) return;
   links.insertAdjacentHTML("afterbegin", `
-    <div class="bell-wrap"><button class="icon-btn bell" id="bell" aria-label="Мэдэгдэл"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg><span class="bell-badge" hidden></span></button>
+    <div class="bell-wrap"><button class="icon-btn bell" id="bell" aria-label="Мэдэгдэл"><svg data-ico="bell" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg><span class="bell-badge" hidden></span></button>
     <div class="bell-panel glass" id="bellPanel" hidden><div class="bell-head"><strong>Мэдэгдэл</strong><button class="btn btn-ghost btn-sm" id="bellPerm" hidden>🔔 Браузерт мэдэгдэх</button></div><ol class="bell-list" id="bellList"><li class="muted small">Ачаалж байна…</li></ol></div></div>`);
   const badge = $(".bell-badge"), panel = $("#bellPanel"), list = $("#bellList");
   let unread = 0;
@@ -641,14 +643,14 @@ function blockHTML(b) {
     }
     case "text": return `<div class="rb-text" data-bid="${esc(b.id || "")}">${richHTML(b.text)}</div>`;
     case "image": return `<figure class="rb-fig"><img src="${esc(b.url)}" alt="${esc(b.text || "")}" loading="lazy">${cap}</figure>`;
-    case "audio": return `<figure class="rb-audio"><span class="rb-audio-ico">🎧</span><div><b>${esc(b.name || "Дуу бичлэг")}</b><audio src="${esc(b.url)}" controls preload="metadata" controlslist="nodownload" oncontextmenu="return false"></audio></div>${cap}</figure>`;
+    case "audio": return `<figure class="rb-audio"><span class="rb-audio-ico">${icon("headphones", 22)}</span><div><b>${esc(b.name || "Дуу бичлэг")}</b><audio src="${esc(b.url)}" controls preload="metadata" controlslist="nodownload" oncontextmenu="return false"></audio></div>${cap}</figure>`;
     case "video": return `<figure class="rb-video" data-bid="${esc(b.id)}" ${b.parts?.length > 1 ? `data-parts="${esc(JSON.stringify(b.parts))}"` : ""}><div class="player">${mediaHTML(b.url, b.name)}</div>${b.parts?.length > 1 ? `<div class="vparts" aria-label="Видеоны хэсгүүд">${b.parts.map((_, i) => `<button type="button" data-vpart="${i}" class="${i ? "" : "on"}">${i + 1}-р хэсэг</button>`).join("")}<span class="muted small">6 минутын ${b.parts.length} хэсэг · дараалан тоглоно</span></div>` : ""}${cap}</figure>`;
     case "file": {
       const meta = esc([extOf(b.url).slice(1).toUpperCase(), fmtBytes(b.size)].filter(Boolean).join(" · ")) + (b.text ? " · " + esc(b.text) : "");
       const kind = docKind(b.url);
       // PDF, PowerPoint, Word, Excel: хичээл дотор шууд (попапгүй), татах боломжгүй — багш зөвшөөрсөн бол л татна.
       if (kind && kind !== "legacy") return `<figure class="rb-doc" ${b.download ? "data-dl" : "data-nodl"}>${docViewHTML(b.url, b.name || DOC_LABEL[kind])}${cap}</figure>`;
-      return b.download ? `<a class="rb-file" href="${esc(b.url)}" target="_blank" rel="noopener" download><span class="rb-file-ico">📄</span><span><b>${esc(b.name || "Файл")}</b><small>${meta}</small></span><span class="btn btn-sm btn-glass">⬇ Татах</span></a>`
+      return b.download ? `<a class="rb-file" href="${esc(b.url)}" target="_blank" rel="noopener" download><span class="rb-file-ico">${icon("doc", 22)}</span><span><b>${esc(b.name || "Файл")}</b><small>${meta}</small></span><span class="btn btn-sm btn-glass">⬇ Татах</span></a>`
         : `<div class="rb-file"><span class="rb-file-ico">🔒</span><span><b>${esc(b.name || "Файл")}</b><small>${meta} · ${kind === "legacy" ? "Хуучин форматыг шууд үзүүлэх боломжгүй — багш PDF, .pptx, .docx болгож оруулна" : "Зөвхөн хичээл дотор үзнэ"}</small></span></div>`;
     }
     case "cloud": { // үүлэн үг: суралцагч 1-3 үг илгээж, бүгдийн хариулт үүл болно (mountClouds)
@@ -1286,7 +1288,7 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
   // «Юуг тэмдэглэдэг вэ?» — шинэ таб нээвэл таб сольсонд тооцогдох тул тайлбарыг хичээлийн цонхон дотор харуулна.
   const why = document.createElement("div"); why.className = "wb-info"; why.id = "wbInfo"; why.hidden = true;
   why.innerHTML = `<b>Хичээлийн цонх нээлттэй үед л</b> таб, цонх сольсон, курсор цонхноос гарсан, 2 минутаас удаан хөдөлгөөнгүй байсан, хуулах гэсэн үйлдлийг тэмдэглэнэ. Камер, микрофон ашиглахгүй, дэлгэц бичихгүй. Тэмдэглэлийг тухайн сургалтын багш харж, 180 хоногийн дараа устна.`;
-  const paint = () => { badge.innerHTML = `👁 Анхаарлын горим · <span class="wb-long">өөр таб руу шилжвэл </span>сануулга <b>${warns}/${WATCH_MAX_WARN}</b><button type="button" class="wb-why" aria-controls="wbInfo" aria-expanded="${!why.hidden}">Юуг тэмдэглэдэг вэ?</button>`; badge.classList.toggle("warned", warns > 0); };
+  const paint = () => { badge.innerHTML = `${icon("eye", 14)} Анхаарлын горим · <span class="wb-long">өөр таб руу шилжвэл </span>сануулга <b>${warns}/${WATCH_MAX_WARN}</b><button type="button" class="wb-why" aria-controls="wbInfo" aria-expanded="${!why.hidden}">Юуг тэмдэглэдэг вэ?</button>`; badge.classList.toggle("warned", warns > 0); };
   badge.addEventListener("click", (e) => { const b = e.target.closest(".wb-why"); if (!b) return; why.hidden = !why.hidden; b.setAttribute("aria-expanded", String(!why.hidden)); });
   paint(); card.prepend(badge); badge.after(why);
   const wm = document.createElement("div"); wm.className = "wm"; wm.setAttribute("aria-hidden", "true");
@@ -1610,7 +1612,7 @@ async function assignmentCard(box, { courseId, lessonId }) {
     card.innerHTML = `<h3>${icon("clip", 20)} Даалгавар</h3>
       <ul class="exam-facts">${due.start_at ? `<li>▶ Эхлэх: <b>${fmtDate(due.start_at)}</b></li>` : ""}${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : "<li>📅 Хугацаагүй</li>"}<li>🎯 ${a.grading === "rubric" ? `Рубрикаар · <b>${a.max_score}</b> оноо` : `Дээд оноо: <b>${a.max_score || 100}</b>`}</li>${due.entry_fee ? `<li>💳 Төлбөр: <b>${money(due.entry_fee)}</b>${due.paid ? " ✓" : ""}</li>` : ""}<li>✍️ Хариу: текст ба холбоос</li></ul>
       ${dueNotice(due)}
-      ${sub ? `<div class="sub-mine"><b>Таны хариу</b> <small class="muted">${fmtDate(sub.submitted_at)}${sub.late ? " · хоцорсон" : ""}</small>${sub.text ? `<p>${esc(sub.text)}</p>` : ""}${sub.links?.length ? `<p>${sub.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 60))}</a>`).join("<br>")}</p>` : ""}${sub.files?.length ? `<p>${sub.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`).join(" · ")}</p>` : ""}
+      ${sub ? `<div class="sub-mine"><b>Таны хариу</b> <small class="muted">${fmtDate(sub.submitted_at)}${sub.late ? " · хоцорсон" : ""}</small>${sub.text ? `<p>${esc(sub.text)}</p>` : ""}${sub.links?.length ? `<p>${sub.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 60))}</a>`).join("<br>")}</p>` : ""}${sub.files?.length ? `<p>${sub.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${icon("doc", 14)} ${esc(f.name)}</a>`).join(" · ")}</p>` : ""}
         ${sub.score !== undefined ? `<div class="sub-score">✅ Дүн: <b>${sub.score}/${a.max_score || 100}</b>${a.grading === "rubric" ? rubricViewHTML(a.rubric, sub.rubric || {}) : ""}${sub.feedback ? `<p class="sub-fb"><b>Багшийн тайлбар:</b> ${esc(sub.feedback)}</p>` : ""}</div>` : `<p class="muted small">Багш хараахан дүгнээгүй байна — дүгнэмэгц энд автоматаар гарч ирнэ.</p>`}</div>` : ""}
       ${a.grading === "rubric" && sub?.score === undefined ? `<details class="asg-rubric" open><summary>Үнэлэх шалгуур (рубрик) · ${a.max_score} оноо</summary>${rubricViewHTML(a.rubric)}</details>` : ""}
       ${due.closed || due.not_started ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж даалгавраа илгээх</button>`
@@ -1641,7 +1643,7 @@ function runExam({ base, courseId, lessonId, title, data, onClose }) {
   let finished = false, sid = null, tick = null, beat = null;
   const lessonModal = $("#lessonModal"); if (lessonModal?.classList.contains("open")) closeModal(lessonModal);
   const el = document.createElement("div"); el.className = "exam"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Шалгалт");
-  el.innerHTML = `<header class="exam-bar"><strong>📝 ${esc(title)}</strong><span class="exam-prog"></span><span class="exam-timer" aria-live="polite"></span><button class="btn btn-gold btn-sm" data-exam-submit>Илгээх</button></header>
+  el.innerHTML = `<header class="exam-bar"><strong>${icon("exam", 18)} ${esc(title)}</strong><span class="exam-prog"></span><span class="exam-timer" aria-live="polite"></span><button class="btn btn-gold btn-sm" data-exam-submit>Илгээх</button></header>
     <nav class="exam-nav" aria-label="Асуултаар шилжих">${data.questions.map((_, i) => `<button type="button" data-goq="${i}" aria-label="${i + 1}-р асуулт руу очих">${i + 1}</button>`).join("")}
       <span class="exam-nav-legend" aria-hidden="true"><i class="lg-todo"></i>хариулаагүй<i class="lg-done"></i>хариулсан</span></nav>
     <div class="exam-body"><div class="exam-qs">${data.questions.map((b, i) => quizFormHTML(b, true, i + 1)).join("")}</div>
@@ -2649,7 +2651,7 @@ const emojiRecent = { get: () => { try { return JSON.parse(localStorage.getItem(
 // Зөвхөн 1-3 emoji-той мессеж → бөмбөлөггүй, том (Messenger шиг).
 const emojiOnly = (s) => { s = (s || "").trim(); if (!s || s.length > 40 || !/^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|‍|️|\s)+$/u.test(s)) return false; const n = (s.match(/\p{Extended_Pictographic}|\p{Regional_Indicator}{2}/gu) || []).length; return n >= 1 && n <= 3; };
 const STICKERS = ["🎉", "👏", "🏆", "💯", "🔥", "🚀", "🧠", "📚", "✅", "🙏", "😎", "🥳", "🤝", "💪", "🌟", "🎯"];
-const ICO_IMG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-9 9"/></svg>`;
+const ICO_IMG = `<svg data-ico="image" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-9 9"/></svg>`;
 const ICO_STICKER = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6"/><path d="M20 13h-4a3 3 0 0 0-3 3v4l7-7Z"/><path d="M9 10h.01M14 10h.01M9 14c.8.8 1.8 1.2 3 1.2"/></svg>`;
 const ICO_SMILE = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01M8.5 14.5c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg>`;
 function dayLabel(t) {
@@ -2840,7 +2842,7 @@ class ChatThread {
     f.innerHTML = `${extra.length ? `<div class="cb-left">${extra.map((b) => `<button type="button" class="cb-ic" id="${esc(b.id)}" title="${esc(b.textContent.trim())}" aria-label="${esc(b.textContent.trim())}">${b.querySelector("svg")?.outerHTML || "📹"}</button>`).join("")}</div>` : ""}
       <div class="cb-input"><textarea name="body" rows="1" maxlength="2000" placeholder="Aa" aria-label="Мессеж"></textarea>
         <button type="button" class="cb-emoji" data-emoji-open aria-label="Emoji" aria-expanded="false" title="Emoji">${ICO_SMILE}</button></div>
-      <button class="cb-send" aria-label="Илгээх" title="Илгээх (Enter)"><span class="cb-like" aria-hidden="true">👍</span><svg class="cb-arrow" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21.9 12 3.4 3.6l-.1 6.6L15 12 3.3 13.8l.1 6.6Z"/></svg></button>`;
+      <button class="cb-send" aria-label="Илгээх" title="Илгээх (Enter)"><span class="cb-like" aria-hidden="true">👍</span><svg data-ico="send" class="cb-arrow" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21.9 12 3.4 3.6l-.1 6.6L15 12 3.3 13.8l.1 6.6Z"/></svg></button>`;
     const ta = f.body;
     const grow = () => {
       ta.style.height = "auto"; if (!ta.scrollHeight) { ta.style.height = ""; return; } // цонх далд үед (scrollHeight 0) өндөр тогтоохгүй
@@ -4128,7 +4130,7 @@ function findCourses() {
   };
   const card = (it) => `<li class="find-item">
       <a class="find-main" href="/c/${esc(it.course_id)}"><strong>${mark(it.title)}</strong>
-        ${it.match ? `<span class="find-match">📖 ${mark(it.match)}</span>` : ""}
+        ${it.match ? `<span class="find-match">${icon("book", 13)} ${mark(it.match)}</span>` : ""}
         <span class="find-tagrow">${it.tags.map((t) => `<span class="ftag ${t === "Үнэгүй" ? "ftag-free" : t === "Төлбөртэй" ? "ftag-paid" : t === "Сертификаттай" ? "ftag-cert" : t === "Шалгалттай" ? "ftag-exam" : ""}">${esc(t)}</span>`).join("")}</span>
         <small class="muted">${it.lessons} хичээл${it.price ? " · " + money(it.price) : ""}${it.views ? " · " + it.views + " үзэлт" : ""}</small></a>
       <a class="find-teacher" href="/t/${esc(it.teacher.username)}" title="Багшийн профайл">${avatarHTML(it.teacher, "avatar-sm")}<span>${mark(it.teacher.display_name)}<small class="muted">Профайл үзэх →</small></span></a></li>`;
@@ -4614,7 +4616,7 @@ Promise.race([document.fonts?.ready || Promise.resolve(), new Promise((r) => set
    карт дээр хулгана авчрах / focus авахад тоглоно. Хөдөлгөөн багасгах тохиргоотой үед огт ачаалахгүй. */
 function animateIcons() {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const MAP = { bell: "Bell", chat: "MessageCircle", book: "BookOpen", users: "Users", user: "User", teacher: "User", profile: "User", gear: "Settings", eye: "Eye", lock: "Lock", check: "Check", clock: "Clock", money: "Wallet", chart: "ChartColumn", live: "Video", clip: "Paperclip", medal: "Medal", courses: "GraduationCap", cal: "Calendar", pin: "MapPin", shield: "ShieldCheck", search: "Search", home: "House", plus: "Plus", x: "X", edit: "SquarePen", trash: "Trash2", heart: "Heart", star: "Star", cloud: "Cloud", link: "Link", files: "Files", doc: "FileText", exam: "ClipboardCheck", play: "Play", text: "Type", image: "Image", mic: "Mic", heading: "Heading", send: "Send", back: "ArrowLeft", next: "ArrowRight", chev: "ChevronRight", chevron: "ChevronRight", down: "ChevronDown", up: "ChevronUp", download: "Download", upload: "Upload", share: "Share", qr: "QrCode", globe: "Globe", card: "CreditCard", slides: "Presentation", sheet: "Table", expand: "Expand", grip: "GripVertical", list: "List", quiz: "MessageCircleQuestionMark", target: "Target", pulse: "Activity", alert: "TriangleAlert", camera: "Camera", phone: "Phone", layers: "Layers", work: "Briefcase", repeat: "Repeat", ext: "ExternalLink", out: "LogOut", group: "Users", people: "Users", collapse: "ChevronsRight" };
+  const MAP = { bell: "Bell", chat: "MessageCircle", book: "BookOpen", users: "Users", user: "User", teacher: "User", profile: "User", gear: "Settings", eye: "Eye", lock: "Lock", check: "Check", clock: "Clock", money: "Wallet", chart: "ChartColumn", live: "Video", clip: "Paperclip", medal: "Medal", courses: "GraduationCap", cal: "Calendar", pin: "MapPin", shield: "ShieldCheck", search: "Search", home: "House", plus: "Plus", x: "X", edit: "SquarePen", trash: "Trash2", heart: "Heart", star: "Star", cloud: "Cloud", link: "Link", files: "Files", doc: "FileText", exam: "ClipboardCheck", play: "Play", text: "Type", image: "Image", mic: "Mic", heading: "Heading", send: "Send", back: "ArrowLeft", next: "ArrowRight", chev: "ChevronRight", chevron: "ChevronRight", down: "ChevronDown", up: "ChevronUp", download: "Download", upload: "Upload", share: "Share", qr: "QrCode", globe: "Globe", card: "CreditCard", slides: "Presentation", sheet: "Table", expand: "Expand", grip: "GripVertical", list: "List", quiz: "MessageCircleQuestionMark", target: "Target", pulse: "Activity", alert: "TriangleAlert", camera: "Camera", phone: "Phone", layers: "Layers", work: "Briefcase", repeat: "Repeat", ext: "ExternalLink", out: "LogOut", group: "Users", people: "Users", collapse: "ChevronsRight", monitor: "Monitor", playc: "CirclePlay", headphones: "Headphones", folder: "Folder" };
   const v = document.querySelector('script[src*="/static/app.js"]')?.src.split("v=")[1] || "";
   const s = document.createElement("script");
   s.src = "/static/vendor/animateicons-lucide-0.1.0.js?v=" + v; s.async = true;
