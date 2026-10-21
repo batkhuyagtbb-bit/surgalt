@@ -237,7 +237,10 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && Li
    Өргөн дэлгэцэд хуудасны баруун талд наалдсан; нарийн дэлгэцэд дээд цэсний товчоор гулсаж гарна. */
 function chatRail() {
   const u = Auth.user;
-  if (!u || !Auth.token || !$(".nav-links") || !["home", "profile", "course", "me"].includes(page)) return;
+  if (!u || !Auth.token || !$(".nav-links") || !["home", "profile", "course", "me"].includes(page)) {
+    document.documentElement.classList.remove("has-rail", "rail-boot", "rail-collapsed"); // <head>-д урьдчилан тавьсныг буцаана
+    return;
+  }
   const teacher = u.role === "teacher";
   const I = {
     chat: `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>`,
@@ -253,7 +256,9 @@ function chatRail() {
   const sameDay = (t) => new Date(t).toDateString() === new Date().toDateString();
   // Хумьсан хавтас "би энд байна": шинэ мессеж ирэхэд нэг удаа дохино.
   const nudgeTab = () => { const tab = $("#railTab"); if (!tab) return; tab.classList.remove("nudge"); void tab.offsetWidth; tab.classList.add("nudge"); };
-  document.documentElement.classList.add("has-rail");
+  // Самбар нэмэгдэх агшинд гулсах/шахагдах transition-гүй (rail-boot), дараагийн кадруудад сэргээнэ.
+  document.documentElement.classList.add("rail-boot", "has-rail");
+  requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => document.documentElement.classList.remove("rail-boot"), 50)));
   document.body.insertAdjacentHTML("beforeend", `<aside class="rail" id="studioRail" aria-label="Чат">
     <div class="rail-view" id="railHome">
       <header class="rail-head"><strong><i></i>Чат</strong><button class="btn btn-sm rail-group-btn" id="railNewGroup" title="${teacher ? "Сургалтын бүлэг чат нээх" : "Ангийн найзуудтайгаа бүлэг үүсгэх"}">${I.plus}Бүлэг чат</button><button class="icon-btn rail-close" data-rail-close aria-label="Чат хумих" title="Хумих">${I.collapse}</button></header>
@@ -358,6 +363,12 @@ function chatRail() {
   });
   const th = new ChatThread({ ol: msgs, body, form, token: () => Auth.token, convId: () => cur, role: () => myRole, group: () => curGroup });
   const append = (m) => th.append(m);
+  // Ярианы гарчиг: жагсаалтаас нэр (суралцагчид багшийн нэр), эс бөгөөс ярианы мэдээллээс.
+  let curConv = null;
+  const whoHTML = (c) => {
+    const known = convs.find((x) => x.id === c.id);
+    return `<strong>${esc(known?.title || c.visitor_name)}</strong><small class="muted">${c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин")}</small>`;
+  };
   // show=false: самбарын нээлттэй/хумьсан төлөвийг өөрчлөхгүй (refresh-ийн дараа сэргээх, дахин холбогдох).
   const open = async (id, show = true) => {
     const same = cur === id && !thread.hidden;
@@ -368,9 +379,8 @@ function chatRail() {
     try {
       const d = await api(`/api/chat/${id}/messages`);
       if (cur !== id) return;
-      const c = d.conversation; curGroup = c.kind === "group" || c.kind === "team"; myRole = d.me;
-      const known = convs.find((x) => x.id === id);
-      $("#railWho").innerHTML = `<strong>${esc(known?.title || c.visitor_name)}</strong><small class="muted">${c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин")}</small>`;
+      const c = d.conversation; curGroup = c.kind === "group" || c.kind === "team"; myRole = d.me; curConv = c;
+      $("#railWho").innerHTML = whoHTML(c);
       th.set(d); if (show) form.body.focus();
     } catch (e) {
       if (!show && e.status >= 400 && e.status < 500) { ss.set("sg_rail_conv", null); cur = null; thread.hidden = true; home.hidden = false; draw(); return; } // хадгалсан яриа байхгүй болсон
@@ -398,7 +408,8 @@ function chatRail() {
   // Refresh-ийн өмнө нээлттэй байсан яриаг (жагсаалт ачаалсны дараа — гарчиг зөв нэртэй) сэргээнэ;
   // нарийн дэлгэцэд самбар нээлттэй байсан бол шууд нээнэ.
   if (ss.get("sg_rail_open") === "1" && !wide()) setRail(true);
-  loadPeople().then(load).then(() => { const saved = ss.get("sg_rail_conv"); if (saved && !cur) open(saved, false); });
+  { const saved = ss.get("sg_rail_conv"); if (saved) open(saved, false); } // жагсаалт хүлээлгүй шууд яриа (жагсаалт→яриа солигдож анивчихгүй)
+  loadPeople().then(load).then(() => { if (curConv && cur === curConv.id) $("#railWho").innerHTML = whoHTML(curConv); });
   window.openRailChat = (id) => (id ? open(id) : setRail(true));
   // Сургалтын хуудасны товчнууд: нэвтэрсэн хүнд яриа энэ самбарт нээгдэнэ.
   window.railStartDirect = async (username) => { const d = await api(`/api/teachers/${username}/chat`, { method: "POST" }); await load(); open(d.conversation.id); };
@@ -2674,7 +2685,12 @@ class ChatThread {
     if (d.type === "typing" && d.key !== this.meKey) { this.typing.set(d.key, { name: d.name, at: Date.now() }); this.render(); this.scroll(); clearTimeout(this._tt); this._tt = setTimeout(() => { this.sweepTyping(); this.render(); }, 4200); }
   }
   sweepTyping() { for (const [k, v] of this.typing) if (Date.now() - v.at > 4000) this.typing.delete(k); }
-  scroll(force) { if (force || this.body.scrollHeight - this.body.scrollTop - this.body.clientHeight < 160) this.body.scrollTop = this.body.scrollHeight; }
+  // force: яриа нээх үед шууд доод хэсэг (smooth гүйлгэхгүй); шинэ мессежид зөөлөн.
+  scroll(force) {
+    const b = this.body;
+    if (force) { b.style.scrollBehavior = "auto"; b.scrollTop = b.scrollHeight; b.style.scrollBehavior = ""; }
+    else if (b.scrollHeight - b.scrollTop - b.clientHeight < 160) b.scrollTop = b.scrollHeight;
+  }
   async markRead() {
     const last = [...this.list].reverse().find((m) => !this.mine(m)); if (!last || last.id === this.lastReadSent || !this.convId()) return;
     this.lastReadSent = last.id;
