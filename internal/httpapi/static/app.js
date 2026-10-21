@@ -89,6 +89,21 @@ function heroStars() {
   }
 }
 
+// Нүүрний танилцуулга кино (intro2, iframe): бүдэг харагдаж, хулгана авчрахад тодорч тоглоно, холдоход зогсоно.
+// Кино дотор дарж үзэж байвал (iframe focus) холдсон ч үргэлжилнэ. Hover-гүй (мэдрэгчтэй) төхөөрөмжид энгийн хэвээр.
+function homeFilm() {
+  const fig = $(".home-film"), fr = fig && $("iframe", fig);
+  if (!fr || !matchMedia("(hover: hover)").matches) return;
+  fig.classList.add("hover-play");
+  const win = () => { try { return fr.contentWindow; } catch { return null; } };
+  let over = false;
+  const off = () => { fig.classList.remove("is-on"); win()?.__introPause?.(); };
+  fig.addEventListener("mouseenter", () => { over = true; fig.classList.add("is-on"); win()?.__introPlay?.(); });
+  fig.addEventListener("mouseleave", () => { over = false; if (document.activeElement !== fr) off(); });
+  // кино дотор дарж үзсэний дараа хуудасны өөр газар дарвал бүдгэрч зогсоно (iframe доторх дарал энд ирэхгүй)
+  document.addEventListener("pointerdown", (e) => { if (!over && !fig.contains(e.target) && fig.classList.contains("is-on")) off(); });
+}
+
 // Сайтын хандалт (хянагчийн самбарын өдөр/7 хоног/сарын статистик): хуудас бүр нэг удаа, хөтчийн санамсаргүй ID-гаар.
 function siteHit() {
   if (page === "admin" || navigator.webdriver) return;
@@ -4581,7 +4596,7 @@ if (new URLSearchParams(location.search).has("deleted")) { // бүртгэлээ
 if (page === "reset") resetPage();
 animateIcons();
 siteHit();
-if (page === "home" && !document.documentElement.classList.contains("authed")) heroStars();
+if (page === "home" && !document.documentElement.classList.contains("authed")) { heroStars(); homeFilm(); }
 // 3D дэвсгэр (Three.js): нүүрэнд зөвхөн зочинд, нэвтрэх хуудсанд — хуудас ачаалагдсаны дараа сул үед.
 if ((page === "home" && !document.documentElement.classList.contains("authed")) || page === "login") {
   (window.requestIdleCallback || ((f) => setTimeout(f, 400)))(() => {

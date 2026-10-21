@@ -602,6 +602,11 @@ const resetScene = () => {
   $("#okOpt").classList.remove("ok"); $("#ncount").textContent = "0"; $("#warnN").textContent = "0"; typed.textContent = ""; $("#pts").textContent = "140";
   sub.textContent = ""; kick.innerHTML = ""; pulse(false); stopVoice();
 };
+// Нүүрэнд суулгасан үед (iframe) эх хуудас hover-оор тоглуулж/зогсооно. Хулганаар авчирч тоглуулахад дуу (AudioContext)
+// хэрэглэгчийн үйлдэлгүй эхэлдэггүй тул кино дотор анх дарахад дууг сэргээнэ.
+window.__introPlay = () => { if (tl.paused() || tl.progress() >= 1) play(); };
+window.__introPause = () => { if (!tl.paused() && tl.progress() < 1) pause(); };
+document.addEventListener("pointerdown", () => { if (A.ctx && A.ctx.state === "suspended" && !tl.paused()) A.ctx.resume(); }, true);
 $("#playBig").onclick = play;
 $("#bPlay").onclick = () => (tl.paused() || tl.progress() >= 1 ? play() : pause());
 $("#bRe").onclick = () => { $("#poster").hidden = true; audioInit(); restart(); };
