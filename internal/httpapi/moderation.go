@@ -125,7 +125,7 @@ func (s *Server) handleReport(w http.ResponseWriter, r *http.Request) {
 		s.chatEvent(conv, map[string]any{"type": "block", "block": s.convBlock(ctx, conv)})
 	}
 	if !dup {
-		s.notifyAdmins(ctx, &store.Notification{Type: NotifReport, Link: "/admin",
+		s.notifyAdmins(ctx, &store.Notification{Type: NotifReport, Link: s.adminPath(),
 			Title: "🚩 Шинэ мэдүүлэг · " + reportReasons[in.Reason],
 			Body:  rep.ReporterName + " → " + rep.TargetName + ": «" + short(m.Body) + "»"})
 	}
@@ -204,6 +204,15 @@ func (s *Server) isAdmin(u *store.User) bool {
 }
 
 func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (*store.User, bool) {
+	w.Header().Set("Cache-Control", "private, no-store")
+	// Тусдаа замаар нууц үгээр нэвтэрсэн хянагч (admin.go): cookie-гоор баталгаажих тул өөрчлөх хүсэлтийн эх сурвалжийг шалгана.
+	if s.adminCookieOK(r) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !s.sameOrigin(r) {
+			writeErr(w, http.StatusForbidden, "хүсэлтийн эх сурвалж буруу")
+			return nil, false
+		}
+		return &store.User{ID: "admin", DisplayName: "Хянагч (" + s.cfg.AdminLogin + ")", Email: s.cfg.AdminLogin}, true
+	}
 	c, ok := s.requireUser(w, r)
 	if !ok {
 		return nil, false

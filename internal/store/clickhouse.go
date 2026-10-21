@@ -389,6 +389,12 @@ var chTables = []chTable{
 	// «Үүлэн үг» хэсгийн хариултууд (cloud.go) — суралцагч бүрийн сүүлийн илгээлт.
 	{"cloud_answers", `(lesson_id String, block_id String, user_id String, words Array(String), at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (lesson_id, block_id, user_id)`},
+	// Хянагчийн самбар: сайтын хуудас нээлт (хөтчөөс; 400 хоног) ба платформын зардлын бүртгэл (admin.go).
+	{"site_hits", `(at ` + tsType + `, visitor_id String, user_id String, path String, referrer String, device String)
+	ENGINE = MergeTree ORDER BY at TTL toDateTime(at) + INTERVAL 400 DAY`},
+	{"admin_expenses", `(id String, date ` + tsType + `, category String, amount Int64, note String, created_by String,
+		created_at ` + tsType + `, ver UInt64, deleted Bool DEFAULT false)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
 }
 
 func (c *ClickHouse) ensureSchema(ctx context.Context) error {

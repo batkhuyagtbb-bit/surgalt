@@ -562,6 +562,7 @@ type Store interface {
 	PayoutStore
 	HighlightStore
 	CloudStore
+	AdminStore
 	CreateUser(ctx context.Context, u *User) error
 	UserByID(ctx context.Context, id string) (*User, error)
 	UserByEmail(ctx context.Context, email string) (*User, error)

@@ -60,6 +60,16 @@ const store = {
   set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
+// Сайтын хандалт (хянагчийн самбарын өдөр/7 хоног/сарын статистик): хуудас бүр нэг удаа, хөтчийн санамсаргүй ID-гаар.
+function siteHit() {
+  if (page === "admin" || navigator.webdriver) return;
+  let vid = ""; try { vid = localStorage.getItem("sg_vid") || ""; if (!vid) { vid = crypto.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("sg_vid", vid); } } catch {}
+  let ref = ""; try { const r = document.referrer && new URL(document.referrer); ref = r ? (r.host === location.host ? "self" : r.host) : ""; } catch {}
+  const body = JSON.stringify({ p: location.pathname, vid, ref }), headers = { "Content-Type": "application/json" };
+  const tok = store.get("sg_token"); if (tok) headers.Authorization = "Bearer " + tok;
+  fetch("/api/hit", { method: "POST", headers, body, keepalive: true }).catch(() => {});
+}
+
 /* ---------- auth + API ---------- */
 const Auth = {
   get token() { return store.get("sg_token"); },
@@ -4285,83 +4295,6 @@ function loginPage() {
 }
 
 // Хянагчийн хуудас (/admin): чатын мэдүүлгийг харж шийдвэрлэнэ (сонговол мэдүүлсэн мессежийг устгана).
-function adminPage() {
-  const list = $("#adList"); if (!list) return;
-  if (!Auth.token) { location.href = "/login?next=/admin"; return; }
-  const KIND = { group: "Сургалтын бүлэг чат", team: "Сурагчдын бүлэг", dm: "Ангийн найзын чат", "": "Багштай чат" };
-  let st = "open";
-  const card = (r) => `<article class="ad-card" data-id="${esc(r.id)}">
-    <header><span class="chip ${r.status === "open" ? "chip-amber" : ""}">${esc(r.reason_label || r.reason)}</span><small class="muted">${esc(KIND[r.conv_kind] ?? "Чат")}</small><time>${fmtDate(r.created_at)}</time></header>
-    <p class="ad-who"><b>${esc(r.reporter_name || "Зочин")}</b> мэдүүлэв <span aria-hidden="true">→</span> <b>${esc(r.target_name || "Зочин")}</b></p>
-    ${r.note ? `<p class="ad-note">«${esc(r.note)}»</p>` : ""}
-    <ol class="ad-ctx">${(r.context || []).map((m) => `<li class="${m.reported ? "hit" : ""}"><b>${esc(m.name || "?")}</b><span>${esc(m.body)}</span><time>${fmtTime(m.at)}</time></li>`).join("")}</ol>
-    ${r.status === "open" ? `<form class="ad-act"><input name="resolution" maxlength="500" placeholder="Шийдвэр (ж: сануулсан, мессежийг устгасан)" aria-label="Шийдвэр"><label class="check"><input type="checkbox" name="del">Мессежийг устгах</label><button class="btn btn-gold btn-sm">Шийдвэрлэх</button></form>`
-      : `<p class="ad-done">✓ ${esc(r.resolved_by || "")}${r.resolved_at ? " · " + fmtDate(r.resolved_at) : ""}${r.resolution ? ` — ${esc(r.resolution)}` : ""}</p>`}
-  </article>`;
-  // Багшийн орлого татах хүсэлт: банкаар шилжүүлээд «Шилжүүлсэн» дарна (татгалзвал дүн багшийн үлдэгдэлд буцна).
-  const PST = { pending: ["Хүлээгдэж буй", "chip-amber"], paid: ["Шилжүүлсэн", "chip-teal"], rejected: ["Татгалзсан", "chip-coral"] };
-  const payCard = (p) => `<article class="ad-card" data-pid="${esc(p.id)}">
-    <header><span class="chip ${PST[p.status]?.[1] || ""}">${PST[p.status]?.[0] || esc(p.status)}</span><small class="muted">${p.auto ? "Хуваариар" : "Гараар"}</small><time>${fmtDate(p.created_at)}</time></header>
-    <p class="ad-pay"><b>${money(p.amount)}</b><span><a class="link" href="/t/${esc(p.teacher_username)}" target="_blank" rel="noopener">${esc(p.teacher_name || p.teacher_username)}</a> · ${esc(p.teacher_email || "")}</span></p>
-    <dl class="ad-acct"><div><dt>Банк</dt><dd>${esc(p.bank_name)}</dd></div><div><dt>Данс</dt><dd><code>${esc(p.account_no)}</code> <button type="button" class="btn btn-ghost btn-sm" data-copy="${esc(p.account_no)}">Хуулах</button></dd></div><div><dt>Эзэмшигч</dt><dd>${esc(p.account_name)}</dd></div></dl>
-    ${p.status === "pending" ? `<form class="ad-act ad-payact"><input name="note" maxlength="300" placeholder="Гүйлгээний дугаар эсвэл татгалзсан шалтгаан" aria-label="Тайлбар"><button class="btn btn-gold btn-sm" value="paid">✓ Шилжүүлсэн</button><button class="btn btn-ghost btn-sm" value="rejected">Татгалзах</button></form>`
-      : `<p class="ad-done">${esc(p.processed_by || "")}${p.processed_at ? " · " + fmtDate(p.processed_at) : ""}${p.note ? ` — ${esc(p.note)}` : ""}</p>`}
-  </article>`;
-  const HEAD = {
-    report: ["Чатын мэдүүлэг", "Мэдүүлсэн мессеж ба түүний өмнөх хэдэн мессежийг л харуулна. Шийдвэрлэхэд бүртгэлтэй мэдүүлэгчид мэдэгдэнэ."],
-    payout: ["Орлого татах хүсэлт", "Багшийн данс руу банкаар шилжүүлээд «Шилжүүлсэн» гэж тэмдэглэнэ. Татгалзвал дүн багшийн үлдэгдэлд буцна. Аль ч тохиолдолд багшид мэдэгдэнэ."],
-  };
-  const load = async () => {
-    const isPay = st.startsWith("payouts");
-    [$("#adTitle").textContent, $("#adDesc").textContent] = HEAD[isPay ? "payout" : "report"];
-    if (isPay) {
-      try {
-        const ps = await api("/api/admin/payouts?status=" + (st === "payouts" ? "pending" : "all"));
-        const shown = st === "payouts" ? ps : ps.filter((p) => p.status !== "pending");
-        if (st === "payouts") $("[data-st=payouts]").textContent = `Татах хүсэлт${ps.length ? ` (${ps.length})` : ""}`;
-        const sum = shown.reduce((n, p) => n + (p.status === "rejected" ? 0 : p.amount), 0);
-        list.innerHTML = shown.length ? `<p class="muted small">${shown.length} хүсэлт · нийт ${money(sum)}</p>` + shown.map(payCard).join("")
-          : `<p class="ad-empty">${st === "payouts" ? "Хүлээгдэж буй хүсэлт алга 🎉" : "Шийдвэрлэсэн хүсэлт алга"}</p>`;
-      } catch (x) { list.innerHTML = `<p class="ad-empty">${x.status === 403 ? "Энэ хуудас зөвхөн хянагчид нээлттэй." : esc(x.message)}</p>`; }
-      return;
-    }
-    try {
-      const rs = await api("/api/admin/reports?status=" + st);
-      if (st === "open") $("[data-st=open]").textContent = `Нээлттэй${rs.length ? ` (${rs.length})` : ""}`;
-      list.innerHTML = rs.length ? rs.map(card).join("") : `<p class="ad-empty">${st === "open" ? "Нээлттэй мэдүүлэг алга 🎉" : "Шийдвэрлэсэн мэдүүлэг алга"}</p>`;
-    } catch (x) {
-      list.innerHTML = `<p class="ad-empty">${x.status === 403 ? "Энэ хуудас зөвхөн хянагчид нээлттэй. Хянагч нь ADMIN_EMAILS-д бүртгэлтэй, Google эсвэл Microsoft-оор нэвтэрсэн бүртгэл байна." : esc(x.message)}</p>`;
-    }
-  };
-  const pick = (name) => { const b = $(`.ad-tabs [data-st="${name}"]`); if (!b) return; st = name; $$(".ad-tabs button").forEach((x) => x.classList.toggle("on", x === b)); list.innerHTML = `<p class="ad-empty">Ачаалж байна…</p>`; load(); };
-  $$(".ad-tabs button").forEach((b) => b.addEventListener("click", () => pick(b.dataset.st)));
-  list.addEventListener("click", (e) => {
-    const c = e.target.closest("[data-copy]"); if (!c) return;
-    navigator.clipboard.writeText(c.dataset.copy).then(() => toast("Дансны дугаар хуулагдлаа ✓"), () => toast(c.dataset.copy));
-  });
-  list.addEventListener("submit", async (e) => {
-    const pf = e.target.closest(".ad-payact");
-    if (pf) {
-      e.preventDefault();
-      const status = e.submitter?.value || "paid", card = pf.closest(".ad-card");
-      if (status === "rejected" && !pf.note.value.trim()) { toast("Татгалзсан шалтгаанаа бичнэ үү", true); pf.note.focus(); return; }
-      if (status === "paid" && !confirm("Энэ дүнг багшийн данс руу шилжүүлсэн үү?")) return;
-      $$("button", pf).forEach((b) => (b.disabled = true));
-      try { await api(`/api/admin/payouts/${card.dataset.pid}`, { method: "POST", body: { status, note: pf.note.value } }); toast(status === "paid" ? "Шилжүүлсэн гэж тэмдэглэлээ ✓" : "Татгалзлаа"); load(); }
-      catch (x) { toast(x.message, true); $$("button", pf).forEach((b) => (b.disabled = false)); }
-      return;
-    }
-    const f = e.target.closest(".ad-act"); if (!f) return;
-    e.preventDefault();
-    const b = $("button", f); b.disabled = true;
-    try {
-      await api(`/api/admin/reports/${f.closest(".ad-card").dataset.id}/resolve`, { method: "POST", body: { resolution: f.resolution.value, delete_message: f.del.checked } });
-      toast("Шийдвэрлэлээ ✓"); load();
-    } catch (x) { toast(x.message, true); b.disabled = false; }
-  });
-  if (location.hash === "#payouts") pick("payouts"); else load();
-}
-
 // Бүртгэлээ устгах: юу устахыг тайлбарлаж «УСТГАХ» гэж бичүүлнэ (буцаах боломжгүй).
 function deleteAccountDialog() {
   if ($(".rp")) return;
@@ -4613,9 +4546,16 @@ if (new URLSearchParams(location.search).has("deleted")) { // бүртгэлээ
   toast("Бүртгэл тань устгагдлаа. surgalt.mn-ийг ашигласанд баярлалаа.");
   history.replaceState(null, "", location.pathname + location.hash);
 }
-if (page === "admin") adminPage();
 if (page === "reset") resetPage();
 animateIcons();
+siteHit();
+// Нүүрний hero-ийн 3D дэвсгэр (Three.js): зөвхөн зочинд, хуудас ачаалагдсаны дараа сул үед.
+if (page === "home" && !document.documentElement.classList.contains("authed")) {
+  (window.requestIdleCallback || ((f) => setTimeout(f, 400)))(() => {
+    const s = document.createElement("script"), v = document.querySelector('script[src*="/static/app.js"]')?.src.split("v=")[1] || "";
+    s.src = "/static/herofx.js?v=" + v; s.async = true; document.head.append(s);
+  }, { timeout: 1500 });
+}
 // Хуудас угсрагдаж (фонт, эхний зурлага) дууссаны дараа зөөлөн гаргана — салж нийлэх нь харагдахгүй.
 Promise.race([document.fonts?.ready || Promise.resolve(), new Promise((r) => setTimeout(r, 600))])
   .then(() => requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove("pre"))));

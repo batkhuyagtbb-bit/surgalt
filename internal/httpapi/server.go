@@ -38,6 +38,10 @@ type Config struct {
 	AdminEmails   []string      // чатын мэдүүлэг шийдвэрлэх хянагчид (жижиг үсгээр; moderation.go)
 	Mail          mail.Sender   // нууц үг сэргээх имэйл (nil бол илгээхгүй; демо горимд холбоосыг логт гаргана)
 	PayoutMin     int64         // багшийн орлого татах доод дүн (₮; 0 бол 1000)
+	// Хянагчийн самбар (admin.go): тусдаа зам ба нууц үгээр нэвтрэх (хоосон бол /admin, зөвхөн ADMIN_EMAILS).
+	AdminPath     string
+	AdminLogin    string
+	AdminPassHash string // bcrypt
 }
 
 type Server struct {
@@ -53,6 +57,9 @@ type Server struct {
 	chatLim  *ratelimit.Limiter // мессеж илгээх
 	phoneLim *ratelimit.Limiter // багшийн утасны дугаар нээх — дугаар хусуурдахаас сэргийлнэ
 	resetLim *ratelimit.Limiter // нэг имэйл рүү нууц үг сэргээх захидал (2 минутад 1 орчим)
+	admLim   *ratelimit.Limiter // хянагчийн нууц үгээр нэвтрэх оролдлого (IP тус бүрт)
+	hits     hitBuf             // сайтын хандалтын түр сан (admin.go)
+	adm      adminCache         // хянагчийн самбарын агшин зураг
 	profiles *cache.Cache[*Rendered[PublicProfile]]
 	courses  *cache.Cache[*Rendered[PublicCourse]]
 	qrs      *cache.Cache[[]byte]
@@ -84,6 +91,7 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 		chatLim:  ratelimit.New(2, 10),
 		phoneLim: ratelimit.New(0.05, 8),
 		resetLim: ratelimit.New(1.0/120, 2),
+		admLim:   ratelimit.New(1.0/30, 5),
 		profiles: cache.New[*Rendered[PublicProfile]](30*time.Second, 5*time.Second, isNF),
 		courses:  cache.New[*Rendered[PublicCourse]](30*time.Second, 5*time.Second, isNF),
 		qrs:      cache.New[[]byte](time.Hour, 5*time.Second, isNF),
@@ -106,6 +114,8 @@ func (s *Server) Background(ctx context.Context) {
 	go s.chatLim.Janitor(ctx)
 	go s.phoneLim.Janitor(ctx)
 	go s.resetLim.Janitor(ctx)
+	go s.admLim.Janitor(ctx)
+	go s.hitLoop(ctx)
 	go s.notifyLoop(ctx)
 	go s.payoutLoop(ctx)
 }
@@ -274,7 +284,21 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/chat/{id}/report", s.handleReport)
 	mux.HandleFunc("POST /api/chat/{id}/block", s.handleBlock)
 	mux.HandleFunc("DELETE /api/chat/{id}/block", s.handleBlock)
-	mux.HandleFunc("GET /admin", s.pageStatic("admin"))
+	// Хянагчийн самбар: зөвхөн ADMIN_PATH-аар (тохируулсан бол /admin нээгдэхгүй).
+	mux.HandleFunc("GET "+s.adminPath(), s.pageAdmin)
+	mux.HandleFunc("POST /api/admin/login", s.handleAdminLogin)
+	mux.HandleFunc("POST /api/admin/logout", s.handleAdminLogout)
+	mux.HandleFunc("GET /api/admin/me", s.handleAdminMe)
+	mux.HandleFunc("GET /api/admin/overview", s.handleAdminOverview)
+	mux.HandleFunc("GET /api/admin/teachers", s.handleAdminTeachers)
+	mux.HandleFunc("GET /api/admin/teachers/{id}", s.handleAdminTeacher)
+	mux.HandleFunc("GET /api/admin/students", s.handleAdminStudents)
+	mux.HandleFunc("GET /api/admin/students/{id}", s.handleAdminStudent)
+	mux.HandleFunc("GET /api/admin/transactions", s.handleAdminTransactions)
+	mux.HandleFunc("GET /api/admin/finance", s.handleAdminFinance)
+	mux.HandleFunc("POST /api/admin/expenses", s.handleAdminAddExpense)
+	mux.HandleFunc("DELETE /api/admin/expenses/{id}", s.handleAdminDeleteExpense)
+	mux.HandleFunc("POST /api/hit", s.handleHit)
 	mux.HandleFunc("GET /api/admin/reports", s.handleAdminReports)
 	mux.HandleFunc("POST /api/admin/reports/{id}/resolve", s.handleAdminResolve)
 	mux.HandleFunc("GET /api/me/classmates", s.handleClassmates)

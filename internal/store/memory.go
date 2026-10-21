@@ -49,6 +49,7 @@ type Memory struct {
 	cloud       cloudMem                   // үүлэн үгийн хариултууд (memory_cloud.go)
 	invoices    map[string]*PaymentInvoice // order → сүүлийн нэхэмжлэх
 	visits      map[string]*PageVisit      // хуудасны үзэлт
+	admin       adminMem                   // сайтын хандалт, зардал (memory_admin.go)
 }
 
 func NewMemory() *Memory {

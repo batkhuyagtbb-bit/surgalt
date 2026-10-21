@@ -191,7 +191,7 @@ func (s *Server) payoutRequested(ctx context.Context, p *store.Payout) {
 	if p.Auto {
 		how = "хуваариар"
 	}
-	s.notifyAdmins(ctx, &store.Notification{Type: NotifPayout, Link: "/admin#payouts",
+	s.notifyAdmins(ctx, &store.Notification{Type: NotifPayout, Link: s.adminPath() + "#payouts",
 		Title: "🏦 Татах хүсэлт · " + money(p.Amount), Body: fmt.Sprintf("%s (%s) — %s %s", who, how, bankName(p.Bank), p.AccountNo)})
 }
 
@@ -585,6 +585,7 @@ func (s *Server) handleAdminPayout(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
+	s.adminInvalidate()
 	n := &store.Notification{UserID: p.TeacherID, Type: NotifPayout, Link: "/me#wallet"}
 	if p.Status == store.PayoutPaid {
 		n.Title = "✅ Орлого данс руу шилжлээ · " + money(p.Amount)

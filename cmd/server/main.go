@@ -112,6 +112,21 @@ func loadDotEnv(path string) (int, error) {
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	// surgalt hash-password — хянагчийн нууц үгийг (stdin-ээс) bcrypt болгож ADMIN_PASSWORD_HASH-д тавих утгыг хэвлэнэ.
+	if len(os.Args) > 1 && os.Args[1] == "hash-password" {
+		var pw string
+		if _, err := fmt.Fscanln(os.Stdin, &pw); err != nil || len(pw) < 12 {
+			fmt.Fprintln(os.Stderr, "нууц үгээ stdin-ээр өгнө үү (12+ тэмдэгт, хоосон зайгүй)")
+			os.Exit(2)
+		}
+		h, err := auth.HashPassword(context.Background(), pw)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println(h)
+		return
+	}
 	if n, err := loadDotEnv(".env"); err != nil {
 		log.Warn(".env уншиж чадсангүй", "err", err)
 	} else if n > 0 {
@@ -203,6 +218,20 @@ func run(log *slog.Logger) error {
 		log.Warn("SMTP тохируулаагүй — нууц үг сэргээх имэйл илгээгдэхгүй (демо горимд холбоосыг логт гаргана)")
 	}
 
+	// Хянагчийн самбар: тусдаа зам (ADMIN_PATH) ба нууц үгээр нэвтрэх (ADMIN_LOGIN + ADMIN_PASSWORD_HASH, bcrypt).
+	adminPath, adminLogin, adminHash := strings.TrimSpace(os.Getenv("ADMIN_PATH")), strings.TrimSpace(os.Getenv("ADMIN_LOGIN")), strings.TrimSpace(os.Getenv("ADMIN_PASSWORD_HASH"))
+	if adminPath != "" && !httpapi.ValidAdminPath(adminPath) {
+		log.Warn("ADMIN_PATH буруу (жишээ: /sg-control-7f3a) — /admin ашиглана")
+		adminPath = ""
+	}
+	if (adminLogin == "") != (adminHash == "") || (adminHash != "" && !strings.HasPrefix(adminHash, "$2")) {
+		log.Warn("ADMIN_LOGIN ба ADMIN_PASSWORD_HASH (bcrypt) хоёулаа хэрэгтэй — нууц үгээр нэвтрэх идэвхгүй")
+		adminLogin, adminHash = "", ""
+	}
+	if adminLogin != "" {
+		log.Info("хянагчийн самбар: нууц үгээр нэвтрэх идэвхтэй", "hidden_path", adminPath != "")
+	}
+
 	hub := chat.NewHub()
 	tokens := auth.NewSigner(secret, 7*24*time.Hour)
 	srv := httpapi.New(httpapi.Config{
@@ -219,6 +248,9 @@ func run(log *slog.Logger) error {
 		AdminEmails:   emailList(os.Getenv("ADMIN_EMAILS")),
 		Mail:          mailer,
 		PayoutMin:     envInt("PAYOUT_MIN", 1000),
+		AdminPath:     adminPath,
+		AdminLogin:    adminLogin,
+		AdminPassHash: adminHash,
 	}, st, tokens, hub, fstore, log)
 
 	base := env("PUBLIC_URL", "http://localhost"+env("ADDR", ":8080"))
