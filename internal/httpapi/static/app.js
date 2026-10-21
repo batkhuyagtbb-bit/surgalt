@@ -16,6 +16,7 @@ const UI_ICONS = {
   book: '<path d="M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h7"/>',
   live: '<rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/>',
   chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/>',
+  cloud: '<path d="M7 18.5a4.5 4.5 0 0 1-.7-8.95A6 6 0 0 1 17.8 8a4.75 4.75 0 0 1-.55 10.5Z"/>',
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.7c2 .7 3.5 2.4 3.5 5.3"/>',
   teacher: '<circle cx="12" cy="7" r="3.5"/><path d="M5 21c0-4 3.1-6.5 7-6.5s7 2.5 7 6.5"/><path d="M15 3.5h5v3"/>',
   play: '<circle cx="12" cy="12" r="9"/><path d="m10 8.5 5.5 3.5-5.5 3.5z"/>',
@@ -619,6 +620,12 @@ function blockHTML(b) {
       return b.download ? `<a class="rb-file" href="${esc(b.url)}" target="_blank" rel="noopener" download><span class="rb-file-ico">📄</span><span><b>${esc(b.name || "Файл")}</b><small>${meta}</small></span><span class="btn btn-sm btn-glass">⬇ Татах</span></a>`
         : `<div class="rb-file"><span class="rb-file-ico">🔒</span><span><b>${esc(b.name || "Файл")}</b><small>${meta} · ${kind === "legacy" ? "Хуучин форматыг шууд үзүүлэх боломжгүй — багш PDF, .pptx, .docx болгож оруулна" : "Зөвхөн хичээл дотор үзнэ"}</small></span></div>`;
     }
+    case "cloud": { // үүлэн үг: суралцагч 1-3 үг илгээж, бүгдийн хариулт үүл болно (mountClouds)
+      const n = Math.max(1, Math.min(3, +b.max || 1));
+      return `<figure class="rb-cloud" data-bid="${esc(b.id || "")}"><figcaption class="cl-q">${icon("cloud", 20)}<span>${esc(b.text)}</span></figcaption>
+        <form class="cl-form">${Array.from({ length: n }, (_, i) => `<input class="cl-in" maxlength="30" autocomplete="off" placeholder="${n > 1 ? `${i + 1}-р үг` : "Нэг үгээр бичнэ үү"}" aria-label="Үг ${i + 1}">`).join("")}<button class="btn btn-gold btn-sm" type="submit">Илгээх</button></form>
+        <div class="cl-cloud" aria-live="polite"><p class="muted small">Ачаалж байна…</p></div><p class="cl-meta muted small"></p></figure>`;
+    }
     case "quiz": return quizFormHTML(b, false);
   }
   return "";
@@ -678,6 +685,45 @@ function bindQuizPicks(box) {
   });
 }
 // Хичээл доторх асуултууд: сервер шалгаж зөв хариулт, тайлбарыг буцаана. results — өмнөх хариултууд.
+/* ---------- Үүлэн үг: суралцагчдын хариулт үүл болж, 5 секунд тутам шинэчлэгдэнэ ---------- */
+const CLOUD_HUES = ["#2f56d6", "#d9622b", "#1f9a4a", "#b45309", "#7c3aed", "#0e7490", "#be185d", "#1f3c8f"];
+// viewOnly — багш (өөрийн хичээл): маягтгүй, зөвхөн үр дүн.
+function mountClouds(root, base, viewOnly = false) {
+  $$(".rb-cloud[data-bid]:not([data-m])", root).forEach((fig) => {
+    fig.dataset.m = 1;
+    const url = base && `${base}/cloud/${encodeURIComponent(fig.dataset.bid)}`;
+    const box = $(".cl-cloud", fig), meta = $(".cl-meta", fig), form = $(".cl-form", fig);
+    if (!url) { form.hidden = true; box.innerHTML = `<p class="muted small">Нэвтэрч орвол хариулж, бусдын үгийг харна.</p>`; return; }
+    if (viewOnly) form.hidden = true;
+    let last = "";
+    const render = (d) => {
+      const key = JSON.stringify([d.words, d.mine]); if (key === last) return; last = key;
+      const ws = d.words || [], top = ws[0]?.n || 1, mine = new Set(d.mine || []);
+      const arr = []; ws.forEach((w, i) => (i % 2 ? arr.push(w) : arr.unshift(w))); // том үгс голд
+      box.innerHTML = ws.length ? arr.map((w) => {
+        const k = Math.sqrt(w.n / top), hue = CLOUD_HUES[[...w.w].reduce((a, ch) => a + ch.charCodeAt(0), 0) % CLOUD_HUES.length];
+        return `<span class="cl-w${mine.has(w.w) ? " mine" : ""}" style="font-size:${(15 + k * 37).toFixed(1)}px;color:${hue}" title="${w.n} хүн">${esc(w.w)}</span>`;
+      }).join("") : `<p class="muted small">${viewOnly ? "Хараахан хариулт алга." : "Хараахан хариулт алга — эхний үгийг та бичээрэй."}</p>`;
+      meta.textContent = d.people ? `${d.people} хүн хариулсан` : "";
+      if (d.mine?.length && !viewOnly) {
+        $$(".cl-in", form).forEach((inp, i) => { if (document.activeElement !== inp) inp.value = d.mine[i] || ""; });
+        $("button", form).textContent = "Шинэчлэх";
+      }
+    };
+    const load = () => api(url).then(render).catch(() => {});
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const words = $$(".cl-in", form).map((i) => i.value.trim()).filter(Boolean);
+      if (!words.length) { $(".cl-in", form).focus(); return; }
+      const b = $("button", form); b.disabled = true;
+      try { render(await api(url, { method: "POST", body: { words } })); toast("☁ Үг тань үүлэнд нэмэгдлээ"); }
+      catch (err) { toast(err.message, true); } finally { b.disabled = false; }
+    });
+    load();
+    const t = setInterval(() => { if (!fig.isConnected) return clearInterval(t); if (!document.hidden) load(); }, 5000);
+  });
+}
+
 function mountQuizzes(box, base, results = {}) {
   bindQuizPicks(box);
   // Асуулт хэзээ нүдэнд харагдсаныг тэмдэглэнэ — хариулах хугацааг (ms) үүнээс тоолж, хэт хурдан
@@ -3729,6 +3775,7 @@ async function coursePage() {
     stopMarker = Auth.token && !l.exam ? lessonMarker(body, `/api/courses/${id}/lessons/${lid}/highlights`, { teacher: tUser && Auth.user?.username !== tUser ? tUser : "", title: l.title }) : null;
     const modal = $("#lessonModal");
     const isOwner = !!Auth.user?.username && $(".teacher-chip")?.getAttribute("href") === "/t/" + Auth.user.username;
+    mountClouds(body, Auth.token ? `/api/courses/${id}/lessons/${lid}` : "", isOwner);
     if (l.exam) { // шалгалт: асуултууд зөвхөн "эхлүүлэх"-ээр ирнэ
       if (done) done.hidden = true;
       examCard(body, { courseId: id, lessonId: lid, title: l.title, onFinish: () => autoAdvance(false) });
@@ -4310,7 +4357,7 @@ function resetPage() {
 
 /* ---------- эхлүүлэх ---------- */
 store.set("sg_guest", null); // зочны чат хасагдсан — хуучин зочны токеныг устгана
-window.SG = { THREAD_EVENTS, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
+window.SG = { THREAD_EVENTS, mountClouds, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх

@@ -60,8 +60,8 @@ func TestLegalPages(t *testing.T) {
 	srv, _ := newTestServer(t)
 	defer srv.Close()
 	for _, c := range []struct{ path, want string }{
-		{"/privacy", `id="monitoring"`},
-		{"/terms", `href="/privacy#monitoring"`},
+		{"/privacy", `id="collect"`},
+		{"/terms", `href="/privacy"`},
 	} {
 		res, err := http.Get(srv.URL + c.path)
 		if err != nil {

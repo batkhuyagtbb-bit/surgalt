@@ -386,6 +386,9 @@ var chTables = []chTable{
 	// Суралцагчийн маркераар тодруулсан хэсгүүд (highlights.go) — зөвхөн өөрт нь харагдана.
 	{"highlights", `(user_id String, lesson_id String, data String, updated_at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, lesson_id)`},
+	// «Үүлэн үг» хэсгийн хариултууд (cloud.go) — суралцагч бүрийн сүүлийн илгээлт.
+	{"cloud_answers", `(lesson_id String, block_id String, user_id String, words Array(String), at ` + tsType + `, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (lesson_id, block_id, user_id)`},
 }
 
 func (c *ClickHouse) ensureSchema(ctx context.Context) error {

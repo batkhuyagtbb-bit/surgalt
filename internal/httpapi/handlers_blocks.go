@@ -94,6 +94,18 @@ func validateBlocks(bs []store.Block, teacherID string) string {
 			if b.Height < 80 || b.Height > 2000 {
 				return "embed-ийн өндөр 80-2000 px"
 			}
+		case "cloud": // үүлэн үг: асуулт (Text) + нэг хүн хэдэн үг илгээх (Max)
+			b.URL, b.Quiz = "", nil
+			b.Text = strings.TrimSpace(b.Text)
+			if b.Text == "" || utf8.RuneCountInString(b.Text) > 200 {
+				return "үүлэн үгийн асуулт 1-200 тэмдэгт"
+			}
+			if b.Max == 0 {
+				b.Max = 1
+			}
+			if b.Max < 1 || b.Max > 3 {
+				return "нэг хүн 1-3 үг илгээнэ"
+			}
 		case "heading":
 			b.URL, b.Quiz = "", nil
 			b.Text = strings.TrimSpace(b.Text)

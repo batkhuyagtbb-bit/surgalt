@@ -167,6 +167,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/reflect", s.handleSaveReflection)
 	mux.HandleFunc("GET /api/courses/{id}/lessons/{lid}/highlights", s.handleGetHighlights)
 	mux.HandleFunc("PUT /api/courses/{id}/lessons/{lid}/highlights", s.handleSetHighlights)
+	mux.HandleFunc("GET /api/courses/{id}/lessons/{lid}/cloud/{bid}", s.handleGetCloud)
+	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/cloud/{bid}", s.handleSendCloud)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/progress/{bid}", s.handleVideoProgress)
 	mux.HandleFunc("GET /api/courses/{id}/lessons/{lid}/discussion", s.handleDiscussion)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/discussion", s.handleAddComment)

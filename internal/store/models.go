@@ -197,6 +197,8 @@ type Block struct {
 	Parts []string `json:"parts,omitempty"`
 	// Download — файлын хэсэгт: суралцагч татаж авахыг багш зөвшөөрсөн эсэх (анхдагч: зөвхөн үзнэ).
 	Download bool `json:"download,omitempty"`
+	// Max — үүлэн үг (cloud) хэсэгт: нэг суралцагч хэдэн үг илгээх (1-3).
+	Max int `json:"max,omitempty"`
 }
 
 // Quiz — нэг асуулт. Зөв хариулт (Correct, Answers, Spot, Right-ийн дараалал) ба Explain нь
@@ -358,7 +360,7 @@ type Submission struct {
 }
 
 // BlockTypes — зөвшөөрөгдсөн блокийн төрлүүд.
-var BlockTypes = map[string]bool{"text": true, "heading": true, "image": true, "audio": true, "video": true, "file": true, "quiz": true, "embed": true}
+var BlockTypes = map[string]bool{"text": true, "heading": true, "image": true, "audio": true, "video": true, "file": true, "quiz": true, "embed": true, "cloud": true}
 
 // LessonOrder — чирж зөөсний дараах нэг хичээлийн байр: ID ба бүлэг.
 type LessonOrder struct {
@@ -559,6 +561,7 @@ type Store interface {
 	BookStore
 	PayoutStore
 	HighlightStore
+	CloudStore
 	CreateUser(ctx context.Context, u *User) error
 	UserByID(ctx context.Context, id string) (*User, error)
 	UserByEmail(ctx context.Context, email string) (*User, error)
