@@ -40,7 +40,7 @@ const UI_ICONS = {
 };
 const icon = (n, size = 18) => `<svg data-ico="${n}" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI_ICONS[n] || ""}</svg>`;
 // Хөдөлгөөнт дүрсэнд (animateIcons) шинээр ашигласан нэрсийн статик зам (байхгүй бол л нэмнэ).
-for (const [k, v] of Object.entries({"exam":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\"/><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\"/><path d=\"m9 14 2 2 4-4\"/>","doc":"<path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M10 9H8M16 13H8M16 17H8\"/>","headphones":"<path d=\"M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3\"/>","folder":"<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/>","eye":"<path d=\"M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","live":"<path d=\"m16 13 5.22 3.48a.5.5 0 0 0 .78-.42V7.94a.5.5 0 0 0-.76-.43L16 10.5\"/><rect x=\"2\" y=\"6\" width=\"14\" height=\"12\" rx=\"2\"/>","book":"<path d=\"M12 7v14\"/><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\"/>","files":"<path d=\"M20 7h-3a2 2 0 0 1-2-2V2\"/><path d=\"M9 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l4 4v10a2 2 0 0 1-2 2Z\"/><path d=\"M3 7.6v12.8A1.6 1.6 0 0 0 4.6 22h9.8\"/>"})) UI_ICONS[k] ||= v;
+for (const [k, v] of Object.entries({"alert":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/>","phone":"<path d=\"M13.83 16.57a1 1 0 0 0 1.21-.3l.36-.47A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.47.35a1 1 0 0 0-.29 1.24 14 14 0 0 0 6.39 6.38\"/>","card":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"5\" rx=\"2\"/><path d=\"M2 10h20\"/>","bell":"<path d=\"M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9\"/><path d=\"M10 20a2.2 2.2 0 0 0 4 0\"/>","exam":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\"/><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\"/><path d=\"m9 14 2 2 4-4\"/>","doc":"<path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M10 9H8M16 13H8M16 17H8\"/>","headphones":"<path d=\"M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3\"/>","folder":"<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/>","eye":"<path d=\"M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","live":"<path d=\"m16 13 5.22 3.48a.5.5 0 0 0 .78-.42V7.94a.5.5 0 0 0-.76-.43L16 10.5\"/><rect x=\"2\" y=\"6\" width=\"14\" height=\"12\" rx=\"2\"/>","book":"<path d=\"M12 7v14\"/><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\"/>","files":"<path d=\"M20 7h-3a2 2 0 0 1-2-2V2\"/><path d=\"M9 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l4 4v10a2 2 0 0 1-2 2Z\"/><path d=\"M3 7.6v12.8A1.6 1.6 0 0 0 4.6 22h9.8\"/>"})) UI_ICONS[k] ||= v;
 // Огноог өөрсдөө хэлбэржүүлнэ: олон браузерт mn-MN локаль байхгүй тул англиар гардаг.
 const WEEKDAYS = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"];
 const WEEKDAYS_SHORT = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"];
@@ -484,11 +484,20 @@ function bell() {
   const badge = $(".bell-badge"), panel = $("#bellPanel"), list = $("#bellList");
   let unread = 0;
   const setBadge = (n) => { unread = n; badge.hidden = !n; badge.textContent = n > 99 ? "99+" : n; };
+  // Мэдэгдэл бүрийн дүрс (хөдөлгөөнт дүрсээр солигдоно): гарчгийн эхний emoji-оос, эс бөгөөс төрлөөс.
+  const N_EMOJI = { "💬": "chat", "📅": "cal", "🏦": "money", "💰": "money", "✅": "check", "⚠️": "alert", "⚠": "alert", "🚩": "alert", "🔓": "lock", "🔒": "lock", "📹": "live", "📣": "bell", "📞": "phone", "📎": "clip", "💾": "files", "🎓": "courses", "👀": "eye", "👁": "eye", "📝": "exam", "🏆": "medal", "🛒": "card", "💳": "card" };
+  const N_TYPE = { message: "chat", booking: "cal", payout: "money", purchase: "card", enroll: "courses", profile_view: "eye", course_view: "eye", lesson_view: "play", phone_view: "phone", storage: "files", report: "alert", account: "shield", blocked: "lock" };
+  const nIcon = (n) => {
+    const t = (n.title || "").trim(), m = /^(\p{Extended_Pictographic}️?)\s*/u.exec(t);
+    const name = (m && N_EMOJI[m[1]]) || N_TYPE[n.type] || "bell";
+    return { ico: `<span class="bell-ico">${icon(name, 18)}</span>`, title: m && N_EMOJI[m[1]] ? t.slice(m[0].length) : t };
+  };
   const item = (n) => {
+    const { ico, title } = nIcon(n);
     const ub = n.type === "blocked" && /^unblock:([^:]+):(.+)$/.exec(n.link || "");
-    if (ub) return `<li class="bell-item bell-blocked ${n.read ? "" : "unread"}"><div><strong>${esc(n.title)}</strong>${n.body ? `<span>${esc(n.body)}</span>` : ""}<time>${fmtDate(n.created_at)}</time>
-      <button type="button" class="btn btn-sm bell-unblock" data-unblock-user="${esc(ub[1])}" data-unblock-lesson="${esc(ub[2])}">⛔ Хаагдсан — 🔓 Дахин нээх</button></div></li>`;
-    return `<li class="bell-item ${n.read ? "" : "unread"}"><a href="${esc(n.Link || n.link || "#")}"><strong>${esc(n.title)}</strong>${n.body ? `<span>${esc(n.body)}</span>` : ""}<time>${fmtDate(n.created_at)}</time></a></li>`;
+    if (ub) return `<li class="bell-item bell-blocked ${n.read ? "" : "unread"}"><div class="bell-row">${ico}<div><strong>${esc(title)}</strong>${n.body ? `<span>${esc(n.body)}</span>` : ""}<time>${fmtDate(n.created_at)}</time>
+      <button type="button" class="btn btn-sm bell-unblock" data-unblock-user="${esc(ub[1])}" data-unblock-lesson="${esc(ub[2])}">⛔ Хаагдсан — 🔓 Дахин нээх</button></div></div></li>`;
+    return `<li class="bell-item ${n.read ? "" : "unread"}"><a class="bell-row" href="${esc(n.Link || n.link || "#")}">${ico}<div><strong>${esc(title)}</strong>${n.body ? `<span>${esc(n.body)}</span>` : ""}<time>${fmtDate(n.created_at)}</time></div></a></li>`;
   };
   list.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-unblock-user]"); if (!b) return;
@@ -4533,7 +4542,8 @@ function explore() {
     panel.replaceChildren(tpl[mode][i].content.cloneNode(true));
     panel.classList.remove("swap"); void panel.offsetWidth; panel.classList.add("swap");
     const d = $(".how-demo", panel); if (d && inView) stopDemo = startDemo(d, still);
-    $$("button", chips).forEach((c, k) => { c.setAttribute("aria-selected", String(k === i)); if (k === i) c.scrollIntoView({ block: "nearest", inline: "nearest" }); });
+    // Идэвхтэй товчийг зөвхөн хэвтээ жагсаалт дотор харуулна (scrollIntoView бүх хуудсыг босоо гүйлгэдэг байсан).
+    $$("button", chips).forEach((c, k) => { c.setAttribute("aria-selected", String(k === i)); if (k === i && chips.scrollWidth > chips.clientWidth) chips.scrollTo({ left: c.offsetLeft - (chips.clientWidth - c.offsetWidth) / 2, behavior: "smooth" }); });
     mark();
   };
   const go = (n) => { const len = tpl[mode].length; i = ((n % len) + len) % len; show(); tick(); };

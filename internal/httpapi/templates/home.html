@@ -1,11 +1,13 @@
 {{template "head" (dict "Title" "surgalt.mn — Сур, сур, бас дахин сур" "Desc" "Сур, сур, бас дахин сур — багш нар сургалтаа зарж, суралцагчид нэг дороос суралцах платформ" "Page" "home")}}
 <main>
   <section class="home-top">
-    <div class="home-inner">
+    {{/* Зочинд: зүүнд уриа ба товчнууд, баруунд танилцуулга кино (intro2). Нэвтэрсэн хүнд .landing нуугдана. */}}
+    <div class="home-inner home-hero">
+    <div class="home-copy">
       <div class="home-intro landing">
         <p class="eyebrow">Багш, суралцагчдын платформ</p>
         <h1 class="home-title display split">Сур, сур, бас дахин сур</h1>
-        <p class="lead">Бүх багшийн сургалт, хичээл, номыг нэг дороос хайж олоорой.</p>
+        <p class="lead">Хичээл үзэх биш, ойлгож сурах газар.</p>
       </div>
     <section class="find find-home" id="find" aria-label="Сургалт хайх" hidden>{{/* Хичээл хайх хэсгийг түр нуусан */}}
       <form class="find-bar" role="search" onsubmit="return false">
@@ -29,6 +31,11 @@
         <a class="btn btn-glass btn-lg" href="/login">Суралцагчаар нэвтрэх</a>
       </div>
       <nav class="home-go landing" aria-label="Танилцах"><a href="#explore">▶ Хэрхэн ажилладаг вэ?</a><a href="#explore=stu">Сурагч сурах</a><a href="#explore=tch">Багш сургалт явуулах</a></nav>
+    </div>
+      <figure class="home-film landing" aria-label="Surgalt.mn танилцуулга кино">
+        <div class="hf-frame"><iframe src="/intro2?embed=1" title="Surgalt.mn танилцуулга" loading="lazy" allow="autoplay; fullscreen" allowfullscreen></iframe></div>
+        <figcaption>1.5 минутын танилцуулга · дуутай үзээрэй</figcaption>
+      </figure>
     </div>
   </section>
   {{/* Нэвтэрсэн хэрэглэгчийн самбар — app.js /api/me/home-оос бөглөнө. Хуудас өөрөө кэшлэгддэг статик HTML. */}}
