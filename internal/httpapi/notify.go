@@ -24,6 +24,7 @@ const (
 	NotifBooking     = "booking" // цаг захиалга (booking.go)
 	NotifReport      = "report"  // чатын мэдүүлэг (moderation.go)
 	NotifAccount     = "account" // бүртгэлийн аюулгүй байдал (нууц үг солигдсон г.м.; reset.go)
+	NotifPayout      = "payout"  // багшийн орлого татах (payouts.go)
 )
 
 type viewKey struct{ teacher, kind, id string }
@@ -228,6 +229,9 @@ var mnLoc = time.FixedZone("ULAT", 8*3600)
 
 // notifyPaid нь төлбөр баталгаажсаны дараа багш болон худалдан авагчид мэдэгдэнэ.
 func (s *Server) notifyPaid(ctx context.Context, o *store.Order) {
+	if o.Kind != store.OrderKindStorage {
+		defer s.instantPayout(context.WithoutCancel(ctx), o.TeacherID) // «Шууд» татах хуваарьтай багшид
+	}
 	if o.Kind == store.OrderKindSlot {
 		s.slotPaid(ctx, o)
 		return

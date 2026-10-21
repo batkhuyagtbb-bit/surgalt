@@ -74,7 +74,7 @@ const setDrawer = () => {};
 let searchCourses = null;
 let cleanup = null;
 
-const views = { overview, courses, books, course: (id) => courseEditor(id), files, live, chat: (id) => chat(id), learning, students };
+const views = { overview, courses, books, course: (id) => courseEditor(id), files, live, chat: (id) => chat(id), learning, students, wallet };
 
 /* Профайл хуудаснаас дуудагдана: тухайн хэсгийг өгсөн контейнерт рендерлэнэ. */
 window.Studio = {
@@ -437,7 +437,8 @@ function beMediaPreview(b) {
   if (b.type === "image") return `<img class="be-img" src="${esc(u)}" alt="">${tools}`;
   if (b.type === "audio") return `<audio src="${esc(u)}" controls preload="metadata" style="width:100%"></audio>${tools}`;
   if (b.type === "video") return `<div class="player be-player">${SG.mediaHTML(u, b.name)}</div>${tools}`;
-  return `<div class="rb-file"><span class="rb-file-ico">📄</span><span><b>${esc(b.name || "Файл")}</b><small>${esc(SG.extOf(stripQ(u)).slice(1).toUpperCase())}</small></span></div>${tools}`;
+  // PDF, PowerPoint, Word, Excel: суралцагчид харагдах яг тэр харагчаар (хичээл дотор шууд) урьдчилан харуулна.
+  return `${SG.blocksHTML([{ type: "file", url: u, name: b.name, size: b.size }])}${tools}`;
 }
 
 // Нэг маягт дээр засварлагчийг холбоно. f._be.collect() → блокууд.
@@ -497,6 +498,7 @@ function mountBlockEditor(f, blocks) {
     <p class="muted small be-tip">${ico("grip", 13)} Хэсгүүдийг бариад чирж байрлалыг солино. Компьютерээсээ файл чирж оруулж болно.</p>
     <input type="file" class="be-file" hidden>`;
   const list = $(".be-list", box), fileIn = $(".be-file", box);
+  hydrateBooks(list); // хадгалсан PDF/Word/PowerPoint хэсгүүдийг суралцагчийн харагчаар нээнэ
   let target = null;
   const add = (type, after, data = {}) => {
     const b = { id: beId(), type, ...data }; const tmp = document.createElement("div"); tmp.innerHTML = beBlockHTML(b);
@@ -592,7 +594,7 @@ function mountBlockEditor(f, blocks) {
     const c = t.closest("[data-cmd]"); if (c && el) return exec(c.dataset.cmd, $(".be-rt", el));
     if (t.closest("[data-import]")) { const fi = $(".be-xlsx", box); fi.value = ""; fi.click(); return; }
     const ep = t.closest("[data-embed-preview]");
-    if (ep) { const el = ep.closest(".be-block"), html = $(".be-embed", el).value.trim(), box = $(".be-embed-prev", el); box.innerHTML = html ? `<iframe sandbox="allow-scripts allow-popups allow-forms allow-presentation" allowfullscreen style="width:100%;height:${+$(".be-embed-h", el).value || 420}px;border:1px solid var(--line);border-radius:12px" srcdoc="${esc(SG.embedDoc(html))}"></iframe>` : ""; return; }
+    if (ep) { const el = ep.closest(".be-block"), html = $(".be-embed", el).value.trim(), box = $(".be-embed-prev", el); box.innerHTML = html ? `<iframe sandbox="allow-scripts allow-popups allow-forms allow-presentation" allowfullscreen scrolling="no" style="width:100%;height:${+$(".be-embed-h", el).value || 420}px;border:1px solid var(--line);border-radius:12px" srcdoc="${esc(SG.embedDoc(html))}"></iframe>` : ""; return; }
     const a = t.closest("[data-add]"); if (a) { const nb = add(a.dataset.add); if (["image", "audio", "video", "file"].includes(a.dataset.add) && a.dataset.add !== "video") pick(nb); return; }
     if (!el) return;
     if (t.closest("[data-be-del]")) { if ((el.dataset.type === "text" && $(".be-rt", el).textContent.trim()) || el.dataset.type === "quiz") { if (!confirm("Энэ хэсгийг устгах уу?")) return; } el.remove(); return; }
@@ -708,7 +710,7 @@ async function courseEditor(id) {
 
   // Бүлгүүд (модуль). Хоосон (хичээлгүй) бүлэг зөвхөн клиент дээр байна: хичээл чирж оруулмагц хадгалагдана.
   let pending = []; // [{name, at}] — хоосон бүлэг ба хөтөлбөр дээрх байр
-  let view = (() => { try { return localStorage.getItem("sg_course_view") || "outline"; } catch { return "outline"; } })();
+  let view = (() => { try { return localStorage.getItem("sg_course_view") === "journal" ? "journal" : "outline"; } catch { return "outline"; } })();
   const groupsModel = () => {
     const out = [];
     for (const l of [...lessons].sort((a, b) => a.position - b.position)) {
@@ -846,8 +848,25 @@ async function courseEditor(id) {
       <span class="ol-num">${String(n).padStart(2, "0")}</span>
       <span class="ol-title"><strong>${esc(l.title)}</strong><small>${[l.format && kindName(l.format), l.mode && kindName(l.mode)].filter(Boolean).map((k) => `<span class="kind">${esc(k)}</span>`).join("")}${audience(l)}${c.drip && !l.always_open && n > 1 ? ruleBadge(l) : ""}${kindBadge(l)}${l.active_min ? `<span class="aud">🕒 ${l.active_min} мин идэвхтэй</span>` : ""}</small></span>
       <span class="ol-acts">${visHTML(l)}
+      <button type="button" class="icon-btn" data-lesson-settings aria-label="«${esc(l.title)}» хичээлийн тохиргоо" title="Тохиргоо">${ico("gear", 17)}</button>
       <button type="button" class="icon-btn" data-edit-post aria-label="Засах" title="Засах">${ico("edit", 17)}</button>
       <button type="button" class="icon-btn ol-del" data-del-post aria-label="Устгах" title="Устгах">${ico("x", 17)}</button></span></li>`;
+  // Хичээлийн тохиргоо (хөтөлбөрийн ⚙): хэн үзэх, үнэ, хэлбэр, идэвхтэй хугацаа, хэлэлцүүлэг, нээгдэх нөхцөл.
+  const lessonSettingsHTML = (l) => `<p class="muted small" style="margin:-4px 0 14px">«${esc(l.title)}»</p>
+      <div class="pe-access"><span class="muted small">Хэн үзэх вэ</span>
+        <div class="seg" role="radiogroup" aria-label="Хэн үзэх вэ">
+          <label><input type="radio" name="mode" value="free" ${l.is_free ? "checked" : ""}><span>${ico("globe", 15)}Үнэгүй</span></label>
+          <label><input type="radio" name="mode" value="paid" ${l.is_free ? "" : "checked"}><span>${ico("lock", 15)}Төлбөртэй</span></label></div>
+        <label class="pe-price" ${l.is_free ? "hidden" : ""}><input name="price" type="number" min="0" step="500" value="${l.price || 0}" aria-label="Үнэ"><span>₮</span></label></div>
+      <p class="muted small" style="margin:6px 0 14px">${c.price ? "Үнэ 0 бол зөвхөн сургалтын багцаар нээгдэнэ." : "Энэ сургалт багц үнэгүй тул төлбөртэй хичээл бүр өөрийн үнэтэй байна."}</p>
+      <div class="pe-grid pe-grid-3">
+        <label>Сургалтын хэлбэр<select name="format">${FORMATS.map(([v, t]) => `<option value="${v}" ${(l.format || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+        <label>Заах аргын төрөл<select name="mode_kind">${MODES.map(([v, t]) => `<option value="${v}" ${(l.mode || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+        <label>Идэвхтэй суралцах хугацаа (мин)<input name="active_min" type="number" min="0" max="600" value="${l.active_min || 0}"><small>0 бол шаардахгүй</small></label></div>
+      <label class="check" style="margin-top:10px"><input type="checkbox" name="discussion" ${l.discussion ? "checked" : ""}> 💬 Хэлэлцүүлэгтэй — хичээлийн доор лайк, сэтгэгдэл, асуулт бичнэ</label>
+      ${c.drip ? unlockHTML(l) : ""}
+      <p class="form-error" role="alert"></p>
+      <div class="hero-cta" style="margin:12px 0 0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div>`;
   const outlineHTML = () => {
     const gs = groupsModel(); let n = 0;
     return `<div class="ol" id="olSecs">${gs.map((g, i) => `<section class="ol-sec" data-sec="${esc(g.name)}">
@@ -895,7 +914,6 @@ async function courseEditor(id) {
             <div id="composerBody" hidden>${editorHTML(null)}</div></section>
           ${lessons.length || pending.length ? `<div class="view-tabs" role="tablist">
             <button role="tab" data-view="outline" aria-selected="${view === "outline"}">${ico("list", 16)}Хөтөлбөр</button>
-            <button role="tab" data-view="posts" aria-selected="${view === "posts"}">${ico("book", 16)}Нийтлэлүүд</button>
             <button role="tab" data-view="journal" aria-selected="${view === "journal"}">${ico("users", 16)}Журнал</button></div>` : ""}
           <div id="gpView">${view === "journal" && lessons.length ? `<div class="jr" id="journal"><div class="loader"></div></div>` : view === "outline" && (lessons.length || pending.length) ? outlineHTML() : feedHTML()}</div>
         </div></div>
@@ -903,6 +921,8 @@ async function courseEditor(id) {
         <h3 class="h3">Суралцагчид <span class="chip">${roster.length}</span></h3>
         <div class="items">${roster.map(studentRow).join("") || `<p class="muted small" style="margin:0">Хараахан хэн ч элсээгүй байна.</p>`}</div>
         ${roster.length ? `<a class="link" href="#students" style="display:inline-flex;margin-top:12px">${ico("chart", 15)}Хяналт ба статистик ${ico("chevron", 14)}</a>` : ""}</div></div>
+      <div class="modal" id="lsModal"><div class="modal-card" style="width:min(680px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+        <h3 class="h3">${ico("gear", 18)} Хичээлийн тохиргоо</h3><form class="form ls-form" id="lsForm"></form></div></div>
       <div class="modal" id="gpModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
         <h3 class="h3">Сургалтын тохиргоо</h3><form class="form" id="gpForm">${courseFormHTML(c)}<p class="form-error" role="alert"></p>
         <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`;
@@ -1205,6 +1225,10 @@ async function courseEditor(id) {
     }
     const post = t.closest(".post, .ol-row"), l = post && lessons.find((x) => x.id === post.dataset.lid);
     if (t.closest("[data-cancel]")) return render();
+    if (t.closest("[data-lesson-settings]") && l) {
+      const f = $("#lsForm"); f.dataset.lsLid = l.id; f.innerHTML = lessonSettingsHTML(l);
+      SG.openModal($("#lsModal")); return;
+    }
     if (t.closest("[data-edit-post]") && l) {
       if (post.classList.contains("editing")) return;
       let row = post;
@@ -1252,7 +1276,7 @@ async function courseEditor(id) {
   const onChange = (e) => {
     const vis = e.target.closest("[data-vis]");
     if (vis) { const l = lessons.find((x) => x.id === vis.closest("[data-lid]")?.dataset.lid); if (l) setHidden(l, !vis.checked, vis); return; }
-    const f = e.target.closest(".post-editor");
+    const f = e.target.closest(".post-editor, .ls-form");
     if (!f) return;
     if (e.target.name === "mode") $(".pe-price", f).hidden = f.mode.value === "free";
     if (e.target.name === "kind") {
@@ -1272,6 +1296,16 @@ async function courseEditor(id) {
     const errBox = $(".form-error", f); if (errBox) errBox.textContent = "";
     try {
       if (f.id === "gpForm") { await saveCourse(courseBody(f)); SG.closeModal($("#gpModal")); toast("Тохиргоо хадгалагдлаа ✓"); render(); return; }
+      if (f.id === "lsForm") {
+        const l = lessons.find((x) => x.id === f.dataset.lsLid); if (!l) return;
+        const free = f.mode.value === "free", ur = f.querySelector("input[name=unlock_rule]:checked");
+        const patch = { is_free: free, price: free ? 0 : +f.price.value || 0, format: f.format.value, mode: f.mode_kind.value, active_min: +f.active_min.value || 0, discussion: f.discussion.checked };
+        if (f.unlock_after_h) Object.assign(patch, { unlock_after_h: +f.unlock_after_h.value || 0, always_open: f.always_open.checked });
+        if (ur) patch.unlock_rule = ur.value;
+        const b = $(".btn-gold", f); b.disabled = true;
+        try { await lessonPut(l, patch); } finally { b.disabled = false; }
+        SG.closeModal($("#lsModal")); toast("Хичээлийн тохиргоо хадгалагдлаа ✓"); await reload(); return;
+      }
       if (!f.classList.contains("post-editor")) return;
       if (f._be?.uploading()) { toast("Файл хуулагдаж дуустал түр хүлээнэ үү"); return; }
       if (f.dataset.edit) { await api(`/api/courses/${c.id}/lessons/${f.dataset.edit}`, { method: "PUT", body: lessonBody(f, lessons.find((x) => x.id === f.dataset.edit)) }); toast("Хичээл шинэчлэгдлээ ✓"); }
@@ -2304,6 +2338,136 @@ async function students() {
   timer = setInterval(() => { if (!document.hidden && !$(".modal.open")) load().catch(() => {}); }, 30000); // бодит хугацаанд ойрхон
   cleanup = () => { clearInterval(timer); main.removeEventListener("click", onClick); main.removeEventListener("change", onChange); main.removeEventListener("input", onInput); };
   await load();
+}
+
+/* ---------- Данс: банкны данс холбох, орлого татах (гараар / хуваариар), орлогын статистик ---------- */
+const PAY_ST = { pending: ["Хүлээгдэж буй", "chip-amber"], paid: ["Шилжүүлсэн", "chip-teal"], rejected: ["Татгалзсан", "chip-coral"] };
+const SCH_HELP = {
+  manual: "Та доорх «Татах» товчоор хүссэн үедээ татна.",
+  instant: "Борлуулалт бүрийн дараа үлдэгдлийг автоматаар татах хүсэлт илгээнэ.",
+  daily: "Өдөрт нэг удаа үлдэгдлийг автоматаар татна.",
+  weekly: "7 хоногт нэг удаа (Даваа гарагаас эхлэн) үлдэгдлийг автоматаар татна.",
+  monthly: "Сард нэг удаа (сарын эхэнд) үлдэгдлийг автоматаар татна.",
+  quarterly: "Улиралд нэг удаа (1, 4, 7, 10-р сарын эхэнд) үлдэгдлийг автоматаар татна.",
+};
+const PERIODS = [["day", "Өдрөөр"], ["week", "7 хоногоор"], ["month", "Сараар"], ["quarter", "Улирлаар"]];
+const wst = { period: "month" };
+async function wallet() {
+  const pay = await api("/api/me/payout");
+  const b = pay.balance, a = pay.account, min = pay.min;
+  const short = (n) => (n >= 1e9 ? +(n / 1e9).toFixed(2) + " тэрбум₮" : n >= 1e6 ? +(n / 1e6).toFixed(2) + " сая₮" : n ? money(n) : "0₮");
+  const bankOf = (k) => pay.banks.find((x) => x.key === k)?.name || k;
+  const kpi = (ic, label, value, sub, cls = "") => `<div class="anx-kpi ${cls}"><span class="anx-ic">${ico(ic, 18)}</span><small>${label}</small><b>${short(value)}</b><div class="anx-sub">${sub}</div></div>`;
+  const sch = a?.schedule || "manual";
+  const canDraw = a && b.available >= min;
+  main.innerHTML = `<div class="wl">
+    <div class="anx-kpis">
+      ${kpi("money", "Татах боломжтой", b.available, `доод дүн ${money(min)}`, "wl-avail")}
+      ${kpi("chart", "Нийт орлого", b.earned, "бүх төлөгдсөн борлуулалт")}
+      ${kpi("clock", "Хүлээгдэж буй", b.pending, "данс руу шилжихийг хүлээж буй")}
+      ${kpi("repeat", "Данс руу шилжсэн", b.paid, "нийт татсан")}
+    </div>
+
+    <div class="wl-grid">
+      <section class="anx-card"><div class="anx-card-head"><h3>${ico("lock", 18)}Орлого хүлээн авах данс</h3>${a ? `<span class="chip chip-teal">Холбогдсон</span>` : `<span class="chip chip-amber">Холбоогүй</span>`}</div>
+        <form class="form wl-form" id="wlAcct">
+          <div class="form-row"><label>Банк<select name="bank" required><option value="">— Банкаа сонгоно уу —</option>${pay.banks.map((x) => `<option value="${esc(x.key)}" ${a?.bank === x.key ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>
+          <label>Дансны дугаар<input name="account_no" required inputmode="numeric" autocomplete="off" maxlength="34" placeholder="ж: 5000123456 эсвэл MN…" value="${esc(a?.account_no || "")}"></label></div>
+          <label>Данс эзэмшигчийн нэр<input name="account_name" required maxlength="100" placeholder="Банкан дахь нэрээр (ж: Бат Болд)" value="${esc(a?.account_name || "")}"></label>
+          <div class="wl-sch"><span class="wl-lbl">Татах хуваарь</span>
+            <div class="anx-seg wl-seg" role="radiogroup" aria-label="Татах хуваарь">${pay.schedules.map((x) => `<button type="button" role="radio" data-sch="${x.key}" aria-pressed="${x.key === sch}" aria-checked="${x.key === sch}">${esc(x.name)}</button>`).join("")}</div>
+            <p class="muted small" id="wlSchHelp">${SCH_HELP[sch]}</p></div>
+          <div><button class="btn btn-gold btn-sm">${a ? "Хадгалах" : "Данс холбох"}</button></div>
+        </form></section>
+
+      <section class="anx-card wl-draw"><div class="anx-card-head"><h3>${ico("money", 18)}Орлого татах</h3></div>
+        <p class="wl-big"><small>Татах боломжтой</small><b>${money(b.available)}</b></p>
+        ${a ? `<p class="muted small">${esc(bankOf(a.bank))} · ${esc(a.account_no)} · ${esc(a.account_name)}</p>` : `<p class="muted small">Эхлээд орлого хүлээн авах дансаа холбоно уу.</p>`}
+        <form class="wl-drawf" id="wlDraw">
+          <input name="amount" type="number" min="${min}" max="${b.available}" step="1" inputmode="numeric" placeholder="${b.available ? `Бүгд: ${b.available}` : "0"}" aria-label="Татах дүн (₮)" ${canDraw ? "" : "disabled"}>
+          <button class="btn btn-gold" ${canDraw ? "" : "disabled"}>${ico("out", 16)}Татах</button>
+        </form>
+        <p class="muted small">${!a ? "" : b.available < min ? `Үлдэгдэл ${money(min)}-д хүрмэгц татах боломжтой.` : "Дүнгээ хоосон орхивол бүх үлдэгдлийг татна."} Хүсэлтийг платформ шалгаж таны данс руу шилжүүлнэ — шилжмэгц мэдэгдэл очно.</p>
+      </section>
+    </div>
+
+    <section class="anx-card" id="wlStats"><div class="anx-card-head"><h3>${ico("chart", 18)}Орлогын статистик</h3>
+      <div class="anx-seg" role="group" aria-label="Хугацаа">${PERIODS.map(([k, t]) => `<button type="button" data-per="${k}" aria-pressed="${k === wst.period}">${t}</button>`).join("")}</div></div>
+      <div id="wlStatsBody"><div class="pw-load"><span class="loader"></span></div></div></section>
+
+    <section class="anx-card"><div class="anx-card-head"><h3>${ico("list", 18)}Татсан түүх</h3>${pay.payouts.length ? `<span class="muted small">${pay.payouts.length} хүсэлт</span>` : ""}</div>
+      ${pay.payouts.length ? `<div class="an-table-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Дүн</th><th>Данс</th><th>Төрөл</th><th>Төлөв</th></tr></thead><tbody>
+        ${pay.payouts.map((p) => `<tr><td class="muted">${fmtDate(p.created_at)}</td><td><strong>${money(p.amount)}</strong></td><td>${esc(bankOf(p.bank))} · ${esc(p.account_no)}</td><td>${p.auto ? "Хуваариар" : "Гараар"}</td>
+          <td><span class="chip ${PAY_ST[p.status]?.[1] || ""}">${PAY_ST[p.status]?.[0] || esc(p.status)}</span>${p.note ? `<div class="muted small">${esc(p.note)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div>`
+        : `<div class="anx-empty">${ico("money", 28)}<p>Одоогоор орлого татаагүй байна.</p></div>`}</section>
+  </div>`;
+
+  // Хуваарь сонгох
+  let pick = sch;
+  $$("[data-sch]", main).forEach((btn) => btn.addEventListener("click", () => {
+    pick = btn.dataset.sch;
+    $$("[data-sch]", main).forEach((x) => { const on = x === btn; x.setAttribute("aria-pressed", on); x.setAttribute("aria-checked", on); });
+    $("#wlSchHelp").textContent = SCH_HELP[pick] || "";
+  }));
+  $("#wlAcct").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target, btn = $("button.btn-gold", f); btn.disabled = true;
+    try {
+      await api("/api/me/payout/account", { method: "PUT", body: { bank: f.bank.value, account_no: f.account_no.value, account_name: f.account_name.value, schedule: pick } });
+      toast(a ? "Дансны мэдээлэл хадгалагдлаа ✓" : "Данс холбогдлоо ✓"); wallet();
+    } catch (x) { toast(x.message, true); btn.disabled = false; }
+  });
+  $("#wlDraw").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target, btn = $("button", f), amount = Math.round(+f.amount.value || 0);
+    if (!confirm(`${money(amount || b.available)}-ийг ${bankOf(a.bank)} ${a.account_no} руу татах уу?`)) return;
+    btn.disabled = true;
+    try { await api("/api/me/payout/withdraw", { method: "POST", body: { amount } }); toast("Татах хүсэлт илгээгдлээ ✓"); wallet(); }
+    catch (x) { toast(x.message, true); btn.disabled = false; }
+  });
+
+  // Статистик: график + эх сурвалж, хамгийн их орлоготой сургалт/ном, хичээл, бүлэг.
+  const bars = (rows, empty) => {
+    const mx = Math.max(1, ...rows.map((x) => x.amount));
+    return rows.length ? `<ul class="vs-bars wl-bars">${rows.map((x) => `<li title="${esc(x.label)}${x.sub ? " · " + esc(x.sub) : ""}: ${money(x.amount)} · ${x.count} борлуулалт"><span>${esc(x.label)}${x.sub ? `<small>${esc(x.sub)}</small>` : ""}</span><i style="width:${x.amount / mx * 100}%"></i><b>${short(x.amount)}</b></li>`).join("")}</ul>`
+      : `<p class="muted small" style="margin:0">${empty}</p>`;
+  };
+  const chart = (series) => {
+    const mx = Math.max(0, ...series.map((d) => d.amount));
+    if (!mx) return `<div class="anx-empty">${ico("chart", 28)}<p>Энэ хугацаанд борлуулалт бүртгэгдээгүй байна.</p></div>`;
+    const top = [1, 2, 5].flatMap((m) => [1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9].map((p) => m * p)).sort((x, y) => x - y).find((x) => x >= mx) || mx;
+    const mid = series[Math.floor((series.length - 1) / 2)];
+    return `<div class="anx-chart" role="img" aria-label="Хугацаа бүрийн орлого">
+      <div class="anx-y" aria-hidden="true"><span>${short(top)}</span><span>${short(top / 2)}</span><span>0</span></div>
+      <div class="anx-plot"><div class="anx-cols">${series.map((d) => `<div class="anx-col" title="${esc(d.label)}: ${money(d.amount)} · ${d.count} борлуулалт"><i class="ac" style="height:${d.amount / top * 100}%"></i></div>`).join("")}</div></div>
+      <div class="anx-x" aria-hidden="true"><span>${esc(series[0].label)}</span><span>${esc(mid.label)}</span><span>${esc(series[series.length - 1].label)}</span></div></div>`;
+  };
+  const WIN = { day: "сүүлийн 30 хоног", week: "сүүлийн 12 долоо хоног", month: "сүүлийн 12 сар", quarter: "сүүлийн 8 улирал" };
+  const loadStats = async () => {
+    const box = $("#wlStatsBody"); if (!box) return;
+    let d; try { d = await api("/api/me/earnings?period=" + wst.period); } catch (x) { box.innerHTML = `<p class="form-error">${esc(x.message)}</p>`; return; }
+    const best = d.series.reduce((m, x) => (x.amount > m.amount ? x : m), d.series[0]);
+    const diff = d.prev_total ? Math.round((d.total - d.prev_total) / d.prev_total * 100) : null;
+    box.innerHTML = `<div class="anx-chart-sum">
+        <span><b>${money(d.total)}</b>${WIN[d.period]}</span>
+        <span><b>${d.count}</b>борлуулалт</span>
+        <span><b>${d.count ? money(Math.round(d.total / d.count)) : "—"}</b>дундаж үнэ</span>
+        <span><b>${best.amount ? esc(best.label) : "—"}</b>хамгийн их орлоготой</span>
+        ${diff === null ? "" : `<span><b class="${diff >= 0 ? "wl-up" : "wl-down"}">${diff >= 0 ? "▲" : "▼"} ${Math.abs(diff)}%</b>өмнөх ижил хугацаанаас</span>`}</div>
+      ${chart(d.series)}
+      <div class="wl-split">
+        <div><h4>${ico("courses", 16)}Хамгийн их орлоготой</h4>${bars(d.top_items, "Борлуулалт алга")}</div>
+        <div><h4>${ico("target", 16)}Орлогын эх сурвалж</h4>${bars(d.by_kind, "Борлуулалт алга")}</div>
+        <div><h4>${ico("text", 16)}Хичээлээр</h4>${bars(d.top_lessons, "Дангаар зарагдсан хичээл алга")}</div>
+        <div><h4>${ico("list", 16)}Бүлгээр</h4>${bars(d.top_sections, "Бүлэгтэй хичээл зарагдаагүй")}<p class="muted small wl-note">Сургалтын багцын орлого тодорхой хичээл, бүлэгт хуваагдахгүй тул энд дангаар худалдсан хичээлүүд л тооцогдоно.</p></div>
+      </div>`;
+  };
+  $$("[data-per]", main).forEach((btn) => btn.addEventListener("click", () => {
+    wst.period = btn.dataset.per;
+    $$("[data-per]", main).forEach((x) => x.setAttribute("aria-pressed", x === btn));
+    loadStats();
+  }));
+  loadStats();
 }
 
 /* ---------- Суралцагч ---------- */

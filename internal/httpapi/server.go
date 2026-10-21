@@ -37,6 +37,7 @@ type Config struct {
 	ContactEmail  string        // нууцлал, нөхцөлийн хуудсанд харагдах холбоо барих имэйл
 	AdminEmails   []string      // чатын мэдүүлэг шийдвэрлэх хянагчид (жижиг үсгээр; moderation.go)
 	Mail          mail.Sender   // нууц үг сэргээх имэйл (nil бол илгээхгүй; демо горимд холбоосыг логт гаргана)
+	PayoutMin     int64         // багшийн орлого татах доод дүн (₮; 0 бол 1000)
 }
 
 type Server struct {
@@ -106,6 +107,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.phoneLim.Janitor(ctx)
 	go s.resetLim.Janitor(ctx)
 	go s.notifyLoop(ctx)
+	go s.payoutLoop(ctx)
 }
 
 func (s *Server) Handler() http.Handler {
@@ -163,6 +165,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/quiz/{bid}", s.handleAnswerQuiz)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/watched/{bid}", s.handleVideoWatched)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/reflect", s.handleSaveReflection)
+	mux.HandleFunc("GET /api/courses/{id}/lessons/{lid}/highlights", s.handleGetHighlights)
+	mux.HandleFunc("PUT /api/courses/{id}/lessons/{lid}/highlights", s.handleSetHighlights)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/progress/{bid}", s.handleVideoProgress)
 	mux.HandleFunc("GET /api/courses/{id}/lessons/{lid}/discussion", s.handleDiscussion)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/discussion", s.handleAddComment)
@@ -207,6 +211,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/payments/qpay", s.handleQPayCallback)
 	mux.HandleFunc("POST /api/payments/qpay", s.handleQPayCallback)
 	mux.HandleFunc("GET /pay/{id}", s.handlePayPage)
+	// Багшийн данс: орлого татах, статистик (payouts.go)
+	mux.HandleFunc("GET /api/me/payout", s.handleMyPayout)
+	mux.HandleFunc("PUT /api/me/payout/account", s.handleSetPayoutAccount)
+	mux.HandleFunc("POST /api/me/payout/withdraw", s.handleWithdraw)
+	mux.HandleFunc("GET /api/me/earnings", s.handleMyEarnings)
+	mux.HandleFunc("GET /api/admin/payouts", s.handleAdminPayouts)
+	mux.HandleFunc("POST /api/admin/payouts/{id}", s.handleAdminPayout)
 
 	// Багшийн файлын сан (багш бүр тусдаа хавтастай)
 	mux.HandleFunc("POST /api/me/files", s.handleUpload)

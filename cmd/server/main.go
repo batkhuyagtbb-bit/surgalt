@@ -159,7 +159,7 @@ func run(log *slog.Logger) error {
 			log.Info("ClickHouse Keeper холбогдлоо (олон хуулбарын түгжээ)", "addr", ka)
 		}
 		var err error
-		ch, err = store.NewClickHouse(cctx, store.ClickHouseOptions{DSN: chDSN, Locker: locker})
+		ch, err = store.NewClickHouse(cctx, store.ClickHouseOptions{DSN: chDSN, Locker: locker, CAFile: os.Getenv("CLICKHOUSE_CA")})
 		cancel()
 		if err != nil {
 			return err
@@ -218,6 +218,7 @@ func run(log *slog.Logger) error {
 		ContactEmail:  os.Getenv("CONTACT_EMAIL"),
 		AdminEmails:   emailList(os.Getenv("ADMIN_EMAILS")),
 		Mail:          mailer,
+		PayoutMin:     envInt("PAYOUT_MIN", 1000),
 	}, st, tokens, hub, fstore, log)
 
 	base := env("PUBLIC_URL", "http://localhost"+env("ADDR", ":8080"))

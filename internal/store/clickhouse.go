@@ -2,7 +2,11 @@ package store
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -34,35 +38,42 @@ type ClickHouseOptions struct {
 	DSN string
 	// Locker: nil бол процесс доторх (нэг хуулбар). Олон хуулбарт NewKeeperLocker өгнө.
 	Locker Locker
+	// CAFile: өөрийн CA-аар гарын үсэг зурсан серверийн сертификатыг шалгах PEM файл (secure=true-тэй).
+	CAFile string
 }
+
+// chUnknownDatabase — ClickHouse-ийн UNKNOWN_DATABASE алдааны код.
+const chUnknownDatabase = 81
 
 func NewClickHouse(ctx context.Context, o ClickHouseOptions) (*ClickHouse, error) {
 	opts, err := clickhouse.ParseDSN(o.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("clickhouse dsn: %w", err)
 	}
+	if o.CAFile != "" {
+		pem, err := os.ReadFile(o.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("clickhouse ca: %w", err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("clickhouse ca: %s дотор PEM сертификат алга", o.CAFile)
+		}
+		if opts.TLS == nil {
+			opts.TLS = &tls.Config{}
+		}
+		opts.TLS.RootCAs = pool
+		opts.TLS.MinVersion = tls.VersionTLS12
+	}
 	db := opts.Auth.Database
 	if db == "" {
 		db = "surgalt"
 	}
-	// Эхлээд "default" сан руу холбогдож өөрийн санг үүсгэнэ.
-	boot := *opts
-	boot.Auth.Database = "default"
-	bc, err := clickhouse.Open(&boot)
-	if err != nil {
-		return nil, fmt.Errorf("clickhouse connect: %w", err)
-	}
-	if err := bc.Ping(ctx); err != nil {
-		_ = bc.Close()
-		return nil, fmt.Errorf("clickhouse ping: %w", err)
-	}
-	if err := bc.Exec(ctx, "CREATE DATABASE IF NOT EXISTS "+quoteIdent(db)); err != nil {
-		_ = bc.Close()
-		return nil, fmt.Errorf("clickhouse create database: %w", err)
-	}
-	_ = bc.Close()
-
 	opts.Auth.Database = db
+	if err := ensureDatabase(ctx, opts, db); err != nil {
+		return nil, err
+	}
+
 	// Жижиг, олон INSERT-ийг ClickHouse өөрөө багцалж нэг part болгоно (async insert): мянга мянган суралцагчийн
 	// beat/явц бичилтэд "too many parts"-гүй, дамжуулалт олон дахин өснө. wait_for_async_insert=1 тул
 	// хариу ирэхэд өгөгдөл уншигдах боломжтой (бичсэний дараах шалгалтууд хэвээр). DSN-д өгвөл тэр нь давамгайлна.
@@ -96,6 +107,34 @@ func NewClickHouse(ctx context.Context, o ClickHouseOptions) (*ClickHouse, error
 		return nil, err
 	}
 	return c, nil
+}
+
+// ensureDatabase нь өөрийн сан руу шууд холбогдоно; сан байхгүй үед л "default" сан руу холбогдож үүсгэнэ.
+// Ингэснээр зөвхөн өөрийн санд эрхтэй хэрэглэгчээр (default санд хандах эрхгүй) ажиллаж болно.
+func ensureDatabase(ctx context.Context, opts *clickhouse.Options, db string) error {
+	pc, err := clickhouse.Open(opts)
+	if err != nil {
+		return fmt.Errorf("clickhouse connect: %w", err)
+	}
+	err = pc.Ping(ctx)
+	_ = pc.Close()
+	var ex *clickhouse.Exception
+	if err == nil {
+		return nil
+	} else if !errors.As(err, &ex) || ex.Code != chUnknownDatabase {
+		return fmt.Errorf("clickhouse ping: %w", err)
+	}
+	boot := *opts
+	boot.Auth.Database = "default"
+	bc, err := clickhouse.Open(&boot)
+	if err != nil {
+		return fmt.Errorf("clickhouse connect: %w", err)
+	}
+	defer bc.Close()
+	if err := bc.Exec(ctx, "CREATE DATABASE IF NOT EXISTS "+quoteIdent(db)); err != nil {
+		return fmt.Errorf("clickhouse create database: %w", err)
+	}
+	return nil
 }
 
 func (c *ClickHouse) Close() { _ = c.conn.Close() }
@@ -335,6 +374,18 @@ var chTables = []chTable{
 	{"book_events", `(id String, book_id String, teacher_id String, user_id String, user_name String,
 		type String, detail String, ip String, at ` + tsType + `)
 	ENGINE = MergeTree ORDER BY (teacher_id, at, id)`},
+	// Багшийн орлого хүлээн авах данс ба татах хүсэлт (payouts.go).
+	{"payout_accounts", `(teacher_id String, bank String, account_no String, account_name String, schedule String,
+		schedule_at ` + tsType + `, updated_at ` + tsType + `, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY teacher_id`},
+	{"payouts", `(id String, teacher_id String, amount Int64, bank String, account_no String, account_name String,
+		status String, auto Bool, note String, created_at ` + tsType + `, processed_at Nullable(` + tsType + `),
+		processed_by String, ver UInt64,
+		INDEX ix_teacher teacher_id TYPE bloom_filter GRANULARITY 1)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
+	// Суралцагчийн маркераар тодруулсан хэсгүүд (highlights.go) — зөвхөн өөрт нь харагдана.
+	{"highlights", `(user_id String, lesson_id String, data String, updated_at ` + tsType + `, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, lesson_id)`},
 }
 
 func (c *ClickHouse) ensureSchema(ctx context.Context) error {

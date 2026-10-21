@@ -44,6 +44,8 @@ type Memory struct {
 	learn       learnMem                   // шалгалт, сесс, лог (memory_learning.go)
 	engage      engageMem                  // идэвхийн нэмэлт (memory_engagement.go)
 	books       bookMem                    // ном (memory_books.go)
+	pay         payoutMem                  // багшийн данс, татах хүсэлт (memory_payouts.go)
+	hl          hlMem                      // суралцагчийн тодруулгууд (memory_highlights.go)
 	invoices    map[string]*PaymentInvoice // order → сүүлийн нэхэмжлэх
 	visits      map[string]*PageVisit      // хуудасны үзэлт
 }

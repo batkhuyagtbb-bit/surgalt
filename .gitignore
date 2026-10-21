@@ -1,3 +1,7 @@
 /data/
 /surgalt
 .env
+.env.bak*
+surgalt.new.exe
+surgalt.prev*.exe
+clickhouse-ca.crt

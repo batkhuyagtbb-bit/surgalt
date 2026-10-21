@@ -42,6 +42,12 @@ func (m *Memory) DeleteUserData(_ context.Context, uid string) error {
 		}
 	}
 	delete(m.notifs, uid)
+	delete(m.pay.accounts, uid)
+	for k := range m.hl {
+		if k[0] == uid {
+			delete(m.hl, k)
+		}
+	}
 	for _, members := range m.teamMembers {
 		delete(members, uid)
 	}

@@ -45,6 +45,7 @@
       <button class="pf-tab" data-tab="books" {{if not .D.Books}}data-owner-tab hidden{{end}}>Номууд{{if .D.Books}} <i>{{len .D.Books}}</i>{{end}}</button>
       <button class="pf-tab" data-tab="live">Шууд хичээл{{if .D.Meetings}} <i>{{len .D.Meetings}}</i>{{end}}</button>
       <button class="pf-tab" data-tab="students" data-owner-tab hidden>Суралцагчид</button>
+      <button class="pf-tab" data-tab="wallet" data-owner-tab hidden>Данс</button>
       <button class="pf-tab" data-tab="files" data-owner-tab hidden>Файлын сан</button>
       <button class="pf-tab" data-tab="about" data-visitor-tab>Тухай</button>
       <button class="pf-tab" data-tab="qr" data-visitor-tab>QR</button>
@@ -176,6 +177,7 @@
       <div class="pf-panel pf-manage" data-panel="m-books" hidden></div>
       <div class="pf-panel pf-manage" data-panel="m-files" hidden></div>
       <div class="pf-panel pf-manage" data-panel="m-students" hidden></div>
+      <div class="pf-panel pf-manage" data-panel="m-wallet" hidden></div>
 
       <div class="pf-panel" data-panel="qr" id="qr" hidden>
         <section class="card qr-card">
