@@ -873,52 +873,49 @@ function lessonMarker(body, base, ctx = {}) {
   let hs = [], color = "y", saveT = 0, dirty = false, pop = null;
   const bar = document.createElement("div"); bar.className = "hl-bar";
   bar.innerHTML = `<button type="button" class="hl-btn hl-toggle" aria-pressed="false" title="Асаагаад тодруулах текстээ чирж сонгоно" aria-label="Маркер">🖍<span class="hl-lbl"> Маркер</span></button>
-    <span class="hl-colors" role="radiogroup" aria-label="Маркерын өнгө" hidden>${HL_COLORS.map(([c, t], i) => `<button type="button" role="radio" class="hl-sw" data-c="${c}" aria-checked="${i === 0}" title="${t}" aria-label="${t}"><i class="hl-dot hl-${c}"></i><span class="hl-lbl">${t}</span></button>`).join("")}</span>
+    <span class="hl-colors" role="radiogroup" aria-label="Маркерын өнгө" hidden>${HL_COLORS.map(([c, t], i) => { const ask = c === "r" && ctx.teacher, tt = ask ? `${t} — тодруулаад багшаасаа асууж эсвэл тэмдэглэж үлдээнэ` : t; return `<button type="button" role="radio" class="hl-sw" data-c="${c}" aria-checked="${i === 0}" title="${tt}" aria-label="${tt}"><i class="hl-dot hl-${c}"></i><span class="hl-lbl">${t}${ask ? " 💬" : ""}</span></button>`; }).join("")}</span>
     <span class="grow"></span>
     <button type="button" class="hl-btn hl-quiz-btn" aria-pressed="false" title="Тодруулсан хэсгүүдийг нууна — санаж байгаад дарж шалгана" aria-label="Давтах" disabled>🧠<span class="hl-lbl"> Давтах</span></button>
     <button type="button" class="hl-btn hl-list-btn" aria-expanded="false" title="Миний тэмдэглэл" aria-label="Миний тэмдэглэл" disabled>📝<span class="hl-lbl"> Миний тэмдэглэл</span> <b>0</b></button>
-    ${ctx.teacher ? `<button type="button" class="hl-btn hl-ask-btn" aria-pressed="false" title="Асаагаад ойлгоогүй текстээ сонгож, асуултаа бичнэ — шууд багшийн чат руу очно" aria-label="Багшаас асуух">💬<span class="hl-lbl"> Багшаас асуух</span></button>` : ""}
     <div class="hl-list" hidden></div><div class="hl-ask" hidden></div>`;
   body.before(bar);
   const listBox = $(".hl-list", bar), askBox = $(".hl-ask", bar);
-  // Багшаас асуух (маркер шиг горим): асаагаад хичээлээс текст сонговол ишлэл болно, асуултаа бичээд
-  // илгээхэд багштай чат руу шууд очно; асуусан текст «Ойлгоогүй» (улаан) өнгөөр тодорч асуулт нь тэмдэглэл болно.
-  let marking = false, asking = false, askSegs = [];
-  const selectOn = () => body.classList.toggle("hl-on", marking || asking);
+  // «Ойлгоогүй» (улаан) тодруулга: тодруулмагц цонх гарна — багшаас асуух (ишлэлтэйгээр багштай чат руу шууд)
+  // эсвэл зөвхөн тэмдэглээд үлдээх. Бичсэн зүйл тодруулгын тэмдэглэл болно (асуусан бол «❓ …»).
+  let marking = false, askIds = [];
   const clip = (s, n) => (s.length > n ? s.slice(0, n) + "…" : s);
-  const openAsk = (quote = "", segs = []) => {
-    if (!ctx.teacher) return;
-    const typed = $("textarea", askBox)?.value || "";
-    closePop(); listBox.hidden = true; askBox.hidden = false; askBox.dataset.quote = quote; askSegs = segs;
-    askBox.innerHTML = `<b>💬 Багшаас асуух</b>${quote ? `<blockquote>${esc(clip(quote, 300))}</blockquote>` : `<p class="muted small hl-ask-hint">Ойлгоогүй хэсгээ хичээлээс сонговол ишлэл болж хавсарна. Шууд бичиж ч болно.</p>`}
-      <textarea rows="2" maxlength="1500" placeholder="Юуг ойлгосонгүй вэ? Асуултаа бичнэ үү…">${esc(typed)}</textarea>
-      <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-ask-x>Болих</button><button type="button" class="btn btn-gold btn-sm" data-ask-send>Илгээх</button></div>`;
-    const ta = $("textarea", askBox); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  const askHs = () => hs.filter((h) => askIds.includes(h.id));
+  const closeAsk = () => { askBox.hidden = true; askBox.innerHTML = ""; askIds = []; };
+  const openAsk = (ids) => {
+    askIds = ids; const items = askHs(); if (!items.length) return;
+    closePop(); listBox.hidden = true; askBox.hidden = false;
+    const note = items[0].n && !items[0].n.startsWith("❓ ") ? items[0].n : "";
+    askBox.innerHTML = `<b><i class="hl-dot hl-r"></i> Ойлгоогүй хэсэг</b><blockquote>${esc(clip(items.map((h) => h.t).join(" … "), 300))}</blockquote>
+      <textarea rows="2" maxlength="1000" placeholder="${ctx.teacher ? "Юуг ойлгосонгүй вэ? Багшаасаа асуух асуулт эсвэл өөртөө тэмдэглэл…" : "Өөртөө тэмдэглэл…"}">${esc(note)}</textarea>
+      ${ctx.teacher ? `<p class="muted small hl-ask-hint">«Багшаас асуух» дарвал асуулт тань ишлэлтэйгээ багшийн чат руу шууд очно.</p>` : ""}
+      <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-ask-keep>📌 Зөвхөн тэмдэглэх</button>${ctx.teacher ? `<button type="button" class="btn btn-gold btn-sm" data-ask-send>💬 Багшаас асуух</button>` : ""}</div>`;
+    $("textarea", askBox).focus();
   };
-  const setAsk = (on, keepBox) => {
-    asking = on; selectOn();
-    const b = $(".hl-ask-btn", bar); b?.setAttribute("aria-pressed", on);
-    if (on) { if (marking) setOn(false); setQuiz(false); openAsk(); }
-    else if (!keepBox) { askBox.hidden = true; askBox.innerHTML = ""; askSegs = []; }
+  const keepAsk = () => {
+    const v = $("textarea", askBox)?.value.trim();
+    for (const h of askHs()) if (v) h.n = v;
+    paint(); save(); closeAsk(); toast("📌 Тэмдэглэгдлээ — «Миний тэмдэглэл»-ээс харна");
   };
   const sendAsk = async () => {
-    const ta = $("textarea", askBox), q = ta?.value.trim(); if (!q) { ta?.focus(); return; }
+    const ta = $("textarea", askBox), q = ta?.value.trim(); if (!q) { ta?.focus(); toast("Багшаасаа асуух асуултаа бичнэ үү"); return; }
     const btn = $("[data-ask-send]", askBox); btn.disabled = true;
-    const quote = askBox.dataset.quote || "";
+    const items = askHs(), quote = items.map((h) => h.t).join(" … ");
     const msg = `❓ «${ctx.title || "Хичээл"}» хичээлээс асуулт${quote ? `\n> ${clip(quote.replace(/\s+/g, " "), 300)}` : ""}\n\n${q}`;
     try {
       const d = await api(`/api/teachers/${encodeURIComponent(ctx.teacher)}/chat`, { method: "POST" });
       await api(`/api/chat/${d.conversation.id}/messages`, { method: "POST", body: { body: msg } });
-      if (askSegs.length) { // асуусан хэсэг «Ойлгоогүй» болж тэмдэглэгдэнэ (давтахад харагдана)
-        for (const g of askSegs) { hs = hs.filter((h) => h.b !== g.b || h.e <= g.s || h.s >= g.e); hs.push({ ...g, id: hid(), c: "r", n: clip("❓ " + q, 990) }); }
-        paint(); save();
-      }
-      setAsk(false, true);
+      for (const h of items) { h.c = "r"; h.n = clip("❓ " + q, 990); }
+      paint(); save(); askIds = [];
       askBox.innerHTML = `<b>✓ Багшид илгээлээ</b><p class="muted small" style="margin:6px 0 0">Хариуг чатаас харна. Хичээлээ үргэлжлүүлээрэй.</p>
         <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-ask-x>Хаах</button><button type="button" class="btn btn-glass btn-sm" data-ask-open="${esc(d.conversation.id)}">Чат нээх</button></div>`;
     } catch (e) { btn.disabled = false; toast(e.message, true); }
   };
-  askBox.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendAsk(); } });
+  askBox.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); ctx.teacher ? sendAsk() : keepAsk(); } });
   // Блокийн текст доторх байрлал (тэмдэгтээр) — тэмдэглэгээ (mark) байсан ч ижил.
   const offsetIn = (u, node, off) => { const r = document.createRange(); r.setStart(u, 0); r.setEnd(node, off); return r.toString().length; };
   const textNodes = (u) => { const w = document.createTreeWalker(u, NodeFilter.SHOW_TEXT), out = []; while (w.nextNode()) out.push(w.currentNode); return out; };
@@ -978,14 +975,15 @@ function lessonMarker(body, base, ctx = {}) {
   };
   const fromSelection = () => {
     const segs = selSegs(); if (!segs.length) return;
-    if (asking) return openAsk(segs.map((g) => g.t).join(" … "), segs);
-    let added = 0;
+    const ids = [];
     for (const g of segs) {
       if (hs.length >= 1000) { toast("Нэг хичээл дээр 1000 хүртэл тодруулга хийнэ", true); break; }
       hs = hs.filter((h) => h.b !== g.b || h.e <= g.s || h.s >= g.e); // давхацсан хуучныг шинээр солино
-      hs.push({ id: hid(), ...g, c: color }); added++;
+      const id = hid(); hs.push({ id, ...g, c: color }); ids.push(id);
     }
-    if (added) { paint(); save(); }
+    if (!ids.length) return;
+    paint(); save();
+    if (color === "r") openAsk(ids); // ойлгоогүй: багшаас асуух эсвэл тэмдэглээд үлдээх
   };
   const closePop = () => { pop?.remove(); pop = null; };
   const openPop = (h, mark) => {
@@ -1004,7 +1002,7 @@ function lessonMarker(body, base, ctx = {}) {
       const c = e.target.closest("[data-pc]");
       if (c) { h.c = c.dataset.pc; $$("[data-pc]", pop).forEach((x) => x.setAttribute("aria-pressed", x === c)); paint(); save(); return; }
       if (e.target.closest("[data-pdel]")) { hs = hs.filter((x) => x !== h); closePop(); paint(); save(); return; }
-      if (e.target.closest("[data-pask]")) { paint(); openAsk(h.t); return; }
+      if (e.target.closest("[data-pask]")) { paint(); openAsk([h.id]); return; }
       if (e.target.closest("[data-pok]")) { closePop(); paint(); }
     };
     ta.focus();
@@ -1017,31 +1015,31 @@ function lessonMarker(body, base, ctx = {}) {
     }).join("") || `<p class="muted small">Тэмдэглэл алга.</p>`;
   };
   const setOn = (on) => {
-    marking = on; selectOn();
+    marking = on; body.classList.toggle("hl-on", on);
     const t = $(".hl-toggle", bar); t.setAttribute("aria-pressed", on); $(".hl-lbl", t).textContent = on ? " Маркер асаалттай" : " Маркер";
     $(".hl-colors", bar).hidden = !on;
-    if (on) { if (asking) setAsk(false); setQuiz(false); toast("Тодруулах текстээ хулганаар чирж (утсанд удаан дарж) сонгоно уу"); }
+    if (on) { setQuiz(false); toast("Тодруулах текстээ хулганаар чирж (утсанд удаан дарж) сонгоно уу"); }
   };
   const setQuiz = (q) => {
     body.classList.toggle("hl-quiz", q); $(".hl-quiz-btn", bar).setAttribute("aria-pressed", q);
     $$("mark.hl.shown", body).forEach((m) => m.classList.remove("shown"));
-    if (q) { setOn(false); if (asking) setAsk(false); closePop(); toast("Тодруулсан хэсгүүд нуугдлаа — эхлээд өөрөө санаад, дараа нь дарж шалгаарай 🧠"); }
+    if (q) { setOn(false); closeAsk(); closePop(); toast("Тодруулсан хэсгүүд нуугдлаа — эхлээд өөрөө санаад, дараа нь дарж шалгаарай 🧠"); }
   };
   bar.onclick = (e) => {
     if (e.target.closest(".hl-toggle")) return setOn(!marking);
     const sw = e.target.closest("[data-c]");
     if (sw) { color = sw.dataset.c; $$("[data-c]", bar).forEach((x) => x.setAttribute("aria-checked", x === sw)); return; }
     if (e.target.closest(".hl-quiz-btn")) return setQuiz(!body.classList.contains("hl-quiz"));
-    if (e.target.closest(".hl-ask-btn")) return setAsk(!asking);
-    if (e.target.closest("[data-ask-x]")) return setAsk(false);
+    if (e.target.closest("[data-ask-x]")) return closeAsk();
+    if (e.target.closest("[data-ask-keep]")) return keepAsk();
     if (e.target.closest("[data-ask-send]")) return sendAsk();
     const oc = e.target.closest("[data-ask-open]");
-    if (oc) { setAsk(false); window.openRailChat?.(oc.dataset.askOpen); return; }
-    if (e.target.closest(".hl-list-btn")) { if (asking) setAsk(false); else askBox.hidden = true; listBox.hidden = !listBox.hidden; $(".hl-list-btn", bar).setAttribute("aria-expanded", !listBox.hidden); if (!listBox.hidden) renderList(); return; }
+    if (oc) { closeAsk(); window.openRailChat?.(oc.dataset.askOpen); return; }
+    if (e.target.closest(".hl-list-btn")) { closeAsk(); listBox.hidden = !listBox.hidden; $(".hl-list-btn", bar).setAttribute("aria-expanded", !listBox.hidden); if (!listBox.hidden) renderList(); return; }
     const go = e.target.closest("[data-go]");
     if (go) { const m = $(`mark.hl[data-hid="${CSS.escape(go.dataset.go)}"]`, body); listBox.hidden = true; if (m) { m.scrollIntoView({ behavior: "smooth", block: "center" }); m.classList.remove("flash"); void m.offsetWidth; m.classList.add("flash"); } }
   };
-  const onUp = () => { if (marking || asking) setTimeout(fromSelection, 0); };
+  const onUp = () => { if (marking) setTimeout(fromSelection, 0); };
   const onClick = (e) => {
     const m = e.target.closest?.("mark.hl"); if (!m) return;
     if (body.classList.contains("hl-quiz")) { m.classList.toggle("shown"); return; }

@@ -3875,9 +3875,10 @@ mark.hl.flash{animation:hl-flash 1.2s ease}
 .hl-ask{position:absolute;right:6px;top:calc(100% + 6px);z-index:30;width:min(420px,calc(100% - 12px));padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow-lg)}
 .hl-ask textarea{width:100%;margin-top:8px;font:inherit;font-size:.9rem;resize:vertical}
 .hl-ask blockquote{margin:8px 0 0;padding:6px 10px;border-left:3px solid #ff453a;border-radius:6px;background:var(--surface-2);color:var(--text-2);font-size:.86rem}
-.hl-ask-btn{border-color:var(--brand);color:var(--brand)}
+
 #lsModal .modal-card{overflow-x:hidden}
 /* Багшаас асуух: самбар дотор бүтэн мөр (сонгох текстийг халхлахгүй) */
 .hl-bar .hl-ask{position:static;flex-basis:100%;width:auto;margin-top:2px;padding:10px;box-shadow:none}
 .hl-ask .hl-ask-hint{margin:6px 0 0}
 .hl-ask textarea{min-height:60px}
+.hl-ask>b{display:flex;align-items:center;gap:6px}
