@@ -1,10 +1,10 @@
 /* Нүүрний hero дэвсгэр: Three.js-ийн 3D цэгийн сүлжээ (particles.js маягийн, гүнтэй). Камер урагш нисэх мэт —
    цэгүүд ойртож ирж, ард гармагц дахин алсад гарч ирнэ; ойрхон цэгүүд зураасаар холбогдоно; алс хэсэг цагаан
    манан руу бүдгэрнэ; хулганаар бага зэрэг эргэнэ. Hero харагдахгүй / таб нуугдвал зогсоно; хөдөлгөөн багасгах
-   тохиргоонд нэг л кадр зурна. Зөвхөн нэвтрээгүй зочинд (app.js-ээс ачаална). */
+   тохиргоонд нэг л кадр зурна. Нүүрэнд зөвхөн нэвтрээгүй зочинд, мөн нэвтрэх хуудасны ард (app.js-ээс ачаална). */
 (function () {
-  const host = document.querySelector(".home-top");
-  if (!host || document.documentElement.classList.contains("authed")) return;
+  const host = document.querySelector(".home-top, main.auth");
+  if (!host || (host.classList.contains("home-top") && document.documentElement.classList.contains("authed"))) return;
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const v = document.querySelector('script[src*="/static/app.js"]')?.src.split("v=")[1] || "";
   const s = document.createElement("script");

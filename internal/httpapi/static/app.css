@@ -3980,7 +3980,9 @@ html.pre{opacity:0;transition:none;animation:pre-reveal 0s 2.5s forwards}
 /* Өгөгдөл ирж солигдох хэсгүүд: гулсахгүй, зөөлөн бүдэгрэн гарна */
 @keyframes fade-in{from{opacity:0}to{opacity:1}}
 @keyframes rail-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
-.fade-in{animation:fade-in .3s ease both}
+.fade-in{animation:fade-in .3s ease backwards} /* backwards: дууссаны дараа stacking context үлдээхгүй (доторх цонх дарагдахгүй) */
+/* Цонх (modal) нээлттэй үед түүнийг агуулсан z-index-тэй хэсгийг навигац, чатын самбар, хөлөөс дээш гаргана */
+.pf:has(.modal.open:not(.inline)),main:has(.modal.open:not(.inline)){z-index:90}
 /* Хөдөлгөөнт дүрс: SVG-тэй адил байрлана */
 .ai-ico{display:inline-flex;flex:none;line-height:0;vertical-align:middle}
 /* Товч, карт: хулгана авчрахад бага зэрэг өргөгдөж, дарахад шахагдана */
@@ -4039,5 +4041,9 @@ ol.thread .msg-day{letter-spacing:.03em}
 /* Нүүрний hero 3D дэвсгэр (herofx.js): бичвэрийн ард, зөөлөн гарч ирнэ */
 .hero-fx{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;opacity:0;transition:opacity 1.4s ease}
 .hero-fx.on{opacity:1}
-.authed .hero-fx{display:none}
-.home-top:has(.hero-fx.on)::before{opacity:.35}
+.authed .home-top .hero-fx{display:none}
+.home-top:has(.hero-fx.on)::before,.auth:has(.hero-fx.on)::before{opacity:.35}
+/* Маягтын олон мөрт сонголт: checkbox эхний мөртэй зэрэгцэнэ (голлож «хөвөхгүй») */
+.form .check{align-items:flex-start;line-height:1.5}
+.form .check>input[type=checkbox]{flex:none;width:18px;height:18px;margin:3px 0 0;accent-color:var(--brand)}
+.form .check svg{vertical-align:-3px;color:var(--brand)}

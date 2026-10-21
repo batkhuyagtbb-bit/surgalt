@@ -205,7 +205,8 @@ function ripples() {
 }
 
 /* ---------- modal ---------- */
-function openModal(el) { if (!el) return; el.classList.add("open"); el.setAttribute("aria-hidden", "false"); }
+// Нээгдэх агшинд эцгийнх нь «зөөлөн гарах» анимейшнийг (stacking context үүсгэдэг) зогсооно — цонх бусад хэсгийн доор дарагдахгүй.
+function openModal(el) { if (!el) return; el.parentElement?.closest(".fade-in")?.classList.remove("fade-in"); el.classList.add("open"); el.setAttribute("aria-hidden", "false"); }
 function closeModal(el) {
   if (!el) return;
   el.classList.remove("open"); el.setAttribute("aria-hidden", "true");
@@ -4549,8 +4550,8 @@ if (new URLSearchParams(location.search).has("deleted")) { // бүртгэлээ
 if (page === "reset") resetPage();
 animateIcons();
 siteHit();
-// Нүүрний hero-ийн 3D дэвсгэр (Three.js): зөвхөн зочинд, хуудас ачаалагдсаны дараа сул үед.
-if (page === "home" && !document.documentElement.classList.contains("authed")) {
+// 3D дэвсгэр (Three.js): нүүрэнд зөвхөн зочинд, нэвтрэх хуудсанд — хуудас ачаалагдсаны дараа сул үед.
+if ((page === "home" && !document.documentElement.classList.contains("authed")) || page === "login") {
   (window.requestIdleCallback || ((f) => setTimeout(f, 400)))(() => {
     const s = document.createElement("script"), v = document.querySelector('script[src*="/static/app.js"]')?.src.split("v=")[1] || "";
     s.src = "/static/herofx.js?v=" + v; s.async = true; document.head.append(s);
