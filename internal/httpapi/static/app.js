@@ -60,6 +60,27 @@ const store = {
   set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
+// Нүүрний гарчиг: гэрлийн туяа үгнээс үг рүү (байрлалаар нь хоцролт --d), ард нь гэрэлтэлт, туяа өнгөрөхөд одод (app.css .ht-*).
+function heroShine() {
+  const h = $(".home-title"); if (!h || reduce || $(".ht-glow", h)) return;
+  const words = $$(".w > span", h); if (!words.length) return;
+  const CROSS = 1.1; // туяа гарчгийг нэвт гарах хугацаа (сек)
+  const glow = document.createElement("span"); glow.className = "ht-glow"; glow.setAttribute("aria-hidden", "true"); h.append(glow); // төгсгөлд: үгсийн :nth-child (өнгө) шилжихгүй
+  Array.from({ length: 7 }, (_, k) => {
+    const sp = document.createElement("span"); sp.className = "ht-spark" + (k % 3 === 1 ? " b" : ""); sp.setAttribute("aria-hidden", "true");
+    const x = Math.min(.97, Math.max(.03, (k + .5) / 7 + (Math.random() - .5) * .08)); // хэвтээ байрлал тогтмол — туяатай таарна
+    sp.style.left = (x * 100).toFixed(1) + "%"; sp.style.setProperty("--d", (x * CROSS).toFixed(3) + "s");
+    const move = () => { sp.style.top = (10 + Math.random() * 80).toFixed(1) + "%"; sp.style.setProperty("--s", (10 + Math.random() * 14).toFixed(0) + "px"); };
+    move(); sp.addEventListener("animationiteration", move); h.append(sp);
+  });
+  const layout = () => {
+    const hr = h.getBoundingClientRect(); if (!hr.width) return;
+    for (const w of words) { const r = w.parentElement.getBoundingClientRect(); w.style.setProperty("--d", (((r.left + r.width / 2 - hr.left) / hr.width) * CROSS).toFixed(3) + "s"); }
+  };
+  layout();
+  let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(layout, 200); }, { passive: true });
+}
+
 // Сайтын хандалт (хянагчийн самбарын өдөр/7 хоног/сарын статистик): хуудас бүр нэг удаа, хөтчийн санамсаргүй ID-гаар.
 function siteHit() {
   if (page === "admin" || navigator.webdriver) return;
@@ -4552,6 +4573,7 @@ if (new URLSearchParams(location.search).has("deleted")) { // бүртгэлээ
 if (page === "reset") resetPage();
 animateIcons();
 siteHit();
+if (page === "home" && !document.documentElement.classList.contains("authed")) heroShine();
 // 3D дэвсгэр (Three.js): нүүрэнд зөвхөн зочинд, нэвтрэх хуудсанд — хуудас ачаалагдсаны дараа сул үед.
 if ((page === "home" && !document.documentElement.classList.contains("authed")) || page === "login") {
   (window.requestIdleCallback || ((f) => setTimeout(f, 400)))(() => {
