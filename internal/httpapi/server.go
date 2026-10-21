@@ -287,6 +287,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /b/{id}", s.pageBook)
 	mux.HandleFunc("GET /login", s.pageStatic("login"))
 	mux.HandleFunc("GET /privacy", s.pageStatic("privacy"))
+	mux.HandleFunc("GET /intro2", s.pageIntro)
 	mux.HandleFunc("GET /terms", s.pageStatic("terms"))
 	// /me — нэвтэрсэн хүний өөрийн хуудас руу шилжүүлнэ (багш: /t/<нэр>, суралцагч: /). Хуучин /studio холбоос ч мөн.
 	mux.HandleFunc("GET /me", s.pageStatic("me"))

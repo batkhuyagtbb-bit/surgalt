@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Surgalt.mn — хичээл үзэх биш, ойлгож сурах газар. Нэг минут хагасын танилцуулга.">
+<meta property="og:title" content="Surgalt.mn — танилцуулга">
+<meta property="og:description" content="Маркер, багшаас асуух, давтах, цол, багшийн хяналт — ирээдүйн амжилт өнөөдөр эхэлнэ.">
+<title>Surgalt.mn Intro 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: 16:9 кино дэлгэц (1280×720 тайз, дэлгэцэнд багтааж томруулна) + доор удирдлага. Нэг харанхуй ертөнц (single dark look). */
+:root{
+  --night:#060914; --deep:#0b1230; --brand:#2f56d6; --brand-soft:#9fb4ff; --amber:#f0a83a; --paper:#ffffff; --ink:#131b31; --muted:#647089; --line:#e3e7ef;
+  --hl-y:rgba(255,214,0,.55); --hl-g:rgba(52,199,89,.42); --hl-r:rgba(255,69,58,.38); --hl-b:rgba(10,132,255,.36);
+  --f-display:"Unbounded","Manrope",system-ui,sans-serif; --f-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--night);color:#e9edff;font-family:var(--f-body);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;box-sizing:border-box;overflow-x:hidden}
+.frame{position:relative;width:min(100%,calc((100vh - 120px)*16/9));aspect-ratio:16/9;max-width:100%;border-radius:14px;overflow:hidden;background:#000;box-shadow:0 30px 80px -30px rgba(47,86,214,.45),0 0 0 1px rgba(159,180,255,.12)}
+.stage{position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:0 0;overflow:hidden;background:radial-gradient(ellipse at 50% 55%,#13204f 0%,var(--deep) 45%,var(--night) 100%)}
+#fx{position:absolute;inset:0;width:1280px;height:720px}
+.world{position:absolute;inset:0;perspective:1200px;perspective-origin:50% 50%}
+.cam{position:absolute;left:640px;top:360px;width:0;height:0;transform-style:preserve-3d}
+.pn{position:absolute;left:0;top:0;transform-style:preserve-3d}
+.card{position:absolute;left:0;top:0;transform:translate(-50%,-50%);transform-origin:50% 50%;background:var(--paper);color:var(--ink);border-radius:18px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.06),0 0 60px -10px rgba(47,86,214,.35);opacity:0;will-change:transform,opacity,filter;overflow:hidden}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;background:#eef2fb;color:var(--brand)}
+/* video */
+.video{width:560px;height:315px;background:linear-gradient(135deg,#0f1838,#1c2c66);color:#fff}
+.video .vt{position:absolute;left:22px;top:18px;font-size:13px;font-weight:700;opacity:.85}
+.video .play{position:absolute;left:50%;top:50%;width:76px;height:76px;margin:-38px 0 0 -38px;border-radius:50%;background:rgba(255,255,255,.14);display:grid;place-items:center;backdrop-filter:blur(6px)}
+.video .play::after{content:"";border-left:24px solid #fff;border-top:15px solid transparent;border-bottom:15px solid transparent;margin-left:6px}
+.video .bar{position:absolute;left:22px;right:22px;bottom:24px;height:5px;border-radius:5px;background:rgba(255,255,255,.2)}
+.video .prog{display:block;height:100%;width:8%;border-radius:5px;background:var(--amber)}
+.video .tc{position:absolute;right:22px;bottom:36px;font:500 12px var(--f-mono);opacity:.8}
+.video .idle{position:absolute;right:20px;top:16px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(255,69,58,.18);color:#ffb3ad}
+.video .zz{position:absolute;left:50%;top:50%;transform:translate(-50%,60px);font:700 15px var(--f-body);color:#ffb3ad;opacity:0}
+/* book */
+.book{width:290px;height:390px;padding:22px}
+.book h4,.slide h4,.quiz h4{margin:10px 0 12px;font:700 20px var(--f-body)}
+.ln{height:9px;border-radius:5px;background:#e8ecf5;margin:9px 0}
+.leaf{width:120px;height:70px;margin:16px auto;border-radius:70px 0;background:linear-gradient(135deg,#5fd06f,#1f9a4a);transform:rotate(-18deg)}
+.pg{position:absolute;bottom:16px;right:20px;font:500 12px var(--f-mono);color:var(--muted)}
+/* slide */
+.slide{width:400px;height:250px;padding:20px;background:linear-gradient(160deg,#fff,#f3f6ff)}
+.bars{display:flex;align-items:flex-end;gap:14px;height:110px;margin-top:8px}
+.bars i{flex:1;border-radius:8px 8px 0 0;background:linear-gradient(var(--brand),#7b95ff);transform-origin:bottom;transform:scaleY(.15)}
+/* quiz */
+.quiz{width:380px;height:250px;padding:20px}
+.opt{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1.5px solid var(--line);border-radius:12px;margin:8px 0;font-weight:600;font-size:14px}
+.opt b{width:20px;height:20px;border-radius:50%;border:2px solid #c9d1e3;flex:none}
+.opt.ok{border-color:#34c759;background:#ecfbef}.opt.ok b{background:#34c759;border-color:#34c759}
+/* lesson text */
+.text{width:780px;height:340px;padding:26px 34px}
+.text .hd{display:flex;align-items:center;gap:10px;font:700 13px var(--f-body);color:var(--muted)}
+.mbar{display:flex;align-items:center;gap:8px;margin:14px 0 18px;padding:7px;border:1px solid var(--line);border-radius:14px;background:#f6f8fd}
+.mbtn{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px}
+.mbtn.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.para{position:relative;font:600 27px/1.75 var(--f-body);letter-spacing:-.01em}
+.hl{border-radius:5px;padding:0 2px;background-repeat:no-repeat;background-size:0% 100%;transition:none}
+.hl.y{background-image:linear-gradient(var(--hl-y),var(--hl-y))}.hl.g{background-image:linear-gradient(var(--hl-g),var(--hl-g))}
+.hl.r{background-image:linear-gradient(var(--hl-r),var(--hl-r))}.hl.b{background-image:linear-gradient(var(--hl-b),var(--hl-b))}
+.hl .cv{position:absolute;inset:0;border-radius:5px;background:repeating-linear-gradient(135deg,#cbd2e1 0 6px,#e1e6f0 6px 12px);opacity:0}
+.hl{position:relative}
+.marker{position:absolute;left:0;top:0;width:34px;height:34px;opacity:0;pointer-events:none;filter:drop-shadow(0 6px 8px rgba(0,0,0,.25))}
+.note{position:absolute;right:26px;bottom:22px;width:250px;padding:12px 14px;border-radius:12px;background:#fffbea;border:1px solid #f4e3a0;font-size:14px;font-weight:600;opacity:0;transform:translateY(12px)}
+.note small{display:block;color:var(--muted);font-weight:700;margin-bottom:4px}
+/* ask */
+.ask{width:470px;height:270px;padding:20px 22px}
+.ask .t{display:flex;align-items:center;gap:8px;font:700 16px var(--f-body)}
+.ask blockquote{margin:12px 0;padding:8px 12px;border-left:4px solid #ff453a;border-radius:8px;background:#f6f8fd;font-weight:700}
+.ta{min-height:62px;padding:10px 12px;border:2px solid var(--brand);border-radius:12px;font-weight:600;font-size:15px}
+.ta .caret{display:inline-block;width:2px;height:18px;background:var(--brand);vertical-align:-3px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.acts{display:flex;justify-content:space-between;margin-top:14px}
+.btn{padding:9px 14px;border-radius:999px;font-weight:800;font-size:13px;border:1px solid var(--line);background:#eef2fb;color:var(--brand)}
+.btn.go{background:var(--brand);border-color:var(--brand);color:#fff}
+/* chat */
+.chat{width:390px;height:450px;display:flex;flex-direction:column}
+.chat .top{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#fff;background:linear-gradient(135deg,#f0a83a,#e0702d)}
+.on-dot{width:8px;height:8px;border-radius:50%;background:#34c759;display:inline-block;margin-right:4px}
+.msgs{flex:1;padding:16px;display:flex;flex-direction:column;gap:10px;background:#f6f8fd}
+.bub{max-width:80%;padding:10px 12px;border-radius:14px;font-size:13.5px;font-weight:600;line-height:1.45;opacity:0;transform:translateY(10px)}
+.bub.me{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:4px}
+.bub.me q{display:block;margin:6px 0;padding:4px 8px;border-left:3px solid #ffb3ad;background:rgba(255,255,255,.12);border-radius:6px;quotes:none}
+.bub.th{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}
+.typing{align-self:flex-start;display:flex;gap:4px;padding:10px 12px;border-radius:14px;background:#fff;border:1px solid var(--line);opacity:0}
+.typing i{width:7px;height:7px;border-radius:50%;background:#9aa6c0;animation:bob 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes bob{50%{transform:translateY(-4px)}}
+/* orb */
+.orb{position:absolute;left:0;top:0;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;background:radial-gradient(circle,#fff 0%,#9fb4ff 35%,rgba(47,86,214,0) 70%);box-shadow:0 0 40px 14px rgba(120,150,255,.55);opacity:0}
+/* journal */
+.journal{width:660px;height:340px;padding:20px 24px}
+.journal table{width:100%;border-collapse:collapse;font-size:14px;margin-top:10px;color:inherit;font-family:inherit}
+.journal th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:6px 4px;border-bottom:1px solid var(--line)}
+.journal td{padding:9px 4px;border-bottom:1px solid #eef1f6;font-weight:600}
+.pb{height:8px;border-radius:8px;background:#eef1f6;width:130px;overflow:hidden}.pb i{display:block;height:100%;width:0;border-radius:8px;background:linear-gradient(90deg,var(--brand),#6f8bff)}
+.score{font-variant-numeric:tabular-nums}
+/* rank */
+.rank{width:320px;height:320px;display:grid;place-items:center;text-align:center}
+.rank svg{position:absolute;inset:30px}
+.rank .pts{font:800 44px var(--f-display);color:var(--ink)}
+.rank .lbl{font-weight:700;color:var(--muted);font-size:13px}
+.rank .badge{margin-top:10px;padding:6px 14px;border-radius:999px;background:#fff6e6;color:#b46b00;font-weight:800;font-size:14px;opacity:0;transform:scale(.6)}
+/* attention */
+.att{width:470px;height:210px;padding:20px 22px;display:flex;flex-direction:column;gap:12px}
+.pill{align-self:center;display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:#f6f8fd;font-weight:700;font-size:13px}
+.warn{padding:12px 14px;border-radius:12px;background:#2a0f12;color:#ffd5d1;font-weight:700;font-size:14px;opacity:0;transform:translateX(-10px)}
+.lock{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:#eef2fb;color:var(--brand);font-weight:800;font-size:14px;opacity:0}
+/* future */
+.future{width:1000px;height:460px;background:transparent;box-shadow:none;overflow:visible;color:#fff}
+.future svg{position:absolute;inset:0;overflow:visible}
+.ms{position:absolute;width:0;height:0}
+.ms .ring{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;background:radial-gradient(circle,#fff 0 30%,#f0a83a 31% 55%,rgba(240,168,58,0) 56%);box-shadow:0 0 30px 8px rgba(240,168,58,.55);transform:scale(0)}
+.ms .lab{position:absolute;left:-30px;bottom:26px;display:flex;align-items:center;gap:10px;white-space:nowrap;padding:10px 16px;border-radius:14px;background:rgba(14,22,58,.82);border:1px solid rgba(159,180,255,.28);font:700 19px var(--f-body);box-shadow:0 18px 40px -16px rgba(0,0,0,.8);opacity:0}
+.ms .lab span{font-size:26px}
+.ms .lab.big{left:auto;right:-20px;font:800 24px var(--f-display);letter-spacing:-.02em;border-color:rgba(240,168,58,.6);background:linear-gradient(135deg,rgba(47,86,214,.9),rgba(14,22,58,.92))}
+.q2 em{font-style:normal;background:linear-gradient(90deg,#9fb4ff,#f0a83a);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* overlay */
+.ov{position:absolute;inset:0;pointer-events:none}
+.lb{position:absolute;left:0;right:0;height:62px;background:#000;z-index:5}.lb.t{top:0}.lb.b{bottom:0}
+.vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.6) 100%);z-index:4}
+#grain{position:absolute;inset:0;width:1280px;height:720px;opacity:.07;mix-blend-mode:overlay;z-index:4}
+.flare{position:absolute;top:-20%;left:-40%;width:40%;height:140%;background:linear-gradient(100deg,transparent,rgba(255,220,160,.18),transparent);transform:skewX(-18deg);z-index:3;opacity:0}
+.sub{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);width:980px;text-align:center;font:700 25px/1.45 var(--f-body);color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.85),0 0 2px #000;z-index:6;text-wrap:balance}
+.kick{position:absolute;left:58px;top:84px;z-index:6;font:500 13px var(--f-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--brand-soft);opacity:0}
+.kick b{color:var(--amber);font-weight:500;margin-right:10px}
+.title{position:absolute;inset:0;display:grid;place-items:center;z-index:6;text-align:center}
+.logo{font:800 108px/1 var(--f-display);letter-spacing:-.04em;color:#fff;white-space:nowrap}
+.logo .mn{color:var(--amber)}
+.logo span{display:inline-block;opacity:0}
+.tag{margin-top:22px;font:600 22px var(--f-body);color:#c9d3ff;opacity:0;letter-spacing:.01em}
+.motto{margin-top:12px;font:500 15px var(--f-mono);letter-spacing:.3em;text-transform:uppercase;color:var(--amber);opacity:0}
+.cta{margin-top:26px;display:inline-block;padding:12px 26px;border-radius:999px;border:1px solid rgba(240,168,58,.6);font:700 18px var(--f-body);color:#fff;opacity:0}
+.q{position:absolute;inset:0;display:grid;place-items:center;z-index:6;font:800 58px/1.1 var(--f-display);letter-spacing:-.03em;text-align:center;color:#fff;opacity:0;text-shadow:0 10px 40px rgba(0,0,0,.6)}
+/* poster + controls */
+.poster{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:radial-gradient(ellipse at 50% 45%,rgba(19,32,79,.85),rgba(6,9,20,.96));text-align:center;padding:16px}
+.poster h1{margin:0;font:800 clamp(30px,6vw,64px)/1 var(--f-display);letter-spacing:-.04em}
+.poster h1 em{font-style:normal;color:var(--amber)}
+.poster p{margin:0;color:#c9d3ff;font-weight:600;font-size:clamp(13px,1.8vw,17px);max-width:46ch}
+.playbig{display:inline-flex;align-items:center;gap:12px;padding:14px 26px;border-radius:999px;border:0;background:var(--amber);color:#1a1205;font:800 clamp(14px,1.8vw,18px) var(--f-body);cursor:pointer;box-shadow:0 12px 40px -10px rgba(240,168,58,.7)}
+.playbig:focus-visible,.ctl button:focus-visible{outline:3px solid var(--brand-soft);outline-offset:3px}
+.ctl{width:min(100%,calc((100vh - 120px)*16/9));display:flex;align-items:center;gap:10px}
+.ctl button{flex:none;width:40px;height:40px;border-radius:12px;border:1px solid rgba(159,180,255,.2);background:rgba(159,180,255,.08);color:#e9edff;font:700 15px var(--f-body);cursor:pointer;display:grid;place-items:center}
+.ctl button:hover{background:rgba(159,180,255,.16)}
+.seek{flex:1;min-width:0;height:8px;border-radius:8px;background:rgba(159,180,255,.15);cursor:pointer;position:relative}
+.seek i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:8px;background:linear-gradient(90deg,var(--brand),var(--amber))}
+.time{flex:none;font:500 12px var(--f-mono);color:#aab6e8;font-variant-numeric:tabular-nums;min-width:86px;text-align:right}
+.cap{margin:0;font-size:12px;color:#7d89b8}
+@media (prefers-reduced-motion:reduce){.typing i,.ta .caret{animation:none}}
+</style>
+<style>body{margin:0}</style>
+</head>
+<body>
+
+<div class="frame" id="frame">
+  <div class="stage" id="stage">
+    <canvas id="fx" width="1280" height="720"></canvas>
+    <div class="world"><div class="cam" id="cam">
+      <!-- 1. Видео -->
+      <div class="pn" style="transform:translate3d(0px,0px,0px)"><div class="card video" id="pVideo">
+        <span class="vt">Биологи · 01 Фотосинтез</span><span class="idle" id="idle">● Идэвх 12%</span>
+        <div class="play"></div><span class="zz" id="zz">Дэлгэц ажиллаж байна… харин хүүхэд?</span>
+        <span class="tc" id="tc">04:12 / 12:30</span><div class="bar"><span class="prog" id="prog"></span></div>
+      </div></div>
+      <!-- 2. Ном (PDF) -->
+      <div class="pn" style="transform:translate3d(-560px,-10px,-280px) rotateY(28deg)"><div class="card book" id="pBook">
+        <span class="chip">PDF ном</span><h4>Фотосинтез</h4>
+        <div class="ln"></div><div class="ln" style="width:86%"></div><div class="ln" style="width:92%"></div>
+        <div class="leaf"></div><div class="ln"></div><div class="ln" style="width:70%"></div><div class="ln" style="width:80%"></div>
+        <span class="pg">3 / 12</span>
+      </div></div>
+      <!-- 3. Слайд -->
+      <div class="pn" style="transform:translate3d(560px,-30px,-280px) rotateY(-28deg)"><div class="card slide" id="pSlide">
+        <span class="chip">Слайд 4 / 9</span><h4>Нарны гэрэл → Глюкоз</h4>
+        <div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></div>
+      </div></div>
+      <!-- 4. Асуулт -->
+      <div class="pn" style="transform:translate3d(0px,330px,-340px) rotateX(-12deg)"><div class="card quiz" id="pQuiz">
+        <span class="chip">Асуулт</span><h4>Фотосинтез хаана явагддаг вэ?</h4>
+        <div class="opt"><b></b>Үндсэнд</div><div class="opt" id="okOpt"><b></b>Навчны эсэд</div><div class="opt"><b></b>Цэцгийн дэлбээнд</div>
+      </div></div>
+      <!-- 5. Хичээлийн текст + маркер -->
+      <div class="pn" style="transform:translate3d(0px,-1500px,200px)"><div class="card text" id="pText">
+        <div class="hd">01 · ФОТОСИНТЕЗ <span class="chip" style="margin-left:auto">Биологи 7А</span></div>
+        <div class="mbar"><span class="mbtn on">🖍 Маркер асаалттай</span><span class="dot" style="background:#ffd60a"></span><span class="dot" style="background:#34c759"></span><span class="dot" style="background:#ff453a"></span><span class="dot" style="background:#0a84ff"></span><span class="mbtn" style="margin-left:auto">📝 Миний тэмдэглэл <b id="ncount">0</b></span></div>
+        <div class="para" id="para"><span class="hl y" id="h1">Фотосинтез<i class="cv"></i></span> бол ногоон ургамал <span class="hl g" id="h2">нарны гэрлийн<i class="cv"></i></span> энергийг ашиглан <span class="hl b" id="h3">хоол хийх<i class="cv"></i></span> үйл явц юм. Энэ үйл явцад <span class="hl r" id="h4">хлорофилл<i class="cv"></i></span> гол үүрэгтэй.
+          <svg class="marker" id="marker" viewBox="0 0 24 24"><path d="M3 21l3.5-1 11-11-2.5-2.5-11 11L3 21z" fill="#ffd60a" stroke="#131b31" stroke-width="1.2" stroke-linejoin="round"/><path d="M14 6.5l2.5 2.5 2.8-2.8a1.8 1.8 0 0 0-2.5-2.5L14 6.5z" fill="#131b31"/></svg>
+        </div>
+        <div class="note" id="note"><small>📝 Миний тэмдэглэл</small>Гол ойлголт — шалгалтад орно</div>
+      </div></div>
+      <!-- 6. Ойлгоогүй хэсэг цонх -->
+      <div class="pn" style="transform:translate3d(470px,-1290px,330px) rotateY(-14deg)"><div class="card ask" id="pAsk">
+        <div class="t"><span class="dot" style="background:#ff453a"></span>Ойлгоогүй хэсэг</div>
+        <blockquote>хлорофилл</blockquote>
+        <div class="ta"><span id="typed"></span><span class="caret"></span></div>
+        <div class="acts"><span class="btn">📌 Зөвхөн тэмдэглэх</span><span class="btn go" id="sendBtn">💬 Багшаас асуух</span></div>
+      </div></div>
+      <!-- 7. Багшийн чат -->
+      <div class="pn" style="transform:translate3d(1700px,-1350px,-200px) rotateY(-20deg)"><div class="card chat" id="pChat">
+        <div class="top"><span class="av">С</span><div><b>Сарнай багш</b><div style="font-size:12px;color:var(--muted);font-weight:600"><span class="on-dot"></span>Онлайн</div></div></div>
+        <div class="msgs">
+          <div class="bub me" id="b1">❓ «Фотосинтез» хичээлээс асуулт<q>хлорофилл</q>Хлорофилл гэж юу вэ?</div>
+          <div class="typing" id="typing"><i></i><i></i><i></i></div>
+          <div class="bub th" id="b2">Навчны ногоон пигмент. Нарны гэрлийг шингээж, ургамлын хоол хийх энерги болгодог 🌿</div>
+        </div>
+      </div></div>
+      <div class="pn" style="transform:translate3d(0,0,0)"><span class="orb" id="orb"></span></div>
+      <!-- 8. Оноо, цол -->
+      <div class="pn" style="transform:translate3d(-640px,-1500px,40px) rotateY(20deg)"><div class="card rank" id="pRank">
+        <svg viewBox="0 0 260 260"><circle cx="130" cy="130" r="112" fill="none" stroke="#eef1f6" stroke-width="16"/><circle id="ring" cx="130" cy="130" r="112" fill="none" stroke="url(#rg)" stroke-width="16" stroke-linecap="round" transform="rotate(-90 130 130)" stroke-dasharray="703.7" stroke-dashoffset="703.7"/><defs><linearGradient id="rg"><stop offset="0" stop-color="#2f56d6"/><stop offset="1" stop-color="#f0a83a"/></linearGradient></defs></svg>
+        <div><div class="pts" id="pts">140</div><div class="lbl">нийт оноо</div><div class="badge" id="badge">▪▪ Ахлах байлдагч</div></div>
+      </div></div>
+      <!-- 9. Журнал -->
+      <div class="pn" style="transform:translate3d(0px,1200px,-100px) rotateX(18deg)"><div class="card journal" id="pJournal">
+        <div style="display:flex;align-items:center;gap:10px"><b style="font-size:18px">Журнал · Биологи 7А</b><span class="chip" style="margin-left:auto">5 суралцагч</span></div>
+        <table><thead><tr><th>Суралцагч</th><th>Явц</th><th>Идэвх</th><th>Дүн</th><th>Цол</th></tr></thead><tbody>
+          <tr><td>Анужин</td><td><div class="pb"><i data-w="92"></i></div></td><td>96%</td><td class="score">98</td><td>▾ Дэд түрүүч</td></tr>
+          <tr><td>Тэмүүлэн</td><td><div class="pb"><i data-w="78"></i></div></td><td>88%</td><td class="score">91</td><td>▪▪ Ахлах байлдагч</td></tr>
+          <tr><td>Номин</td><td><div class="pb"><i data-w="64"></i></div></td><td>81%</td><td class="score">86</td><td>▪▪ Ахлах байлдагч</td></tr>
+          <tr><td>Баярсайхан</td><td><div class="pb"><i data-w="47"></i></div></td><td>63%</td><td class="score">72</td><td>▪ Байлдагч</td></tr>
+          <tr><td>Сувд</td><td><div class="pb"><i data-w="35"></i></div></td><td>58%</td><td class="score">69</td><td>▪ Байлдагч</td></tr>
+        </tbody></table>
+      </div></div>
+      <!-- 10. Анхаарлын горим -->
+      <div class="pn" style="transform:translate3d(620px,1150px,120px) rotateX(18deg) rotateY(-16deg)"><div class="card att" id="pAtt">
+        <span class="pill">👁 Анхаарлын горим · сануулга <b id="warnN">0</b>/3</span>
+        <div class="warn" id="warn">⚠ Өөр таб руу шилжлээ — 1/3, багшид тэмдэглэгдэнэ</div>
+        <div class="lock" id="lock">🔒 Хичээлийн агуулгыг хуулах боломжгүй</div>
+      </div></div>
+      <!-- 11. Ирээдүй: амжилтын зам -->
+      <div class="pn" style="transform:translate3d(0px,-2960px,0px)"><div class="card future" id="pFuture">
+        <svg viewBox="0 0 1000 460" width="1000" height="460" aria-hidden="true">
+          <defs><linearGradient id="fg" x1="0" x2="1" y1="1" y2="0"><stop offset="0" stop-color="#2f56d6"/><stop offset=".55" stop-color="#9fb4ff"/><stop offset="1" stop-color="#f0a83a"/></linearGradient>
+            <filter id="fb"><feGaussianBlur stdDeviation="9"/></filter></defs>
+          <path d="M0 440 H1000" stroke="rgba(159,180,255,.12)" stroke-width="1" fill="none"/>
+          <path id="fGlow" d="M40 420 C160 400 200 350 260 330 S400 270 480 250 S620 180 700 150 S880 60 940 40" stroke="url(#fg)" stroke-width="16" fill="none" filter="url(#fb)" opacity=".7" stroke-dasharray="1300" stroke-dashoffset="1300"/>
+          <path id="fPath" d="M40 420 C160 400 200 350 260 330 S400 270 480 250 S620 180 700 150 S880 60 940 40" stroke="url(#fg)" stroke-width="5" stroke-linecap="round" fill="none" stroke-dasharray="1300" stroke-dashoffset="1300"/>
+        </svg>
+        <div class="ms ms1" style="left:260px;top:330px"><i class="ring"></i><div class="lab"><span>📘</span>Ойлгосон хичээл</div></div>
+        <div class="ms ms2" style="left:480px;top:250px"><i class="ring"></i><div class="lab"><span>🏅</span>Олимпиадын медаль</div></div>
+        <div class="ms ms3" style="left:700px;top:150px"><i class="ring"></i><div class="lab"><span>🎓</span>Их сургууль</div></div>
+        <div class="ms ms4" style="left:940px;top:40px"><i class="ring"></i><div class="lab big"><span>🚀</span>Эрдэмтэн · Инженер · Эмч</div></div>
+      </div></div>
+    </div></div>
+    <div class="ov">
+      <div class="flare" id="flare"></div>
+      <canvas id="grain" width="320" height="180"></canvas>
+      <div class="vig"></div>
+      <div class="lb t"></div><div class="lb b"></div>
+      <div class="kick" id="kick"></div>
+      <div class="q" id="q">Үнэхээр<br>суралцаж байна уу?</div>
+      <div class="q q2" id="q2"><div>Өнөөдрийн ойлголт —<br><em>маргаашийн амжилт</em></div></div>
+      <div class="title" id="title"><div>
+        <div class="logo" id="logo"></div>
+        <div class="tag" id="tag">Хичээл үзэх биш, ойлгож сурах газар.</div>
+        <div class="motto" id="motto">Сур, сур, бас дахин сур</div>
+        <div><span class="cta" id="cta">surgalt.mn</span></div>
+      </div></div>
+      <div class="sub" id="sub"></div>
+    </div>
+  </div>
+  <div class="poster" id="poster">
+    <h1>Surgalt<em>.mn</em></h1>
+    <p>Хичээл үзэх биш, ойлгож сурах газар. Нэг минут хагасын танилцуулга. Дуутай үзэхийг зөвлөж байна.</p>
+    <button class="playbig" id="playBig" type="button">▶ Интро үзэх</button>
+  </div>
+</div>
+<div class="ctl">
+  <button id="bPlay" type="button" aria-label="Тоглуулах">▶</button>
+  <button id="bRe" type="button" aria-label="Эхнээс нь">↺</button>
+  <div class="seek" id="seek" role="slider" aria-label="Явц" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="seekI"></i></div>
+  <span class="time" id="time">0:00 / 1:26</span>
+  <button id="bSnd" type="button" aria-label="Дуу унтраах">🔊</button>
+  <button id="bFs" type="button" aria-label="Бүтэн дэлгэц">⛶</button>
+</div>
+<p class="cap">Surgalt.mn · Танилцуулга · Камерын хөдөлгөөн бүхий кино интро</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(() => {
+const $ = (s) => document.querySelector(s);
+const stage = $("#stage"), frame = $("#frame");
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+// ---- тайзыг дэлгэцэнд багтаах ----
+const fit = () => { stage.style.transform = `scale(${frame.clientWidth / 1280})`; };
+addEventListener("resize", fit); fit();
+
+// ---- гэрлийн тоосонцор (гүнтэй) ----
+const fx = $("#fx").getContext("2d");
+const dots = Array.from({ length: 140 }, () => ({ x: Math.random() * 1280, y: Math.random() * 720, z: Math.random(), vx: (Math.random() - .5) * .15, vy: -Math.random() * .25 - .05 }));
+let camPush = 0;
+const camPushProxy = { get v() { return camPush; }, set v(x) { camPush = x; } }; // GSAP-аар тоосонцрын «камер түлхэлт»
+const drawFx = () => {
+  fx.clearRect(0, 0, 1280, 720);
+  for (const d of dots) {
+    if (!reduced) { d.x += d.vx * (1 + d.z * 2) + camPush * (d.x - 640) * .0009 * d.z; d.y += d.vy * (1 + d.z * 2) + camPush * (d.y - 360) * .0009 * d.z; }
+    if (d.y < -10) d.y = 730; if (d.y > 730) d.y = -10; if (d.x < -10) d.x = 1290; if (d.x > 1290) d.x = -10;
+    const r = .6 + d.z * 2.6, a = .15 + d.z * .55;
+    const g = fx.createRadialGradient(d.x, d.y, 0, d.x, d.y, r * 4);
+    g.addColorStop(0, `rgba(${d.z > .8 ? "255,214,150" : "170,190,255"},${a})`); g.addColorStop(1, "rgba(170,190,255,0)");
+    fx.fillStyle = g; fx.beginPath(); fx.arc(d.x, d.y, r * 4, 0, 7); fx.fill();
+  }
+};
+// ---- film grain ----
+const gr = $("#grain").getContext("2d"), gimg = gr.createImageData(320, 180);
+const drawGrain = () => { const b = gimg.data; for (let i = 0; i < b.length; i += 4) { const v = Math.random() * 255; b[i] = b[i + 1] = b[i + 2] = v; b[i + 3] = 255; } gr.putImageData(gimg, 0, 0); };
+let frameN = 0;
+const loop = () => { drawFx(); if (frameN++ % 3 === 0 && !reduced) drawGrain(); requestAnimationFrame(loop); };
+drawGrain(); loop();
+
+// ---- камер: зорилтыг тойрон эргэлдэх (dist — ойртох, rx/ry — эргэлт) ----
+const cam = { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, dist: -900 };
+const camEl = $("#cam");
+const applyCam = () => { camEl.style.transform = `translateZ(${cam.dist}px) rotateX(${cam.rx}deg) rotateY(${cam.ry}deg) rotateZ(${cam.rz}deg) translate3d(${-cam.x}px,${-cam.y}px,${-cam.z}px)`; };
+applyCam();
+const move = (t, d, vars, ease = "power3.inOut") => tl.to(cam, { ...vars, duration: reduced ? .01 : d, ease, onUpdate: applyCam }, t);
+
+// ---- лого үсгээр ----
+$("#logo").innerHTML = [..."Surgalt"].map((c) => `<span>${c}</span>`).join("") + `<span class="mn">.</span><span class="mn">m</span><span class="mn">n</span>`;
+
+// ---- дуу: WebAudio-оор нийлэгжүүлсэн кино хөгжим ----
+const A = { ctx: null, on: true, master: null, pad: [], filt: null };
+const audioInit = () => {
+  if (A.ctx) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const comp = ctx.createDynamicsCompressor(); comp.connect(ctx.destination);
+    const master = ctx.createGain(); master.gain.value = A.on ? .9 : 0; master.connect(comp);
+    const filt = ctx.createBiquadFilter(); filt.type = "lowpass"; filt.frequency.value = 700; filt.Q.value = .7; filt.connect(master);
+    const padGain = ctx.createGain(); padGain.gain.value = 0; padGain.connect(filt);
+    const pad = [0, 1, 2].map(() => [-7, 7].map((det) => { const o = ctx.createOscillator(); o.type = "sawtooth"; o.detune.value = det; o.connect(padGain); o.start(); return o; })).flat();
+    Object.assign(A, { ctx, master, filt, padGain, pad });
+  } catch { A.ctx = null; }
+};
+const chord = (notes) => { if (!A.ctx) return; const t = A.ctx.currentTime; notes.forEach((n, i) => { const f = 440 * Math.pow(2, (n - 69) / 12); A.pad[i * 2].frequency.setTargetAtTime(f, t, .4); A.pad[i * 2 + 1].frequency.setTargetAtTime(f, t, .4); }); };
+const padLevel = (v, s = 2) => { if (A.ctx) A.padGain.gain.setTargetAtTime(v, A.ctx.currentTime, s / 3); };
+const open = (hz, s = 3) => { if (A.ctx) A.filt.frequency.setTargetAtTime(hz, A.ctx.currentTime, s / 3); };
+const noiseBuf = () => { const b = A.ctx.createBuffer(1, A.ctx.sampleRate * 2, A.ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; };
+const whoosh = (dur = 1.4, up = true) => {
+  if (!A.ctx) return; const c = A.ctx, t = c.currentTime, s = c.createBufferSource(); s.buffer = noiseBuf();
+  const bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.2; bp.frequency.setValueAtTime(up ? 300 : 3000, t); bp.frequency.exponentialRampToValueAtTime(up ? 3200 : 250, t + dur);
+  const g = c.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.35, t + dur * .6); g.gain.linearRampToValueAtTime(0, t + dur);
+  s.connect(bp).connect(g).connect(A.master); s.start(t); s.stop(t + dur + .1);
+};
+const boom = (gain = .9) => {
+  if (!A.ctx) return; const c = A.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain();
+  o.type = "sine"; o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(36, t + 1.1);
+  g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(.001, t + 1.6); o.connect(g).connect(A.master); o.start(t); o.stop(t + 1.7);
+  const s = c.createBufferSource(); s.buffer = noiseBuf(); const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 900; const ng = c.createGain();
+  ng.gain.setValueAtTime(.4 * gain, t); ng.gain.exponentialRampToValueAtTime(.001, t + .5); s.connect(lp).connect(ng).connect(A.master); s.start(t); s.stop(t + .6);
+};
+const tick = (f = 1800, gain = .12) => { if (!A.ctx) return; const c = A.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.type = "triangle"; o.frequency.value = f; g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(.001, t + .12); o.connect(g).connect(A.master); o.start(t); o.stop(t + .15); };
+const chime = () => [880, 1320, 1760].forEach((f, i) => setTimeout(() => tick(f, .16), i * 90));
+let pulseT = null;
+const pulse = (on, bpm = 92) => { clearInterval(pulseT); if (!on) return; pulseT = setInterval(() => { if (!A.ctx || A.ctx.state !== "running") return; const c = A.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(40, t + .18); g.gain.setValueAtTime(.32, t); g.gain.exponentialRampToValueAtTime(.001, t + .25); o.connect(g).connect(A.master); o.start(t); o.stop(t + .3); }, 60000 / bpm); };
+
+// ---- хадмал ба бүлгийн гарчиг ----
+const sub = $("#sub"), kick = $("#kick");
+const say = (t, text, dur) => { tl.call(() => { sub.textContent = text; }, null, t); tl.fromTo(sub, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .45 }, t); tl.to(sub, { opacity: 0, duration: .4 }, t + dur - .4); };
+const chapter = (t, n, text) => { tl.call(() => { kick.innerHTML = `<b>${n}</b>${text}`; }, null, t); tl.fromTo(kick, { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: .6 }, t); tl.to(kick, { opacity: 0, duration: .5 }, t + 6); };
+const show = (sel, t, from = {}) => tl.fromTo(sel, { opacity: 0, scale: .82, filter: "blur(10px)", ...from }, { opacity: 1, scale: 1, filter: "blur(0px)", y: 0, x: 0, duration: 1.1, ease: "power3.out" }, t);
+const blur = (sel, t, px = 4, op = .55) => tl.to(sel, { filter: `blur(${px}px)`, opacity: op, duration: 1 }, t);
+const focus = (sel, t) => tl.to(sel, { filter: "blur(0px)", opacity: 1, duration: .8 }, t);
+const sweep = (sel, t, d = .9) => tl.to(sel, { backgroundSize: "100% 100%", duration: d, ease: "power2.inOut" }, t);
+
+gsap.set(".card", { xPercent: -50, yPercent: -50, x: 0, y: 0 }); // төвлөрөл GSAP-д (x/y анимейшн дарж бичихгүй)
+const tl = gsap.timeline({ paused: true, onUpdate: () => syncUI() });
+window.__intro = tl;
+
+// ===== S0 Нээлт: лого гэрлээс угсрагдана (0–6) =====
+tl.call(() => { padLevel(.05, 3); chord([57, 64, 72]); open(500); }, null, 0);
+tl.to({}, { duration: .01 }, 0);
+tl.fromTo("#logo span", { opacity: 0, y: 40, filter: "blur(18px)", scale: 1.6 }, { opacity: 1, y: 0, filter: "blur(0px)", scale: 1, duration: 1.4, stagger: .07, ease: "expo.out" }, .6);
+tl.call(() => boom(.8), null, 1.1);
+tl.fromTo("#flare", { x: 0, opacity: 0 }, { x: 2600, opacity: 1, duration: 2.2, ease: "power2.inOut" }, 1.4);
+tl.fromTo("#tag", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 1 }, 2.4);
+tl.to(camPushObj(), { v: 1.4, duration: 5, ease: "none" }, 0);
+tl.to("#title", { scale: 1.08, duration: 6, ease: "none" }, 0);
+tl.to(["#logo span", "#tag"], { opacity: 0, filter: "blur(14px)", duration: .8, stagger: .02 }, 5.2);
+tl.call(() => whoosh(1.2), null, 5.3);
+
+// ===== S1 Асуулт: идэвхгүй дэлгэц (6–13) =====
+chapter(6, "01", "Асуулт");
+move(6, .01, { x: 0, y: 0, z: 0, dist: -1300, rx: 8, ry: -26 });
+show("#pVideo", 6.1);
+move(6.1, 6.6, { dist: -380, rx: 2, ry: 14 }, "sine.inOut");
+tl.to("#prog", { width: "34%", duration: 6.5, ease: "none" }, 6.2);
+tl.to({ s: 252 }, { s: 412, duration: 6.5, ease: "none", onUpdate() { const s = Math.round(this.targets()[0].s); $("#tc").textContent = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")} / 12:30`; } }, 6.2);
+tl.fromTo("#idle", { opacity: 1 }, { opacity: .25, repeat: 5, yoyo: true, duration: .5 }, 7);
+tl.to("#zz", { opacity: 1, y: 70, duration: 1 }, 8.2);
+say(6.4, "Хүүхэд маань онлайн хичээл үзэж байхдаа үнэхээр суралцаж байна уу, эсвэл зүгээр дэлгэц хараад сууж байна уу?", 6.4);
+tl.fromTo("#q", { opacity: 0, scale: 1.25, filter: "blur(12px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: .9, ease: "expo.out" }, 10.6);
+tl.call(() => boom(.5), null, 10.6);
+blur("#pVideo", 10.6, 8, .35);
+tl.to("#q", { opacity: 0, scale: .9, duration: .6 }, 12.4);
+
+// ===== S2 Платформ: хичээлийн хэсгүүд нисэн ирж угсрагдана (13–22) =====
+chapter(13, "02", "Хичээл");
+tl.call(() => { whoosh(1.6); chord([53, 60, 69]); padLevel(.07); open(1100); pulse(true); }, null, 13);
+focus("#pVideo", 13);
+tl.to("#zz", { opacity: 0, duration: .3 }, 13);
+say(13.2, "Surgalt.mn яг энэ асуудлыг шийдэхэд зориулсан.", 4.2);
+move(13, 4.2, { dist: -1250, rx: 14, ry: -38, rz: -2 }, "power2.inOut");
+show("#pBook", 13.8, { z: -600, x: -200 });
+show("#pSlide", 14.6, { x: 200 });
+show("#pQuiz", 15.4, { y: 120 });
+tl.to("#bars i", { scaleY: (i) => [.45, .7, .55, .9, 1][i], duration: .8, stagger: .12, ease: "back.out(1.6)" }, 15.6);
+move(17.2, 4.6, { dist: -1150, rx: 6, ry: 32, rz: 1 }, "sine.inOut");
+say(17.6, "Багш хичээлээ видео, ном, слайд, асуултаар байрлуулна.", 4.4);
+tl.call(() => { $("#okOpt").classList.add("ok"); tick(1400); }, null, 19.4);
+tl.call(() => whoosh(1.4), null, 21.2);
+
+// ===== S3 Маркер: камер текст рүү шумбана (22–33) =====
+chapter(22, "03", "Маркер");
+move(21.4, 2.4, { x: 0, y: -1500, z: 200, dist: -60, rx: 0, ry: 0, rz: 0 }, "power4.inOut");
+blur(["#pVideo", "#pBook", "#pSlide", "#pQuiz"], 21.6, 10, 0);
+show("#pText", 22.4);
+tl.call(() => { chord([48, 55, 64]); open(1500); }, null, 22.4);
+say(23, "Хүүхэд чухал хэсгийг маркераар тодруулж, өөрийн үгээр тэмдэглэл бичнэ.", 9.6);
+const mk = $("#marker");
+const markWord = (id, t, d = 1) => {
+  const el = $(id);
+  tl.set(mk, { opacity: 1 }, t - .25);
+  tl.fromTo(mk, { x: () => el.offsetLeft - 12, y: () => el.offsetTop + el.offsetHeight - 30 }, { x: () => el.offsetLeft + el.offsetWidth - 10, y: () => el.offsetTop + el.offsetHeight - 30, duration: d, ease: "power1.inOut", immediateRender: false }, t);
+  sweep(id, t, d);
+  tl.call(() => tick(1200 + Math.random() * 300, .08), null, t + .1);
+};
+move(23.2, 9.5, { dist: 120, ry: -4, rx: 3 }, "sine.inOut");
+markWord("#h1", 24);
+tl.call(() => { $("#ncount").textContent = "1"; }, null, 25);
+markWord("#h2", 25.6, 1.2);
+tl.call(() => { $("#ncount").textContent = "2"; }, null, 26.8);
+markWord("#h3", 27.2);
+tl.call(() => { $("#ncount").textContent = "3"; }, null, 28.2);
+tl.to(mk, { opacity: 0, duration: .3 }, 28.4);
+tl.to("#note", { opacity: 1, y: 0, duration: .7, ease: "back.out(1.7)" }, 28.8);
+tl.call(() => chime(), null, 28.9);
+
+// ===== S4 Багшаас асуух: улаан → цонх → бөмбөлөг нисэх → чат (33–45) =====
+chapter(33, "04", "Багшаас асуух");
+tl.to("#note", { opacity: 0, duration: .4 }, 32.6);
+markWord("#h4", 33.2, .9);
+tl.call(() => { $("#ncount").textContent = "4"; boom(.35); }, null, 34);
+tl.to(mk, { opacity: 0, duration: .3 }, 34.2);
+say(33.4, "Ойлгоогүй хэсгээ улаанаар тодруулаад нэг даралтаар багшаасаа асууна.", 5.6);
+move(34, 1.6, { x: 260, y: -1390, z: 260, dist: -120, ry: -8 }, "power3.inOut");
+show("#pAsk", 34.4, { y: 30 });
+const typed = $("#typed"), full = "Хлорофилл гэж юу вэ?";
+tl.to({ n: 0 }, { n: full.length, duration: 1.8, ease: "none", onUpdate() { const n = Math.round(this.targets()[0].n); if (typed.textContent.length !== n) { typed.textContent = full.slice(0, n); if (n) tick(2400, .04); } } }, 35.4);
+tl.to("#sendBtn", { scale: .9, duration: .12, yoyo: true, repeat: 1 }, 37.6);
+tl.call(() => { whoosh(1.8); open(2200); }, null, 37.7);
+// бөмбөлөг асуух цонхоос чат руу нисэнэ, камер дагана
+tl.set("#orb", { opacity: 1, x: 560, y: -1210, z: 360 }, 37.8);
+tl.to("#orb", { x: 1640, y: -1390, z: -140, duration: 1.9, ease: "power2.inOut" }, 37.8);
+tl.to("#orb", { scale: 2.4, opacity: 0, duration: .4 }, 39.7);
+move(37.8, 2.2, { x: 1700, y: -1350, z: -200, dist: -40, ry: 12, rx: -2 }, "power3.inOut");
+blur(["#pText", "#pAsk"], 38.2, 8, .2);
+show("#pChat", 38.4, { x: 60 });
+tl.to("#b1", { opacity: 1, y: 0, duration: .5, ease: "back.out(1.6)" }, 39.8);
+tl.call(() => chime(), null, 39.8);
+say(39.4, "Асуулт нь тэр дороо багшийн чат руу ишлэлтэйгээ очно.", 5.4);
+tl.to("#typing", { opacity: 1, duration: .3 }, 40.8);
+tl.to("#typing", { opacity: 0, height: 0, padding: 0, duration: .3 }, 42.3);
+tl.to("#b2", { opacity: 1, y: 0, duration: .5, ease: "back.out(1.6)" }, 42.5);
+tl.call(() => tick(990, .12), null, 42.5);
+move(40.2, 4.6, { dist: 60, ry: 4 }, "sine.inOut");
+
+// ===== S5 Давтах ба цол (45–55) =====
+chapter(45, "05", "Давтах");
+tl.call(() => { whoosh(1.4, false); chord([50, 57, 65]); }, null, 44.8);
+move(44.8, 2, { x: 0, y: -1500, z: 200, dist: -80, rx: 0, ry: 0 }, "power3.inOut");
+blur("#pChat", 45, 8, 0); focus(["#pText"], 45.2); tl.to("#pAsk", { opacity: 0, duration: .5 }, 45);
+say(45.6, "«Давтах» горимд тодруулсан хэсгүүд нуугдаж, хүүхэд өөрөө санаад шалгана.", 4.6);
+tl.to(".hl .cv", { opacity: 1, duration: .5, stagger: .12 }, 46.4);
+["#h1", "#h2", "#h3", "#h4"].forEach((id, i) => { tl.to(`${id} .cv`, { opacity: 0, duration: .35 }, 47.8 + i * .55); tl.call(() => tick(1600, .09), null, 47.8 + i * .55); });
+// цол
+move(50, 1.8, { x: -640, y: -1500, z: 40, dist: 160, ry: -14, rx: 0 }, "power3.inOut");
+blur("#pText", 50.2, 6, .3);
+show("#pRank", 50.3);
+say(50.4, "Асуултад зөв хариулж, идэвхтэй суралцах тусам оноо цуглуулж цол ахина.", 4.6);
+tl.to("#ring", { attr: { "stroke-dashoffset": 703.7 * (1 - .93) }, duration: 2, ease: "power2.out" }, 51.2);
+tl.to({ p: 140 }, { p: 160, duration: 2, ease: "power2.out", onUpdate() { $("#pts").textContent = Math.round(this.targets()[0].p); } }, 51.2);
+tl.to("#badge", { opacity: 1, scale: 1, duration: .6, ease: "back.out(2)" }, 52.6);
+tl.call(() => { chime(); boom(.4); }, null, 52.6);
+
+// ===== S6 Багшийн хяналт: камер дээшээ өргөгдөж журнал (55–65) =====
+chapter(55, "06", "Багшийн хяналт");
+tl.call(() => { whoosh(1.8); chord([45, 52, 60]); open(1800); }, null, 54.8);
+move(54.8, 2.6, { x: 160, y: 1180, z: -40, dist: -420, rx: -22, ry: -6 }, "power3.inOut");
+blur("#pRank", 55, 8, 0);
+show("#pJournal", 55.6);
+say(55.8, "Багш суралцагч бүрийнхээ явц, идэвх, дүнг журналаас харна.", 4.6);
+tl.to(".pb i", { width: (i, el) => el.dataset.w + "%", duration: 1.4, stagger: .15, ease: "power2.out" }, 56.6);
+show("#pAtt", 58.2, { x: 80 });
+move(57.6, 6.8, { x: 380, dist: -330, ry: -14, rx: -18 }, "sine.inOut");
+say(60.4, "«Анхаарлын горим» өөр таб руу шилжвэл сануулж, агуулгыг хуулахаас хамгаална.", 4.6);
+tl.to("#warn", { opacity: 1, x: 0, duration: .5, ease: "power3.out" }, 60.8);
+tl.call(() => { $("#warnN").textContent = "1"; tick(520, .2); setTimeout(() => tick(390, .2), 140); }, null, 60.8);
+tl.fromTo("#pAtt", { x: 0 }, { x: 6, duration: .06, repeat: 5, yoyo: true }, 60.9);
+tl.to("#lock", { opacity: 1, duration: .5 }, 62);
+
+// ===== S7 Ирээдүй: амжилтын зам дээш өгсөнө (65–76) =====
+chapter(65, "07", "Ирээдүй");
+tl.call(() => { whoosh(2, true); chord([52, 59, 67]); open(2400); padLevel(.09, 1); pulse(true, 104); }, null, 64.6);
+blur(["#pJournal", "#pAtt"], 64.8, 10, 0);
+move(64.6, 2.6, { x: -380, y: -2860, z: 0, dist: -260, rx: 10, ry: 16, rz: 0 }, "power3.inOut");
+tl.fromTo("#pFuture", { opacity: 0 }, { opacity: 1, duration: .8 }, 65.4);
+tl.fromTo("#fPath", { attr: { "stroke-dashoffset": 1300 } }, { attr: { "stroke-dashoffset": 0 }, duration: 6.4, ease: "power1.inOut" }, 65.8);
+tl.fromTo("#fGlow", { attr: { "stroke-dashoffset": 1300 } }, { attr: { "stroke-dashoffset": 0 }, duration: 6.4, ease: "power1.inOut" }, 65.8);
+[".ms1", ".ms2", ".ms3", ".ms4"].forEach((s, i) => {
+  const t = 66.9 + i * 1.55;
+  tl.fromTo(`${s} .ring`, { scale: 0 }, { scale: 1, duration: .5, ease: "back.out(2.2)" }, t);
+  tl.fromTo(`${s} .lab`, { opacity: 0, y: 16, filter: "blur(8px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: .7, ease: "power3.out" }, t + .1);
+  tl.call(() => (i === 3 ? (chime(), boom(.5)) : tick(880 + i * 220, .14)), null, t);
+});
+move(66, 6.8, { x: 380, y: -3080, dist: -220, rx: 8, ry: -12 }, "sine.inOut");
+say(65.6, "Өнөөдөр ойлгож сурсан хүүхэд маргааш олимпиадад түрүүлж, хүссэн их сургуульдаа тэнцэнэ.", 5);
+say(70.6, "Тэд ирээдүйд эрдэмтэн, инженер, эмч болж, Монголын ирээдүйг бүтээнэ.", 4.8);
+tl.fromTo("#q2", { opacity: 0, scale: 1.2, filter: "blur(12px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 1, ease: "expo.out" }, 73.2);
+tl.call(() => boom(.7), null, 73.2);
+blur("#pFuture", 73.2, 6, .25);
+tl.to("#q2", { opacity: 0, scale: .94, duration: .7 }, 75.4);
+
+// ===== S8 Төгсгөл: камер холдож бүх ертөнц харагдана, лого (76–86) =====
+const F = 76; // төгсгөлийн эхлэл
+tl.call(() => { whoosh(2.2, false); chord([57, 64, 69]); open(2600); padLevel(.09, 1); }, null, F - .2);
+move(F - .4, 3.2, { x: 0, y: -1000, z: 0, dist: -4200, rx: 26, ry: 40, rz: -4 }, "power3.inOut");
+tl.to(".card", { filter: "blur(2px)", opacity: .7, duration: 1 }, F - .2);
+tl.to(".card", { opacity: 0, duration: 1.2 }, F + 1.8);
+tl.to(camPushObj(), { v: 3, duration: 3, ease: "power2.in" }, F - .2);
+tl.set("#title", { scale: 1 }, F + 1.8);
+tl.fromTo("#logo span", { opacity: 0, y: -30, filter: "blur(16px)", scale: .7 }, { opacity: 1, y: 0, filter: "blur(0px)", scale: 1, duration: 1.2, stagger: .06, ease: "expo.out" }, F + 2.4);
+tl.call(() => { boom(1); pulse(false); }, null, F + 2.9);
+tl.fromTo("#flare", { x: 0, opacity: 0 }, { x: 2600, opacity: 1, duration: 2.4, ease: "power2.inOut" }, F + 3.2);
+tl.fromTo("#tag", { opacity: 0, y: 14, filter: "blur(0px)" }, { opacity: 1, y: 0, duration: 1 }, F + 4);
+tl.fromTo("#motto", { opacity: 0, letterSpacing: ".6em" }, { opacity: 1, letterSpacing: ".3em", duration: 1.6, ease: "power2.out" }, F + 5);
+tl.fromTo("#cta", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: .8 }, F + 6.2);
+tl.to(camPushObj(), { v: 0, duration: 2 }, F + 3);
+tl.to("#title", { scale: 1.04, duration: 6, ease: "none" }, F + 4);
+tl.call(() => padLevel(0, 4), null, F + 7.5);
+tl.to({}, { duration: 2.5 }, F + 7.5);
+
+function camPushObj() { return camPushProxy; }
+// ---- удирдлага ----
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+const total = tl.duration();
+const syncUI = () => {
+  const p = tl.progress();
+  $("#seekI").style.width = (p * 100).toFixed(2) + "%";
+  $("#seek").setAttribute("aria-valuenow", Math.round(p * 100));
+  $("#time").textContent = `${fmt(tl.time())} / ${fmt(total)}`;
+};
+const setPlayIcon = () => { const playing = !tl.paused() && tl.progress() < 1; $("#bPlay").textContent = playing ? "❚❚" : "▶"; $("#bPlay").setAttribute("aria-label", playing ? "Түр зогсоох" : "Тоглуулах"); };
+tl.eventCallback("onComplete", () => { setPlayIcon(); pulse(false); });
+const play = () => {
+  $("#poster").hidden = true; audioInit(); A.ctx?.resume?.();
+  if (tl.progress() >= 1) restart(); else tl.play();
+  setPlayIcon();
+};
+const pause = () => { tl.pause(); A.ctx?.suspend?.(); setPlayIcon(); };
+const restart = () => {
+  resetScene(); tl.restart(); A.ctx?.resume?.(); setPlayIcon();
+};
+// эхний төлөв рүү буцаах (дуудагдсан callback-ын өөрчлөлтүүд)
+const resetScene = () => {
+  $("#okOpt").classList.remove("ok"); $("#ncount").textContent = "0"; $("#warnN").textContent = "0"; typed.textContent = ""; $("#pts").textContent = "140";
+  sub.textContent = ""; kick.innerHTML = ""; pulse(false);
+};
+$("#playBig").onclick = play;
+$("#bPlay").onclick = () => (tl.paused() || tl.progress() >= 1 ? play() : pause());
+$("#bRe").onclick = () => { $("#poster").hidden = true; audioInit(); restart(); };
+const seekTo = (e) => { const r = $("#seek").getBoundingClientRect(); const p = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); $("#poster").hidden = true; tl.progress(p).pause(); A.ctx?.suspend?.(); setPlayIcon(); };
+$("#seek").addEventListener("pointerdown", seekTo);
+$("#seek").addEventListener("keydown", (e) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); tl.time(Math.min(total, Math.max(0, tl.time() + (e.key === "ArrowRight" ? 5 : -5)))); } });
+$("#bSnd").onclick = () => { A.on = !A.on; $("#bSnd").textContent = A.on ? "🔊" : "🔇"; $("#bSnd").setAttribute("aria-label", A.on ? "Дуу унтраах" : "Дуу асаах"); if (A.master) A.master.gain.setTargetAtTime(A.on ? .9 : 0, A.ctx.currentTime, .1); };
+$("#bFs").onclick = () => { const f = document.fullscreenElement ? document.exitFullscreen?.() : frame.requestFullscreen?.(); f?.catch?.(() => {}); };
+document.addEventListener("fullscreenchange", () => setTimeout(fit, 50));
+document.addEventListener("keydown", (e) => { if (e.code === "Space" && !/BUTTON|INPUT/.test(document.activeElement.tagName)) { e.preventDefault(); $("#bPlay").click(); } });
+syncUI();
+})();
+</script>
+
+</body>
+</html>

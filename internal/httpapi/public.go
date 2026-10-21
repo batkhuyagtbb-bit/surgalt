@@ -411,6 +411,18 @@ func (s *Server) pageHome(w http.ResponseWriter, r *http.Request) {
 	s.pageStatic("home")(w, r)
 }
 
+// pageIntro — танилцуулгын кино интро (static/intro2.html, бие даасан хуудас: template-гүй, JS template literal хэвээр).
+func (s *Server) pageIntro(w http.ResponseWriter, r *http.Request) {
+	b, err := staticFS.ReadFile("static/intro2.html")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	_, _ = w.Write(b)
+}
+
 func (s *Server) pageStatic(name string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
