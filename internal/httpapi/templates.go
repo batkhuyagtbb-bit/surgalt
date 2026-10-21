@@ -121,7 +121,7 @@ func icon(name string, size ...int) template.HTML {
 		n = size[0]
 	}
 	sz := strconv.Itoa(n)
-	return template.HTML(`<svg viewBox="0 0 24 24" width="` + sz + `" height="` + sz +
+	return template.HTML(`<svg data-ico="` + template.HTMLEscapeString(name) + `" viewBox="0 0 24 24" width="` + sz + `" height="` + sz +
 		`" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` + iconPaths[name] + `</svg>`)
 }
 

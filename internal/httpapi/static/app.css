@@ -3909,3 +3909,85 @@ mark.hl.flash{animation:hl-flash 1.2s ease}
 /* Чатын самбар анх нэмэгдэх агшинд (JS хуудас зурагдсаны дараа ачаалагдсан) гулсах/шахагдах хөдөлгөөнгүй */
 html.rail-boot body,html.rail-boot .nav,html.rail-boot .rail,html.rail-boot .rail-tab{transition:none!important}
 html.rail-boot .rail-item{animation:none!important}
+/* ===== Чат: Messenger маягийн загвар (самбар, профайлын чат хоёуланд) ===== */
+.chat-body,#railBody{overflow-x:hidden;background:var(--surface)}
+#railWho{display:flex;align-items:center;gap:10px;min-width:0}
+#railWho .rw-av{flex:none;display:flex}
+#railWho .rw-av .avatar{width:36px;height:36px;font-size:.8rem}
+#railWho .rw-txt{min-width:0;line-height:1.25}
+#railWho .rw-txt strong,#railWho .rw-txt small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#railWho .rw-txt strong{font-size:.98rem}
+ol.thread{gap:1px;padding-bottom:4px}
+ol.thread .msg{max-width:100%;gap:6px}
+ol.thread .msg-col{max-width:min(78%,calc(100% - 34px))}
+ol.thread .msg.me .msg-col{max-width:78%}
+ol.thread .msg.first{margin-top:6px}
+ol.thread .bubble{border:0;background:#f0f2f5;color:#050505;padding:8px 12px;font-size:.94rem;line-height:1.38;border-radius:18px}
+ol.thread .msg.me .bubble{background:linear-gradient(135deg,#3b82f6,#2f56d6);color:#fff}
+ol.thread .msg.them .bubble{border-top-left-radius:4px;border-bottom-left-radius:4px}
+ol.thread .msg.them.first .bubble{border-top-left-radius:18px}
+ol.thread .msg.them.last .bubble{border-bottom-left-radius:18px}
+ol.thread .msg.me .bubble{border-top-right-radius:4px;border-bottom-right-radius:4px}
+ol.thread .msg.me.first .bubble{border-top-right-radius:18px}
+ol.thread .msg.me.last .bubble{border-bottom-right-radius:18px}
+ol.thread .msg.is-sticker .bubble,ol.thread .msg.me.is-sticker .bubble{background:none;padding:0 2px}
+ol.thread .msg-sticker{font-size:2.6rem;line-height:1.15}
+ol.thread .msg.me .msg-quote{background:rgba(255,255,255,.18);border-left-color:#fff;color:#fff}
+ol.thread .msg.has-img .bubble{background:none;padding:0}
+/* Үйлдлийн товчнууд: хулгана авчрахад бөмбөлгийн дээр хөвөгч жижиг мөр (өргөн нэмэхгүй) */
+ol.thread .msg-tools{position:absolute;top:-17px;bottom:auto;z-index:3;gap:0;padding:2px;border-radius:999px;background:var(--surface);box-shadow:0 4px 14px rgba(18,24,41,.16);opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity .12s,transform .12s}
+ol.thread .msg.them .msg-tools{left:4px}
+ol.thread .msg.me .msg-tools{right:4px}
+ol.thread .msg:hover .msg-tools,ol.thread .msg-tools:focus-within{opacity:1;pointer-events:auto;transform:none}
+ol.thread .msg-tools button{width:26px;height:26px;font-size:.85rem}
+@media (hover:none){ol.thread .msg-tools{display:none}}
+/* Реакц: бөмбөлгийн буланд давхцана */
+ol.thread .msg-reacts{margin:-7px 6px 0;z-index:2}
+ol.thread .msg-reacts button{border:2px solid var(--surface);background:#f0f2f5;box-shadow:0 1px 3px rgba(18,24,41,.14);font-size:.78rem;padding:0 6px}
+ol.thread .msg-reacts button.on{background:#e7efff;color:var(--brand)}
+ol.thread .msg-foot{margin:2px 8px 0;font-size:.66rem}
+ol.thread .msg-day{margin:12px 0 6px;font-weight:600;text-transform:none;letter-spacing:0;font-size:.72rem}
+ol.thread .msg-day span{background:none;padding:0}
+ol.thread .typing .bubble{background:#f0f2f5}
+/* Бичих мөр */
+.composer-bar{border-top:0;padding:8px 10px 10px;gap:4px;align-items:flex-end}
+.cb-input{background:#f0f2f5;border-radius:20px;padding:0 3px 0 14px;align-items:flex-end;min-height:38px}
+.cb-input textarea{padding:9px 0;line-height:20px;font-size:.94rem;max-height:140px;overflow-y:hidden}
+.cb-emoji{width:34px;height:34px;margin-bottom:2px;flex:none;color:var(--brand)}
+.cb-emoji[aria-expanded="true"]{background:rgba(47,86,214,.12)}
+.cb-send{width:38px;height:38px;flex:0 0 38px;font-size:1.55rem;color:var(--brand)}
+.cb-send .cb-arrow{display:none}
+.composer-bar.has-text .cb-send{background:none;color:var(--brand)}
+.composer-bar.has-text .cb-send .cb-like{display:none}
+.composer-bar.has-text .cb-send .cb-arrow{display:inline}
+.cb-send .cb-like{transition:transform .15s}
+.cb-send:hover .cb-like{transform:scale(1.15)}
+/* Emoji сонгогч */
+.cb-pop{left:8px;right:8px;bottom:calc(100% + 4px);padding:8px 8px 10px;border-radius:16px;box-shadow:0 12px 36px -10px rgba(18,24,41,.35);max-height:300px;display:flex;flex-direction:column}
+.cb-tabs{display:flex;gap:2px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.cb-tabs button{flex:1;height:32px;border:0;border-radius:8px;background:none;font-size:1.15rem;cursor:pointer;opacity:.55}
+.cb-tabs button[aria-selected="true"]{opacity:1;background:#f0f2f5}
+.cb-tab-name{display:block;margin:6px 4px 4px;font-size:.72rem;color:var(--muted);font-weight:700}
+.cb-pop .cb-grid{grid-template-columns:repeat(7,1fr);overflow-y:auto;min-height:0}
+ol.thread .msg.them .bubble{background:#f0f2f5;border:0;box-shadow:none}
+ol.thread .msg.me .bubble{box-shadow:none;border:0}
+form.composer-bar .cb-input textarea{padding:9px 0;line-height:20px;min-height:38px;box-sizing:border-box}
+/* ===== Амьд мэт хөдөлгөөн: зөвхөн гарч ирэх, хулгана авчрах, дарах үед (давтагдах хөдөлгөөнгүй) ===== */
+/* Хуудас угсрагдаж дуустал нуугдаж, зөөлөн гарна; JS ажиллахгүй бол 2.5 секундэд өөрөө гарна */
+html{transition:opacity .35s ease}
+html.pre{opacity:0;transition:none;animation:pre-reveal 0s 2.5s forwards}
+@keyframes pre-reveal{to{opacity:1}}
+/* Өгөгдөл ирж солигдох хэсгүүд: гулсахгүй, зөөлөн бүдэгрэн гарна */
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+@keyframes rail-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.fade-in{animation:fade-in .3s ease both}
+/* Хөдөлгөөнт дүрс: SVG-тэй адил байрлана */
+.ai-ico{display:inline-flex;flex:none;line-height:0;vertical-align:middle}
+/* Товч, карт: хулгана авчрахад бага зэрэг өргөгдөж, дарахад шахагдана */
+.btn,.icon-btn,.hl-btn,.hl-sw,.mbtn,.cb-send,.cb-emoji,.rail-item,.chip-btn{transition:transform .14s ease,background-color .15s ease,box-shadow .15s ease,color .15s ease,border-color .15s ease}
+.btn:active,.icon-btn:active,.hl-btn:active,.hl-sw:active,.cb-send:active,.cb-emoji:active{transform:scale(.95)}
+.btn:hover:not(:disabled){transform:translateY(-1px)}
+.btn:active:not(:disabled){transform:translateY(0) scale(.97)}
+a.card,.pv-card{transition:transform .18s ease,box-shadow .18s ease}
+a.card:hover,.pv-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px -18px rgba(18,24,41,.35)}
+@media (prefers-reduced-motion:reduce){html,html.pre{transition:none;opacity:1;animation:none}.fade-in{animation:none}.btn:hover,.btn:active,a.card:hover,.pv-card:hover{transform:none}}

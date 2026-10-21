@@ -65,7 +65,7 @@ Object.assign(ICON, {
   pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   alert: '<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5h.01"/>',
 });
-const ico = (n, size = 20) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n] || ""}</svg>`;
+const ico = (n, size = 20) => `<svg data-ico="${n}" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n] || ""}</svg>`;
 
 Live.connect(Auth.token);
 
@@ -86,6 +86,7 @@ window.Studio = {
     main.innerHTML = `<div class="loader"></div>`;
     try { await (views[view] || views.overview)(arg); }
     catch (e) { main.innerHTML = panel(`<p class="form-error">${esc(e.message)}</p>`); }
+    main.classList.remove("fade-in"); void main.offsetWidth; main.classList.add("fade-in"); // хэсэг солигдоход зөөлөн
   },
 };
 

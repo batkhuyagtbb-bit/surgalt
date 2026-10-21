@@ -38,7 +38,7 @@ const UI_ICONS = {
   next: '<path d="M9 6l6 6-6 6"/>',
   expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
 };
-const icon = (n, size = 18) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI_ICONS[n] || ""}</svg>`;
+const icon = (n, size = 18) => `<svg data-ico="${n}" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI_ICONS[n] || ""}</svg>`;
 // Огноог өөрсдөө хэлбэржүүлнэ: олон браузерт mn-MN локаль байхгүй тул англиар гардаг.
 const WEEKDAYS = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"];
 const WEEKDAYS_SHORT = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"];
@@ -253,6 +253,7 @@ function chatRail() {
     plus: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
     collapse: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 6 6 6-6 6M13 6l6 6-6 6"/></svg>`,
   };
+  for (const k in I) I[k] = I[k].replace("<svg ", `<svg data-ico="${k}" `); // хөдөлгөөнт дүрсэнд тааруулах нэр
   const sameDay = (t) => new Date(t).toDateString() === new Date().toDateString();
   // Хумьсан хавтас "би энд байна": шинэ мессеж ирэхэд нэг удаа дохино.
   const nudgeTab = () => { const tab = $("#railTab"); if (!tab) return; tab.classList.remove("nudge"); void tab.offsetWidth; tab.classList.add("nudge"); };
@@ -366,8 +367,10 @@ function chatRail() {
   // Ярианы гарчиг: жагсаалтаас нэр (суралцагчид багшийн нэр), эс бөгөөс ярианы мэдээллээс.
   let curConv = null;
   const whoHTML = (c) => {
-    const known = convs.find((x) => x.id === c.id);
-    return `<strong>${esc(known?.title || c.visitor_name)}</strong><small class="muted">${c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин")}</small>`;
+    const known = convs.find((x) => x.id === c.id), name = known?.title || c.visitor_name || "?";
+    const av = c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group ${c.kind}">${c.kind === "team" ? I.people : I.group}</span>`
+      : known?.user ? avatarHTML(known.user, "avatar-sm") : `<span class="avatar avatar-sm" style="--h:${hueOfName(name)}">${esc(name.slice(0, 1).toUpperCase())}</span>`;
+    return `<span class="rw-av">${av}</span><span class="rw-txt"><strong>${esc(name)}</strong><small class="muted">${c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин")}</small></span>`;
   };
   // show=false: самбарын нээлттэй/хумьсан төлөвийг өөрчлөхгүй (refresh-ийн дараа сэргээх, дахин холбогдох).
   const open = async (id, show = true) => {
@@ -382,6 +385,7 @@ function chatRail() {
       const c = d.conversation; curGroup = c.kind === "group" || c.kind === "team"; myRole = d.me; curConv = c;
       $("#railWho").innerHTML = whoHTML(c);
       th.set(d); if (show) form.body.focus();
+      if (!same) { msgs.classList.remove("fade-in"); void msgs.offsetWidth; msgs.classList.add("fade-in"); } // өөр яриа нээгдэхэд зөөлөн
     } catch (e) {
       if (!show && e.status >= 400 && e.status < 500) { ss.set("sg_rail_conv", null); cur = null; thread.hidden = true; home.hidden = false; draw(); return; } // хадгалсан яриа байхгүй болсон
       $("#railWho").innerHTML = `<span class="form-error" style="margin:0">${esc(e.message)}</span>`;
@@ -2633,6 +2637,17 @@ function msgHTML(m, me, group) { // хуучин дуудлагад: энгий�
    реакц (👍❤️😂😮😢🙏), "Үзсэн", "бичиж байна…", Enter-ээр илгээх ---------- */
 const REACTS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 const EMOJIS = ["😀", "😂", "🥰", "😍", "😎", "🤔", "😅", "😭", "😡", "🙏", "👍", "👎", "👏", "🙌", "💪", "🔥", "🎉", "❤️", "💙", "✅", "❌", "⭐", "📚", "✍️", "🧠", "💡", "⏰", "🏆"];
+// Emoji сонгогчийн ангиллууд (Messenger маягийн). «Сүүлд» — хөтөчид хадгалсан сүүлийн 21.
+const EMOJI_TABS = [
+  ["😀", "Нүүр", "😀 😃 😄 😁 😆 😅 🤣 😂 🙂 😉 😊 😇 🥰 😍 🤩 😘 😋 😜 🤪 😎 🤗 🤭 🤫 🤔 😐 😴 😮 😲 😳 🥺 😢 😭 😤 😡 🤯 😱 😬 🙄 😏 🥳"],
+  ["👍", "Гар", "👍 👎 👌 ✌️ 🤞 🤟 🤙 👋 👏 🙌 🙏 💪 ✍️ 👆 👇 👉 👈 🤝 ✋"],
+  ["❤️", "Зүрх", "❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💕 💖 💗 💯 ✨ ⭐ 🌟 🔥 💥"],
+  ["📚", "Сургууль", "📚 📖 ✏️ ✍️ 📝 📐 📏 ⚗️ 🔬 🧠 💡 🎓 🏆 🥇 ⏰ 📅 ✅ ❌ ❓ ❗ 💻 🔢"],
+  ["🎉", "Баяр", "🎉 🥳 🎊 🎁 🎈 🍰 ☕ 🍎 ⚽ 🏀 🎵 🎨 🚀 🌈 🌸 🌞 🐱 🐶"],
+].map(([ic, name, s]) => [ic, name, s.split(" ")]);
+const emojiRecent = { get: () => { try { return JSON.parse(localStorage.getItem("sg_emoji_recent")) || []; } catch { return []; } }, add(e) { const r = [e, ...this.get().filter((x) => x !== e)].slice(0, 21); try { localStorage.setItem("sg_emoji_recent", JSON.stringify(r)); } catch {} } };
+// Зөвхөн 1-3 emoji-той мессеж → бөмбөлөггүй, том (Messenger шиг).
+const emojiOnly = (s) => { s = (s || "").trim(); if (!s || s.length > 40 || !/^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|‍|️|\s)+$/u.test(s)) return false; const n = (s.match(/\p{Extended_Pictographic}|\p{Regional_Indicator}{2}/gu) || []).length; return n >= 1 && n <= 3; };
 const STICKERS = ["🎉", "👏", "🏆", "💯", "🔥", "🚀", "🧠", "📚", "✅", "🙏", "😎", "🥳", "🤝", "💪", "🌟", "🎯"];
 const ICO_IMG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-9 9"/></svg>`;
 const ICO_STICKER = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6"/><path d="M20 13h-4a3 3 0 0 0-3 3v4l7-7Z"/><path d="M9 10h.01M14 10h.01M9 14c.8.8 1.8 1.2 3 1.2"/></svg>`;
@@ -2721,7 +2736,7 @@ class ChatThread {
       const reacts = rx.length ? `<div class="msg-reacts">${rx.map(([e, u]) => `<button type="button" class="${u.some((x) => x.key === this.meKey) ? "on" : ""}" data-react-one="${e}" title="${esc(u.map((x) => x.name).join(", "))}">${e}${u.length > 1 ? ` ${u.length}` : ""}</button>`).join("")}</div>` : "";
       const av = !mine && last ? `<span class="msg-av">${avatarHTML({ display_name: m.sender_name || (m.sender === "teacher" ? "Багш" : "?") }, "avatar-sm")}</span>` : `<span class="msg-av"></span>`;
       const foot = last || rx.length || m.edited ? `<div class="msg-foot"><time>${fmtTime(m.created_at)}</time>${m.edited && !m.deleted ? `<span class="msg-edited">засварласан</span>` : ""}${mine && seen && seen.id === m.id ? `<span class="msg-seen">✓✓ Үзсэн${this.group() && seen.n > 1 ? ` · ${seen.n}` : ""}</span>` : ""}</div>` : "";
-      const sticker = !m.deleted && /^::sticker::(.+)$/.exec(m.body || "");
+      const sticker = !m.deleted && (/^::sticker::(.+)$/.exec(m.body || "") || (!m.attachment_url && emojiOnly(m.body) && [m.body, m.body.trim()]));
       const imgUrl = m.deleted ? "" : m.attachment_url || (/^https?:\/\/\S+\.(gif|png|jpe?g|webp)(\?\S*)?$/i.test(m.body || "") ? m.body : "");
       const editing = this.editing === m.id;
       const content = m.deleted ? `<span class="msg-text msg-deleted">Мессеж устгагдсан</span>` : editing ? `<form class="msg-edit"><textarea rows="2" maxlength="2000">${esc(m.body)}</textarea><div><button type="submit" class="btn btn-gold btn-sm">Хадгалах</button><button type="button" class="btn btn-ghost btn-sm" data-edit-cancel>Болих</button></div></form>` : sticker ? `<span class="msg-sticker">${esc(sticker[1])}</span>` : imgUrl ? `<a class="msg-img" href="${esc(imgUrl)}" target="_blank" rel="noopener"><img src="${esc(imgUrl)}" alt="" loading="lazy"></a>${m.attachment_url && m.body && m.body !== "📷 Зураг" ? `<span class="msg-text">${linkify(m.body)}</span>` : ""}` : `<span class="msg-text">${linkify(m.body)}</span>`;
@@ -2818,18 +2833,55 @@ class ChatThread {
     bar.innerHTML = `<span>↩ ${who} хариулж байна: <em>${esc((this.replyTo.body || "").replace(/^::sticker::/, "").slice(0, 80))}</em></span><button type="button" data-cancel-reply aria-label="Болих">✕</button>`;
     bar.querySelector("[data-cancel-reply]").onclick = () => { this.replyTo = null; this.renderReply(); };
   }
-  // Бичих мөр: [📹 Meet (багш)] [Aa] [➤] — энгийн, зөвхөн уулзалтын товчтой.
+  // Бичих мөр (Messenger шиг): [📹 Meet (багш)] [Aa … 😊] [➤ / 👍]. Хоосон үед 👍 нэг дарж илгээнэ.
   bindForm() {
     const f = this.form, extra = [...f.querySelectorAll("[data-plus]")];
     f.classList.add("composer-bar");
     f.innerHTML = `${extra.length ? `<div class="cb-left">${extra.map((b) => `<button type="button" class="cb-ic" id="${esc(b.id)}" title="${esc(b.textContent.trim())}" aria-label="${esc(b.textContent.trim())}">${b.querySelector("svg")?.outerHTML || "📹"}</button>`).join("")}</div>` : ""}
-      <div class="cb-input"><textarea name="body" rows="1" maxlength="2000" placeholder="Мессеж бичих…" aria-label="Мессеж"></textarea></div>
-      <button class="cb-send has-arrow" aria-label="Илгээх" title="Илгээх (Enter)"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21.9 12 3.4 3.6l-.1 6.6L15 12 3.3 13.8l.1 6.6Z"/></svg></button>`;
+      <div class="cb-input"><textarea name="body" rows="1" maxlength="2000" placeholder="Aa" aria-label="Мессеж"></textarea>
+        <button type="button" class="cb-emoji" data-emoji-open aria-label="Emoji" aria-expanded="false" title="Emoji">${ICO_SMILE}</button></div>
+      <button class="cb-send" aria-label="Илгээх" title="Илгээх (Enter)"><span class="cb-like" aria-hidden="true">👍</span><svg class="cb-arrow" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21.9 12 3.4 3.6l-.1 6.6L15 12 3.3 13.8l.1 6.6Z"/></svg></button>`;
     const ta = f.body;
-    const grow = () => { ta.style.height = "auto"; ta.style.height = Math.min(140, ta.scrollHeight) + "px"; f.classList.toggle("has-text", !!ta.value.trim()); };
+    const grow = () => {
+      ta.style.height = "auto"; if (!ta.scrollHeight) { ta.style.height = ""; return; } // цонх далд үед (scrollHeight 0) өндөр тогтоохгүй
+      const h = Math.min(140, ta.scrollHeight); ta.style.height = h + "px";
+      ta.style.overflowY = ta.scrollHeight > 140 ? "auto" : "hidden"; // жижиг үед гүйлгэх сум гарахгүй
+      f.classList.toggle("has-text", !!ta.value.trim());
+    };
+    // Emoji сонгогч: ангилал, сүүлд хэрэглэсэн; сонгосон emoji-г курсорын байрлалд оруулна.
+    const pop = () => f.querySelector(".cb-pop");
+    const closePop = () => { pop()?.remove(); f.querySelector("[data-emoji-open]").setAttribute("aria-expanded", "false"); };
+    const drawPop = (tab) => {
+      const p = pop(); if (!p) return;
+      const rec = emojiRecent.get(), tabs = [["🕘", "Сүүлд", rec], ...EMOJI_TABS].filter(([, , l], i) => i || l.length);
+      const cur = tabs.find((t) => t[1] === tab) || tabs[0];
+      p.innerHTML = `<div class="cb-tabs" role="tablist">${tabs.map(([ic, name]) => `<button type="button" role="tab" data-etab="${esc(name)}" aria-selected="${name === cur[1]}" title="${esc(name)}">${ic}</button>`).join("")}</div>
+        <b class="cb-tab-name">${esc(cur[1])}</b><div class="cb-grid">${cur[2].map((e) => `<button type="button" data-emo="${e}" aria-label="${e}">${e}</button>`).join("")}</div>`;
+    };
+    const insert = (e) => {
+      const s = ta.selectionStart ?? ta.value.length, en = ta.selectionEnd ?? s;
+      ta.value = ta.value.slice(0, s) + e + ta.value.slice(en); ta.selectionStart = ta.selectionEnd = s + e.length;
+      emojiRecent.add(e); grow(); ta.focus();
+    };
+    f.addEventListener("click", (e) => {
+      if (e.target.closest("[data-emoji-open]")) {
+        if (pop()) return closePop();
+        f.insertAdjacentHTML("beforeend", `<div class="cb-pop" role="dialog" aria-label="Emoji сонгох"></div>`); drawPop(); e.target.closest("[data-emoji-open]").setAttribute("aria-expanded", "true"); return;
+      }
+      const tb = e.target.closest("[data-etab]"); if (tb) return drawPop(tb.dataset.etab);
+      const em = e.target.closest("[data-emo]"); if (em) return insert(em.dataset.emo);
+    });
+    document.addEventListener("pointerdown", (e) => { if (pop() && !f.contains(e.target)) closePop(); });
     ta.addEventListener("input", () => { grow(); this.sendTyping(); });
-    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); } if (e.key === "Escape" && this.replyTo) { this.replyTo = null; this.renderReply(); } });
-    f.addEventListener("submit", async (e) => { e.preventDefault(); const text = ta.value.trim(); if (!text) return; ta.value = ""; grow(); if (!(await this.send(text))) { ta.value = text; grow(); } });
+    ta.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); }
+      if (e.key === "Escape") { if (pop()) closePop(); else if (this.replyTo) { this.replyTo = null; this.renderReply(); } }
+    });
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault(); closePop();
+      const text = ta.value.trim() || "👍"; // хоосон үед 👍 (Messenger шиг)
+      ta.value = ""; grow(); if (!(await this.send(text)) && text !== "👍") { ta.value = text; grow(); }
+    });
     grow();
   }
   async send(body, attachment = "") {
@@ -3801,6 +3853,7 @@ async function coursePage() {
       mountQuizzes(body, `/api/courses/${id}/lessons/${lid}`, access?.progress?.[lid]?.quiz || {});
     } else { body.classList.add("pre"); body.textContent = l.content || ""; }
     hydrateBooks(player); hydrateBooks(body); readingRuler(body);
+    body.classList.remove("fade-in"); void body.offsetWidth; body.classList.add("fade-in"); // хичээл солигдоход зөөлөн
     stopMarker?.(); // маркер: шалгалтаас бусад хичээлд, нэвтэрсэн суралцагчид (тодруулга зөвхөн өөрт нь)
     $$(".hl-bar, .hl-pop", body.parentElement).forEach((x) => x.remove());
     const tHref = $(".teacher-chip")?.getAttribute("href") || "", tUser = tHref.startsWith("/t/") ? tHref.slice(3) : "";
@@ -4550,4 +4603,46 @@ if (new URLSearchParams(location.search).has("deleted")) { // бүртгэлээ
 }
 if (page === "admin") adminPage();
 if (page === "reset") resetPage();
+animateIcons();
+// Хуудас угсрагдаж (фонт, эхний зурлага) дууссаны дараа зөөлөн гаргана — салж нийлэх нь харагдахгүй.
+Promise.race([document.fonts?.ready || Promise.resolve(), new Promise((r) => setTimeout(r, 600))])
+  .then(() => requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove("pre"))));
 })();
+
+/* ---------- Хөдөлгөөнт дүрс (AnimateIcons · Lucide, MIT, өөрийн серверээс): ----------
+   SVG дүрс (data-ico) эхэлж харагдана; сан ачаалагдмагц хөдөлгөөнт хувилбараар солигдож, эцэг товч, холбоос,
+   карт дээр хулгана авчрах / focus авахад тоглоно. Хөдөлгөөн багасгах тохиргоотой үед огт ачаалахгүй. */
+function animateIcons() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const MAP = { bell: "Bell", chat: "MessageCircle", book: "BookOpen", users: "Users", user: "User", teacher: "User", profile: "User", gear: "Settings", eye: "Eye", lock: "Lock", check: "Check", clock: "Clock", money: "Wallet", chart: "ChartColumn", live: "Video", clip: "Paperclip", medal: "Medal", courses: "GraduationCap", cal: "Calendar", pin: "MapPin", shield: "ShieldCheck", search: "Search", home: "House", plus: "Plus", x: "X", edit: "SquarePen", trash: "Trash2", heart: "Heart", star: "Star", cloud: "Cloud", link: "Link", files: "Files", doc: "FileText", exam: "ClipboardCheck", play: "Play", text: "Type", image: "Image", mic: "Mic", heading: "Heading", send: "Send", back: "ArrowLeft", next: "ArrowRight", chev: "ChevronRight", chevron: "ChevronRight", down: "ChevronDown", up: "ChevronUp", download: "Download", upload: "Upload", share: "Share", qr: "QrCode", globe: "Globe", card: "CreditCard", slides: "Presentation", sheet: "Table", expand: "Expand", grip: "GripVertical", list: "List", quiz: "MessageCircleQuestionMark", target: "Target", pulse: "Activity", alert: "TriangleAlert", camera: "Camera", phone: "Phone", layers: "Layers", work: "Briefcase", repeat: "Repeat", ext: "ExternalLink", out: "LogOut", group: "Users", people: "Users", collapse: "ChevronsRight" };
+  const v = document.querySelector('script[src*="/static/app.js"]')?.src.split("v=")[1] || "";
+  const s = document.createElement("script");
+  s.src = "/static/vendor/animateicons-lucide-0.1.0.js?v=" + v; s.async = true;
+  s.onload = () => {
+    const A = window.AnimateIcons; if (!A?.createIcon) return;
+    const hostOf = (el) => el.closest("a,button,summary,label,[role=tab],[role=button],.rail-item,.pv-card,.card,li") || el.parentElement;
+    const swap = (svg) => {
+      svg.dataset.ai = "1";
+      const data = A.icons[MAP[svg.dataset.ico]]; if (!data) return;
+      let el; try { el = A.createIcon(data, { size: +svg.getAttribute("width") || 18, isAnimated: false }); } catch { return; }
+      el.classList.add("ai-ico"); el.setAttribute("aria-hidden", "true");
+      const sv = el.querySelector("svg");
+      if (sv) { sv.setAttribute("stroke-width", svg.getAttribute("stroke-width") || "1.9"); sv.dataset.ico = svg.dataset.ico; sv.dataset.ai = "1"; svg.classList.forEach((c) => sv.classList.add(c)); }
+      svg.replaceWith(el);
+      const host = hostOf(el); if (!host) return;
+      (host._ai ||= []).push(el);
+      if (host._aiOn) return; host._aiOn = 1;
+      const go = () => host._ai.forEach((i) => i.isConnected && i.startAnimation?.()), stop = () => host._ai.forEach((i) => i.stopAnimation?.());
+      host.addEventListener("pointerenter", go); host.addEventListener("focusin", go);
+      host.addEventListener("pointerleave", stop); host.addEventListener("focusout", stop);
+    };
+    const scan = (root) => root.querySelectorAll?.("svg[data-ico]:not([data-ai])").forEach(swap);
+    scan(document);
+    const q = new Set(); let t = 0;
+    new MutationObserver((ms) => {
+      for (const m of ms) m.addedNodes.forEach((n) => n.nodeType === 1 && q.add(n));
+      if (!t) t = requestAnimationFrame(() => { t = 0; q.forEach((n) => (n.matches?.("svg[data-ico]:not([data-ai])") ? n.isConnected && swap(n) : scan(n))); q.clear(); });
+    }).observe(document.body, { childList: true, subtree: true });
+  };
+  (window.requestIdleCallback || ((f) => setTimeout(f, 300)))(() => document.head.append(s), { timeout: 1500 });
+}
