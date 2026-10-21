@@ -4047,39 +4047,29 @@ ol.thread .msg-day{letter-spacing:.03em}
 .form .check{align-items:flex-start;line-height:1.5}
 .form .check>input[type=checkbox]{flex:none;width:18px;height:18px;margin:3px 0 0;accent-color:var(--brand)}
 .form .check svg{vertical-align:-3px;color:var(--brand)}
-/* ---- Нүүрний гарчиг: металл өнгө, гэрлийн туяа, ард нь гэрэлтэлт, оч (heroShine, app.js) ----
-   Цэнхэр үгс гүн цэнхэр металл, «дахин» алтан тугалган өнгөтэй. Гэрлийн туяа гарчгийг зүүнээс баруун тийш нэвт
-   гүйнэ (үг бүрийн байрлалаар хоцролт --d), ард нь зөөлөн гэрэл дагаж, туяа өнгөрөх агшинд одод гялсхийнэ.
+/* ---- Нүүрний гарчиг: металл өнгө (хөдөлгөөнгүй), орохдоо бүдгээс тод; жижиг шошго, дэд гарчигт зөөлөн гэрлийн туяа ----
    Текстийг тайрах (background-clip:text) эсвэл color-mix дэмжихгүй хөтөч, хөдөлгөөн багасгах тохиргоонд энгийн текст. */
 @property --bx{syntax:"<percentage>";inherits:false;initial-value:130%}
 @supports ((-webkit-background-clip:text) or (background-clip:text)) and (color:color-mix(in srgb,red,blue)){
   @media (prefers-reduced-motion:no-preference){
-    .home-title{position:relative;isolation:isolate}
-    .home-title .w>span,.shine{
-      --beam:linear-gradient(100deg,transparent 0 38%,rgba(255,255,255,.35) 43%,rgba(255,255,255,.95) 48.5%,#fff 50%,rgba(255,255,255,.95) 51.5%,rgba(255,255,255,.35) 57%,transparent 62% 100%);
-      background-repeat:no-repeat;background-position:var(--bx) 0,0 0;background-size:250% 100%,100% 100%;
-      -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-    /* Гүн цэнхэр металл (дээрээс доош) ба алтан тугалга — туяа өнгөрөхөд гялалзана */
-    .home-title .w>span{background-image:var(--beam),linear-gradient(180deg,#3a63e0 0%,#2446b4 38%,#1f3c8f 62%,#152b6c 100%);
-      animation:ht-beam 6s cubic-bezier(.45,0,.35,1) calc(2s + var(--d,0s)) infinite}
-    .home-title .w:nth-child(4)>span{background-image:var(--beam),linear-gradient(180deg,#ffe08a 0%,#f6b84a 34%,#eaa02e 58%,#c47208 100%)}
-    .shine{background-image:var(--beam),linear-gradient(currentColor,currentColor);animation:ht-beam 8s cubic-bezier(.45,0,.35,1) 2.6s infinite}
+    .home-title .w>span,.shine{background-repeat:no-repeat;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    /* Гүн цэнхэр металл ба алтан тугалга (дээрээс доош) */
+    .home-title .w>span{background-image:linear-gradient(180deg,#3a63e0 0%,#2446b4 38%,#1f3c8f 62%,#152b6c 100%)}
+    .home-title .w:nth-child(4)>span{background-image:linear-gradient(180deg,#ffe08a 0%,#f6b84a 34%,#eaa02e 58%,#c47208 100%)}
+    .shine{background-image:linear-gradient(100deg,transparent 0 38%,rgba(255,255,255,.35) 43%,rgba(255,255,255,.95) 48.5%,#fff 50%,rgba(255,255,255,.95) 51.5%,rgba(255,255,255,.35) 57%,transparent 62% 100%),linear-gradient(currentColor,currentColor);
+      background-size:250% 100%,100% 100%;background-position:var(--bx) 0,0 0;animation:ht-beam 8s cubic-bezier(.45,0,.35,1) 2.6s infinite}
     .eyebrow.shine{animation-duration:7s;animation-delay:1.2s}
     @keyframes ht-beam{0%,55%{--bx:130%}85%,100%{--bx:-30%}}
     /* Орох: бүдэг, доор → тод, байрандаа */
     .home-title.split .w>span{filter:blur(14px);opacity:0;transition:transform 1.05s var(--ease),filter 1.1s var(--ease),opacity .9s var(--ease);transition-delay:calc(var(--i)*95ms + 120ms)}
     .home-title.split.in .w>span{filter:none;opacity:1}
-    /* Туяаг дагах гэрэлтэлт (текстийн ард) */
-    .ht-glow{position:absolute;z-index:-1;top:-30%;bottom:-30%;left:0;width:38%;pointer-events:none;border-radius:50%;
-      background:radial-gradient(closest-side,rgba(110,150,255,.5),rgba(234,160,46,.16) 60%,transparent);filter:blur(22px);
-      opacity:0;transform:translateX(-110%);animation:ht-glow 6s cubic-bezier(.45,0,.35,1) 2s infinite}
-    @keyframes ht-glow{0%,55%{opacity:0;transform:translateX(-110%)}62%{opacity:1}94%{opacity:.85}100%{opacity:0;transform:translateX(290%)}}
-    /* Од: 4 хошуут, туяа өнгөрөх агшинд томорч эргэлдэн алга болно */
-    .ht-spark{position:absolute;z-index:2;width:var(--s,16px);height:var(--s,16px);margin:calc(var(--s,16px)/-2) 0 0 calc(var(--s,16px)/-2);pointer-events:none;
-      background:radial-gradient(circle,#fff 0 16%,#ffe9b0 38%,#eaa02e 72%);
-      clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%);
-      filter:drop-shadow(0 0 8px rgba(255,200,90,.9));opacity:0;transform:scale(0);animation:ht-spark 6s ease-in-out calc(2s + var(--d,0s)) infinite}
-    .ht-spark.b{background:radial-gradient(circle,#fff 0 18%,#d7e2ff 42%,#3d66e6 75%);filter:drop-shadow(0 0 8px rgba(80,130,255,.9))}
-    @keyframes ht-spark{0%,66%{opacity:0;transform:scale(0) rotate(0deg)}70%{opacity:1;transform:scale(1.3) rotate(45deg)}75%{opacity:.85;transform:scale(.75) rotate(90deg)}81%,100%{opacity:0;transform:scale(0) rotate(135deg)}}
+    /* Үсгүүд дээр энд тэнд гялсхийх жижиг од (heroStars, app.js): гаднах нь гэрэлтэлт, дотор нь 4 хошуут хэлбэр */
+    .home-title{position:relative}
+    .ht-star{position:absolute;z-index:2;left:0;top:0;width:var(--s,18px);height:var(--s,18px);margin:calc(var(--s,18px)/-2) 0 0 calc(var(--s,18px)/-2);pointer-events:none;
+      filter:drop-shadow(0 0 3px rgba(255,214,120,1)) drop-shadow(0 0 10px rgba(234,160,46,.75));opacity:0;transform:scale(0)}
+    .ht-star svg{display:block;width:100%;height:100%;overflow:visible}
+    .ht-star.b{filter:drop-shadow(0 0 3px rgba(190,210,255,1)) drop-shadow(0 0 10px rgba(61,102,230,.7))}
+    .ht-star.go{animation:ht-twinkle 1.3s ease-in-out var(--dl,0s) both}
+    @keyframes ht-twinkle{0%{opacity:0;transform:scale(0) rotate(0deg)}40%{opacity:1;transform:scale(1.15) rotate(40deg)}62%{opacity:.9;transform:scale(.8) rotate(70deg)}100%{opacity:0;transform:scale(0) rotate(110deg)}}
   }
 }

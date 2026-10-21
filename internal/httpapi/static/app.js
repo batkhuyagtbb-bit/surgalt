@@ -60,25 +60,33 @@ const store = {
   set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
-// Нүүрний гарчиг: гэрлийн туяа үгнээс үг рүү (байрлалаар нь хоцролт --d), ард нь гэрэлтэлт, туяа өнгөрөхөд одод (app.css .ht-*).
-function heroShine() {
-  const h = $(".home-title"); if (!h || reduce || $(".ht-glow", h)) return;
+// Нүүрний гарчиг: үсгүүд дээр энд тэнд жижиг одод ээлжлэн гялсхийнэ (app.css .ht-star). Байрлалыг гялсхийх агшинд
+// (animationstart) санамсаргүй үгийн дээгүүр сонгоно — үгс орж ирэх хөдөлгөөн дууссаны дараах байрлалаар.
+function heroStars() {
+  const h = $(".home-title"); if (!h || reduce || $(".ht-star", h)) return;
   const words = $$(".w > span", h); if (!words.length) return;
-  const CROSS = 1.1; // туяа гарчгийг нэвт гарах хугацаа (сек)
-  const glow = document.createElement("span"); glow.className = "ht-glow"; glow.setAttribute("aria-hidden", "true"); h.append(glow); // төгсгөлд: үгсийн :nth-child (өнгө) шилжихгүй
-  Array.from({ length: 7 }, (_, k) => {
-    const sp = document.createElement("span"); sp.className = "ht-spark" + (k % 3 === 1 ? " b" : ""); sp.setAttribute("aria-hidden", "true");
-    const x = Math.min(.97, Math.max(.03, (k + .5) / 7 + (Math.random() - .5) * .08)); // хэвтээ байрлал тогтмол — туяатай таарна
-    sp.style.left = (x * 100).toFixed(1) + "%"; sp.style.setProperty("--d", (x * CROSS).toFixed(3) + "s");
-    const move = () => { sp.style.top = (10 + Math.random() * 80).toFixed(1) + "%"; sp.style.setProperty("--s", (10 + Math.random() * 14).toFixed(0) + "px"); };
-    move(); sp.addEventListener("animationiteration", move); h.append(sp);
-  });
-  const layout = () => {
-    const hr = h.getBoundingClientRect(); if (!hr.width) return;
-    for (const w of words) { const r = w.parentElement.getBoundingClientRect(); w.style.setProperty("--d", (((r.left + r.width / 2 - hr.left) / hr.width) * CROSS).toFixed(3) + "s"); }
+  const place = (st) => {
+    const hr = h.getBoundingClientRect(), w = words[Math.floor(Math.random() * words.length)].getBoundingClientRect();
+    if (!hr.width || !w.width) return;
+    st.style.left = (w.left - hr.left + w.width * (0.08 + Math.random() * 0.84)).toFixed(1) + "px";
+    st.style.top = (w.top - hr.top + w.height * (0.12 + Math.random() * 0.62)).toFixed(1) + "px";
+    st.style.setProperty("--s", (14 + Math.random() * 14).toFixed(0) + "px");
+    const blue = Math.random() < 0.3; st.classList.toggle("b", blue);
+    st.querySelector("path").setAttribute("fill", blue ? "url(#htStarB)" : "url(#htStarG)");
   };
-  layout();
-  let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(layout, 200); }, { passive: true });
+  const run = (st, first) => {
+    st.classList.remove("go"); void st.offsetWidth;
+    st.style.setProperty("--dl", ((first ? 1.8 : 0.3) + Math.random() * 2.4).toFixed(2) + "s");
+    st.classList.add("go");
+  };
+  // Нэг удаа: алтан ба цэнхэр градиент (төв нь цагаан гэрэл)
+  h.insertAdjacentHTML("beforeend", `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><radialGradient id="htStarG"><stop offset="0" stop-color="#fff"/><stop offset=".28" stop-color="#fff3cc"/><stop offset=".62" stop-color="#ffc24a"/><stop offset="1" stop-color="#e08a10"/></radialGradient><radialGradient id="htStarB"><stop offset="0" stop-color="#fff"/><stop offset=".3" stop-color="#e6edff"/><stop offset=".65" stop-color="#7d9cff"/><stop offset="1" stop-color="#3557d6"/></radialGradient></defs></svg>`);
+  for (let k = 0; k < 4; k++) {
+    const st = document.createElement("span"); st.className = "ht-star"; st.setAttribute("aria-hidden", "true");
+    st.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 0C12.9 7.6 16.4 11.1 24 12 16.4 12.9 12.9 16.4 12 24 11.1 16.4 7.6 12.9 0 12 7.6 11.1 11.1 7.6 12 0Z" fill="url(#htStarG)"/></svg>`;
+    st.addEventListener("animationstart", () => place(st)); st.addEventListener("animationend", () => run(st));
+    h.append(st); run(st, true); // төгсгөлд нэмнэ: үгсийн :nth-child (өнгө) шилжихгүй
+  }
 }
 
 // Сайтын хандалт (хянагчийн самбарын өдөр/7 хоног/сарын статистик): хуудас бүр нэг удаа, хөтчийн санамсаргүй ID-гаар.
@@ -4573,7 +4581,7 @@ if (new URLSearchParams(location.search).has("deleted")) { // бүртгэлээ
 if (page === "reset") resetPage();
 animateIcons();
 siteHit();
-if (page === "home" && !document.documentElement.classList.contains("authed")) heroShine();
+if (page === "home" && !document.documentElement.classList.contains("authed")) heroStars();
 // 3D дэвсгэр (Three.js): нүүрэнд зөвхөн зочинд, нэвтрэх хуудсанд — хуудас ачаалагдсаны дараа сул үед.
 if ((page === "home" && !document.documentElement.classList.contains("authed")) || page === "login") {
   (window.requestIdleCallback || ((f) => setTimeout(f, 400)))(() => {
