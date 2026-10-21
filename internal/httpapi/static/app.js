@@ -218,7 +218,8 @@ const Live = {
     try { this.ws?.close(); } catch {}
     const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/chat/ws?token=" + encodeURIComponent(token));
     this.ws = ws;
-    ws.onopen = () => { this.tries = 0; };
+    // Тасраад дахин холбогдвол тасарсан хугацаанд ирсэн мессежийг сонсогчид дахин татна.
+    ws.onopen = () => { this.tries = 0; if (this.opened) this.handlers.forEach((h) => h({ type: "reconnected" })); this.opened = true; };
     ws.onmessage = (e) => { let d; try { d = JSON.parse(e.data); } catch { return; } this.handlers.forEach((h) => h(d)); };
     ws.onclose = () => {
       if (this.ws !== ws) return;
@@ -228,6 +229,8 @@ const Live = {
     };
   },
 };
+// Утас унтраад сэрэхэд холболт дуугүй тасарсан байж болно — табыг харах мөчид шалгаж дахин холбогдоно.
+document.addEventListener("visibilitychange", () => { if (!document.hidden && Live.token && (!Live.ws || Live.ws.readyState > 1)) { Live.ws = null; Live.tries = 0; Live.connect(Live.token); } });
 
 /* ---------- Чатын самбар: нэвтэрсэн хүн бүрт баруун талд байнга ----------
    Багш: суралцагчид, зочид, бүлгүүд. Суралцагч: багш нартайгаа хийсэн яриа, элссэн сургалтын бүлгүүд.
@@ -269,9 +272,12 @@ function chatRail() {
   document.body.insertAdjacentHTML("beforeend", `<button class="rail-tab" id="railTab" aria-label="Чат нээх" title="Чат нээх"><span class="rail-tab-ico">${I.chat}<i class="rail-tab-dot"></i></span><span class="rail-tab-txt">Чат</span><span class="bell-badge" id="railTabBadge" hidden></span></button>`);
   const setCollapsed = (c) => { document.documentElement.classList.toggle("rail-collapsed", c); try { localStorage.setItem("sg_rail_collapsed", c ? "1" : "0"); } catch {} };
   try { if (localStorage.getItem("sg_rail_collapsed") === "1") setCollapsed(true); } catch {}
+  // Нээлттэй яриа, самбарын төлөвийг тухайн табд хадгална: refresh хийхэд яг тэр яриа дахин нээгдэнэ.
+  const ss = { get: (k) => { try { return sessionStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch {} } };
   const setRail = (open) => {
     if (wide()) { setCollapsed(!open); }
     document.body.classList.toggle("rail-open", open && !wide()); $("#railToggle").setAttribute("aria-expanded", String(open));
+    ss.set("sg_rail_open", open ? "1" : null);
   };
   const badge = () => { let n = 0; unread.forEach((v) => (n += v)); for (const id of ["railBadge", "railTabBadge"]) { const b = $("#" + id); if (b) { b.hidden = !n; b.textContent = n > 99 ? "99+" : n; } } document.documentElement.classList.toggle("rail-has-unread", n > 0); };
   $("#railToggle").onclick = () => setRail(wide() ? document.documentElement.classList.contains("rail-collapsed") : !document.body.classList.contains("rail-open"));
@@ -352,20 +358,26 @@ function chatRail() {
   });
   const th = new ChatThread({ ol: msgs, body, form, token: () => Auth.token, convId: () => cur, role: () => myRole, group: () => curGroup });
   const append = (m) => th.append(m);
-  const open = async (id) => {
-    cur = id; unread.delete(id); badge(); setRail(true); draw();
+  // show=false: самбарын нээлттэй/хумьсан төлөвийг өөрчлөхгүй (refresh-ийн дараа сэргээх, дахин холбогдох).
+  const open = async (id, show = true) => {
+    const same = cur === id && !thread.hidden;
+    cur = id; unread.delete(id); badge(); if (show) setRail(true); draw();
+    ss.set("sg_rail_conv", id);
     home.hidden = true; thread.hidden = false;
-    $("#railWho").innerHTML = `<span class="muted small">Ачаалж байна…</span>`; msgs.innerHTML = "";
+    if (!same) { $("#railWho").innerHTML = `<span class="muted small">Ачаалж байна…</span>`; msgs.innerHTML = ""; }
     try {
       const d = await api(`/api/chat/${id}/messages`);
       if (cur !== id) return;
       const c = d.conversation; curGroup = c.kind === "group" || c.kind === "team"; myRole = d.me;
       const known = convs.find((x) => x.id === id);
       $("#railWho").innerHTML = `<strong>${esc(known?.title || c.visitor_name)}</strong><small class="muted">${c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин")}</small>`;
-      th.set(d); form.body.focus();
-    } catch (e) { $("#railWho").innerHTML = `<span class="form-error" style="margin:0">${esc(e.message)}</span>`; }
+      th.set(d); if (show) form.body.focus();
+    } catch (e) {
+      if (!show && e.status >= 400 && e.status < 500) { ss.set("sg_rail_conv", null); cur = null; thread.hidden = true; home.hidden = false; draw(); return; } // хадгалсан яриа байхгүй болсон
+      $("#railWho").innerHTML = `<span class="form-error" style="margin:0">${esc(e.message)}</span>`;
+    }
   };
-  $("#railBack").onclick = () => { cur = null; thread.hidden = true; home.hidden = false; draw(); };
+  $("#railBack").onclick = () => { cur = null; ss.set("sg_rail_conv", null); thread.hidden = true; home.hidden = false; draw(); };
   $("#railSearch").addEventListener("input", draw);
   $("#railList").addEventListener("click", (e) => { const p = e.target.closest("[data-person]"); if (p) return startWith(p.dataset.person); const it = e.target.closest(".rail-item"); if (it) open(it.dataset.id); });
   form.addEventListener("click", async (e) => {
@@ -374,6 +386,7 @@ function chatRail() {
     catch (x) { toast(x.message, true); }
   });
   Live.on((d) => {
+    if (d.type === "reconnected") { if (cur) open(cur, false); load(); return; } // тасарсан хугацааны мессежүүд
     if (THREAD_EVENTS.includes(d.type)) { th.event(d); return; }
     if (d.type !== "message") return;
     const m = d.message;
@@ -382,7 +395,10 @@ function chatRail() {
     clearTimeout(timer); timer = setTimeout(load, 400);
   });
   Live.connect(Auth.token);
-  loadPeople().then(load);
+  // Refresh-ийн өмнө нээлттэй байсан яриаг (жагсаалт ачаалсны дараа — гарчиг зөв нэртэй) сэргээнэ;
+  // нарийн дэлгэцэд самбар нээлттэй байсан бол шууд нээнэ.
+  if (ss.get("sg_rail_open") === "1" && !wide()) setRail(true);
+  loadPeople().then(load).then(() => { const saved = ss.get("sg_rail_conv"); if (saved && !cur) open(saved, false); });
   window.openRailChat = (id) => (id ? open(id) : setRail(true));
   // Сургалтын хуудасны товчнууд: нэвтэрсэн хүнд яриа энэ самбарт нээгдэнэ.
   window.railStartDirect = async (username) => { const d = await api(`/api/teachers/${username}/chat`, { method: "POST" }); await load(); open(d.conversation.id); };
