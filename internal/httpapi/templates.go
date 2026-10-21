@@ -112,6 +112,8 @@ var iconPaths = map[string]string{
 	"clock":   `<circle cx="12" cy="12" r="8.500"/><path d="M12 7.500V12l3 2"/>`,
 	"card":    `<rect x="2.500" y="5" width="19" height="14" rx="2"/><path d="M2.500 10h19M6.500 15h4"/>`,
 	"shield":  `<path d="M12 3 4.500 6v5.500c0 4.600 3.200 8.300 7.500 9.500 4.300-1.200 7.500-4.900 7.500-9.500V6L12 3Z"/><path d="m9 12 2 2 4-4"/>`,
+	"chart":   `<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>`,
+	"money":   `<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 9v.01M17 15v.01"/>`,
 }
 
 // icon нь загварт <svg> оруулна. Нэр нь кодод тогтмол бичигддэг тул HTML аюулгүй.

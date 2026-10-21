@@ -4073,3 +4073,22 @@ ol.thread .msg-day{letter-spacing:.03em}
     @keyframes ht-twinkle{0%{opacity:0;transform:scale(0) rotate(0deg)}40%{opacity:1;transform:scale(1.15) rotate(40deg)}62%{opacity:.9;transform:scale(.8) rotate(70deg)}100%{opacity:0;transform:scale(0) rotate(110deg)}}
   }
 }
+/* ===== Нүүр (зочин): дэд тайлбар, итгэлцлийн мөр, хөл ===== */
+.home-sub{margin:0 auto;max-width:46ch;color:var(--muted);font-size:.98rem;line-height:1.55}
+.home-trust{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 18px;margin:6px 0 0;padding:0;list-style:none;font-size:.88rem;font-weight:700;color:var(--text-2)}
+.home-trust li{display:inline-flex;align-items:center;gap:6px}
+.home-trust svg{color:var(--teal)}
+@media (min-width:1024px){.home-hero .home-sub{margin:0}.home-hero .home-trust{justify-content:flex-start}}
+.landing>section{scroll-margin-top:72px}
+/* Хөл */
+.footer.footer-x{display:grid;grid-template-columns:minmax(0,2fr) repeat(2,minmax(0,1fr));gap:28px 32px;padding:40px clamp(16px,5vw,64px) 28px;font-size:.9rem}
+.fx-brand{display:grid;align-content:start;gap:8px}
+.fx-brand p{margin:0;max-width:34ch;line-height:1.5}
+.fx-brand a:not(.fx-logo){color:var(--brand);font-weight:700}
+.fx-logo{font:800 1.3rem/1 var(--sans);letter-spacing:-.03em;color:var(--brand)}
+.fx-logo b{color:var(--accent)}
+.fx-col{display:grid;align-content:start;gap:8px}
+.fx-col b{margin-bottom:4px;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text-2)}
+.fx-col a{color:var(--muted);font-weight:600}
+.fx-copy{grid-column:1/-1;margin:8px 0 0;padding-top:18px;border-top:1px solid var(--line);font-size:.82rem}
+@media (max-width:760px){.footer.footer-x{grid-template-columns:repeat(2,minmax(0,1fr))}.fx-brand{grid-column:1/-1}}
