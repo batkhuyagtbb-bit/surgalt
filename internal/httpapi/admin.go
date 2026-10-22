@@ -617,6 +617,7 @@ type teacherRow struct {
 	Students     int        `json:"students"`
 	Sales        int        `json:"sales"`
 	Revenue      int64      `json:"revenue"`
+	Commission   int64      `json:"commission"` // платформын шимтгэл (TEACHER_COMMISSION_PERCENT)
 	PaidOut      int64      `json:"paid_out"`
 	Pending      int64      `json:"pending"`
 	Available    int64      `json:"available"`
@@ -684,7 +685,8 @@ func (s *Server) teacherRows(sn *adminSnap) map[string]*teacherRow {
 		}
 	}
 	for _, t := range rows {
-		t.Available = max(0, t.Revenue-t.PaidOut-t.Pending)
+		t.Commission = store.Commission(t.Revenue)
+		t.Available = max(0, t.Revenue-t.Commission-t.PaidOut-t.Pending)
 	}
 	return rows
 }
@@ -1088,16 +1090,17 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().In(time.Local)
 	first := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local).AddDate(0, -(months - 1), 0)
 	type monthRow struct {
-		Month    string `json:"month"`
-		Sales    int64  `json:"sales"`
-		Storage  int64  `json:"storage"`
-		Fees     int64  `json:"fees"`
-		Income   int64  `json:"income"`
-		Payouts  int64  `json:"payouts"`
-		Expenses int64  `json:"expenses"`
-		Outgo    int64  `json:"outgo"`
-		Net      int64  `json:"net"`
-		Orders   int    `json:"orders"`
+		Month      string `json:"month"`
+		Sales      int64  `json:"sales"`
+		Storage    int64  `json:"storage"`
+		Fees       int64  `json:"fees"`
+		Commission int64  `json:"commission"`
+		Income     int64  `json:"income"`
+		Payouts    int64  `json:"payouts"`
+		Expenses   int64  `json:"expenses"`
+		Outgo      int64  `json:"outgo"`
+		Net        int64  `json:"net"`
+		Orders     int    `json:"orders"`
 	}
 	idx := map[string]int{}
 	rows := make([]monthRow, months)
@@ -1106,7 +1109,7 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 		rows[i].Month, idx[k] = k, i
 	}
 	type totals struct {
-		Sales, Storage, Fees, Income, Payouts, Pending, Expenses, Outgo, Net int64
+		Sales, Storage, Fees, Commission, Income, Payouts, Pending, Expenses, Outgo, Net int64
 	}
 	var all, rng totals
 	for i := range sn.orders {
@@ -1166,27 +1169,29 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 	}
 	for i := range rows {
 		m := &rows[i]
+		m.Commission = store.Commission(m.Sales)
 		m.Outgo = m.Payouts + m.Expenses
 		m.Net = m.Income - m.Outgo
 	}
 	for _, t := range []*totals{&all, &rng} {
+		t.Commission = store.Commission(t.Sales)
 		t.Outgo = t.Payouts + t.Expenses
 		t.Net = t.Income - t.Outgo
 	}
 	j := func(t totals) map[string]int64 {
-		return map[string]int64{"sales": t.Sales, "storage": t.Storage, "fees": t.Fees, "income": t.Income, "payouts": t.Payouts, "pending": t.Pending,
+		return map[string]int64{"sales": t.Sales, "storage": t.Storage, "fees": t.Fees, "commission": t.Commission, "income": t.Income, "payouts": t.Payouts, "pending": t.Pending,
 			"expenses": t.Expenses, "outgo": t.Outgo, "net": t.Net}
 	}
 	allJ := j(all)
-	allJ["owed"] = max(0, all.Sales-all.Payouts)           // багшид шилжүүлээгүй үлдэгдэл (хүлээгдэж буй хүсэлт орно)
-	allJ["profit"] = all.Storage + all.Fees - all.Expenses // платформын өөрийн ашиг (багтаамж + үйлчилгээний хураамж − зардал)
-	allJ["cash"] = all.Income - all.Payouts - all.Expenses // данс дахь мөнгө (онолын)
+	allJ["owed"] = max(0, all.Sales-all.Commission-all.Payouts)             // багшид шилжүүлээгүй үлдэгдэл (хүлээгдэж буй хүсэлт орно)
+	allJ["profit"] = all.Storage + all.Fees + all.Commission - all.Expenses // платформын ашиг: багтаамж + хураамж + шимтгэл − зардал
+	allJ["cash"] = all.Income - all.Payouts - all.Expenses                  // данс дахь мөнгө (онолын)
 	cats := []map[string]any{}
 	for k, v := range byCat {
 		cats = append(cats, map[string]any{"category": k, "total": v})
 	}
 	sort.Slice(cats, func(i, j int) bool { return cats[i]["total"].(int64) > cats[j]["total"].(int64) })
-	writeJSON(w, http.StatusOK, map[string]any{"months": rows, "range": j(rng), "all": allJ, "expenses": exps, "by_category": cats,
+	writeJSON(w, http.StatusOK, map[string]any{"months": rows, "range": j(rng), "all": allJ, "commission_pct": store.TeacherCommission(), "expenses": exps, "by_category": cats,
 		"categories": expenseCategories})
 }
 

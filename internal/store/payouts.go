@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"math"
 	"time"
 )
 
@@ -51,12 +52,33 @@ type Payout struct {
 	ProcessedBy string     `json:"processed_by,omitempty"`
 }
 
+// teacherCommission — багшийн борлуулалтаас платформын авах шимтгэл (%). main.go эхлэхэд тохируулна (анхдагч 0).
+var teacherCommission float64
+
+// SetTeacherCommission — шимтгэлийн хувийг (0–100) тохируулна; сервер эхлэхэд нэг удаа.
+func SetTeacherCommission(pct float64) { teacherCommission = math.Min(100, math.Max(0, pct)) }
+
+// TeacherCommission — одоогийн шимтгэлийн хувь.
+func TeacherCommission() float64 { return teacherCommission }
+
+// Commission — борлуулалтын дүнгээс авах платформын шимтгэл (бүхэл төгрөг рүү тоймлоно).
+func Commission(gross int64) int64 {
+	if teacherCommission <= 0 || gross <= 0 {
+		return 0
+	}
+	return int64(math.Round(float64(gross) * teacherCommission / 100))
+}
+
 // Balance — багшийн орлогын үлдэгдэл.
 type Balance struct {
-	Earned    int64 `json:"earned"`    // нийт төлөгдсөн борлуулалт
-	Paid      int64 `json:"paid"`      // данс руу шилжүүлсэн
-	Pending   int64 `json:"pending"`   // шилжүүлэхийг хүлээж буй
-	Available int64 `json:"available"` // одоо татах боломжтой
+	Earned int64 `json:"earned"` // нийт төлөгдсөн борлуулалт
+	// Commission — борлуулалтаас платформын шимтгэл (CommissionPct %); Net = Earned − Commission (багшийн цэвэр орлого).
+	Commission    int64   `json:"commission"`
+	CommissionPct float64 `json:"commission_pct"`
+	Net           int64   `json:"net"`
+	Paid          int64   `json:"paid"`      // данс руу шилжүүлсэн
+	Pending       int64   `json:"pending"`   // шилжүүлэхийг хүлээж буй
+	Available     int64   `json:"available"` // одоо татах боломжтой
 }
 
 type PayoutStore interface {
@@ -95,7 +117,9 @@ func balanceOf(orders []Order, payouts []Payout) *Balance {
 			b.Pending += p.Amount
 		}
 	}
-	b.Available = b.Earned - b.Paid - b.Pending
+	b.Commission, b.CommissionPct = Commission(b.Earned), teacherCommission
+	b.Net = b.Earned - b.Commission
+	b.Available = max(0, b.Net-b.Paid-b.Pending) // шимтгэлийг хасаад л татна
 	return b
 }
 

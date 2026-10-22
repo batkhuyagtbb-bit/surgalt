@@ -232,6 +232,9 @@ func run(log *slog.Logger) error {
 		log.Info("хянагчийн самбар: нууц үгээр нэвтрэх идэвхтэй", "hidden_path", adminPath != "")
 	}
 
+	// Багшийн борлуулалтаас платформын шимтгэл (%): «Татах боломжтой» дүнгээс хасагдана.
+	store.SetTeacherCommission(envFloat("TEACHER_COMMISSION_PERCENT", 21))
+
 	hub := chat.NewHub()
 	tokens := auth.NewSigner(secret, 7*24*time.Hour)
 	srv := httpapi.New(httpapi.Config{

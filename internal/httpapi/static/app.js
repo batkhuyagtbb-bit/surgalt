@@ -357,7 +357,7 @@ function chatRail() {
       list.forEach((c) => out.set(c.id, { id: c.id, kind: c.kind || "", title: c.visitor_name, sub: c.kind === "group" ? "Бүлэг · сургалтын суралцагчид" : c.user_id ? "Суралцагч" : "Зочин", last: c.last_message, at: c.last_message_at }));
     }
     const h = await api("/api/me/home").catch(() => null);
-    (h?.chats || []).forEach((c) => { if (!out.has(c.id)) out.set(c.id, { id: c.id, kind: c.kind || "", title: c.kind === "group" || c.kind === "team" ? c.title : c.teacher?.display_name || "", sub: c.kind === "group" ? "Бүлэг · " + (c.teacher?.display_name || "") : c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : "Багш", user: c.kind === "team" ? null : c.teacher, last: c.last_message, at: c.last_message_at }); });
+    (h?.chats || []).forEach((c) => { if (!out.has(c.id)) out.set(c.id, { id: c.id, kind: c.kind || "", title: c.kind === "group" || c.kind === "team" ? c.title : c.teacher?.display_name || "", sub: c.kind === "group" ? "Бүлэг · " + (c.teacher?.display_name || "") : c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : "Багш", user: c.kind === "team" ? null : c.teacher, course: c.course_id || "", last: c.last_message, at: c.last_message_at }); });
     return [...out.values()].sort((a, b) => new Date(b.at) - new Date(a.at));
   };
   // Хүмүүс: багшид — суралцагчид нь, суралцагчид — багш нар нь (яриа эхлээгүй байсан ч нэг дарж эхэлнэ).
@@ -427,7 +427,11 @@ function chatRail() {
     const known = convs.find((x) => x.id === c.id), name = known?.title || c.visitor_name || "?";
     const av = c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group ${c.kind}">${c.kind === "team" ? I.people : I.group}</span>`
       : known?.user ? avatarHTML(known.user, "avatar-sm") : `<span class="avatar avatar-sm" style="--h:${hueOfName(name)}">${esc(name.slice(0, 1).toUpperCase())}</span>`;
-    return `<span class="rw-av">${av}</span><span class="rw-txt"><strong>${esc(name)}</strong><small class="muted">${c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин")}</small></span>`;
+    // Чатлаж буй багш дээр дарвал профайл руу, сургалтын бүлэг дээр дарвал сургалт руу (суралцагч, ангийн найз — нээлттэй профайлгүй).
+    const course = known?.course || c.course_id || "";
+    const href = c.kind === "group" && course ? `/c/${encodeURIComponent(course)}` : !teacher && !c.kind && known?.user?.username ? `/t/${encodeURIComponent(known.user.username)}` : "";
+    const body = `<span class="rw-av">${av}</span><span class="rw-txt"><strong>${esc(name)}</strong><small class="muted">${c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин")}</small></span>`;
+    return href ? `<a class="rw-link" href="${href}" title="${c.kind === "group" ? "Сургалт руу очих" : "Багшийн профайл руу очих"}">${body}</a>` : body;
   };
   // show=false: самбарын нээлттэй/хумьсан төлөвийг өөрчлөхгүй (refresh-ийн дараа сэргээх, дахин холбогдох).
   const open = async (id, show = true) => {

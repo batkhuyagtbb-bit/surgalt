@@ -244,7 +244,7 @@ VIEWS.teachers = {
       ${kpi("Агуулга", num(sum("courses")) + " <small>сургалт</small>", `${num(sum("lessons"))} хичээл · ${num(sum("books"))} ном · ${num(sum("files"))} файл`)}
       ${kpi("Нийт борлуулалт", tg(sum("revenue")), `${num(sum("sales"))} гүйлгээ`, "good")}
       ${kpi("Татсан (шилжүүлсэн)", tg(sum("paid_out")), `хүлээгдэж буй ${tg(sum("pending"))}`)}
-      ${kpi("Багшийн үлдэгдэл", tg(sum("available")), "одоо татах боломжтой")}
+      ${kpi("Багшийн үлдэгдэл", tg(sum("available")), `шимтгэл ${tg(sum("commission"))} хассан, татах боломжтой`)}
     </section>
     <div class="adm-table-wrap"><table class="adm-table" id="tTable"><thead><tr>
       <th data-sort="name" data-type="text">Багш</th><th data-sort="courses">Сургалт</th><th data-sort="lessons">Хичээл</th><th data-sort="books">Ном</th>
@@ -297,7 +297,8 @@ async function openTeacher(id) {
       ${kpi("Борлуулалт", tg(t.revenue), `${num(t.sales)} удаа`, "good")}
       ${kpi("Татсан", tg(t.paid_out), "данс руу шилжүүлсэн")}
       ${kpi("Хүлээгдэж буй", tg(t.pending), "татах хүсэлт", t.pending ? "warn" : "")}
-      ${kpi("Үлдэгдэл", tg(t.available), "татаж болох")}
+      ${kpi("Платформын шимтгэл", tg(t.commission), "борлуулалтаас")}
+      ${kpi("Үлдэгдэл", tg(t.available), "шимтгэл хассан, татаж болох")}
       ${kpi("Суралцагч", num(t.students), `${num(t.profile_views)} профайл үзэлт`)}
       ${kpi("Агуулга", `${num(t.courses)} <small>сургалт</small>`, `${num(t.lessons)} хичээл · ${num(t.books)} ном · ${num(t.files)} файл (${bytes(t.file_bytes)})`)}
     </section>
@@ -436,15 +437,15 @@ VIEWS.finance = {
       ${kpi("Орлого", tg(R.income), `борлуулалт ${tg(R.sales)} · багтаамж ${tg(R.storage)} · хураамж ${tg(R.fees)}`, "good")}
       ${kpi("Зарлага", tg(R.outgo), `багшид ${tg(R.payouts)} · зардал ${tg(R.expenses)}`, "bad")}
       ${kpi("Цэвэр", tg(R.net), `сүүлийн ${state.months} сард`, R.net < 0 ? "bad" : "")}
-      ${kpi("Багшид өгөх үлдэгдэл", tg(A.owed), `үүнээс хүсэлт гаргасан ${tg(A.pending)}`, A.pending ? "warn" : "")}
-      ${kpi("Платформын ашиг", tg(A.profit), "багтаамж + хураамж − зардал (бүх хугацаа)")}
+      ${kpi("Багшид өгөх үлдэгдэл", tg(A.owed), `шимтгэл ${d.commission_pct}% хассан · хүсэлт гаргасан ${tg(A.pending)}`, A.pending ? "warn" : "")}
+      ${kpi("Платформын ашиг", tg(A.profit), `шимтгэл ${tg(A.commission)} + хураамж ${tg(A.fees)} + багтаамж − зардал`)}
       ${kpi("Данс дахь мөнгө", tg(A.cash), "нийт орлого − шилжүүлсэн − зардал")}
     </section>
     <section class="adm-card"><header><h3>Сар бүрийн орлого ба зарлага</h3><span class="lg"><i class="brand"></i>Орлого <i class="coral"></i>Зарлага</span></header>
       ${chart2(d.months, { a: "income", b: "outgo", label: (m) => MONTHS[+m.month.slice(5) - 1].replace("-р сар", "") })}</section>
-    <div class="adm-table-wrap"><table class="adm-table"><thead><tr><th>Сар</th><th>Борлуулалт</th><th>Багтаамж</th><th>Хураамж</th><th>Нийт орлого</th><th>Багшид шилжүүлсэн</th><th>Зардал</th><th>Нийт зарлага</th><th>Цэвэр</th></tr></thead><tbody>
-      ${[...d.months].reverse().map((m) => `<tr><td>${monthName(m.month)}<small>${num(m.orders)} гүйлгээ</small></td><td class="n">${tg(m.sales)}</td><td class="n">${tg(m.storage)}</td><td class="n">${tg(m.fees)}</td><td class="n"><b>${tg(m.income)}</b></td><td class="n">${tg(m.payouts)}</td><td class="n">${tg(m.expenses)}</td><td class="n">${tg(m.outgo)}</td><td class="n ${m.net < 0 ? "bad" : "good"}"><b>${tg(m.net)}</b></td></tr>`).join("")}
-      <tr class="tot"><td>Нийт</td><td class="n">${tg(R.sales)}</td><td class="n">${tg(R.storage)}</td><td class="n">${tg(R.fees)}</td><td class="n">${tg(R.income)}</td><td class="n">${tg(R.payouts)}</td><td class="n">${tg(R.expenses)}</td><td class="n">${tg(R.outgo)}</td><td class="n">${tg(R.net)}</td></tr>
+    <div class="adm-table-wrap"><table class="adm-table"><thead><tr><th>Сар</th><th>Борлуулалт</th><th>Шимтгэл</th><th>Багтаамж</th><th>Хураамж</th><th>Нийт орлого</th><th>Багшид шилжүүлсэн</th><th>Зардал</th><th>Нийт зарлага</th><th>Цэвэр</th></tr></thead><tbody>
+      ${[...d.months].reverse().map((m) => `<tr><td>${monthName(m.month)}<small>${num(m.orders)} гүйлгээ</small></td><td class="n">${tg(m.sales)}</td><td class="n">${tg(m.commission)}</td><td class="n">${tg(m.storage)}</td><td class="n">${tg(m.fees)}</td><td class="n"><b>${tg(m.income)}</b></td><td class="n">${tg(m.payouts)}</td><td class="n">${tg(m.expenses)}</td><td class="n">${tg(m.outgo)}</td><td class="n ${m.net < 0 ? "bad" : "good"}"><b>${tg(m.net)}</b></td></tr>`).join("")}
+      <tr class="tot"><td>Нийт</td><td class="n">${tg(R.sales)}</td><td class="n">${tg(R.commission)}</td><td class="n">${tg(R.storage)}</td><td class="n">${tg(R.fees)}</td><td class="n">${tg(R.income)}</td><td class="n">${tg(R.payouts)}</td><td class="n">${tg(R.expenses)}</td><td class="n">${tg(R.outgo)}</td><td class="n">${tg(R.net)}</td></tr>
     </tbody></table></div>
     <div class="adm-grid2 fin">
       <section class="adm-card"><header><h3>Зардал бүртгэх</h3></header>

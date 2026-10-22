@@ -2368,11 +2368,12 @@ async function wallet() {
   const bankOf = (k) => pay.banks.find((x) => x.key === k)?.name || k;
   const kpi = (ic, label, value, sub, cls = "") => `<div class="anx-kpi ${cls}"><span class="anx-ic">${ico(ic, 18)}</span><small>${label}</small><b>${short(value)}</b><div class="anx-sub">${sub}</div></div>`;
   const sch = a?.schedule || "manual";
+  const tg0 = (n) => (n ? money(n) : "0₮");
   const canDraw = a && b.available >= min;
   main.innerHTML = `<div class="wl">
     <div class="anx-kpis">
-      ${kpi("money", "Татах боломжтой", b.available, `доод дүн ${money(min)}`, "wl-avail")}
-      ${kpi("chart", "Нийт орлого", b.earned, "бүх төлөгдсөн борлуулалт")}
+      ${kpi("money", "Татах боломжтой", b.available, `${b.commission ? "шимтгэл хассан · " : ""}доод дүн ${money(min)}`, "wl-avail")}
+      ${kpi("chart", "Нийт борлуулалт", b.earned, b.commission ? `платформын шимтгэл ${b.commission_pct}% · −${tg0(b.commission)}` : "бүх төлөгдсөн борлуулалт")}
       ${kpi("clock", "Хүлээгдэж буй", b.pending, "данс руу шилжихийг хүлээж буй")}
       ${kpi("repeat", "Данс руу шилжсэн", b.paid, "нийт татсан")}
     </div>
@@ -2390,7 +2391,8 @@ async function wallet() {
         </form></section>
 
       <section class="anx-card wl-draw"><div class="anx-card-head"><h3>${ico("money", 18)}Орлого татах</h3></div>
-        <p class="wl-big"><small>Татах боломжтой</small><b>${money(b.available)}</b></p>
+        <p class="wl-big"><small>Татах боломжтой</small><b>${tg0(b.available)}</b></p>
+        ${b.commission ? `<dl class="wl-calc"><div><dt>Нийт борлуулалт</dt><dd>${tg0(b.earned)}</dd></div><div><dt>Платформын шимтгэл (${b.commission_pct}%)</dt><dd>−${tg0(b.commission)}</dd></div><div class="sum"><dt>Цэвэр орлого</dt><dd>${tg0(b.net)}</dd></div>${b.paid ? `<div><dt>Данс руу шилжсэн</dt><dd>−${tg0(b.paid)}</dd></div>` : ""}${b.pending ? `<div><dt>Хүлээгдэж буй</dt><dd>−${tg0(b.pending)}</dd></div>` : ""}<div class="sum"><dt>Татах боломжтой</dt><dd>${tg0(b.available)}</dd></div></dl>` : ""}
         ${a ? `<p class="muted small">${esc(bankOf(a.bank))} · ${esc(a.account_no)} · ${esc(a.account_name)}</p>` : `<p class="muted small">Эхлээд орлого хүлээн авах дансаа холбоно уу.</p>`}
         <form class="wl-drawf" id="wlDraw">
           <input name="amount" type="number" min="${min}" max="${b.available}" step="1" inputmode="numeric" placeholder="${b.available ? `Бүгд: ${b.available}` : "0"}" aria-label="Татах дүн (₮)" ${canDraw ? "" : "disabled"}>
