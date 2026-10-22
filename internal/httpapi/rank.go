@@ -55,6 +55,8 @@ type RankInfo struct {
 	Progress    int         `json:"progress"` // дараагийн цол хүртэлх хувь
 	// Систем өөрөө оношилж өгөх зөвлөмж: юу дутуу байгаа, дараагийн цолд юу хэрэгтэй.
 	Tips []string `json:"tips,omitempty"`
+	// Average — бүх сургалтын нэгдсэн цол: оноо нь сургалт бүрийн онооны дундаж (Integration.CoursesAll сургалтаас).
+	Average bool `json:"average,omitempty"`
 	// itips — интеграцын зөвлөмж (бүх сургалтын цолд сургалтын нэрээр нэгтгэнэ).
 	itips []string
 }
@@ -372,7 +374,8 @@ func integrate(lessons []store.Lesson, progress map[string]store.LessonProgress,
 	return in, tips
 }
 
-// mergeRanks — сургалт бүрийн нэгдсэн цолыг нэгтгэж бүх сургалтын нэг цол гаргана.
+// mergeRanks — сургалт бүрийн цолыг нэгтгэж бүх сургалтын нэг цол гаргана: оноо нь сургалт бүрийн онооны дундаж
+// (олон сургалтад хамрагдсанаар биш, сургалт бүрт хэр сайн суралцсанаар цол ахина). Интеграцын задаргаа нь нийлбэр.
 // titles[i] — courses[i]-ийн нэр (интеграцын зөвлөмжид).
 func mergeRanks(rows []LessonRank, courses []RankInfo, titles []string) RankInfo {
 	var in Integration
@@ -394,8 +397,12 @@ func mergeRanks(rows []LessonRank, courses []RankInfo, titles []string) RankInfo
 			itips = append(itips, t)
 		}
 	}
-	ri := summarizeRank(rows, total)
-	ri.Integration, ri.itips = in, itips
+	avg := 0
+	if len(courses) > 0 {
+		avg = int(math.Round(float64(total) / float64(len(courses))))
+	}
+	ri := summarizeRank(rows, avg)
+	ri.Integration, ri.itips, ri.Average = in, itips, true
 	ri.Tips = append(append([]string{}, itips...), ri.Tips...)
 	return ri
 }
@@ -451,11 +458,11 @@ func diagnose(ranks []LessonRank, ri RankInfo) []string {
 	return out
 }
 
-// autoAward — систем өөрөө цол олгоно: сургалт бүрийн оноог хадгалж, нийлбэр түвшин дээшилбэл
+// autoAward — систем өөрөө цол олгоно: сургалт бүрийн оноог хадгалж, сургалтуудын дундаж оноогоор түвшин дээшилбэл
 // суралцагчид мэдэгдэл илгээж, олгосон түвшинг хадгална. Нэгдсэн (бүх сургалтын) цолыг буцаана.
 // awarded=true бол яг энэ хүсэлтээр шинэ цол олгогдсон (хөтөч баяр хүргэж салют буудуулна).
 func (s *Server) autoAward(ctx context.Context, uid, courseID, link string, coursePts int) (info RankInfo, awarded bool) {
-	total, err := s.store.SaveRankPoints(ctx, uid, courseID, coursePts)
+	total, err := s.store.SaveRankPoints(ctx, uid, courseID, coursePts) // сургалтуудын дундаж оноо
 	if err != nil {
 		return RankFor(coursePts), false
 	}
@@ -465,7 +472,7 @@ func (s *Server) autoAward(ctx context.Context, uid, courseID, link string, cour
 		if err := s.store.SetUserRankLevel(ctx, uid, info.Level); err == nil {
 			awarded = true
 			s.notify(ctx, &store.Notification{UserID: uid, Type: "rank", Title: "🎖 Шинэ цол: " + info.Name,
-				Body: "Баяр хүргэе! Систем таны бүх хичээлийг нэгтгэн идэвхтэй, шударга суралцсан байдлыг үнэлж «" + info.Name + "» цол олголоо (" + itoa(total) + " оноо).", Link: link})
+				Body: "Баяр хүргэе! Систем таны бүх хичээлийг нэгтгэн идэвхтэй, шударга суралцсан байдлыг үнэлж «" + info.Name + "» цол олголоо (сургалтуудын дундаж " + itoa(total) + " оноо).", Link: link})
 		}
 	}
 	return info, awarded

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"strconv"
 	"time"
 
@@ -422,9 +423,14 @@ func (c *ClickHouse) SaveRankPoints(ctx context.Context, userID, courseID string
 	if err := c.insert(ctx, "rank_points", []string{"user_id", "course_id", "points", "ver"}, userID, courseID, int32(points), ver()); err != nil {
 		return 0, err
 	}
+	// Нэгдсэн цол — сургалт бүрийн онооны дундаж (бүхэл рүү тоймлоно).
 	var total int64
-	err := c.query(ctx, "SELECT toInt64(sum(points)) FROM rank_points FINAL WHERE user_id = ?", []any{userID}, func(r driver.Rows) error { return r.Scan(&total) })
-	return int(total), err
+	var n uint64
+	err := c.query(ctx, "SELECT toInt64(sum(points)), count() FROM rank_points FINAL WHERE user_id = ?", []any{userID}, func(r driver.Rows) error { return r.Scan(&total, &n) })
+	if err != nil || n == 0 {
+		return int(total), err
+	}
+	return int(math.Round(float64(total) / float64(n))), nil
 }
 
 func (c *ClickHouse) RankCourseIDs(ctx context.Context, userID string) ([]string, error) {

@@ -3394,9 +3394,9 @@ async function homePage() {
     const tipLine = (t) => { const m = /\(\+(\d+)/.exec(t); return `<li><i>${m ? "+" + m[1] : "✓"}</i><span>${esc(t.replace(/\s*\(\+.*$/, ""))}</span></li>`; };
     parts.push(sec("my-rank", "Миний цол", `<div class="rank-hero">
       <div class="rank-hero-top">${ring}
-        <div class="grow"><span class="eyebrow">Нэгдсэн цол · бүх хичээлээ нэгтгэж систем олгоно</span><strong class="rank-title">${esc(rk.name)}</strong>
+        <div class="grow"><span class="eyebrow">Нэгдсэн цол · ${rk.average && rk.integration?.courses_all > 1 ? `${rk.integration.courses_all} сургалтын цолны дундаж` : "бүх хичээлээ нэгтгэж систем олгоно"}</span><strong class="rank-title">${esc(rk.name)}</strong>
           <p class="rank-cheer">${cheer}</p>
-          <div class="rank-stats"><span><b>${rk.points}</b> оноо</span>${rk.integration?.bonus ? `<span><b>+${rk.integration.bonus}</b> интеграц</span>` : ""}<span><b>${rk.honest}</b> шударга хичээл</span>${rk.integration?.sections_all ? `<span><b>${rk.integration.sections}/${rk.integration.sections_all}</b> бүлэг бүтэн</span>` : ""}${rk.cheated ? `<span class="bad"><b>${rk.cheated}</b> тооцогдоогүй</span>` : ""}${rk.next ? `<span><b>${left}</b> оноо дараагийн цолд</span>` : ""}</div>
+          <div class="rank-stats"><span><b>${rk.points}</b> ${rk.average && rk.integration?.courses_all > 1 ? "дундаж оноо" : "оноо"}</span>${rk.integration?.bonus ? `<span><b>+${rk.integration.bonus}</b> интеграц</span>` : ""}<span><b>${rk.honest}</b> шударга хичээл</span>${rk.integration?.sections_all ? `<span><b>${rk.integration.sections}/${rk.integration.sections_all}</b> бүлэг бүтэн</span>` : ""}${rk.cheated ? `<span class="bad"><b>${rk.cheated}</b> тооцогдоогүй</span>` : ""}${rk.next ? `<span><b>${left}</b> оноо дараагийн цолд</span>` : ""}</div>
           ${rk.next ? `<div class="rank-next"><div class="meter"><i style="width:${rk.progress}%"></i></div><span>${esc(rk.name)} <em>→</em> ${esc(rk.next_name)} <b>${rk.progress}%</b></span></div>` : ""}</div></div>
       ${ladder.length ? `<div class="rank-ladder-wrap"><ol class="rank-ladder">${steps}</ol></div>` : ""}
       <div class="rank-grid">
@@ -3593,6 +3593,7 @@ async function coursePage() {
       rl.hidden = !rk.lessons;
       const tot = a.rank_total && a.rank_total.points > rk.points ? a.rank_total : null;
       const shown = tot || rk;
+      const avg = a.rank_total && a.rank_total.points !== rk.points ? a.rank_total : null; // бүх сургалтын цол (сургалтуудын дундаж)
       // Шинэ цол: сервер дохио өгсөн эсвэл сүүлд харснаас түвшин дээшилсэн бол баяр хүргэж салют буудуулна.
       const lvlKey = "sg_rank_lvl_" + (Auth.user?.id || "u");
       let seen = -1; try { seen = localStorage.getItem(lvlKey) === null ? -1 : +localStorage.getItem(lvlKey); } catch {}
@@ -3604,7 +3605,7 @@ async function coursePage() {
         <span class="cr-pts"><b>${rk.points}</b> оноо</span>
         <span class="cr-sum">Хичээлүүд ${ig.lesson_points ?? rk.points}${ig.bonus ? ` + интеграц ${ig.bonus}` : ""}${ig.sections_all ? ` · ${ig.sections}/${ig.sections_all} бүлэг бүтэн` : ""}${ig.courses ? " · сургалт бүтэн ✓" : ""}${rk.cheated ? ` · <span class="cr-bad">${rk.cheated} хичээл тооцогдоогүй</span>` : ""}</span>
         <span class="meter cr-meter"><i style="width:${rk.progress}%"></i></span>
-        <span class="cr-next">${rk.next ? `Дараагийн «${esc(rk.next_name)}» цол ${rk.next} оноонд` : "Дээд цол"}${tot ? ` · бүх сургалтаар: <b>${esc(tot.name)}</b> ${tot.points} оноо` : ""}</span>
+        <span class="cr-next">${rk.next ? `Дараагийн «${esc(rk.next_name)}» цол ${rk.next} оноонд` : "Дээд цол"}${avg ? ` · бүх сургалтын дундаж: <b>${esc(avg.name)}</b> ${avg.points} оноо` : ""}</span>
         ${rk.tips?.length ? `<ul class="cr-tips">${rk.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}`;
     }
   };

@@ -2830,9 +2830,9 @@ func TestRankIntegration(t *testing.T) {
 	if in := ri.Integration; in.Sections != 1 || in.Courses != 0 || in.Bonus != 10 || ri.Cheated != 1 {
 		t.Fatalf("хуулсан бол интеграц хаагдана: %+v %+v", in, ri)
 	}
-	// Бүх сургалтын цол: сургалтуудын оноо, нэмэлтийг нэгтгэнэ.
+	// Бүх сургалтын цол: оноо нь сургалтуудын дундаж, интеграцын задаргаа нийлбэр.
 	m := mergeRanks(nil, []RankInfo{ri, ri}, []string{"Х", "Ү"})
-	if m.Points != 2*ri.Points || m.Integration.Bonus != 20 || m.Integration.CoursesAll != 2 || m.Name != RankFor(m.Points).Name {
+	if m.Points != ri.Points || !m.Average || m.Integration.Bonus != 20 || m.Integration.CoursesAll != 2 || m.Name != RankFor(m.Points).Name {
 		t.Fatalf("нэгтгэл: %+v", m)
 	}
 }

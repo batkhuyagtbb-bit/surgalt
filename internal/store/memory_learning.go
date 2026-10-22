@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"maps"
+	"math"
 	"slices"
 	"sync"
 	"time"
@@ -105,13 +106,16 @@ func (m *Memory) SaveRankPoints(_ context.Context, userID, courseID string, poin
 		l.rankPts = map[[2]string]int{}
 	}
 	l.rankPts[[2]string{userID, courseID}] = points
-	total := 0
+	total, n := 0, 0 // нэгдсэн цол — сургалт бүрийн онооны дундаж
 	for k, v := range l.rankPts {
 		if k[0] == userID {
-			total += v
+			total, n = total+v, n+1
 		}
 	}
-	return total, nil
+	if n == 0 {
+		return 0, nil
+	}
+	return int(math.Round(float64(total) / float64(n))), nil
 }
 
 func (m *Memory) UserRankLevel(_ context.Context, userID string) (int, error) {
