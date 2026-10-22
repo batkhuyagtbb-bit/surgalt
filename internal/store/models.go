@@ -417,6 +417,8 @@ type Order struct {
 	TeacherID string      `json:"teacher_id,omitempty"`
 	Title     string      `json:"title,omitempty"`
 	Amount    int64       `json:"amount"`
+	// Fee — үнэ дээр нэмж авсан үйлчилгээний хураамж (платформын орлого; багшийн орлогод орохгүй). Төлөгдөх үед бүртгэгдэнэ.
+	Fee       int64       `json:"fee,omitempty"`
 	Status    OrderStatus `json:"status"`
 	CreatedAt time.Time   `json:"created_at"`
 	PaidAt    *time.Time  `json:"paid_at,omitempty"`
@@ -682,7 +684,7 @@ type Store interface {
 	CreateStorageOrder(ctx context.Context, userID string, mb int64, months int, amount int64) (*Order, error)
 	OrderByID(ctx context.Context, id string) (*Order, error)
 	// MarkOrderPaid нь идемпотент: дахин дуудахад алдаагүй, элсэлт/багтаамж давхардахгүй.
-	MarkOrderPaid(ctx context.Context, orderID string, amount int64) (*Order, error)
+	MarkOrderPaid(ctx context.Context, orderID string, amount, fee int64) (*Order, error)
 	// SaveVisit / VisitByID / Visits — хуудасны үзэлт (хугацаа шинэчлэхэд SaveVisit-ээр дахин бичнэ).
 	SaveVisit(ctx context.Context, v *PageVisit) error
 	VisitByID(ctx context.Context, id string) (*PageVisit, error)

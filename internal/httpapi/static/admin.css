@@ -229,3 +229,8 @@ html.adm-noscroll{overflow:hidden}
   .adm-me span{display:none}
 }
 @media (prefers-reduced-motion:reduce){.kp.live b::before,.adm-loading i{animation:none}.ch-col i{transition:none}}
+/* Систем: ашиглалтын зурвас */
+.use{display:block;height:6px;margin-top:6px;border-radius:99px;background:var(--ink-2);overflow:hidden}
+.use i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#2f56d6,#14a38b)}
+.kp.warn .use i{background:linear-gradient(90deg,#eaa02e,#e11d48)}
+.adm-table code{font-size:.82rem;color:var(--text)}

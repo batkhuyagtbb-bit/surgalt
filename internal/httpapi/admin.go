@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"unicode/utf8"
 
 	"surgalt/internal/auth"
+	"surgalt/internal/files"
 	"surgalt/internal/store"
 )
 
@@ -486,7 +488,7 @@ func (s *Server) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 		Total int64 `json:"total"`
 		Count int   `json:"count"`
 	}
-	inc := map[string]*money{"today": {}, "week": {}, "month": {}, "period": {}, "all": {}, "sales": {}, "storage": {}, "pending": {}}
+	inc := map[string]*money{"today": {}, "week": {}, "month": {}, "period": {}, "all": {}, "sales": {}, "storage": {}, "fees": {}, "pending": {}}
 	add := func(k string, v int64) { inc[k].Total += v; inc[k].Count++ }
 	for i := range sn.orders {
 		o := &sn.orders[i]
@@ -494,27 +496,30 @@ func (s *Server) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 			add("pending", o.Amount)
 			continue
 		}
-		t := paidAt(o)
-		add("all", o.Amount)
+		t, got := paidAt(o), o.Amount+o.Fee // хүлээн авсан мөнгө: үнэ + үйлчилгээний хураамж
+		add("all", got)
 		if o.Kind == store.OrderKindStorage {
 			add("storage", o.Amount)
 		} else {
 			add("sales", o.Amount)
 		}
+		if o.Fee > 0 {
+			add("fees", o.Fee)
+		}
 		if !t.Before(today) {
-			add("today", o.Amount)
+			add("today", got)
 		}
 		if !t.Before(week) {
-			add("week", o.Amount)
+			add("week", got)
 		}
 		if !t.Before(month) {
-			add("month", o.Amount)
+			add("month", got)
 		}
 		if !t.Before(since) {
-			add("period", o.Amount)
+			add("period", got)
 		}
 		if i, ok := idx[localDay(t)]; ok {
-			daily[i].Revenue += o.Amount
+			daily[i].Revenue += got
 			daily[i].Orders++
 		}
 	}
@@ -945,7 +950,7 @@ func (s *Server) handleAdminStudent(w http.ResponseWriter, r *http.Request) {
 // ---- Гүйлгээ ----
 
 func (s *Server) txRow(sn *adminSnap, o *store.Order) map[string]any {
-	return map[string]any{"id": o.ID, "kind": o.Kind, "kind_label": kindLabel(o.Kind), "title": o.Title, "amount": o.Amount,
+	return map[string]any{"id": o.ID, "kind": o.Kind, "kind_label": kindLabel(o.Kind), "title": o.Title, "amount": o.Amount, "fee": o.Fee,
 		"status": o.Status, "created_at": o.CreatedAt, "paid_at": o.PaidAt, "buyer": sn.person(o.UserID), "teacher": sn.person(o.TeacherID)}
 }
 
@@ -996,7 +1001,7 @@ func (s *Server) handleAdminTransactions(w http.ResponseWriter, r *http.Request)
 		Count int   `json:"count"`
 		Total int64 `json:"total"`
 	}
-	tot := map[string]*sum{"paid": {}, "pending": {}}
+	tot := map[string]*sum{"paid": {}, "pending": {}, "fees": {}}
 	byKind := map[string]*sum{}
 	list := []*store.Order{}
 	for i := range sn.orders {
@@ -1007,7 +1012,11 @@ func (s *Server) handleAdminTransactions(w http.ResponseWriter, r *http.Request)
 		list = append(list, o)
 		if t := tot[string(o.Status)]; t != nil {
 			t.Count++
-			t.Total += o.Amount
+			t.Total += o.Amount + o.Fee
+		}
+		if o.Status == store.OrderPaid && o.Fee > 0 {
+			tot["fees"].Count++
+			tot["fees"].Total += o.Fee
 		}
 		if o.Status == store.OrderPaid {
 			if byKind[o.Kind] == nil {
@@ -1022,14 +1031,14 @@ func (s *Server) handleAdminTransactions(w http.ResponseWriter, r *http.Request)
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="guilgee-%s.csv"`, time.Now().Format("2006-01-02")))
 		_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF}) // UTF-8 BOM: Excel монгол үсгийг зөв уншина
 		cw := csv.NewWriter(w)
-		_ = cw.Write([]string{"Огноо", "Төлөв", "Төрөл", "Нэр", "Дүн (₮)", "Худалдан авагч", "Багш", "Захиалгын дугаар"})
+		_ = cw.Write([]string{"Огноо", "Төлөв", "Төрөл", "Нэр", "Үнэ (₮)", "Хураамж (₮)", "Нийт (₮)", "Худалдан авагч", "Багш", "Захиалгын дугаар"})
 		for _, o := range list {
 			t, st := o.CreatedAt, "Хүлээгдэж буй"
 			if o.Status == store.OrderPaid {
 				t, st = paidAt(o), "Төлөгдсөн"
 			}
 			b, te := sn.person(o.UserID), sn.person(o.TeacherID)
-			_ = cw.Write([]string{t.In(time.Local).Format("2006-01-02 15:04"), st, kindLabel(o.Kind), o.Title, strconv.FormatInt(o.Amount, 10),
+			_ = cw.Write([]string{t.In(time.Local).Format("2006-01-02 15:04"), st, kindLabel(o.Kind), o.Title, strconv.FormatInt(o.Amount, 10), strconv.FormatInt(o.Fee, 10), strconv.FormatInt(o.Amount+o.Fee, 10),
 				strings.TrimSpace(b.Name + " (@" + b.Username + ")"), te.Name, o.ID})
 		}
 		cw.Flush()
@@ -1082,6 +1091,7 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 		Month    string `json:"month"`
 		Sales    int64  `json:"sales"`
 		Storage  int64  `json:"storage"`
+		Fees     int64  `json:"fees"`
 		Income   int64  `json:"income"`
 		Payouts  int64  `json:"payouts"`
 		Expenses int64  `json:"expenses"`
@@ -1096,7 +1106,7 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 		rows[i].Month, idx[k] = k, i
 	}
 	type totals struct {
-		Sales, Storage, Income, Payouts, Pending, Expenses, Outgo, Net int64
+		Sales, Storage, Fees, Income, Payouts, Pending, Expenses, Outgo, Net int64
 	}
 	var all, rng totals
 	for i := range sn.orders {
@@ -1105,7 +1115,8 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		in := func(t *totals) {
-			t.Income += o.Amount
+			t.Income += o.Amount + o.Fee
+			t.Fees += o.Fee
 			if o.Kind == store.OrderKindStorage {
 				t.Storage += o.Amount
 			} else {
@@ -1116,7 +1127,8 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 		if j, ok := idx[localMonth(paidAt(o))]; ok {
 			in(&rng)
 			m := &rows[j]
-			m.Income += o.Amount
+			m.Income += o.Amount + o.Fee
+			m.Fees += o.Fee
 			m.Orders++
 			if o.Kind == store.OrderKindStorage {
 				m.Storage += o.Amount
@@ -1162,12 +1174,12 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 		t.Net = t.Income - t.Outgo
 	}
 	j := func(t totals) map[string]int64 {
-		return map[string]int64{"sales": t.Sales, "storage": t.Storage, "income": t.Income, "payouts": t.Payouts, "pending": t.Pending,
+		return map[string]int64{"sales": t.Sales, "storage": t.Storage, "fees": t.Fees, "income": t.Income, "payouts": t.Payouts, "pending": t.Pending,
 			"expenses": t.Expenses, "outgo": t.Outgo, "net": t.Net}
 	}
 	allJ := j(all)
 	allJ["owed"] = max(0, all.Sales-all.Payouts)           // багшид шилжүүлээгүй үлдэгдэл (хүлээгдэж буй хүсэлт орно)
-	allJ["profit"] = all.Storage - all.Expenses            // платформын өөрийн ашиг (багтаамжийн орлого − зардал)
+	allJ["profit"] = all.Storage + all.Fees - all.Expenses // платформын өөрийн ашиг (багтаамж + үйлчилгээний хураамж − зардал)
 	allJ["cash"] = all.Income - all.Payouts - all.Expenses // данс дахь мөнгө (онолын)
 	cats := []map[string]any{}
 	for k, v := range byCat {
@@ -1230,4 +1242,46 @@ func (s *Server) handleAdminDeleteExpense(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ---- Систем: файлын сан, өгөгдлийн сан, сервер ----
+
+type sysCache struct {
+	mu    sync.Mutex
+	at    time.Time
+	files *files.Space
+	ferr  string
+}
+
+// handleAdminSystem: GET /api/admin/system[?fresh=1] — файлын сангийн хэмжээ ба дискний сул зай, өгөгдлийн сангийн
+// хүснэгт бүрийн хэмжээ, серверийн төлөв. Файлын санг гүйх нь удаан байж болох тул 60 секунд кэшлэнэ.
+func (s *Server) handleAdminSystem(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	out := map[string]any{}
+	s.sys.mu.Lock()
+	if s.files != nil && (s.sys.files == nil || time.Since(s.sys.at) > time.Minute || r.URL.Query().Get("fresh") == "1") {
+		sp, err := s.files.Space()
+		s.sys.files, s.sys.ferr, s.sys.at = sp, "", time.Now()
+		if err != nil {
+			s.sys.ferr = err.Error()
+		}
+	}
+	out["files"], out["files_err"], out["files_at"] = s.sys.files, s.sys.ferr, s.sys.at
+	s.sys.mu.Unlock()
+	if ds, ok := s.store.(store.DBStatser); ok {
+		if st, err := ds.DBStats(r.Context()); err == nil {
+			out["db"] = st
+		} else {
+			out["db_err"] = err.Error()
+		}
+	} else {
+		out["db"] = &store.DBStats{Engine: "Санах ой", Version: "туршилтын горим — өгөгдөл хадгалагдахгүй", Tables: []store.DBTable{}, Disks: []store.DBDisk{}}
+	}
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	out["server"] = map[string]any{"started_at": s.started, "uptime_sec": int64(time.Since(s.started).Seconds()), "mem_alloc": ms.Alloc,
+		"mem_sys": ms.Sys, "goroutines": runtime.NumGoroutine(), "ws": s.hub.Connections(), "go": runtime.Version(), "version": assetVersion}
+	writeJSON(w, http.StatusOK, out)
 }

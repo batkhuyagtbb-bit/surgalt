@@ -4031,7 +4031,7 @@ function payWindow(order, payment, label, onPaid, extra = {}) {
     if (!p.qr) return `<div class="pw-empty"><b>Онлайн төлбөр (QPay) хараахан тохируулагдаагүй байна.</b><small>Багштайгаа холбогдоно уу · захиалга #${esc(ord.id.slice(-6).toUpperCase())} · ${money(ord.amount)}</small></div>`;
     const qpay = p.provider === "qpay";
     return `<div class="pw-body"><figure class="pw-qr"><span class="pw-qr-frame"><img src="${p.qr}" alt="Төлбөрийн QR код" width="200" height="200"></span><figcaption>${qpay ? "QPay · бүх банкны апп" : "Демо QR · туршилтын горим"}</figcaption></figure>
-      <div class="pw-side"><p class="pw-amount">${money(ord.amount)}</p>
+      <div class="pw-side"><p class="pw-amount">${money(p.amount || ord.amount)}</p>${p.fee > 0 ? `<p class="pw-fee">${money(p.base)} + үйлчилгээний хураамж ${money(p.fee)} (${p.fee_pct}%)</p>` : ""}
       <ol class="pw-steps"><li><span>${qpay ? "Банкны апп-аа нээгээд <b>QR уншуулах</b>-ыг сонгоно" : "Утасныхаа камераар QR-ыг уншуулна"}</span></li><li><span>${qpay ? "Дүнг шалгаад төлбөрөө баталгаажуулна" : "Нээгдсэн хуудсанд <b>«Төлөх»</b> дарна"}</span></li><li><span>Энэ цонх өөрөө шинэчлэгдэж <b>шууд нээгдэнэ</b></span></li></ol>
       <p class="pw-status" role="status"><i></i>Төлбөр хүлээж байна… <button type="button" class="pw-recheck" data-pw-check>Шалгах</button></p></div></div>
       ${qpay && p.urls?.length ? `<div class="pw-banks ${mobile ? "open" : ""}"><button type="button" class="pw-banks-t" data-pw-banks aria-expanded="${mobile}">📱 Утсан дээрээ байна уу? Банкны апп-аар шууд төлөх</button>

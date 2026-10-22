@@ -1,10 +1,12 @@
 package httpapi
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"mime"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -191,7 +193,17 @@ func (s *Server) dueFor(r *http.Request, uid string, course *store.Course, l *st
 		return DueState{StartAt: d.StartAt, At: d.At, Policy: d.Late, Open: true, EntryFee: d.Fee}
 	}
 	lp, fp := s.passes(r, uid, course.ID, l.ID)
+	if !fp && d.Fee > 0 && s.boughtLesson(r.Context(), uid, course.ID, l.ID) {
+		fp = true // хичээлийг тусад нь худалдаж авсан — оролцооны төлбөрийг дахин авахгүй
+	}
 	return dueStateOf(d, lp, fp, time.Now())
+}
+
+// boughtLesson — суралцагч энэ хичээлийг тусад нь (хичээлийн үнээр) худалдаж авсан эсэх.
+// Шалгалт/даалгаврын хичээлийн үнэ төлсөн бол түүний оролцооны төлбөрт тооцогдоно (давхар төлбөргүй).
+func (s *Server) boughtLesson(ctx context.Context, uid, courseID, lessonID string) bool {
+	ids, err := s.store.PurchasedLessons(ctx, uid, courseID)
+	return err == nil && slices.Contains(ids, lessonID)
 }
 
 // dueBlocked — эхлээгүй/хаалттай (423) эсвэл төлбөр шаардлагатай (402) бол хариулаад true.

@@ -167,7 +167,7 @@ func TestAutoPayout(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if o, err = st.MarkOrderPaid(ctx, o.ID, amount); err != nil {
+		if o, err = st.MarkOrderPaid(ctx, o.ID, amount, 0); err != nil {
 			t.Fatal(err)
 		}
 		s.notifyPaid(ctx, o)

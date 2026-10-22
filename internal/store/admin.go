@@ -95,3 +95,35 @@ type AdminStore interface {
 	// Expenses — since-ээс хойших (Date) зардал, шинэ нь эхэндээ.
 	Expenses(ctx context.Context, since time.Time) ([]Expense, error)
 }
+
+// DBTable — өгөгдлийн сангийн нэг хүснэгтийн эзлэх хэмжээ.
+type DBTable struct {
+	Name  string `json:"name"`
+	Rows  uint64 `json:"rows"`
+	Bytes uint64 `json:"bytes"` // дискэн дээр (шахсан)
+	Raw   uint64 `json:"raw"`   // шахаагүй
+}
+
+// DBDisk — өгөгдлийн сангийн серверийн диск.
+type DBDisk struct {
+	Name  string `json:"name"`
+	Free  uint64 `json:"free"`
+	Total uint64 `json:"total"`
+}
+
+// DBStats — өгөгдлийн сангийн хэмжээ (хянагчийн самбарт).
+type DBStats struct {
+	Engine   string    `json:"engine"`
+	Version  string    `json:"version,omitempty"`
+	Database string    `json:"database,omitempty"`
+	Rows     uint64    `json:"rows"`
+	Bytes    uint64    `json:"bytes"`
+	Raw      uint64    `json:"raw"`
+	Tables   []DBTable `json:"tables"`
+	Disks    []DBDisk  `json:"disks"`
+}
+
+// DBStatser — сангийн хэмжээг гаргаж чаддаг store (ClickHouse); санах ойн store хэрэгжүүлэхгүй.
+type DBStatser interface {
+	DBStats(ctx context.Context) (*DBStats, error)
+}

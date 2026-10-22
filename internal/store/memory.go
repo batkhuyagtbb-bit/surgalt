@@ -391,7 +391,7 @@ func (m *Memory) OrderByID(_ context.Context, id string) (*Order, error) {
 	return &oc, nil
 }
 
-func (m *Memory) MarkOrderPaid(_ context.Context, orderID string, amount int64) (*Order, error) {
+func (m *Memory) MarkOrderPaid(_ context.Context, orderID string, amount, fee int64) (*Order, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	o, ok := m.orders[orderID]
@@ -403,7 +403,7 @@ func (m *Memory) MarkOrderPaid(_ context.Context, orderID string, amount int64) 
 			return nil, ErrConflict
 		}
 		now := time.Now()
-		o.Status, o.PaidAt = OrderPaid, &now
+		o.Status, o.PaidAt, o.Fee = OrderPaid, &now, max(fee, 0)
 	}
 	switch o.Kind {
 	case OrderKindLesson:

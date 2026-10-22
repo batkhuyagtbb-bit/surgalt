@@ -248,6 +248,7 @@ func run(log *slog.Logger) error {
 		AdminEmails:   emailList(os.Getenv("ADMIN_EMAILS")),
 		Mail:          mailer,
 		PayoutMin:     envInt("PAYOUT_MIN", 1000),
+		ServiceFeePct: envFloat("SERVICE_FEE_PERCENT", 1),
 		AdminPath:     adminPath,
 		AdminLogin:    adminLogin,
 		AdminPassHash: adminHash,

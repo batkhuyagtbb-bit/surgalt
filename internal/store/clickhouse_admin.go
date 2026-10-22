@@ -191,3 +191,51 @@ func (c *ClickHouse) DeleteExpense(ctx context.Context, id string) error {
 func (c *ClickHouse) Expenses(ctx context.Context, since time.Time) ([]Expense, error) {
 	return c.expensesWhere(ctx, "date >= ?", since.UTC())
 }
+
+// DBStats — ClickHouse-ийн хүснэгт бүрийн мөр, дискэн дээрх (шахсан) ба шахаагүй хэмжээ, серверийн диск.
+func (c *ClickHouse) DBStats(ctx context.Context) (*DBStats, error) {
+	st := &DBStats{Engine: "ClickHouse", Tables: []DBTable{}, Disks: []DBDisk{}}
+	if err := c.conn.QueryRow(ctx, "SELECT version(), currentDatabase()").Scan(&st.Version, &st.Database); err != nil {
+		return nil, err
+	}
+	add := func(t DBTable) {
+		st.Rows, st.Bytes, st.Raw = st.Rows+t.Rows, st.Bytes+t.Bytes, st.Raw+t.Raw
+		st.Tables = append(st.Tables, t)
+	}
+	err := c.query(ctx, `SELECT table, sum(rows), sum(bytes_on_disk), sum(data_uncompressed_bytes)
+		FROM system.parts WHERE active AND database = currentDatabase() GROUP BY table ORDER BY sum(bytes_on_disk) DESC`, nil,
+		func(r driver.Rows) error {
+			var t DBTable
+			if err := r.Scan(&t.Name, &t.Rows, &t.Bytes, &t.Raw); err != nil {
+				return err
+			}
+			add(t)
+			return nil
+		})
+	if err != nil {
+		// system.parts-ийг унших эрхгүй (жишээ нь app хэрэглэгч) — system.tables-ийн нийт мөр, хэмжээгээр (шахаагүй хэмжээгүй).
+		st.Rows, st.Bytes, st.Raw, st.Tables = 0, 0, 0, []DBTable{}
+		err = c.query(ctx, `SELECT name, ifNull(total_rows, 0), ifNull(total_bytes, 0) FROM system.tables
+			WHERE database = currentDatabase() AND NOT is_temporary ORDER BY ifNull(total_bytes, 0) DESC`, nil, func(r driver.Rows) error {
+			var t DBTable
+			if err := r.Scan(&t.Name, &t.Rows, &t.Bytes); err != nil {
+				return err
+			}
+			add(t)
+			return nil
+		})
+	}
+	if err != nil {
+		return nil, err
+	}
+	// Диск: эрхгүй бол алгасна (хүснэгтийн хэмжээ хангалттай).
+	_ = c.query(ctx, "SELECT name, free_space, total_space FROM system.disks", nil, func(r driver.Rows) error {
+		var d DBDisk
+		if err := r.Scan(&d.Name, &d.Free, &d.Total); err != nil {
+			return err
+		}
+		st.Disks = append(st.Disks, d)
+		return nil
+	})
+	return st, nil
+}

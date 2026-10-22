@@ -38,6 +38,8 @@ type Config struct {
 	AdminEmails   []string      // чатын мэдүүлэг шийдвэрлэх хянагчид (жижиг үсгээр; moderation.go)
 	Mail          mail.Sender   // нууц үг сэргээх имэйл (nil бол илгээхгүй; демо горимд холбоосыг логт гаргана)
 	PayoutMin     int64         // багшийн орлого татах доод дүн (₮; 0 бол 1000)
+	// ServiceFeePct — төлбөр бүрийн үнэ дээр нэмж авах үйлчилгээний хураамж (%, жишээ нь 1). Багшийн орлогод орохгүй.
+	ServiceFeePct float64
 	// Хянагчийн самбар (admin.go): тусдаа зам ба нууц үгээр нэвтрэх (хоосон бол /admin, зөвхөн ADMIN_EMAILS).
 	AdminPath     string
 	AdminLogin    string
@@ -60,6 +62,8 @@ type Server struct {
 	admLim   *ratelimit.Limiter // хянагчийн нууц үгээр нэвтрэх оролдлого (IP тус бүрт)
 	hits     hitBuf             // сайтын хандалтын түр сан (admin.go)
 	adm      adminCache         // хянагчийн самбарын агшин зураг
+	sys      sysCache           // хянагчийн «Систем»: файлын сангийн хэмжээ (60 сек кэш)
+	started  time.Time          // сервер асаасан мөч
 	profiles *cache.Cache[*Rendered[PublicProfile]]
 	courses  *cache.Cache[*Rendered[PublicCourse]]
 	qrs      *cache.Cache[[]byte]
@@ -98,6 +102,7 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 		alive:    cache.New[int64](5*time.Minute, 5*time.Minute, isNF),
 	}
 	s.notif = newNotifier()
+	s.started = time.Now()
 	s.search = &searchIndex{}
 	s.Publish, s.PublishNotif = hub.Deliver, hub.Notify
 	return s
@@ -296,6 +301,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/admin/students/{id}", s.handleAdminStudent)
 	mux.HandleFunc("GET /api/admin/transactions", s.handleAdminTransactions)
 	mux.HandleFunc("GET /api/admin/finance", s.handleAdminFinance)
+	mux.HandleFunc("GET /api/admin/system", s.handleAdminSystem)
 	mux.HandleFunc("POST /api/admin/expenses", s.handleAdminAddExpense)
 	mux.HandleFunc("DELETE /api/admin/expenses/{id}", s.handleAdminDeleteExpense)
 	mux.HandleFunc("POST /api/hit", s.handleHit)

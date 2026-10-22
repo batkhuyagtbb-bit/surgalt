@@ -117,7 +117,7 @@ func seedStudent(ctx context.Context, st store.Store, teacher *store.User, cours
 		if err != nil {
 			return err
 		}
-		if _, err := st.MarkOrderPaid(ctx, o.ID, o.Amount); err != nil {
+		if _, err := st.MarkOrderPaid(ctx, o.ID, o.Amount, 0); err != nil {
 			return err
 		}
 	}

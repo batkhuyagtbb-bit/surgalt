@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"hash/fnv"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -22,10 +23,20 @@ import (
 
 // ---- Төлбөр: QR (QPay эсвэл демо), банкны апп-ын холбоос, төлөгдсөнийг шалгаж эрх нээх ----
 
-// paymentInfo — бүх худалдан авалтын хариунд ижил хэлбэртэй төлбөрийн мэдээлэл.
+// serviceFee — үнэ дээр нэмж авах үйлчилгээний хураамж (ServiceFeePct %, бүхэл төгрөг рүү дээш тоймлоно; 1000₮ → 10₮).
+func (s *Server) serviceFee(amount int64) int64 {
+	if s.cfg.ServiceFeePct <= 0 || amount <= 0 {
+		return 0
+	}
+	return int64(math.Ceil(float64(amount) * s.cfg.ServiceFeePct / 100))
+}
+
+// paymentInfo — бүх худалдан авалтын хариунд ижил хэлбэртэй төлбөрийн мэдээлэл. amount — төлөх нийт дүн (үнэ + хураамж),
+// base — үнэ, fee — үйлчилгээний хураамж.
 // provider: "qpay" (жинхэнэ QR), "demo" (DEV_PAYMENTS — QR нь демо төлбөрийн хуудас руу), "" (тохируулаагүй).
 func (s *Server) paymentInfo(r *http.Request, o *store.Order) map[string]any {
-	p := map[string]any{"amount": o.Amount, "currency": "MNT", "dev_pay": s.cfg.DevPayments, "provider": ""}
+	fee := s.serviceFee(o.Amount)
+	p := map[string]any{"amount": o.Amount + fee, "base": o.Amount, "fee": fee, "fee_pct": s.cfg.ServiceFeePct, "currency": "MNT", "dev_pay": s.cfg.DevPayments, "provider": ""}
 	if o.Status == store.OrderPaid {
 		return p
 	}
@@ -111,15 +122,16 @@ func payLock(orderID string) *sync.Mutex {
 	return &payLocks[h.Sum32()%uint32(len(payLocks))]
 }
 
-// qpayInvoice — захиалгын QPay нэхэмжлэх (байвал дахин ашиглана; дүн өөрчлөгдсөн бол шинээр).
+// qpayInvoice — захиалгын QPay нэхэмжлэх: дүн нь үнэ + үйлчилгээний хураамж (байвал дахин ашиглана; дүн өөрчлөгдсөн бол шинээр).
 func (s *Server) qpayInvoice(r *http.Request, o *store.Order) (*store.PaymentInvoice, error) {
 	mu := payLock(o.ID)
 	mu.Lock()
 	defer mu.Unlock()
+	total := o.Amount + s.serviceFee(o.Amount)
 	sender := o.ID
 	old, err := s.store.InvoiceByOrder(r.Context(), o.ID)
 	switch {
-	case err == nil && old.Provider == "qpay" && old.Amount == o.Amount:
+	case err == nil && old.Provider == "qpay" && old.Amount == total:
 		return old, nil
 	case err == nil:
 		sender = o.ID + "-" + strconv.FormatInt(time.Now().Unix()%1e6, 36)
@@ -128,13 +140,13 @@ func (s *Server) qpayInvoice(r *http.Request, o *store.Order) (*store.PaymentInv
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	res, err := s.QPay.CreateInvoice(ctx, qpay.InvoiceRequest{SenderNo: sender, Description: "surgalt.mn — " + o.Title, Amount: o.Amount,
+	res, err := s.QPay.CreateInvoice(ctx, qpay.InvoiceRequest{SenderNo: sender, Description: "surgalt.mn — " + o.Title, Amount: total,
 		CallbackURL: s.baseURL(r) + "/api/payments/qpay?o=" + url.QueryEscape(o.ID) + "&t=" + s.payMAC(o.ID)})
 	if err != nil {
 		return nil, err
 	}
 	urls, _ := json.Marshal(res.URLs)
-	inv := &store.PaymentInvoice{OrderID: o.ID, Provider: "qpay", InvoiceID: res.ID, Amount: o.Amount, QRText: res.QRText, URLs: string(urls)}
+	inv := &store.PaymentInvoice{OrderID: o.ID, Provider: "qpay", InvoiceID: res.ID, Amount: total, QRText: res.QRText, URLs: string(urls)}
 	if err := s.store.SaveInvoice(r.Context(), inv); err != nil {
 		return nil, err
 	}
@@ -178,16 +190,19 @@ func (s *Server) syncPayment(ctx context.Context, o *store.Order, force bool) *s
 		s.log.Warn("qpay шалгах", "order", o.ID, "err", err)
 		return o
 	}
-	if paid <= 0 || paid < o.Amount {
+	// Нэхэмжлэхийн дүнг (хураамжтай) бүтэн төлсөн бол биелнэ; хураамж нэвтрэхээс өмнөх хуучин нэхэмжлэх (зөвхөн үнэ) ч хүчинтэй.
+	need := max(inv.Amount, o.Amount)
+	if paid <= 0 || paid < need {
 		return o
 	}
+	fee := max(inv.Amount-o.Amount, 0)
 	mu := payLock(o.ID)
 	mu.Lock()
 	defer mu.Unlock()
 	if cur, err := s.store.OrderByID(ctx, o.ID); err == nil && cur.Status == store.OrderPaid {
 		return cur // зэрэг ирсэн callback аль хэдийн биелүүлсэн
 	}
-	po, err := s.store.MarkOrderPaid(ctx, o.ID, o.Amount)
+	po, err := s.store.MarkOrderPaid(ctx, o.ID, o.Amount, fee)
 	if err != nil {
 		s.log.Warn("төлбөр бүртгэх", "order", o.ID, "err", err)
 		return o

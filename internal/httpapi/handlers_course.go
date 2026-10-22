@@ -873,7 +873,7 @@ func (s *Server) handleDevPay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wasPaid := o.Status == store.OrderPaid
-	o, err = s.store.MarkOrderPaid(r.Context(), o.ID, o.Amount)
+	o, err = s.store.MarkOrderPaid(r.Context(), o.ID, o.Amount, s.serviceFee(o.Amount))
 	if s.storeErr(w, r, err) {
 		return
 	}
@@ -901,7 +901,11 @@ func (s *Server) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	o, err := s.store.MarkOrderPaid(r.Context(), in.OrderID, in.Amount)
+	if in.Amount < before.Amount { // дутуу төлбөр
+		writeErr(w, http.StatusConflict, "дүн таарахгүй")
+		return
+	}
+	o, err := s.store.MarkOrderPaid(r.Context(), in.OrderID, before.Amount, in.Amount-before.Amount) // илүү нь үйлчилгээний хураамж
 	if s.storeErr(w, r, err) {
 		return
 	}

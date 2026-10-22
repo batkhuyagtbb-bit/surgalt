@@ -31,6 +31,7 @@ const ICONS = {
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
   live: '<circle cx="12" cy="12" r="3"/><path d="M6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4"/>',
+  db: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
 };
 const ic = (n, s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ""}</svg>`;
@@ -198,7 +199,7 @@ VIEWS.overview = {
       ${kpi("Нийт хэрэглэгч", num(U.total), `${num(U.teacher || 0)} багш · ${num(U.student || 0)} суралцагч`)}
       ${kpi("Шинэ бүртгэл", num(U.today || 0) + " <small>өнөөдөр</small>", `7 хоногт ${num(U.week || 0)} · 30 хоногт ${num(U.month || 0)}`)}
       ${kpi("Орлого (өнөөдөр)", tg(I.today.total), `7 хоногт ${tg(I.week.total)} · 30 хоногт ${tg(I.month.total)}`, "good")}
-      ${kpi("Нийт орлого", tg(I.all.total), `${num(I.all.count)} гүйлгээ · хүлээгдэж буй ${num(I.pending.count)}`)}
+      ${kpi("Нийт орлого", tg(I.all.total), `${num(I.all.count)} гүйлгээ · хураамж ${tg(I.fees?.total)} · хүлээгдэж буй ${num(I.pending.count)}`)}
       ${kpi("Багшид шилжүүлэх", tg(d.payouts.pending.total), `${num(d.payouts.pending.count)} хүсэлт хүлээгдэж байна`, d.payouts.pending.count ? "warn" : "")}
       ${kpi("Багшид шилжүүлсэн", tg(d.payouts.paid.total), `${num(d.payouts.paid.count)} шилжүүлэг`)}
     </section>
@@ -390,6 +391,7 @@ VIEWS.transactions = {
         <section class="kp-grid">
           ${kpi("Төлөгдсөн", tg(d.totals.paid.total), `${num(d.totals.paid.count)} гүйлгээ`, "good")}
           ${kpi("Хүлээгдэж буй", tg(d.totals.pending.total), `${num(d.totals.pending.count)} төлөгдөөгүй захиалга`)}
+          ${kpi("Үйлчилгээний хураамж", tg(d.totals.fees?.total), `${num(d.totals.fees?.count)} гүйлгээнээс`)}
           ${kpi("Дундаж", tg(d.totals.paid.count ? Math.round(d.totals.paid.total / d.totals.paid.count) : 0), "нэг гүйлгээнд")}
         </section>
         ${d.by_kind.length ? `<div class="kchips">${d.by_kind.map((k) => `<span><b>${esc(k.label)}</b>${tg(k.total)} · ${num(k.count)}</span>`).join("")}</div>` : ""}
@@ -398,7 +400,7 @@ VIEWS.transactions = {
       const rows = d.rows.map((o) => ({ ...o, t: o.paid_at || o.created_at, buyerN: o.buyer.name, teacherN: o.teacher.name }));
       sortable($("#txT"), rows, (o) => `<tr><td>${dt(o.t)}<small class="mono">${esc(o.id.slice(0, 12))}</small></td><td>${esc(o.title || "—")}<small>${esc(o.kind_label)}</small></td>
         <td ${o.buyer.id ? `data-student="${esc(o.buyer.id)}" class="clk"` : ""}>${who(o.buyer)}</td><td ${o.teacher.id ? `data-teacher="${esc(o.teacher.id)}" class="clk"` : ""}>${o.teacher.id ? who(o.teacher) : `<span class="muted">Платформ</span>`}</td>
-        <td class="n"><b>${tg(o.amount)}</b></td><td>${chip(o.status)}</td></tr>`);
+        <td class="n"><b>${tg(o.amount + (o.fee || 0))}</b>${o.fee ? `<small>${tg(o.amount)} + ${tg(o.fee)}</small>` : ""}</td><td>${chip(o.status)}</td></tr>`);
     };
     const reload = () => { clearTimeout(t); t = setTimeout(() => load().catch((x) => ($("#txOut").innerHTML = empty(x.message))), 250); };
     form.addEventListener("input", (e) => { f[e.target.name] = e.target.value; reload(); });
@@ -431,18 +433,18 @@ VIEWS.finance = {
     const R = d.range, A = d.all;
     el.innerHTML = `
     <section class="kp-grid">
-      ${kpi("Орлого", tg(R.income), `борлуулалт ${tg(R.sales)} · багтаамж ${tg(R.storage)}`, "good")}
+      ${kpi("Орлого", tg(R.income), `борлуулалт ${tg(R.sales)} · багтаамж ${tg(R.storage)} · хураамж ${tg(R.fees)}`, "good")}
       ${kpi("Зарлага", tg(R.outgo), `багшид ${tg(R.payouts)} · зардал ${tg(R.expenses)}`, "bad")}
       ${kpi("Цэвэр", tg(R.net), `сүүлийн ${state.months} сард`, R.net < 0 ? "bad" : "")}
       ${kpi("Багшид өгөх үлдэгдэл", tg(A.owed), `үүнээс хүсэлт гаргасан ${tg(A.pending)}`, A.pending ? "warn" : "")}
-      ${kpi("Платформын ашиг", tg(A.profit), "багтаамжийн орлого − зардал (бүх хугацаа)")}
+      ${kpi("Платформын ашиг", tg(A.profit), "багтаамж + хураамж − зардал (бүх хугацаа)")}
       ${kpi("Данс дахь мөнгө", tg(A.cash), "нийт орлого − шилжүүлсэн − зардал")}
     </section>
     <section class="adm-card"><header><h3>Сар бүрийн орлого ба зарлага</h3><span class="lg"><i class="brand"></i>Орлого <i class="coral"></i>Зарлага</span></header>
       ${chart2(d.months, { a: "income", b: "outgo", label: (m) => MONTHS[+m.month.slice(5) - 1].replace("-р сар", "") })}</section>
-    <div class="adm-table-wrap"><table class="adm-table"><thead><tr><th>Сар</th><th>Борлуулалт</th><th>Багтаамж</th><th>Нийт орлого</th><th>Багшид шилжүүлсэн</th><th>Зардал</th><th>Нийт зарлага</th><th>Цэвэр</th></tr></thead><tbody>
-      ${[...d.months].reverse().map((m) => `<tr><td>${monthName(m.month)}<small>${num(m.orders)} гүйлгээ</small></td><td class="n">${tg(m.sales)}</td><td class="n">${tg(m.storage)}</td><td class="n"><b>${tg(m.income)}</b></td><td class="n">${tg(m.payouts)}</td><td class="n">${tg(m.expenses)}</td><td class="n">${tg(m.outgo)}</td><td class="n ${m.net < 0 ? "bad" : "good"}"><b>${tg(m.net)}</b></td></tr>`).join("")}
-      <tr class="tot"><td>Нийт</td><td class="n">${tg(R.sales)}</td><td class="n">${tg(R.storage)}</td><td class="n">${tg(R.income)}</td><td class="n">${tg(R.payouts)}</td><td class="n">${tg(R.expenses)}</td><td class="n">${tg(R.outgo)}</td><td class="n">${tg(R.net)}</td></tr>
+    <div class="adm-table-wrap"><table class="adm-table"><thead><tr><th>Сар</th><th>Борлуулалт</th><th>Багтаамж</th><th>Хураамж</th><th>Нийт орлого</th><th>Багшид шилжүүлсэн</th><th>Зардал</th><th>Нийт зарлага</th><th>Цэвэр</th></tr></thead><tbody>
+      ${[...d.months].reverse().map((m) => `<tr><td>${monthName(m.month)}<small>${num(m.orders)} гүйлгээ</small></td><td class="n">${tg(m.sales)}</td><td class="n">${tg(m.storage)}</td><td class="n">${tg(m.fees)}</td><td class="n"><b>${tg(m.income)}</b></td><td class="n">${tg(m.payouts)}</td><td class="n">${tg(m.expenses)}</td><td class="n">${tg(m.outgo)}</td><td class="n ${m.net < 0 ? "bad" : "good"}"><b>${tg(m.net)}</b></td></tr>`).join("")}
+      <tr class="tot"><td>Нийт</td><td class="n">${tg(R.sales)}</td><td class="n">${tg(R.storage)}</td><td class="n">${tg(R.fees)}</td><td class="n">${tg(R.income)}</td><td class="n">${tg(R.payouts)}</td><td class="n">${tg(R.expenses)}</td><td class="n">${tg(R.outgo)}</td><td class="n">${tg(R.net)}</td></tr>
     </tbody></table></div>
     <div class="adm-grid2 fin">
       <section class="adm-card"><header><h3>Зардал бүртгэх</h3></header>
@@ -534,6 +536,54 @@ VIEWS.reports = {
       try { await api(`/api/admin/reports/${encodeURIComponent(f.closest(".ad-card").dataset.id)}/resolve`, { method: "POST", body: { resolution: f.resolution.value, delete_message: f.del.checked } }); toast("Шийдвэрлэлээ ✓"); badges(); route(); }
       catch (x) { toast(x.message, true); b.disabled = false; }
     };
+  },
+};
+
+/* ---------- Систем ---------- */
+const uptime = (sec) => { sec = +sec || 0; const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60); return d ? `${d} өдөр ${h} цаг` : h ? `${h} цаг ${m} мин` : `${m} мин`; };
+const useBar = (used, total) => total ? `<span class="use" title="${pct(used, total)}% ашиглагдсан"><i style="width:${Math.min(100, pct(used, total))}%"></i></span>` : "";
+const FOLDER = { teachers: "Багш нарын файл (хичээл, ном, видео)", "(үндсэн)": "Үндсэн хавтас" };
+VIEWS.system = {
+  title: "Систем", sub: "Файлын сан, өгөгдлийн сангийн хэмжээ, дискний сул зай, серверийн төлөв",
+  fresh: false,
+  async render(tools, el, live) {
+    const self = VIEWS.system;
+    tools.innerHTML = `<button type="button" class="btn btn-ghost btn-sm" data-fresh>${ic("refresh", 16)} Шинээр тооцох</button>`;
+    tools.onclick = (e) => { if (e.target.closest("[data-fresh]")) { self.fresh = true; route(); } };
+    const d = await api("/api/admin/system" + (self.fresh ? "?fresh=1" : "")); self.fresh = false;
+    if (!live()) return;
+    const F = d.files, D = d.db, S = d.server;
+    const fUsed = F ? F.disk_total - F.disk_free : 0, low = F && F.disk_total && F.disk_free / F.disk_total < 0.1;
+    const dbDisk = (D?.disks || [])[0];
+    el.innerHTML = `
+    <h2 class="adm-h">Файлын сан</h2>
+    ${F ? `<section class="kp-grid">
+      ${kpi("Файлын сангийн хэмжээ", bytes(F.bytes), `${num(F.files)} файл`)}
+      ${kpi("Дискний сул зай", bytes(F.disk_free), `нийт ${bytes(F.disk_total)} · ашиглагдсан ${pct(fUsed, F.disk_total)}% ${useBar(fUsed, F.disk_total)}`, low ? "warn" : "")}
+      ${kpi("Файлын сангийн эзлэх хувь", pct(F.bytes, F.disk_total) + "%", "дискний нийт багтаамжаас")}
+    </section>
+    <section class="adm-card"><header><h3>Хавтсаар</h3><span class="muted small">${esc(F.root)} · ${dt(d.files_at)}-д тооцсон</span></header>
+      ${bars((F.folders || []).map((f) => ({ name: `${FOLDER[f.name] || f.name} · ${num(f.files)} файл`, count: f.bytes })), bytes)}
+      ${d.files_err ? `<p class="muted small">⚠️ ${esc(d.files_err)}</p>` : ""}</section>` : empty("Файлын сан тохируулаагүй")}
+
+    <h2 class="adm-h">Өгөгдлийн сан</h2>
+    ${D ? `<section class="kp-grid">
+      ${kpi("Өгөгдлийн сангийн хэмжээ", bytes(D.bytes), D.raw ? `шахаагүй ${bytes(D.raw)} · ${(D.raw / D.bytes).toFixed(1)}× шахалт` : "дискэн дээрх (шахсан) хэмжээ")}
+      ${kpi("Нийт мөр", num(D.rows), `${num((D.tables || []).length)} хүснэгт`)}
+      ${dbDisk ? kpi("Сангийн серверийн сул зай", bytes(dbDisk.free), `нийт ${bytes(dbDisk.total)} · ашиглагдсан ${pct(dbDisk.total - dbDisk.free, dbDisk.total)}% ${useBar(dbDisk.total - dbDisk.free, dbDisk.total)}`, dbDisk.total && dbDisk.free / dbDisk.total < 0.1 ? "warn" : "") : ""}
+      ${kpi("Хөдөлгүүр", esc(D.engine || "—"), [D.version, D.database].filter(Boolean).map(esc).join(" · "))}
+    </section>
+    ${(D.tables || []).length ? `<div class="adm-table-wrap"><table class="adm-table" id="dbT"><thead><tr><th data-sort="name" data-type="text">Хүснэгт</th><th data-sort="rows">Мөр</th><th data-sort="bytes">Дискэн дээр</th><th data-sort="raw">Шахаагүй</th><th data-sort="ratio">Шахалт</th></tr></thead><tbody></tbody></table></div>` : ""}` : ""}
+    ${d.db_err ? `<p class="adm-empty">⚠️ Өгөгдлийн сангийн хэмжээг уншиж чадсангүй: ${esc(d.db_err)}</p>` : ""}
+
+    <h2 class="adm-h">Сервер</h2>
+    <section class="kp-grid small">
+      ${kpi("Ажилласан хугацаа", uptime(S.uptime_sec), `${dt(S.started_at)}-с хойш`)}
+      ${kpi("Санах ой", bytes(S.mem_alloc), `процесс ${bytes(S.mem_sys)}`)}
+      ${kpi("Шууд холболт", num(S.ws), "WebSocket (чат, мэдэгдэл)")}
+      ${kpi("Хувилбар", esc(S.version || "—"), `${esc(S.go || "")} · ${num(S.goroutines)} goroutine`)}
+    </section>`;
+    if ($("#dbT")) sortable($("#dbT"), D.tables.map((t) => ({ ...t, ratio: t.bytes ? t.raw / t.bytes : 0 })), (t) => `<tr><td><code>${esc(t.name)}</code></td><td class="n">${num(t.rows)}</td><td class="n"><b>${bytes(t.bytes)}</b></td><td class="n">${t.raw ? bytes(t.raw) : "—"}</td><td class="n">${t.ratio ? t.ratio.toFixed(1) + "×" : "—"}</td></tr>`, ["bytes", -1]);
   },
 };
 

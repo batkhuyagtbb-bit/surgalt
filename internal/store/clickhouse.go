@@ -203,6 +203,7 @@ var chMigrations = []string{
 	"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS rubric String DEFAULT ''",
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS phone String DEFAULT ''",
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS slot_id String DEFAULT ''",
+	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS fee Int64 DEFAULT 0", // үйлчилгээний хураамж
 	"ALTER TABLE slots ADD COLUMN IF NOT EXISTS series_id String DEFAULT ''",
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version String DEFAULT ''",
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_at Nullable(" + tsType + ")",
@@ -297,7 +298,7 @@ var chTables = []chTable{
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, lesson_id)`},
 	{"orders", `(id String, kind String, storage_mb Int64, months Int32, user_id String, course_id String,
 		lesson_id String, book_id String, meeting_id String DEFAULT '', slot_id String DEFAULT '', teacher_id String, title String, amount Int64, status String,
-		created_at ` + tsType + `, paid_at Nullable(` + tsType + `), applied Bool DEFAULT false, ver UInt64,
+		created_at ` + tsType + `, paid_at Nullable(` + tsType + `), applied Bool DEFAULT false, fee Int64 DEFAULT 0, ver UInt64,
 		INDEX ix_user user_id TYPE bloom_filter GRANULARITY 1,
 		INDEX ix_teacher teacher_id TYPE bloom_filter GRANULARITY 1)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},

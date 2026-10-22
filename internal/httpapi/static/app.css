@@ -4095,3 +4095,9 @@ ol.thread .msg-day{letter-spacing:.03em}
 /* Нүүрний танилцуулга кино: бүдэг (0.1), хулгана авчрахад эсвэл дотор нь дарахад бүрэн тод (homeFilm, app.js) */
 .home-film.hover-play{opacity:.1;transition:opacity .45s var(--ease)}
 .home-film.hover-play.is-on,.home-film.hover-play:focus-within{opacity:1}
+/* Төлбөрийн цонх: үнэ + үйлчилгээний хураамжийн задаргаа */
+.pw-fee{margin:-2px 0 8px;font-size:.8rem;font-weight:600;color:var(--muted)}
+/* Чатын самбар (Messenger шиг): мессежийн мөр бүтэн өргөнтэй — өөрийнх баруун ирмэгт, ирсэн нь аватартайгаа зүүн ирмэгт.
+   Хуучин #railThread .msg{max-width:88%} (ID-тай тул давамгайлдаг) мөрийг хязгаарлаж баруун талд 35px үлдээдэг байсан. */
+#railThread ol.thread .msg{max-width:100%}
+#railThread ol.thread{padding-left:6px;padding-right:6px}
