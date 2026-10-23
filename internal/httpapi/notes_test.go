@@ -247,3 +247,25 @@ func TestShortMediaTicket(t *testing.T) {
 	}
 	r.Body.Close()
 }
+
+// Элсээгүй ч үнэгүй хичээл үзэж оноо авсан суралцагчийн нүүр хуудсанд цол гарна.
+func TestRankWithoutEnrollment(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Математик","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true,"blocks":[{"id":"txt1","type":"text","text":"Текст."}]}`)
+	s1, _ := register(t, srv, "stud", "student")
+	if _, h := call(t, srv, "GET", "/api/me/home", s1, ""); h["rank"] != nil {
+		t.Fatalf("юу ч үзээгүй бол цол гарахгүй: %v", h["rank"])
+	}
+	call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+l["id"].(string), s1, "")
+	call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+l["id"].(string)+"/complete", s1, "")
+	call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
+	_, h := call(t, srv, "GET", "/api/me/home", s1, "")
+	rk, _ := h["rank"].(map[string]any)
+	if rk == nil || rk["points"].(float64) <= 0 || len(h["course_ranks"].([]any)) != 1 || len(h["courses"].([]any)) != 0 {
+		t.Fatalf("элсээгүй суралцагчийн цол: rank=%v courses=%v", h["rank"], h["courses"])
+	}
+}
