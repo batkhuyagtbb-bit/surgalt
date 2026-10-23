@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"slices"
+	"time"
 )
 
 // hlMem — суралцагчийн тодруулгууд: (хэрэглэгч, хичээл) → жагсаалт (highlights.go).
@@ -12,6 +13,19 @@ func (m *Memory) Highlights(_ context.Context, userID, lessonID string) ([]Highl
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return append([]Highlight{}, m.hl[[2]string{userID, lessonID}]...), nil
+}
+
+func (m *Memory) UserHighlights(_ context.Context, userID string) ([]HighlightSet, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := []HighlightSet{}
+	for k, hs := range m.hl {
+		if k[0] == userID && len(hs) > 0 {
+			out = append(out, HighlightSet{LessonID: k[1], Items: slices.Clone(hs), UpdatedAt: m.hlAt[k]})
+		}
+	}
+	slices.SortFunc(out, func(a, b HighlightSet) int { return b.UpdatedAt.Compare(a.UpdatedAt) })
+	return out, nil
 }
 
 func (m *Memory) SetHighlights(_ context.Context, userID, lessonID string, hs []Highlight) error {
@@ -26,5 +40,9 @@ func (m *Memory) SetHighlights(_ context.Context, userID, lessonID string, hs []
 		return nil
 	}
 	m.hl[k] = slices.Clone(hs)
+	if m.hlAt == nil {
+		m.hlAt = map[[2]string]time.Time{}
+	}
+	m.hlAt[k] = time.Now()
 	return nil
 }

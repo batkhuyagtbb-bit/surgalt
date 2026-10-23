@@ -411,10 +411,12 @@ function beBlockHTML(b) {
   else if (b.type === "heading") body = `<input class="be-h" maxlength="200" placeholder="Гарчиг бичнэ үү" value="${esc(b.text || "")}">`;
   else if (b.type === "cloud") body = `<input class="be-cloud-q" maxlength="200" placeholder="Асуулт — жишээ нь: Фотосинтез гэж сонсоход юу санаанд орж байна?" value="${esc(b.text || "")}">
       <div class="be-embed-bar"><label class="small">Нэг хүн <select class="be-cloud-n" style="width:auto;margin:0 4px">${[1, 2, 3].map((n) => `<option value="${n}" ${(b.max || 1) === n ? "selected" : ""}>${n}</option>`).join("")}</select> үг илгээнэ</label>
-      <span class="muted small">Суралцагчдын хариулт үүл болж харагдана — олон хүн бичсэн үг томорно.</span></div>`;
+      <span class="muted small">Суралцагчдын хариулт үүл болж харагдана — олон хүн бичсэн үг томорно.</span></div>
+      <details class="be-cloud-live"><summary>${ico("eye", 15)}Суралцагчдын хариулт (шууд)</summary><div class="be-cloud-res"></div></details>`;
   else if (b.type === "board") body = `<input class="be-board-t" maxlength="300" placeholder="Самбарын гарчиг эсвэл даалгавар — жишээ нь: Ургамлын хэсгүүдийг зурж нэрлэ" value="${esc(b.text && b.text !== "Цагаан самбар" ? b.text : "")}">
       <div class="be-embed-bar"><label class="small">Анхдагч багийн тоо <select class="be-board-n" style="width:auto;margin:0 4px">${[2, 3, 4, 5, 6, 8, 10, 12].map((n) => `<option value="${n}" ${(b.max || 4) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
-      <span class="muted small">Хичээл дээр «Самбар нээх» дарж та тайлбарлана; хүүхдүүд хувиараа эсвэл багаар зурж, бичиж, зураг оруулна — бүгд танд шууд харагдана.</span></div>`;
+      <span class="muted small">Хичээл дээр «Самбар нээх» дарж та тайлбарлана; хүүхдүүд хувиараа эсвэл багаар зурж, бичиж, зураг оруулна — бүгд танд шууд харагдана.</span></div>
+      <div class="be-live"><button type="button" class="btn btn-gold btn-sm" data-board-open>${ico("board", 15)}Самбар нээх</button><span class="muted small">Хичээл эхлэхээс өмнө ажлын хуудсаа бэлдэж, зураг, дүрс байрлуулж болно.</span></div>`;
   else if (b.type === "embed") body = `<textarea class="be-embed" rows="5" maxlength="60000" spellcheck="false" placeholder="Холбоос (https://…) эсвэл HTML код буулгана уу — Google Docs/Slides/Forms, Canva, YouTube, GeoGebra, Desmos, Padlet, Quizlet… Холбоос хичээл дотроо шууд ажиллана.">${esc(b.text || "")}</textarea>
       <div class="be-embed-bar"><label class="small">Өндөр<input class="be-embed-h" type="number" min="80" max="2000" step="20" value="${b.height || 420}"> px</label><button type="button" class="btn btn-glass btn-sm" data-embed-preview>Урьдчилан харах</button><span class="muted small">Тусгаарлагдсан хүрээнд аюулгүй ажиллана</span></div>
       <div class="be-embed-prev"></div>`;
@@ -601,6 +603,24 @@ function mountBlockEditor(f, blocks) {
     else document.execCommand(cmd);
   };
   box.addEventListener("mousedown", (e) => { if (e.target.closest("[data-cmd]")) e.preventDefault(); }); // сонголтыг алдахгүй
+  // Хадгалагдсан хичээлийн блокууд (самбар, үүлэн үг серверт байгаа эсэх).
+  const saved = new Map((f.dataset.edit ? blocks : []).map((b) => [b.id, b]));
+  const lessonBase = (lid) => `/api/courses/${f.dataset.course}/lessons/${lid}`;
+  box.addEventListener("click", (e) => {
+    const ob = e.target.closest("[data-board-open]"); if (!ob) return;
+    const el = ob.closest(".be-block"), id = el.dataset.id, title = $(".be-board-t", el).value.trim() || "Цагаан самбар";
+    const open = (lid) => SG.openBoard({ base: `${lessonBase(lid)}/board/${encodeURIComponent(id)}`, lid, bid: id, title, teacher: true }).catch((err) => toast(err.message, true));
+    if (!f.dataset.course) return toast("Сургалтаа эхлээд хадгална уу", true);
+    if (f.dataset.edit && saved.get(id)?.type === "board") return open(f.dataset.edit);
+    if (!confirm("Самбарыг нээхийн өмнө хичээлийг хадгална. Хадгалаад нээх үү?")) return;
+    f._afterSave = open; f.requestSubmit();
+  });
+  box.addEventListener("toggle", (e) => {
+    const d = e.target; if (!d.matches?.(".be-cloud-live") || !d.open) return;
+    const id = d.closest(".be-block").dataset.id, res = $(".be-cloud-res", d), sb = saved.get(id);
+    if (!sb || sb.type !== "cloud" || !f.dataset.course) { res.innerHTML = `<p class="muted small">Хичээлийг хадгалсны дараа суралцагчдын хариулт энд шууд харагдана.</p>`; return; }
+    res.innerHTML = SG.blocksHTML([sb]); SG.mountClouds(res, lessonBase(f.dataset.edit), true);
+  }, true);
   box.addEventListener("click", (e) => {
     const t = e.target, el = t.closest(".be-block");
     const c = t.closest("[data-cmd]"); if (c && el) return exec(c.dataset.cmd, $(".be-rt", el));
@@ -942,7 +962,7 @@ async function courseEditor(id) {
         <h3 class="h3">Сургалтын тохиргоо</h3><form class="form" id="gpForm">${courseFormHTML(c)}<p class="form-error" role="alert"></p>
         <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`;
     hydrateBooks(main);
-    const cf = $("#composerForm"); if (cf) mountBlockEditor(cf, lessonBlocks(null));
+    const cf = $("#composerForm"); if (cf) { cf.dataset.course = c.id; mountBlockEditor(cf, lessonBlocks(null)); }
     if (view === "journal" && $("#journal")) loadJournal();
   };
 
@@ -1086,7 +1106,7 @@ async function courseEditor(id) {
   const reload = async () => { const d = await api(`/api/me/courses/${id}`); c = d.course; lessons = d.lessons; commentCounts = d.comments || {}; roster = await api(`/api/me/courses/${id}/students`).catch(() => roster); render(); };
 
   // Засварлах маягт + блок засварлагч.
-  const putEditor = (box, l, preset, kind) => { box.innerHTML = editorHTML(l, preset, kind); mountBlockEditor($(".post-editor", box), lessonBlocks(l)); };
+  const putEditor = (box, l, preset, kind) => { box.innerHTML = editorHTML(l, preset, kind); const pf = $(".post-editor", box); pf.dataset.course = c.id; mountBlockEditor(pf, lessonBlocks(l)); };
   // ---- Хөтөлбөрийн DOM → хадгалах ----
   const domSecs = () => $$("#olSecs > .ol-sec");
   const domNames = () => domSecs().map((x) => x.dataset.sec);
@@ -1323,13 +1343,16 @@ async function courseEditor(id) {
       }
       if (!f.classList.contains("post-editor")) return;
       if (f._be?.uploading()) { toast("Файл хуулагдаж дуустал түр хүлээнэ үү"); return; }
+      const after = f._afterSave; f._afterSave = null;
+      let savedLid = f.dataset.edit;
       if (f.dataset.edit) { await api(`/api/courses/${c.id}/lessons/${f.dataset.edit}`, { method: "PUT", body: lessonBody(f, lessons.find((x) => x.id === f.dataset.edit)) }); toast("Хичээл шинэчлэгдлээ ✓"); }
       else {
         const body = lessonBody(f), nl = await api(`/api/courses/${c.id}/lessons`, { method: "POST", body });
-        toast("Хичээл нийтлэгдлээ ✓");
+        toast("Хичээл нийтлэгдлээ ✓"); savedLid = nl.id;
         if (body.section) { lessons = [...lessons, nl]; await placeNew(nl.id, body.section); }
       }
       await reload();
+      after?.(savedLid);
     } catch (err) { if (errBox) errBox.textContent = err.message; toast(err.message, true); }
   };
   const onEdInput = (e) => { const pe = e.target.closest?.(".post-editor"); if (pe) pe.dataset.dirty = "1"; }; // хадгалаагүй өөрчлөлт

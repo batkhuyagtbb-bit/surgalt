@@ -46,6 +46,7 @@ type Memory struct {
 	books       bookMem                    // ном (memory_books.go)
 	pay         payoutMem                  // багшийн данс, татах хүсэлт (memory_payouts.go)
 	hl          hlMem                      // суралцагчийн тодруулгууд (memory_highlights.go)
+	hlAt        map[[2]string]time.Time    // тодруулгыг сүүлд өөрчилсөн цаг
 	boards      boardMem                   // цагаан самбарын өрөөнүүд (memory_board.go)
 	cloud       cloudMem                   // үүлэн үгийн хариултууд (memory_cloud.go)
 	invoices    map[string]*PaymentInvoice // order → сүүлийн нэхэмжлэх
@@ -303,6 +304,24 @@ func (m *Memory) LessonsByCourse(_ context.Context, courseID string) ([]Lesson, 
 	out := make([]Lesson, 0, len(m.lessons[courseID]))
 	for _, l := range m.lessons[courseID] {
 		out = append(out, *l)
+	}
+	return out, nil
+}
+
+func (m *Memory) LessonsByIDs(_ context.Context, ids []string) ([]Lesson, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	want := map[string]bool{}
+	for _, id := range ids {
+		want[id] = true
+	}
+	out := []Lesson{}
+	for _, ls := range m.lessons {
+		for _, l := range ls {
+			if want[l.ID] {
+				out = append(out, *l)
+			}
+		}
 	}
 	return out, nil
 }

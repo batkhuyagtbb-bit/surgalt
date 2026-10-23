@@ -252,6 +252,13 @@ func (c *ClickHouse) LessonByID(ctx context.Context, courseID, lessonID string) 
 	return &ls[0], nil
 }
 
+func (c *ClickHouse) LessonsByIDs(ctx context.Context, ids []string) ([]Lesson, error) {
+	if len(ids) == 0 {
+		return []Lesson{}, nil
+	}
+	return c.lessonsWhere(ctx, "has(?, id)", ids)
+}
+
 func (c *ClickHouse) UpdateLesson(ctx context.Context, l *Lesson) error {
 	unlock, err := c.lock(ctx, "lessons:"+l.CourseID)
 	if err != nil {

@@ -641,6 +641,8 @@ type Store interface {
 	CreateLesson(ctx context.Context, l *Lesson) error
 	LessonsByCourse(ctx context.Context, courseID string) ([]Lesson, error)
 	LessonByID(ctx context.Context, courseID, lessonID string) (*Lesson, error)
+	// LessonsByIDs — ID-гаар хичээлүүд (олдоогүйг алгасна, дараалал баталгаагүй).
+	LessonsByIDs(ctx context.Context, ids []string) ([]Lesson, error)
 	// UpdateLesson нь гарчиг, агуулга, медиа, үнэгүй/төлбөртэй, үнэ, дараалсан нээлтийн тохиргоог шинэчилнэ.
 	UpdateLesson(ctx context.Context, l *Lesson) error
 	// SetLessonHidden — хичээлийг суралцагчдад нээх (false) / хаах (true).

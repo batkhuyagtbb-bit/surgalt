@@ -34,7 +34,9 @@ const EMOJI = [
 ];
 const BGS = [["dots", "Цэгэн"], ["grid", "Нүдэн тор"], ["lines", "Шугамтай"], ["none", "Хоосон"]];
 const ERASABLE = new Set(["pen", "marker", "line", "shape", "icon", "emoji", "text"]);
-const PROPS = ["id", "k", "lk", "by", "fm", "note"];
+const PROPS = ["id", "k", "lk", "by", "fm", "note", "cr"];
+const IMG_KINDS = [["", "Бүгд"], ["clip", "Зурган"], ["photo", "Гэрэл зураг"]];
+const IMG_IDEAS = ["нарны аймаг", "наран цэцэг", "хүний бие", "амьтан", "монгол гэр", "галт уул", "үлэг гүрвэл", "дэлхий"];
 const U = 100; // дүрсийн суурь хэмжээ (scaleX/Y-ээр томруулна, хүрээ strokeUniform)
 
 const regular = (n, rot = -Math.PI / 2) => Array.from({ length: n }, (_, i) => [0.5 + 0.5 * Math.cos(rot + i * 2 * Math.PI / n), 0.5 + 0.5 * Math.sin(rot + i * 2 * Math.PI / n)]);
@@ -176,7 +178,7 @@ function shellHTML(title) {
       <button type="button" data-t="laser" class="bd-tonly" title="Лазер заагч (K)">${bi("laser")}</button>
     </nav>
     <div class="bd-pop" data-p="shapes" hidden></div>
-    <div class="bd-pop" data-p="image" hidden></div>
+    <div class="bd-pop bd-pop-img" data-p="image" hidden></div>
     <div class="bd-pop bd-pop-lg" data-p="icons" hidden></div>
     <div class="bd-pop bd-pop-lg" data-p="emoji" hidden></div>
     <div class="bd-pop bd-menu" data-p="more" hidden></div>
@@ -825,11 +827,12 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     if (!r.ok) throw new Error(d?.error || "Зураг оруулж чадсангүй");
     return d;
   }
-  function addImage(d, at) {
+  function addImage(d, at, cr) {
     return new Promise((res) => F.Image.fromURL(d.url, (img, err) => {
       if (!img || err || !img.width) { toast("Зургийг ачаалж чадсангүй", true); return res(null); }
       const vp = viewRect(), s = Math.min(1, (vp.w * 0.5) / img.width, (vp.h * 0.55) / img.height), c = at || dropPoint();
       img.set({ left: c.x, top: c.y, scaleX: s, scaleY: s, k: "image" });
+      if (cr) img.cr = String(cr).slice(0, 200);
       addLocal(img, { select: true }); res(img);
     }));
   }
@@ -848,6 +851,16 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     if (!/^https?:\/\//i.test(u)) return toast("Зургийн холбоос https://-ээр эхэлнэ", true);
     const done = busyToast("Зураг татаж байна…");
     try { await addImage(await post("/fetch", { url: u }), at); } catch (e) { toast(e.message, true); } finally { done(); }
+  }
+  // Хайлтаас: том хувилбарыг сервер татна; болохгүй бол жижиг хувилбараар.
+  async function insertHit(h, at) {
+    if (!canEdit) return toast("Энэ самбарт одоо зураг оруулах боломжгүй", true);
+    const done = busyToast("Зураг оруулж байна…");
+    try {
+      let d;
+      try { d = await post("/fetch", { url: h.url }); } catch (e) { if (!h.thumb || h.thumb === h.url) throw e; d = await post("/fetch", { url: h.thumb }); }
+      await addImage(d, at, h.credit);
+    } catch (e) { toast(e.message, true); } finally { done(); }
   }
   const imgFromHTML = (html) => { const m = /<img[^>]+src\s*=\s*["']([^"']+)["']/i.exec(html || ""); return m ? m[1].replace(/&amp;/g, "&") : ""; };
   async function editImage(o) {
@@ -921,7 +934,8 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
   wrap.addEventListener("drop", (e) => {
     e.preventDefault(); wrap.classList.remove("bd-drop");
     const dt = e.dataTransfer, pt = cv.restorePointerVpt(new F.Point(e.offsetX, e.offsetY));
-    const em = dt.getData("text/x-sg-emoji"), ic = dt.getData("text/x-sg-icon");
+    const em = dt.getData("text/x-sg-emoji"), ic = dt.getData("text/x-sg-icon"), hit = dt.getData("text/x-sg-img");
+    if (hit) { try { return insertHit(JSON.parse(hit), pt); } catch { return; } }
     if (em) return canEdit && addEmoji(em, pt);
     if (ic) return canEdit && addIcon(ic, pt);
     const files = [...dt.files].filter((f) => f.type.startsWith("image/"));
@@ -942,7 +956,10 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     if (btn && innerWidth > 720) {
       const r = btn.getBoundingClientRect(), s = stage.getBoundingClientRect();
       if (name === "more") { p.style.top = "8px"; p.style.right = "12px"; p.style.left = "auto"; }
-      else { p.style.left = r.right - s.left + 10 + "px"; p.style.top = clamp(r.top - s.top - 8, 8, s.height - p.offsetHeight - 8) + "px"; p.style.right = "auto"; }
+      else { // том цонх (зураг хайлт, дүрс, эможи) дээрээсээ — үр дүн ачаалагдаж өндөр нь өсөхөд тайрагдахгүй
+        const big = name === "image" || name === "icons" || name === "emoji";
+        p.style.left = r.right - s.left + 10 + "px"; p.style.top = (big ? 8 : clamp(r.top - s.top - 8, 8, s.height - p.offsetHeight - 8)) + "px"; p.style.right = "auto";
+      }
     }
   }
   function renderShapes(p) {
@@ -951,13 +968,43 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
       <div class="bd-pop-h"><b>Шугам, сум</b></div>
       <div class="bd-shgrid">${Object.entries(LINES).map(([k, [t, svg]]) => `<button type="button" data-sh="${k}" class="${shapeKind === k ? "on" : ""}" title="${esc(t)}"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg></button>`).join("")}</div>`;
   }
+  /* Зураг хайлт: самбар дотроо хайж, дармагц (эсвэл чирээд) оруулна. Хайлтын төлөв попап хаагдсан ч хадгалагдана. */
+  const isr = { q: "", kind: "", page: 1, items: [], more: false, busy: false, en: "" };
   function renderImagePop(p) {
-    p.innerHTML = `<div class="bd-pop-h"><b>Зураг оруулах</b></div>
-      <button type="button" class="bd-big" data-img="file">${bi("upload", 22)}<span><b>Компьютер, утаснаас</b><small>PNG, JPG, WebP, GIF — олныг зэрэг</small></span></button>
-      <form class="bd-f" data-img="google"><label>Google-ээс хайх</label><div class="bd-row"><input name="q" placeholder="жишээ нь: нарны аймаг" required autocomplete="off"><button class="btn btn-gold btn-sm" title="Хайх">${bi("search", 16)}</button></div>
-        <small class="muted">Нээгдсэн зураг дээр <b>баруун товч → «Зургийг хуулах»</b> дараад энд <kbd>Ctrl</kbd>+<kbd>V</kbd>. Зургийг чирээд самбар руу оруулж ч болно.</small></form>
-      <form class="bd-f" data-img="url"><label>Зургийн холбоосоор</label><div class="bd-row"><input name="u" placeholder="https://…/zurag.png" required autocomplete="off" inputmode="url"><button class="btn btn-glass btn-sm">Оруулах</button></div></form>
-      <p class="bd-tip">${bi("crop", 15)}<span>Зураг дээр <b>давхар дарж</b> тайрах, хайчлах, <b>дэвсгэрийг арилгана</b>.</span></p>`;
+    p.innerHTML = `<div class="bd-pop-h"><b>Зураг хайх, оруулах</b><button type="button" class="bd-mini" data-img="file">${bi("upload", 15)}Компьютерээс</button></div>
+      <form class="bd-f bd-isf" data-img="search"><div class="bd-row"><input name="q" type="search" placeholder="Юу хайх вэ? — жишээ нь: наран цэцэг" autocomplete="off" value="${esc(isr.q)}" aria-label="Зураг хайх"><button class="btn btn-gold btn-sm" title="Хайх">${bi("search", 16)}</button></div></form>
+      <div class="bd-tabs bd-ikind">${IMG_KINDS.map(([k, n]) => `<button type="button" data-ik="${k}" class="${isr.kind === k ? "on" : ""}">${n}</button>`).join("")}</div>
+      <div class="bd-ires"></div>
+      <details class="bd-imore"><summary>Бусад арга: Google, холбоос, хуулж буулгах</summary>
+        <form class="bd-f" data-img="google"><div class="bd-row"><input name="q" placeholder="Google зургаас хайх" required autocomplete="off" value="${esc(isr.q)}"><button class="btn btn-glass btn-sm">Google ↗</button></div>
+          <small class="muted">Google шинэ цонхонд нээгдэнэ: зураг дээр <b>баруун товч → «Зургийг хуулах»</b> дараад энд <kbd>Ctrl</kbd>+<kbd>V</kbd> (эсвэл зургийг чирээд оруулна).</small></form>
+        <form class="bd-f" data-img="url"><div class="bd-row"><input name="u" placeholder="Зургийн холбоос https://…" required autocomplete="off" inputmode="url"><button class="btn btn-glass btn-sm">Оруулах</button></div></form>
+      </details>
+      <p class="bd-tip">${bi("crop", 15)}<span>Оруулсан зураг дээр <b>давхар дарж</b> тайрах, <b>дэвсгэрийг арилгана</b>.</span></p>`;
+    paintHits(p);
+    if (innerWidth > 720) setTimeout(() => p.querySelector(".bd-isf input")?.focus(), 30);
+  }
+  function paintHits(p) {
+    const box = p.querySelector(".bd-ires"); if (!box) return;
+    if (isr.busy && !isr.items.length) { box.innerHTML = `<p class="bd-pop-wait"><span class="bd-spin"></span>Хайж байна…</p>`; return; }
+    if (!isr.q) { box.innerHTML = `<p class="bd-ihint">Санаа:</p><div class="bd-ideas">${IMG_IDEAS.map((t) => `<button type="button" data-idea="${esc(t)}">${esc(t)}</button>`).join("")}</div>`; return; }
+    if (!isr.items.length) { box.innerHTML = `<p class="bd-ihint">«${esc(isr.q)}» олдсонгүй — өөр үгээр, эсвэл англиар хайгаад үзээрэй.</p>`; return; }
+    box.innerHTML = `<div class="bd-igrid2">${isr.items.map((h, i) => `<button type="button" class="bd-ihit" data-hit="${i}" draggable="true" title="${esc((h.title || "") + (h.credit ? " — " + h.credit : ""))}"><img src="${esc(h.thumb)}" alt="${esc(h.title || "")}" loading="lazy" referrerpolicy="no-referrer" style="aspect-ratio:${h.w && h.h ? h.w + "/" + h.h : "4/3"}"></button>`).join("")}</div>
+      ${isr.more ? `<button type="button" class="btn btn-glass btn-sm bd-imorebtn" data-img="more" ${isr.busy ? "disabled" : ""}>${isr.busy ? "Ачаалж байна…" : "Цааш үзэх"}</button>` : ""}
+      <p class="bd-credit muted">${isr.en && isr.en !== isr.q ? `«${esc(isr.en)}» гэж хайлаа · ` : ""}Нээлттэй лицензтэй зургууд (Wikimedia Commons, Pixabay). Дармагц самбарт орно, чирж ч болно.</p>`;
+    box.querySelectorAll("img").forEach((im) => { im.onerror = () => im.closest(".bd-ihit")?.remove(); });
+  }
+  async function searchImages(p, more) {
+    if (isr.busy || !isr.q) return;
+    isr.busy = true; if (!more) { isr.items = []; isr.page = 1; } paintHits(p);
+    try {
+      const d = await api(`/api/board/images?q=${encodeURIComponent(isr.q)}&kind=${isr.kind}&page=${more ? isr.page + 1 : 1}`);
+      if (more) isr.page++;
+      const seen = new Set(isr.items.map((h) => h.url));
+      isr.items = isr.items.concat((d.items || []).filter((h) => !seen.has(h.url)));
+      isr.more = !!d.more; isr.en = d.en || "";
+    } catch (e) { toast(e.message, true); }
+    finally { isr.busy = false; paintHits(p); }
   }
   let iconData = null;
   async function renderIcons(p) {
@@ -1018,7 +1065,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
       <button type="button" data-bold class="${style.bold ? "on" : ""}" title="Тод">${bi("bold", 17)}</button></div>`;
     if (sel.length) {
       const one = sel.length === 1 ? sel[0] : null, locked = sel.every((o) => o.lk);
-      h += `<div class="bd-sg bd-acts">${one?.type === "image" ? `<button type="button" data-act="edit" class="bd-act-wide">${bi("crop", 17)}<span>Тайрах · дэвсгэр</span></button>` : ""}
+      h += `<div class="bd-sg bd-acts">${one?.type === "image" ? `<button type="button" data-act="edit" class="bd-act-wide">${bi("crop", 17)}<span>Тайрах · дэвсгэр</span></button>${one.cr ? `<button type="button" data-act="credit" title="${esc(one.cr)}">©</button>` : ""}` : ""}
         <button type="button" data-act="dup" title="Хувилах (Ctrl+D)">${bi("copy", 18)}</button>
         <button type="button" data-act="front" title="Хамгийн өмнө">${bi("front", 18)}</button>
         <button type="button" data-act="back" title="Хамгийн ард">${bi("back", 18)}</button>
@@ -1042,6 +1089,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
       const a = b.dataset.act;
       if (a === "del") delSel(); else if (a === "dup") duplicate(); else if (a === "front") zorder(true); else if (a === "back") zorder(false);
       else if (a === "edit" && sel[0]?.type === "image") editImage(sel[0]);
+      else if (a === "credit") { toast("Зургийн эх сурвалж: " + (sel[0]?.cr || "")); return; }
       else if (a === "lock") { const lk = !sel.every((o) => o.lk); restyle(sel, (o) => { o.lk = lk; }); sel.forEach(prepare); }
       renderStyle(); return;
     }
@@ -1228,6 +1276,10 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     const p = b.closest(".bd-pop");
     if (b.dataset.sh) { shapeKind = b.dataset.sh; setTool("shape"); closePops(); return; }
     if (b.dataset.img === "file") { closePops(); fileIn.click(); return; }
+    if (b.dataset.hit) { const h = isr.items[+b.dataset.hit]; if (h) { insertHit(h); b.classList.add("bd-picked"); if (innerWidth <= 720) closePops(); } return; }
+    if (b.dataset.img === "more") { searchImages(p, true); return; }
+    if (b.dataset.idea) { isr.q = b.dataset.idea; p.querySelector(".bd-isf input").value = isr.q; searchImages(p); return; }
+    if ("ik" in b.dataset) { isr.kind = b.dataset.ik; p.querySelectorAll("[data-ik]").forEach((x) => x.classList.toggle("on", x === b)); if (isr.q) searchImages(p); return; }
     if (b.dataset.cat) { p.querySelectorAll(".bd-tabs button").forEach((x) => x.classList.toggle("on", x === b)); p.querySelector(".bd-search").value = ""; const grid = p.querySelector(".bd-igrid"); const items = iconData.cats[+b.dataset.cat].i; grid.innerHTML = items.map(([n, t, inner]) => `<button type="button" draggable="true" data-ic="${esc(n)}" title="${esc(t)}"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg><small>${esc(t)}</small></button>`).join(""); return; }
     if (b.dataset.ic) { addIcon(p._inner.get(b.dataset.ic)); return; }
     if (b.dataset.ecat) { p.querySelectorAll(".bd-tabs button").forEach((x) => x.classList.toggle("on", x === b)); showEmoji(p, +b.dataset.ecat); return; }
@@ -1241,10 +1293,13 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
   root.addEventListener("submit", (e) => {
     const f = e.target.closest("form.bd-f"); if (!f) return;
     e.preventDefault();
+    if (f.dataset.img === "search") { const p = f.closest(".bd-pop"), v = f.q.value.trim(); if (v) { isr.q = v; searchImages(p); } return; }
     if (f.dataset.img === "google") window.open("https://www.google.com/search?tbm=isch&safe=active&q=" + encodeURIComponent(f.q.value.trim()), "_blank", "noopener");
     else if (f.dataset.img === "url") { closePops(); insertURL(f.u.value); }
   });
   root.addEventListener("dragstart", (e) => {
+    const hit = e.target.closest?.("[data-hit]");
+    if (hit && isr.items[+hit.dataset.hit]) { e.dataTransfer.setData("text/x-sg-img", JSON.stringify(isr.items[+hit.dataset.hit])); e.dataTransfer.effectAllowed = "copy"; }
     const em = e.target.closest?.("[data-em]"), ic = e.target.closest?.("[data-ic]");
     if (em) e.dataTransfer.setData("text/x-sg-emoji", em.dataset.em);
     if (ic) e.dataTransfer.setData("text/x-sg-icon", ic.closest(".bd-pop")._inner.get(ic.dataset.ic));

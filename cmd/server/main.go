@@ -252,6 +252,7 @@ func run(log *slog.Logger) error {
 		Mail:          mailer,
 		PayoutMin:     envInt("PAYOUT_MIN", 1000),
 		ServiceFeePct: envFloat("SERVICE_FEE_PERCENT", 1),
+		PixabayKey:    os.Getenv("PIXABAY_KEY"),
 		AdminPath:     adminPath,
 		AdminLogin:    adminLogin,
 		AdminPassHash: adminHash,

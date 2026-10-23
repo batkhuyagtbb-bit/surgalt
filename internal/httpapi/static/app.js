@@ -712,13 +712,13 @@ function blockHTML(b) {
     }
     case "text": return `<div class="rb-text" data-bid="${esc(b.id || "")}">${richHTML(b.text)}</div>`;
     case "image": return `<figure class="rb-fig"><img src="${esc(b.url)}" alt="${esc(b.text || "")}" loading="lazy">${cap}</figure>`;
-    case "audio": return `<figure class="rb-audio"><span class="rb-audio-ico">${icon("headphones", 22)}</span><div><b>${esc(b.name || "Дуу бичлэг")}</b><audio src="${esc(b.url)}" controls preload="metadata" controlslist="nodownload" oncontextmenu="return false"></audio></div>${cap}</figure>`;
+    case "audio": return `<figure class="rb-audio" data-bid="${esc(b.id || "")}"><span class="rb-audio-ico">${icon("headphones", 22)}</span><div><b>${esc(b.name || "Дуу бичлэг")}</b><audio src="${esc(b.url)}" controls preload="metadata" controlslist="nodownload" oncontextmenu="return false"></audio></div>${cap}</figure>`;
     case "video": return `<figure class="rb-video" data-bid="${esc(b.id)}" ${b.parts?.length > 1 ? `data-parts="${esc(JSON.stringify(b.parts))}"` : ""}><div class="player">${mediaHTML(b.url, b.name)}</div>${b.parts?.length > 1 ? `<div class="vparts" aria-label="Видеоны хэсгүүд">${b.parts.map((_, i) => `<button type="button" data-vpart="${i}" class="${i ? "" : "on"}">${i + 1}-р хэсэг</button>`).join("")}<span class="muted small">6 минутын ${b.parts.length} хэсэг · дараалан тоглоно</span></div>` : ""}${cap}</figure>`;
     case "file": {
       const meta = esc([extOf(b.url).slice(1).toUpperCase(), fmtBytes(b.size)].filter(Boolean).join(" · ")) + (b.text ? " · " + esc(b.text) : "");
       const kind = docKind(b.url);
       // PDF, PowerPoint, Word, Excel: хичээл дотор шууд (попапгүй), татах боломжгүй — багш зөвшөөрсөн бол л татна.
-      if (kind && kind !== "legacy") return `<figure class="rb-doc" ${b.download ? "data-dl" : "data-nodl"}>${docViewHTML(b.url, b.name || DOC_LABEL[kind])}${cap}</figure>`;
+      if (kind && kind !== "legacy") return `<figure class="rb-doc" data-bid="${esc(b.id || "")}" ${b.download ? "data-dl" : "data-nodl"}>${docViewHTML(b.url, b.name || DOC_LABEL[kind])}${cap}</figure>`;
       return b.download ? `<a class="rb-file" href="${esc(b.url)}" target="_blank" rel="noopener" download><span class="rb-file-ico">${icon("doc", 22)}</span><span><b>${esc(b.name || "Файл")}</b><small>${meta}</small></span><span class="btn btn-sm btn-glass">⬇ Татах</span></a>`
         : `<div class="rb-file"><span class="rb-file-ico">🔒</span><span><b>${esc(b.name || "Файл")}</b><small>${meta} · ${kind === "legacy" ? "Хуучин форматыг шууд үзүүлэх боломжгүй — багш PDF, .pptx, .docx болгож оруулна" : "Зөвхөн хичээл дотор үзнэ"}</small></span></div>`;
     }
@@ -834,8 +834,10 @@ function mountClouds(root, base, viewOnly = false) {
     fig.dataset.m = 1;
     const url = base && `${base}/cloud/${encodeURIComponent(fig.dataset.bid)}`;
     const box = $(".cl-cloud", fig), meta = $(".cl-meta", fig), form = $(".cl-form", fig);
-    if (!url) { form.hidden = true; box.innerHTML = `<p class="muted small">Нэвтэрч орвол хариулж, бусдын үгийг харна.</p>`; return; }
-    if (viewOnly) form.hidden = true;
+    // Багшийн засварлагч (өөр <form> дотор) — дотоод form-ыг хөтөч хасдаг тул оролтуудыг шууд нууна.
+    const hideForm = () => $$(".cl-form, .cl-in, button[type=submit]", fig).forEach((x) => (x.hidden = true));
+    if (!url) { hideForm(); box.innerHTML = `<p class="muted small">Нэвтэрч орвол хариулж, бусдын үгийг харна.</p>`; return; }
+    if (viewOnly || !form) hideForm();
     let last = "";
     const render = (d) => {
       const key = JSON.stringify([d.words, d.mine]); if (key === last) return; last = key;
@@ -846,13 +848,13 @@ function mountClouds(root, base, viewOnly = false) {
         return `<span class="cl-w${mine.has(w.w) ? " mine" : ""}" style="font-size:${(15 + k * 37).toFixed(1)}px;color:${hue}" title="${w.n} хүн">${esc(w.w)}</span>`;
       }).join("") : `<p class="muted small">${viewOnly ? "Хараахан хариулт алга." : "Хараахан хариулт алга — эхний үгийг та бичээрэй."}</p>`;
       meta.textContent = d.people ? `${d.people} хүн хариулсан` : "";
-      if (d.mine?.length && !viewOnly) {
+      if (d.mine?.length && !viewOnly && form) {
         $$(".cl-in", form).forEach((inp, i) => { if (document.activeElement !== inp) inp.value = d.mine[i] || ""; });
         $("button", form).textContent = "Шинэчлэх";
       }
     };
     const load = () => api(url).then(render).catch(() => {});
-    form.addEventListener("submit", async (e) => {
+    form?.addEventListener("submit", async (e) => {
       e.preventDefault();
       const words = $$(".cl-in", form).map((i) => i.value.trim()).filter(Boolean);
       if (!words.length) { $(".cl-in", form).focus(); return; }
@@ -1092,14 +1094,17 @@ const HL_COLORS = [["y", "Чухал"], ["g", "Ойлгосон"], ["r", "Ойл
 // ctx.self — багш өөрийн хичээлээ үзэж байна: «Багшаас асуух» урьдчилан харах байдлаар (илгээхгүй, тайлбар өгнө).
 function lessonMarker(body, base, ctx = {}) {
   const card = body.parentElement;
-  $$(".hl-bar, .hl-pop", card).forEach((x) => x.remove());
+  $$(".hl-bar, .hl-pop, .mn", card).forEach((x) => x.remove());
   body.classList.remove("hl-on", "hl-quiz");
   const units = () => (body.classList.contains("pre") ? [body] : $$(".rb-text[data-bid]", body));
   const bidOf = (u) => (u === body ? "content" : u.dataset.bid);
   // HTML embed-үүд (sandbox iframe): тодруулгыг postMessage-ээр дамжуулна (EMBED_HL_JS).
   const frames = () => $$(".rb-embed[data-bid] > iframe[srcdoc]", body);
   const frameBid = (f) => f.parentElement.dataset.bid;
-  if (!units().length && !frames().length) return () => {};
+  // Видео/аудио (мөчөөр), PDF, PowerPoint, Word (хуудас, слайдаар) дээрх тэмдэглэл.
+  const medias = () => $$(".rb-video[data-bid], .rb-audio[data-bid], .rb-doc[data-bid]", body);
+  const mediaOf = (b) => medias().find((f) => f.dataset.bid === b);
+  if (!units().length && !frames().length && !medias().length) return () => {};
   let hs = [], color = "y", saveT = 0, dirty = false, pop = null;
   const bar = document.createElement("div"); bar.className = "hl-bar";
   bar.innerHTML = `<button type="button" class="hl-btn hl-toggle" aria-pressed="false" title="Асаагаад тодруулах текстээ чирж сонгоно" aria-label="Маркер">🖍<span class="hl-lbl"> Маркер</span></button>
@@ -1109,6 +1114,7 @@ function lessonMarker(body, base, ctx = {}) {
     <button type="button" class="hl-btn hl-list-btn" aria-expanded="false" title="Миний тэмдэглэл" aria-label="Миний тэмдэглэл" disabled>📝<span class="hl-lbl"> Миний тэмдэглэл</span> <b>0</b></button>
     <div class="hl-list" hidden></div><div class="hl-ask" hidden></div>`;
   body.before(bar);
+  if (!units().length && !frames().length) { $(".hl-toggle", bar).hidden = true; $(".hl-quiz-btn", bar).hidden = true; } // зөвхөн видео/баримт: тэмдэглэл л
   const listBox = $(".hl-list", bar), askBox = $(".hl-ask", bar);
   // «Ойлгоогүй» (улаан) тодруулга: тодруулмагц цонх гарна — багшаас асуух (ишлэлтэйгээр багштай чат руу шууд)
   // эсвэл зөвхөн тэмдэглээд үлдээх. Бичсэн зүйл тодруулгын тэмдэглэл болно (асуусан бол «❓ …»).
@@ -1174,8 +1180,8 @@ function lessonMarker(body, base, ctx = {}) {
   const paint = () => {
     unwrap();
     const fb = new Set(frames().map(frameBid));
-    for (const h of hs) { if (fb.has(h.b)) { h._lost = false; continue; } const u = locate(h); h._lost = !u; if (u) wrap(u, h); }
-    syncFrames();
+    for (const h of hs) { if (h.k) { h._lost = !mediaOf(h.b); continue; } if (fb.has(h.b)) { h._lost = false; continue; } const u = locate(h); h._lost = !u; if (u) wrap(u, h); }
+    syncFrames(); paintMedia();
     const n = hs.length; $(".hl-list-btn b", bar).textContent = n;
     $(".hl-list-btn", bar).disabled = $(".hl-quiz-btn", bar).disabled = !n;
     if (!listBox.hidden) renderList();
@@ -1249,7 +1255,7 @@ function lessonMarker(body, base, ctx = {}) {
     listBox.innerHTML = HL_COLORS.map(([c, t]) => {
       const items = hs.filter((h) => h.c === c);
       return items.length ? `<div class="hl-grp"><h5><i class="hl-dot hl-${c}"></i>${t} <span class="muted">${items.length}</span></h5>${items.map((h) => `<button type="button" class="hl-item" data-go="${esc(h.id)}" ${h._lost ? "disabled" : ""}>
-        <span>${esc(h.t.length > 160 ? h.t.slice(0, 160) + "…" : h.t)}</span>${h.n ? `<small>📝 ${esc(h.n)}</small>` : ""}${h._lost ? `<small class="muted">Багш агуулгыг өөрчилсөн тул байршил олдсонгүй</small>` : ""}</button>`).join("")}</div>` : "";
+        ${h.k ? `<span><b class="hl-when">${h.k === "time" ? "▶" : "📄"} ${esc(h.t || "")}</b> ${esc(clip(mediaTitle(h.b), 60))}</span>` : `<span>${esc(h.t.length > 160 ? h.t.slice(0, 160) + "…" : h.t)}</span>`}${h.n ? `<small>📝 ${esc(h.n)}</small>` : ""}${h._lost ? `<small class="muted">Багш агуулгыг өөрчилсөн тул байршил олдсонгүй</small>` : ""}</button>`).join("")}</div>` : "";
     }).join("") || `<p class="muted small">Тэмдэглэл алга.</p>`;
   };
   const syncFrames = () => frames().forEach((f) => {
@@ -1313,6 +1319,7 @@ function lessonMarker(body, base, ctx = {}) {
     const go = e.target.closest("[data-go]");
     if (go) {
       const m = $(`mark.hl[data-hid="${CSS.escape(go.dataset.go)}"]`, body), h = hs.find((x) => x.id === go.dataset.go); listBox.hidden = true;
+      if (h?.k) return goMedia(h);
       if (m) { m.scrollIntoView({ behavior: "smooth", block: "center" }); m.classList.remove("flash"); void m.offsetWidth; m.classList.add("flash"); }
       else if (h) $(`.rb-embed[data-bid="${CSS.escape(h.b)}"]`, body)?.scrollIntoView({ behavior: "smooth", block: "center" }); // embed доторх тодруулга
     }
@@ -1326,12 +1333,95 @@ function lessonMarker(body, base, ctx = {}) {
     if (!getSelection().isCollapsed) return;
     const h = hs.find((x) => x.id === m.dataset.hid); if (h) openPop(h, m);
   };
-  const onDoc = (e) => { if (pop && !pop.contains(e.target) && !e.target.closest?.("mark.hl")) { closePop(); paint(); } };
+  const onDoc = (e) => { if (pop && !pop.contains(e.target) && !e.target.closest?.("mark.hl, [data-mn-go]")) { closePop(); paint(); } };
+  /* медиа тэмдэглэл: «📝 Энэ мөчид / хуудсанд тэмдэглэх» + тэмдэглэлүүд (дарж тэр мөч, хуудас руу) */
+  const fmtT = (s) => { s = Math.max(0, Math.floor(+s || 0)); const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = String(s % 60).padStart(2, "0"); return hh ? `${hh}:${String(mm).padStart(2, "0")}:${ss}` : `${mm}:${ss}`; };
+  const isDoc = (fig) => fig.classList.contains("rb-doc");
+  const mPlayer = (fig) => $("video, audio, iframe[data-yt]", fig);
+  const mNow = (fig) => { const v = mPlayer(fig); return v ? (v._sgNow ? v._sgNow() : v.currentTime || 0) : 0; };
+  const mDur = (fig) => { const v = mPlayer(fig); return v ? (v._sgDur ? v._sgDur() : v.duration || 0) : 0; };
+  const mDv = (fig) => $(".doc-view", fig)?._dv;
+  const pageWord = (fig) => ($(".doc-view.dv-slides", fig) ? "слайд" : "хуудас");
+  function mediaTitle(b) { const fig = mediaOf(b); return fig ? ($(".dv-title b", fig)?.textContent || $("b", fig)?.textContent || (isDoc(fig) ? "Баримт" : "Видео")) : ""; }
+  function goMedia(h) {
+    const fig = mediaOf(h.b); if (!fig) return;
+    fig.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (h.k === "time") { const v = mPlayer(fig); if (v?._sgSeek) v._sgSeek(h.sec); else if (v) { try { v.currentTime = h.sec; } catch {} } }
+    else mDv(fig)?.go?.(h.p);
+  }
+  function mountMedia() {
+    for (const fig of medias()) {
+      if (fig.querySelector(":scope > .mn")) continue;
+      const doc = isDoc(fig), el = document.createElement("div"); el.className = "mn"; el.dataset.mn = fig.dataset.bid;
+      el.innerHTML = `<div class="mn-line" hidden></div><div class="mn-row"><button type="button" class="mn-add" title="${doc ? "Одоо харж буй хуудсанд тэмдэглэл хөтлөх" : "Энэ мөчид тэмдэглэл хөтлөх — дараа нь дарж яг энэ мөч рүү очно"}">📝 <span>${doc ? "Энэ хуудсанд тэмдэглэх" : "Энэ мөчид тэмдэглэх"}</span><b class="mn-at"></b></button><div class="mn-chips"></div></div><div class="mn-form" hidden></div>`;
+      const cap = fig.querySelector(":scope > figcaption"); cap ? cap.before(el) : fig.append(el);
+    }
+  }
+  function paintMedia() {
+    for (const el of $$(".mn", body)) {
+      const fig = el.parentElement, b = el.dataset.mn, d = +el.dataset.dur || 0;
+      const list = hs.filter((h) => h.k && h.b === b).sort((x, y) => (x.sec || x.p || 0) - (y.sec || y.p || 0));
+      $(".mn-chips", el).innerHTML = list.map((h) => `<button type="button" class="mn-chip" data-mn-go="${esc(h.id)}" title="${esc(h.n || "Тэмдэглэл")}"><i class="hl-dot hl-${h.c}"></i><b>${esc(h.t || "")}</b>${h.n ? `<span>${esc(clip(h.n, 38))}</span>` : ""}</button>`).join("");
+      const line = $(".mn-line", el);
+      line.hidden = isDoc(fig) || !d || !list.length;
+      if (!line.hidden) line.innerHTML = list.map((h) => `<button type="button" class="mn-dot" data-mn-go="${esc(h.id)}" style="left:${Math.min(100, (h.sec / d) * 100)}%" title="${esc(h.t + (h.n ? " — " + h.n : ""))}"><i class="hl-dot hl-${h.c}"></i></button>`).join("");
+    }
+  }
+  const mTick = () => {
+    for (const el of $$(".mn", body)) {
+      const fig = el.parentElement, at = $(".mn-at", el);
+      if (isDoc(fig)) { const p = mDv(fig)?.page?.(); at.textContent = p ? ` · ${p}-р ${pageWord(fig)}` : ""; continue; }
+      at.textContent = " · " + fmtT(mNow(fig));
+      const d = Math.round(mDur(fig)); if (d && +el.dataset.dur !== d) { el.dataset.dur = d; paintMedia(); }
+    }
+  };
+  const mTimer = setInterval(() => { if (!document.hidden) mTick(); }, 1000);
+  const openForm = (el) => {
+    const fig = el.parentElement, doc = isDoc(fig), form = $(".mn-form", el);
+    let nw;
+    if (doc) { const p = mDv(fig)?.page?.() || 1; nw = { k: "page", p, t: `${p}-р ${pageWord(fig)}` }; }
+    else { const t = mNow(fig), v = mPlayer(fig); nw = { k: "time", sec: Math.round(t * 10) / 10, t: fmtT(t) }; try { v?._sgPause ? v._sgPause() : v?.pause?.(); } catch {} }
+    nw.c = color === "r" ? "y" : color;
+    form._new = nw; form.hidden = false;
+    form.innerHTML = `<div class="mn-fh"><b>${doc ? "📄" : "▶"} ${esc(nw.t)}</b><span class="mn-sw">${HL_COLORS.map(([c, t]) => `<button type="button" class="hl-sw" data-mc="${c}" aria-pressed="${c === nw.c}" title="${t}"><i class="hl-dot hl-${c}"></i><span class="hl-lbl">${t}</span></button>`).join("")}</span></div>
+      <textarea rows="2" maxlength="1000" placeholder="${doc ? "Энэ хуудсанд юу чухал байв? Өөрийн үгээр тэмдэглэнэ…" : "Энэ мөчид юу ярьсан бэ? Гол санаа, асуултаа тэмдэглэнэ…"}"></textarea>
+      <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-mn-x>Болих</button><button type="button" class="btn btn-gold btn-sm" data-mn-save>Хадгалах</button></div>`;
+    $("textarea", form).focus();
+  };
+  const saveForm = (el) => {
+    const form = $(".mn-form", el), nw = form._new; if (!nw) return;
+    if (hs.length >= 1000) return toast("Нэг хичээл дээр 1000 хүртэл тэмдэглэл хөтөлнө", true);
+    const n = $("textarea", form).value.trim();
+    const h = { id: hid(), b: el.dataset.mn, s: 0, e: 0, c: nw.c, t: nw.t, k: nw.k };
+    if (nw.k === "time") h.sec = nw.sec; else h.p = nw.p;
+    if (n) h.n = n.slice(0, 1000);
+    hs.push(h); form._new = null; form.hidden = true; form.innerHTML = "";
+    paint(); save(); toast("📝 Тэмдэглэгдлээ — «Миний тэмдэглэл»-ээс бүгдийг харна");
+  };
+  const onMn = (e) => {
+    const el = e.target.closest?.(".mn"); if (!el || !body.contains(el)) return;
+    const form = $(".mn-form", el);
+    if (e.target.closest(".mn-add")) { if (!form.hidden) { form.hidden = true; form._new = null; return; } return openForm(el); }
+    const sw = e.target.closest("[data-mc]");
+    if (sw && form._new) { form._new.c = sw.dataset.mc; $$("[data-mc]", form).forEach((x) => x.setAttribute("aria-pressed", x === sw)); return; }
+    if (e.target.closest("[data-mn-x]")) { form.hidden = true; form._new = null; form.innerHTML = ""; return; }
+    if (e.target.closest("[data-mn-save]")) return saveForm(el);
+    const g = e.target.closest("[data-mn-go]");
+    if (g) { const h = hs.find((x) => x.id === g.dataset.mnGo); if (h) { goMedia(h); openPop(h, g); } }
+  };
+  const onMnKey = (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && e.target.closest?.(".mn-form")) { e.preventDefault(); saveForm(e.target.closest(".mn")); } };
+  mountMedia(); mTick();
+  body.addEventListener("click", onMn); body.addEventListener("keydown", onMnKey);
   body.addEventListener("pointerup", onUp); body.addEventListener("keyup", onUp); body.addEventListener("click", onClick);
   document.addEventListener("pointerdown", onDoc); addEventListener("message", onMsg);
-  api(base).then((d) => { hs = d.highlights || []; paint(); }).catch(() => {});
+  api(base).then((d) => {
+    hs = d.highlights || []; paint();
+    const nid = new URLSearchParams(location.hash.slice(1)).get("n"), h = nid && hs.find((x) => x.id === nid);
+    if (h) setTimeout(() => { if (h.k) return goMedia(h); const m = $(`mark.hl[data-hid="${CSS.escape(h.id)}"]`, body); if (m) { m.scrollIntoView({ behavior: "smooth", block: "center" }); m.classList.remove("flash"); void m.offsetWidth; m.classList.add("flash"); } }, 900);
+  }).catch(() => {});
   return () => {
-    flush(); closePop(); closeLink();
+    flush(); closePop(); closeLink(); clearInterval(mTimer);
+    body.removeEventListener("click", onMn); body.removeEventListener("keydown", onMnKey);
     body.removeEventListener("pointerup", onUp); body.removeEventListener("keyup", onUp); body.removeEventListener("click", onClick);
     document.removeEventListener("pointerdown", onDoc); removeEventListener("message", onMsg);
   };
@@ -1589,6 +1679,15 @@ function guardVideos(box, { watched = {}, owner = false, onWatched, modal, progr
       v.addEventListener("seeking", () => { if (!free && idx >= unlockedPart && v.currentTime > maxPart + 1) { v.currentTime = maxPart; note(); } });
       v.addEventListener("ratechange", () => { if (!free && v.playbackRate > 2) v.playbackRate = 2; });
       const release = lockedControls(v, () => free, note, () => (idx < unlockedPart ? Infinity : maxPart));
+      // Маркерын тэмдэглэл (мөчөөр): 6 минутын хэсгүүдтэй бол нийт хугацаагаар.
+      v._sgNow = () => offset + v.currentTime;
+      v._sgDur = () => (parts.length > 1 ? SEG * (parts.length - 1) + (idx === parts.length - 1 ? v.duration || 0 : SEG) : v.duration || 0);
+      v._sgSeek = (t) => {
+        const i = parts.length > 1 ? Math.min(parts.length - 1, Math.floor(t / SEG)) : 0;
+        if (!free && i > unlockedPart) return note();
+        const set = () => { v.currentTime = Math.max(0, t - i * SEG); };
+        if (parts.length > 1 && i !== idx) { loadPart(i, false); v.addEventListener("loadedmetadata", set, { once: true }); } else set();
+      };
       v.addEventListener("ended", () => {
         if (parts.length > 1 && idx < parts.length - 1) { unlockedPart = Math.max(unlockedPart, idx + 1); loadPart(idx + 1, true); return; } // дараагийн хэсэг
         if (!free) { free = true; onWatched?.(bid); release(); paintParts(); } flush();
@@ -1606,6 +1705,10 @@ function guardVideos(box, { watched = {}, owner = false, onWatched, modal, progr
         },
       } });
       modal._ytPause = () => { try { p.pauseVideo(); } catch {} };
+      v._sgNow = () => { try { return p.getCurrentTime() || 0; } catch { return 0; } };
+      v._sgDur = () => { try { return p.getDuration() || 0; } catch { return 0; } };
+      v._sgSeek = (t) => { try { if (!free && t > max + 0.5) { note(); t = max; } p.seekTo(Math.max(0, t), true); } catch {} };
+      v._sgPause = () => { try { p.pauseVideo(); } catch {} };
       // Хамгаалах давхарга ба өөрийн удирдлага (YouTube-ийн холбоос, лого дарагдахгүй).
       const wrap = v.closest(".yt-wrap");
       if (wrap) {
@@ -2277,6 +2380,8 @@ function slidePlayer(el, body, { count, ratio, draw, prefetch }) {
   ro?.observe(stage);
   show(0);
   return {
+    page: () => cur + 1,
+    go: (p) => show(p - 1, p - 1 > cur ? 1 : -1),
     key(e) {
       if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); step(1); }
       else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) { e.preventDefault(); step(-1); }
@@ -2300,6 +2405,8 @@ function flipInline(el, body, doc, ratio, wide) {
   });
   let rt = 0;
   return {
+    page() { return Math.min(doc.numPages, fb.single ? fb.cur + 1 : Math.max(1, fb.cur * 2)); },
+    go(p) { fb.go(fb.single ? p - 1 : Math.floor(p / 2)); },
     key(e) {
       if (["ArrowRight", "PageDown", " "].includes(e.key)) { e.preventDefault(); fb.go(fb.cur + 1); }
       else if (["ArrowLeft", "PageUp"].includes(e.key)) { e.preventDefault(); fb.go(fb.cur - 1); }
@@ -2354,6 +2461,8 @@ const DOC_VIEWS = {
     if ("ResizeObserver" in window) new ResizeObserver(apply).observe(sc);
     apply();
     return {
+      page() { const top = sc.getBoundingClientRect().top + 12; let p = 1; pages.forEach((s, i) => { if (s.getBoundingClientRect().top <= top) p = i + 1; }); return p; },
+      go(p) { const s = pages[p - 1]; if (s) sc.scrollTo({ top: sc.scrollTop + s.getBoundingClientRect().top - sc.getBoundingClientRect().top - 8, behavior: "smooth" }); },
       key(e) {
         if (e.key === "+" || e.key === "=") setZ(z * 1.25); else if (e.key === "-") setZ(z / 1.25); else if (e.key === "0") setZ(1);
         else if (e.key === "PageDown" || e.key === " ") { e.preventDefault(); sc.scrollBy({ top: sc.clientHeight * 0.9, behavior: "smooth" }); }
@@ -2520,6 +2629,7 @@ const BookReader = {
           <button class="rd-btn" data-fit title="Хуудасны өргөнд / бүтэн хуудсанд тааруулах">⇔</button>
           <button class="rd-btn" data-mode title="Нэг / хоёр хуудсаар">▯▯</button>
           <button class="rd-btn" data-fs title="Бүтэн дэлгэц (F)">⛶</button>
+          ${loggedIn ? `<button class="rd-btn rd-nbtn" data-notes title="Миний тэмдэглэл — хуудас бүрт" aria-label="Миний тэмдэглэл">📝<b></b></button>` : ""}
           <button class="rd-btn" data-close title="Хаах (Esc)" aria-label="Хаах">✕</button>
         </div></div>
       <div class="rd-stage"><div class="rd-pan"><div class="fb-book"></div></div></div>
@@ -2536,6 +2646,53 @@ const BookReader = {
     this.rs = () => { clearTimeout(this.rt); this.rt = setTimeout(() => this.layout(), 120); }; addEventListener("resize", this.rs);
     this.bindGestures();
     this.layout();
+    this.notes = []; this.noteColor = "y";
+    if (loggedIn) api(`/api/books/${id}/notes`).then((d) => { if (this.id !== id || !this.el) return; this.notes = d.highlights || []; this.notesPaint(); }).catch(() => {});
+  },
+  /* Номын тэмдэглэл: одоо харж буй хуудсанд өнгө + тэмдэглэл; жагсаалтаас дарж тэр хуудас руу очно. */
+  notePage() { return Math.max(1, Math.min(this.readable, this.single ? this.cur + 1 : Math.max(1, this.cur * 2))); },
+  notesOpen(on) {
+    let p = $(".rd-notes", this.el);
+    if (!on) { p?.remove(); $("[data-notes]", this.el)?.classList.remove("on"); return; }
+    if (!p) { p = document.createElement("aside"); p.className = "rd-notes"; p.setAttribute("aria-label", "Миний тэмдэглэл"); this.el.append(p); p.addEventListener("click", (e) => this.notesClick(e)); p.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.noteAdd(); } }); }
+    $("[data-notes]", this.el)?.classList.add("on");
+    this.notesPaint(true);
+  },
+  notesPaint(full) {
+    if (!this.el) return;
+    const n = this.notes.length, b = $("[data-notes] b", this.el); if (b) b.textContent = n ? n : "";
+    const has = new Set(this.notes.map((h) => h.p));
+    $$(".face[data-p]", this.el).forEach((f) => f.classList.toggle("has-note", has.has(+f.dataset.p)));
+    const p = $(".rd-notes", this.el); if (!p) return;
+    const pg = this.notePage(), list = [...this.notes].sort((x, y) => x.p - y.p);
+    const listHTML = list.length ? list.map((h) => `<div class="rn-item ${h.p === pg ? "here" : ""}"><button type="button" class="rn-go" data-np="${h.p}"><i class="hl-dot hl-${h.c}"></i><b>${h.p}-р хуудас</b>${h.n ? `<span>${esc(h.n)}</span>` : ""}</button><button type="button" class="icon-btn rn-del" data-ndel="${esc(h.id)}" title="Устгах" aria-label="Устгах">✕</button></div>`).join("") : `<p class="muted small">Одоогоор тэмдэглэл алга. Хуудас уншингаа гол санаа, асуултаа тэмдэглээрэй.</p>`;
+    if (!full && $(".rn-list", p)) { $(".rn-list", p).innerHTML = listHTML; $(".rn-pg", p).textContent = `📄 ${pg}-р хуудас`; return; }
+    p.innerHTML = `<header><b>📝 Миний тэмдэглэл</b><button type="button" class="icon-btn" data-nclose aria-label="Хаах">✕</button></header>
+      <div class="rn-form"><div class="rn-fh"><b class="rn-pg">📄 ${pg}-р хуудас</b><span>${HL_COLORS.map(([c, t]) => `<button type="button" class="hl-sw" data-nc="${c}" aria-pressed="${c === this.noteColor}" title="${t}"><i class="hl-dot hl-${c}"></i></button>`).join("")}</span></div>
+        <textarea rows="3" maxlength="1000" placeholder="Энэ хуудсанд юу чухал байв? Өөрийн үгээр, асуулт, жишээ…"></textarea>
+        <button type="button" class="btn btn-gold btn-sm" data-nadd>Энэ хуудсанд нэмэх</button></div>
+      <div class="rn-list">${listHTML}</div>`;
+  },
+  noteAdd() {
+    const p = $(".rd-notes", this.el), ta = p && $("textarea", p); if (!ta) return;
+    const n = ta.value.trim(); if (!n) { ta.focus(); return toast("Тэмдэглэлээ бичнэ үү"); }
+    if (this.notes.length >= 1000) return toast("1000 хүртэл тэмдэглэл хөтөлнө", true);
+    const pg = this.notePage();
+    this.notes.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), b: "book", s: 0, e: 0, k: "page", p: pg, c: this.noteColor, t: `${pg}-р хуудас`, n: n.slice(0, 1000) });
+    ta.value = ""; this.notesPaint(); this.notesSave(); toast("📝 Тэмдэглэгдлээ");
+  },
+  notesSave() {
+    clearTimeout(this.nsT);
+    const id = this.id, list = this.notes;
+    this.nsT = setTimeout(() => api(`/api/books/${id}/notes`, { method: "PUT", body: { highlights: list } }).catch((e) => toast(e.message, true)), 400);
+  },
+  notesClick(e) {
+    const t = e.target;
+    if (t.closest("[data-nclose]")) return this.notesOpen(false);
+    if (t.closest("[data-nadd]")) return this.noteAdd();
+    const c = t.closest("[data-nc]"); if (c) { this.noteColor = c.dataset.nc; $$("[data-nc]", this.el).forEach((x) => x.setAttribute("aria-pressed", x === c)); return; }
+    const d = t.closest("[data-ndel]"); if (d) { this.notes = this.notes.filter((h) => h.id !== d.dataset.ndel); this.notesPaint(); this.notesSave(); return; }
+    const g = t.closest("[data-np]"); if (g) { const p = +g.dataset.np; this.go(this.single ? p - 1 : Math.floor(p / 2)); }
   },
   layout() {
     const el = this.el; if (!el) return;
@@ -2593,6 +2750,7 @@ const BookReader = {
     $("[data-prev]", this.el).disabled = k === 0; $("[data-next]", this.el).disabled = k >= this.leaves;
     for (let p = Math.max(1, k * per - 2); p <= Math.min(this.readable, k * per + 4); p++) this.load(p);
     this.trim(k * per);
+    if (this.notes) this.notesPaint();
   },
   async load(p) {
     if (this.urls.has(p) || this.loading.has(p) || !this.el) return;
@@ -2676,8 +2834,10 @@ const BookReader = {
     if (t.closest("[data-fit]")) { this.fit = this.fit === "page" ? "width" : "page"; this.zoom = 1; this.pan = { x: 0, y: 0 }; return this.layout(); }
     if (t.closest("[data-mode]")) { this.mode = this.single ? "double" : "single"; const p = this.cur * (this.single ? 1 : 2); this.cur = this.mode === "single" ? p : Math.floor(p / 2); return this.layout(); }
     if (t.closest("[data-fs]")) { document.fullscreenElement ? document.exitFullscreen?.() : this.el.requestFullscreen?.(); }
+    if (t.closest("[data-notes]")) this.notesOpen(!$(".rd-notes", this.el));
   },
   onKey(e) {
+    if (e.target.closest?.("textarea, input")) { if (e.key === "Escape") this.notesOpen(false); return; }
     if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") { e.preventDefault(); this.go(this.cur + 1); }
     else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); this.go(this.cur - 1); }
     else if (e.key === "Home") this.go(0); else if (e.key === "End") this.go(this.leaves);
@@ -2694,6 +2854,8 @@ const BookReader = {
     if (document.fullscreenElement) document.exitFullscreen?.();
     for (const u of this.urls.values()) URL.revokeObjectURL(u);
     this.urls.clear(); this.ratio = 0; this.cur = 0;
+    if (this.nsT) { clearTimeout(this.nsT); this.nsT = 0; api(`/api/books/${this.id}/notes`, { method: "PUT", body: { highlights: this.notes || [] } }).catch(() => {}); }
+    this.notes = null;
     document.documentElement.classList.remove("reader-open");
     el.classList.remove("open"); setTimeout(() => el.remove(), 300);
   },
@@ -3370,6 +3532,146 @@ function profileOwner(root, h) {
 }
 
 /* ---------- нүүр хуудас: нэвтэрсэн хэрэглэгчийн самбар ---------- */
+/* ---------- Миний тэмдэглэл → «story»: хичээл бүрийн тодруулга, видео/баримтын тэмдэглэл нүүрэнд (зөвхөн өөрт) ----------
+   Цагираг бүр нэг хичээл (ном); эхнийх нь бүх тэмдэглэлээс санамсаргүй сонгосон «Өнөөдрийн давталт».
+   Үзэгч: Instagram маягийн дэвсгэр, явцын мөр, дарж/шудраж шилжинэ, удаан дарвал зогсоно, анимац олон янз. */
+const ST_CAT = { y: ["⭐", "Чухал"], g: ["✅", "Ойлгосон"], r: ["❓", "Ойлгоогүй"], b: ["📘", "Нэр томьёо"] };
+const ST_FX = ["st-rise", "st-zoom", "st-tilt", "st-slide", "st-blur", "st-flip"];
+const stTop = (notes) => { const c = { y: 0, g: 0, r: 0, b: 0 }; for (const n of notes) c[n.c] = (c[n.c] || 0) + 1; return Object.entries(c).sort((a, b) => b[1] - a[1])[0][0]; };
+const stKey = (s) => s.id + ":" + s.notes.length + ":" + (s.updated_at || "");
+async function noteStories(rail) {
+  if (!rail || !Auth.token) return;
+  let d; try { d = await api("/api/me/notes"); } catch { return; }
+  const list = (d.stories || []).filter((s) => s.notes?.length);
+  if (!list.length) return;
+  const all = list.flatMap((s) => s.notes.map((n) => ({ ...n, _s: s })));
+  const stories = [];
+  if (all.length >= 3) stories.push({ id: "review-" + new Date().toDateString(), kind: "review", title: "Өнөөдрийн давталт", sub: `${all.length} тэмдэглэлээс`, notes: all.slice().sort(() => Math.random() - 0.5).slice(0, 8), url: "" });
+  stories.push(...list);
+  const seen = store.get("sg_story_seen") || {};
+  rail.innerHTML = `<div class="st-head"><h2><span class="sec-ico">${icon("book", 17)}</span>Миний тэмдэглэл</h2><span class="muted small">Тодруулсан, тэмдэглэсэн бүхэн тань story болно — зөвхөн танд харагдана</span></div>
+    <div class="st-list">${stories.map((s, i) => { const top = stTop(s.notes); return `<button type="button" class="st-ring st-c-${top} ${s.kind === "review" ? "st-review" : ""} ${seen[s.id] === stKey(s) ? "seen" : ""}" data-st="${i}" style="--i:${i}">
+      <span class="st-av"><span>${s.kind === "review" ? "💡" : s.kind === "book" ? "📕" : ST_CAT[top][0]}</span></span><b>${esc(s.title)}</b><small>${s.kind === "review" ? "Шинэ" : s.notes.length + " тэмдэглэл"}</small></button>`; }).join("")}</div>`;
+  rail.hidden = false;
+  rail.onclick = (e) => {
+    const b = e.target.closest("[data-st]"); if (!b) return;
+    storyViewer(stories, +b.dataset.st, (s) => {
+      const m = store.get("sg_story_seen") || {}; m[s.id] = stKey(s); store.set("sg_story_seen", m);
+      rail.querySelector(`[data-st="${stories.indexOf(s)}"]`)?.classList.add("seen");
+    });
+  };
+}
+function storyViewer(stories, si, onSeen) {
+  $(".stv")?.remove();
+  if (!document.querySelector("link[data-bd-font]")) { const l = document.createElement("link"); l.rel = "stylesheet"; l.dataset.bdFont = 1; l.href = "https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap"; document.head.append(l); }
+  const el = document.createElement("div");
+  el.className = "stv"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", "Миний тэмдэглэл");
+  el.innerHTML = `<button type="button" class="stv-side stv-sl" aria-label="Өмнөх story">‹</button>
+    <div class="stv-card"><div class="stv-bars"></div>
+      <header class="stv-top"><span class="stv-av"></span><span class="stv-ttl"><b></b><small></small></span><button type="button" class="stv-pause" aria-label="Зогсоох">❚❚</button><button type="button" class="stv-x" aria-label="Хаах">✕</button></header>
+      <div class="stv-stage" aria-live="polite"></div><footer class="stv-foot"></footer></div>
+    <button type="button" class="stv-side stv-sr" aria-label="Дараагийн story">›</button>`;
+  document.body.append(el); document.documentElement.classList.add("stv-on");
+  const card = $(".stv-card", el), stage = $(".stv-stage", el), bars = $(".stv-bars", el), foot = $(".stv-foot", el);
+  let s = null, slides = [], i = 0, t0 = 0, elapsed = 0, dur = 5000, paused = false, raf = 0, down = null;
+  const noteURL = (src, n) => !src?.url ? "" : src.kind === "lesson" ? `${src.url}&n=${encodeURIComponent(n.id)}` : src.url;
+  const ctaLabel = (src, n) => src.kind === "book" ? "Ном руу очих" : n?.k === "time" ? "Тэр мөч рүү очих" : n?.k === "page" ? "Тэр хуудас руу очих" : "Хичээл рүү очих";
+  const floaters = (arr, n) => Array.from({ length: n }, (_, k) => `<i style="--x:${(k * 37) % 100}%;--d:${(k * 0.7) % 5}s;--s:${0.7 + ((k * 13) % 6) / 10}">${arr[k % arr.length]}</i>`).join("");
+  const build = (st) => {
+    const out = [], cnt = st.notes.length, cats = Object.entries(ST_CAT).map(([c, [e, t]]) => [c, e, t, st.notes.filter((n) => n.c === c).length]).filter((x) => x[3]);
+    out.push({ cls: "stv-cover", fx: "st-zoom", dur: 3800, url: st.url, cta: st.url ? (st.kind === "book" ? "Ном руу очих" : "Хичээл рүү очих") : "",
+      html: `<div class="stv-blobs"><i></i><i></i><i></i></div><div class="stv-float">${floaters(st.kind === "review" ? ["💡", "✨", "💡", "⭐"] : ["📚", "✏️", "⭐", "💡", "🖍"], 12)}</div>
+        <div class="stv-emoji">${st.kind === "review" ? "💡" : st.kind === "book" ? "📕" : "📚"}</div><p class="stv-kick">${esc(st.kind === "review" ? "Өнөөдрийн давталт" : st.sub || "")}</p>
+        <h2 class="stv-big">${esc(st.title)}</h2><p class="stv-meta"><b>${cnt}</b> тэмдэглэл</p>
+        <div class="stv-cats">${cats.map(([c, e, t, k]) => `<span class="stv-chip stv-chip-${c}">${e} ${t} · ${k}</span>`).join("")}</div>` });
+    st.notes.forEach((n, k) => {
+      const cat = ST_CAT[n.c] || ST_CAT.y, src = n._s || st;
+      let body;
+      if (n.k === "time" || n.k === "page") {
+        body = `<div class="stv-when stv-when-${n.k}"><span>${n.k === "time" ? "▶" : "📄"}</span><b>${esc(n.t || "")}</b></div>
+          ${n.n ? `<p class="stv-note stv-note-big">${esc(n.n)}</p>` : `<p class="stv-note">${n.k === "time" ? "Энэ мөчийг тэмдэглэсэн" : "Энэ хуудсыг тэмдэглэсэн"}</p>`}`;
+      } else {
+        const txt = (n.t || "").length > 240 ? n.t.slice(0, 240) + "…" : n.t || "";
+        body = `<blockquote class="stv-quote ${txt.length > 120 ? "long" : ""}"><mark>${txt.split(/\s+/).map((w, j) => `<span style="--d:${300 + j * 55}ms">${esc(w)}</span>`).join(" ")}</mark></blockquote>
+          ${n.n ? `<p class="stv-note"><em>✍️ Миний тэмдэглэл</em>${esc(n.n)}</p>` : ""}`;
+      }
+      out.push({ cls: `stv-hl stv-${n.c}`, fx: ST_FX[k % ST_FX.length], dur: Math.min(12000, 4200 + ((n.t || "").length + (n.n || "").length) * 32),
+        url: noteURL(src, n), cta: src.url ? ctaLabel(src, n) : "",
+        html: `<div class="stv-blobs"><i></i><i></i></div><span class="stv-cat">${cat[0]} ${cat[1]}</span>${st.kind === "review" ? `<p class="stv-from">${esc(src.title)}</p>` : ""}${body}` });
+    });
+    out.push({ cls: "stv-outro", fx: "st-zoom", dur: 4200, confetti: true, url: st.url, cta: st.url ? (st.kind === "book" ? "Ном руу очих" : "Хичээл рүү очих") : "", again: true,
+      html: `<div class="stv-blobs"><i></i><i></i><i></i></div><div class="stv-emoji">🎉</div><h2 class="stv-big">Сайн байна!</h2><p class="stv-meta"><b>${cnt}</b> тэмдэглэлээ давтлаа.<br>Тогтмол давтвал удаан санана 💡</p>` });
+    return out;
+  };
+  const confetti = () => {
+    if (reduce) return;
+    const cols = ["#ffd60a", "#34c759", "#ff453a", "#0a84ff", "#ffffff", "#eaa02e"];
+    for (let k = 0; k < 70; k++) {
+      const p = document.createElement("i"); p.className = "stv-conf"; p.style.background = cols[k % cols.length]; stage.append(p);
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2, v = 180 + Math.random() * 320;
+      p.animate([{ transform: "translate(0,0) rotate(0)", opacity: 1 }, { transform: `translate(${Math.cos(a) * v}px,${Math.sin(a) * v + 420}px) rotate(${Math.random() * 900}deg)`, opacity: 0 }],
+        { duration: 1600 + Math.random() * 900, easing: "cubic-bezier(.15,.7,.3,1)" }).onfinish = () => p.remove();
+    }
+  };
+  const header = () => {
+    const top = stTop(s.notes);
+    $(".stv-av", el).className = `stv-av st-c-${top}`; $(".stv-av", el).textContent = s.kind === "review" ? "💡" : s.kind === "book" ? "📕" : ST_CAT[top][0];
+    $(".stv-ttl b", el).textContent = s.title;
+    $(".stv-ttl small", el).textContent = [s.kind === "review" ? "Санамсаргүй сонголт" : s.sub, s.updated_at ? fmtDate(s.updated_at) : ""].filter(Boolean).join(" · ");
+    bars.innerHTML = slides.map(() => `<i><b></b></i>`).join("");
+    $(".stv-sl", el).disabled = si === 0; $(".stv-sr", el).disabled = si === stories.length - 1;
+  };
+  const show = () => {
+    const sl = slides[i];
+    stage.innerHTML = `<section class="stv-slide ${sl.cls} ${reduce ? "" : sl.fx}">${sl.html}</section>`;
+    foot.innerHTML = (sl.again ? `<button type="button" class="stv-cta stv-ghost" data-again>↺ Дахин үзэх</button>` : "") + (sl.url ? `<a class="stv-cta" href="${esc(sl.url)}">${esc(sl.cta)} →</a>` : "");
+    $$("b", bars).forEach((b, k) => { b.style.transition = "none"; b.style.width = k < i ? "100%" : "0%"; });
+    dur = sl.dur; elapsed = 0; t0 = performance.now();
+    if (sl.confetti) setTimeout(confetti, 250);
+    if (i === slides.length - 1) onSeen?.(s);
+  };
+  const openStory = (k, fromEnd) => { si = k; s = stories[k]; slides = build(s); i = fromEnd ? slides.length - 1 : 0; header(); card.classList.remove("stv-swap"); void card.offsetWidth; card.classList.add("stv-swap"); show(); };
+  const next = () => { if (i < slides.length - 1) { i++; show(); } else if (si < stories.length - 1) openStory(si + 1); else close(); };
+  const prev = () => { if (i > 0) { i--; show(); } else if (si > 0) openStory(si - 1, true); else show(); };
+  const setPaused = (p) => { if (p === paused) return; const now = performance.now(); if (p) elapsed += now - t0; else t0 = now; paused = p; $(".stv-pause", el).textContent = p ? "▶" : "❚❚"; card.classList.toggle("paused", p); };
+  const tick = (now) => {
+    if (!paused) {
+      const p = Math.min(1, (elapsed + now - t0) / dur), b = $$("b", bars)[i];
+      if (b) b.style.width = p * 100 + "%";
+      if (p >= 1) next();
+    }
+    raf = requestAnimationFrame(tick);
+  };
+  const onKey = (e) => {
+    if (e.key === "Escape") { e.stopPropagation(); close(); }
+    else if (e.key === "ArrowRight") next(); else if (e.key === "ArrowLeft") prev();
+    else if (e.key === " ") { e.preventDefault(); setPaused(!paused); }
+  };
+  function close() { cancelAnimationFrame(raf); document.removeEventListener("keydown", onKey, true); document.documentElement.classList.remove("stv-on"); el.classList.add("out"); setTimeout(() => el.remove(), 250); }
+  card.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("a, button")) return;
+    down = { x: e.clientX, y: e.clientY, t: performance.now() }; setPaused(true);
+  });
+  card.addEventListener("pointermove", (e) => { if (down && e.clientY - down.y > 10) card.style.transform = `translateY(${Math.max(0, e.clientY - down.y)}px) scale(${1 - Math.min(0.08, (e.clientY - down.y) / 2000)})`; });
+  const up = (e) => {
+    if (!down) return;
+    const d = down; down = null; card.style.transform = ""; setPaused(false);
+    if (e.clientY - d.y > 110) return close(); // доош шудраж хаана
+    if (Math.abs(e.clientX - d.x) > 60) return e.clientX < d.x ? (si < stories.length - 1 ? openStory(si + 1) : close()) : si > 0 ? openStory(si - 1) : show();
+    if (performance.now() - d.t < 260) { const r = card.getBoundingClientRect(); (e.clientX - r.left < r.width * 0.32 ? prev : next)(); }
+  };
+  card.addEventListener("pointerup", up); card.addEventListener("pointercancel", () => { down = null; card.style.transform = ""; setPaused(false); });
+  el.addEventListener("click", (e) => {
+    if (e.target === el || e.target.closest(".stv-x")) return close();
+    if (e.target.closest(".stv-pause")) return setPaused(!paused);
+    if (e.target.closest(".stv-sl")) return si > 0 && openStory(si - 1);
+    if (e.target.closest(".stv-sr")) return si < stories.length - 1 && openStory(si + 1);
+    if (e.target.closest("[data-again]")) { i = 0; show(); }
+  });
+  document.addEventListener("keydown", onKey, true);
+  openStory(si);
+  raf = requestAnimationFrame(tick);
+}
 async function homePage() {
   const dash = $("#dash");
   if (!dash || !Auth.token) return;
@@ -3414,6 +3716,7 @@ async function homePage() {
       ${h.rank ? `<a class="tile tile-rank" href="#my-rank"><em class="rank-shine" data-level="${h.rank.level}">${esc(h.rank.insignia)}</em><b>${esc(h.rank.name)}</b><span>Миний цол · ${h.rank.points} оноо</span></a>` : ""}
       ${h.tasks?.length ? `<a class="tile" href="#my-tasks"><em>${icon("exam")}</em><b>${h.tasks.filter((t) => ["open", "need_pay"].includes(t.status)).length}</b><span>Хийх даалгавар, шалгалт</span></a>` : ""}
     </div>`];
+  parts.splice(1, 0, `<div class="st-rail" id="stRail" hidden></div>`); // тэмдэглэлийн story (noteStories)
   // Цол: систем шинэ цол олгосон бол баяр хүргэж салют буудуулна.
   if (h.rank) {
     const lvlKey = "sg_rank_lvl_" + (u.id || "u");
@@ -3550,6 +3853,7 @@ async function homePage() {
       <h3 class="h3">Профайл засах</h3><form class="form" id="stuForm"><label>Нэр<input name="display_name" required maxlength="80" value="${esc(u.display_name)}"></label>
       <p class="muted small" style="margin:0">Имэйл: ${esc(u.email || "")} · <a class="link" href="/privacy#my-data">Өгөгдлөө татах, бүртгэлээ устгах →</a></p><p class="form-error" role="alert"></p>
       <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`);
+  noteStories($("#stRail"));
   $("[data-student-settings]")?.addEventListener("click", () => openModal($("#stuModal")));
   $("#stuForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();

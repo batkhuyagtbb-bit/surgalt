@@ -40,6 +40,8 @@ type Config struct {
 	PayoutMin     int64         // багшийн орлого татах доод дүн (₮; 0 бол 1000)
 	// ServiceFeePct — төлбөр бүрийн үнэ дээр нэмж авах үйлчилгээний хураамж (%, жишээ нь 1). Багшийн орлогод орохгүй.
 	ServiceFeePct float64
+	// PixabayKey — цагаан самбарын зураг хайлтад Pixabay (SafeSearch) ашиглах түлхүүр (хоосон бол Openverse + Wikimedia).
+	PixabayKey string
 	// Хянагчийн самбар (admin.go): тусдаа зам ба нууц үгээр нэвтрэх (хоосон бол /admin, зөвхөн ADMIN_EMAILS).
 	AdminPath     string
 	AdminLogin    string
@@ -47,31 +49,33 @@ type Config struct {
 }
 
 type Server struct {
-	cfg      Config
-	store    store.Store
-	tokens   *auth.Signer
-	hub      *chat.Hub
-	files    *files.Store
-	log      *slog.Logger
-	tmpl     *template.Template
-	limiter  *ratelimit.Limiter
-	authLim  *ratelimit.Limiter // нэвтрэлт/бүртгэл/зочин токен — илүү чанга
-	chatLim  *ratelimit.Limiter // мессеж илгээх
-	phoneLim *ratelimit.Limiter // багшийн утасны дугаар нээх — дугаар хусуурдахаас сэргийлнэ
-	resetLim *ratelimit.Limiter // нэг имэйл рүү нууц үг сэргээх захидал (2 минутад 1 орчим)
-	admLim   *ratelimit.Limiter // хянагчийн нууц үгээр нэвтрэх оролдлого (IP тус бүрт)
-	boardLim *ratelimit.Limiter // цагаан самбарын өөрчлөлт (хэрэглэгч тус бүрт; анги нэг IP-аас орж болно)
-	boards   boardHub           // цагаан самбарын сессүүд (board.go)
-	hits     hitBuf             // сайтын хандалтын түр сан (admin.go)
-	adm      adminCache         // хянагчийн самбарын агшин зураг
-	sys      sysCache           // хянагчийн «Систем»: файлын сангийн хэмжээ (60 сек кэш)
-	started  time.Time          // сервер асаасан мөч
-	profiles *cache.Cache[*Rendered[PublicProfile]]
-	courses  *cache.Cache[*Rendered[PublicCourse]]
-	qrs      *cache.Cache[[]byte]
-	alive    *cache.Cache[int64] // хэрэглэгч бүрийн «энэ цагаас өмнөх токен хүчингүй» (миллисекунд; account.go)
-	notif    *notifier
-	search   *searchIndex
+	cfg       Config
+	store     store.Store
+	tokens    *auth.Signer
+	hub       *chat.Hub
+	files     *files.Store
+	log       *slog.Logger
+	tmpl      *template.Template
+	limiter   *ratelimit.Limiter
+	authLim   *ratelimit.Limiter // нэвтрэлт/бүртгэл/зочин токен — илүү чанга
+	chatLim   *ratelimit.Limiter // мессеж илгээх
+	phoneLim  *ratelimit.Limiter // багшийн утасны дугаар нээх — дугаар хусуурдахаас сэргийлнэ
+	resetLim  *ratelimit.Limiter // нэг имэйл рүү нууц үг сэргээх захидал (2 минутад 1 орчим)
+	admLim    *ratelimit.Limiter // хянагчийн нууц үгээр нэвтрэх оролдлого (IP тус бүрт)
+	boardLim  *ratelimit.Limiter // цагаан самбарын өөрчлөлт (хэрэглэгч тус бүрт; анги нэг IP-аас орж болно)
+	boards    boardHub           // цагаан самбарын сессүүд (board.go)
+	searchLim *ratelimit.Limiter // самбарын зураг хайлт (хэрэглэгч тус бүрт)
+	imgs      imgSearch          // зураг хайлтын кэш, орчуулга (board_images.go)
+	hits      hitBuf             // сайтын хандалтын түр сан (admin.go)
+	adm       adminCache         // хянагчийн самбарын агшин зураг
+	sys       sysCache           // хянагчийн «Систем»: файлын сангийн хэмжээ (60 сек кэш)
+	started   time.Time          // сервер асаасан мөч
+	profiles  *cache.Cache[*Rendered[PublicProfile]]
+	courses   *cache.Cache[*Rendered[PublicCourse]]
+	qrs       *cache.Cache[[]byte]
+	alive     *cache.Cache[int64] // хэрэглэгч бүрийн «энэ цагаас өмнөх токен хүчингүй» (миллисекунд; account.go)
+	notif     *notifier
+	search    *searchIndex
 
 	// OAuth нь Google/Microsoft/Facebook/Instagram нэвтрэлт (nil бол идэвхгүй).
 	OAuth *oauth.Registry
@@ -91,18 +95,19 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 	isNF := func(err error) bool { return errors.Is(err, store.ErrNotFound) }
 	s := &Server{
 		cfg: cfg, store: st, tokens: tokens, hub: hub, files: fstore, log: log,
-		tmpl:     parseTemplates(),
-		limiter:  ratelimit.New(cfg.RateLimitRPS, cfg.RateBurst),
-		authLim:  ratelimit.New(1, 10),
-		chatLim:  ratelimit.New(2, 10),
-		phoneLim: ratelimit.New(0.05, 8),
-		resetLim: ratelimit.New(1.0/120, 2),
-		admLim:   ratelimit.New(1.0/30, 5),
-		boardLim: ratelimit.New(25, 100),
-		profiles: cache.New[*Rendered[PublicProfile]](30*time.Second, 5*time.Second, isNF),
-		courses:  cache.New[*Rendered[PublicCourse]](30*time.Second, 5*time.Second, isNF),
-		qrs:      cache.New[[]byte](time.Hour, 5*time.Second, isNF),
-		alive:    cache.New[int64](5*time.Minute, 5*time.Minute, isNF),
+		tmpl:      parseTemplates(),
+		limiter:   ratelimit.New(cfg.RateLimitRPS, cfg.RateBurst),
+		authLim:   ratelimit.New(1, 10),
+		chatLim:   ratelimit.New(2, 10),
+		phoneLim:  ratelimit.New(0.05, 8),
+		resetLim:  ratelimit.New(1.0/120, 2),
+		admLim:    ratelimit.New(1.0/30, 5),
+		boardLim:  ratelimit.New(25, 100),
+		searchLim: ratelimit.New(0.5, 12),
+		profiles:  cache.New[*Rendered[PublicProfile]](30*time.Second, 5*time.Second, isNF),
+		courses:   cache.New[*Rendered[PublicCourse]](30*time.Second, 5*time.Second, isNF),
+		qrs:       cache.New[[]byte](time.Hour, 5*time.Second, isNF),
+		alive:     cache.New[int64](5*time.Minute, 5*time.Minute, isNF),
 	}
 	s.notif = newNotifier()
 	s.started = time.Now()
@@ -124,6 +129,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.resetLim.Janitor(ctx)
 	go s.admLim.Janitor(ctx)
 	go s.boardLim.Janitor(ctx)
+	go s.searchLim.Janitor(ctx)
 	go s.boardLoop(ctx)
 	go s.hitLoop(ctx)
 	go s.notifyLoop(ctx)
@@ -196,6 +202,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/board/{bid}/image", s.handleBoardImage)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/board/{bid}/fetch", s.handleBoardFetch)
 	mux.HandleFunc("GET /board-img/{lid}/{name}", s.handleBoardImg)
+	mux.HandleFunc("GET /api/board/images", s.handleBoardImages)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/progress/{bid}", s.handleVideoProgress)
 	mux.HandleFunc("GET /api/courses/{id}/lessons/{lid}/discussion", s.handleDiscussion)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/discussion", s.handleAddComment)
@@ -231,6 +238,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/books/{id}/cover", s.handleBookCover)
 	mux.HandleFunc("POST /api/books/{id}/buy", s.handleBuyBook)
 	mux.HandleFunc("POST /api/books/{id}/interest", s.handleBookInterest)
+	mux.HandleFunc("GET /api/me/notes", s.handleMyNotes)
+	mux.HandleFunc("GET /api/books/{id}/notes", s.handleGetBookNotes)
+	mux.HandleFunc("PUT /api/books/{id}/notes", s.handleSetBookNotes)
 	mux.HandleFunc("POST /api/me/quiz-import", s.handleQuizImport)
 
 	// Төлбөр

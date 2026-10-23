@@ -22,6 +22,22 @@ func (c *ClickHouse) Highlights(ctx context.Context, userID, lessonID string) ([
 	return out, err
 }
 
+func (c *ClickHouse) UserHighlights(ctx context.Context, userID string) ([]HighlightSet, error) {
+	out := []HighlightSet{}
+	err := c.query(ctx, "SELECT lesson_id, data, updated_at FROM highlights FINAL WHERE user_id = ? ORDER BY updated_at DESC", []any{userID}, func(r driver.Rows) error {
+		var hs HighlightSet
+		var data string
+		if err := r.Scan(&hs.LessonID, &data, &hs.UpdatedAt); err != nil {
+			return err
+		}
+		if json.Unmarshal([]byte(data), &hs.Items) == nil && len(hs.Items) > 0 {
+			out = append(out, hs)
+		}
+		return nil
+	})
+	return out, err
+}
+
 func (c *ClickHouse) SetHighlights(ctx context.Context, userID, lessonID string, hs []Highlight) error {
 	if hs == nil {
 		hs = []Highlight{}

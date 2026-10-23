@@ -1,6 +1,9 @@
 package store
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Highlight — суралцагч хичээлийн текстийг маркераар тодруулсан хэсэг. Зөвхөн тухайн суралцагчид
 // харагдана (багш, бусад суралцагч харахгүй).
@@ -12,6 +15,11 @@ type Highlight struct {
 	Color string `json:"c"` // HighlightColors
 	Text  string `json:"t"` // тодруулсан текст: багш агуулгаа засвал байрлалыг дахин олоход
 	Note  string `json:"n,omitempty"`
+	// Kind: "" — текстийн тодруулга; "time" — видео/аудиогийн мөч (Sec секунд); "page" — PDF, PowerPoint,
+	// Word, номын хуудас/слайд (Page, 1-ээс). Эдгээрт Start/End ашиглахгүй.
+	Kind string  `json:"k,omitempty"`
+	Page int     `json:"p,omitempty"`
+	Sec  float64 `json:"sec,omitempty"`
 }
 
 // HighlightColors — маркерын өнгө: y чухал, g ойлгосон, r ойлгоогүй, b нэр томьёо.
@@ -22,4 +30,13 @@ type HighlightStore interface {
 	Highlights(ctx context.Context, userID, lessonID string) ([]Highlight, error)
 	// SetHighlights — тухайн хичээлийн тодруулгуудыг бүхэлд нь солино.
 	SetHighlights(ctx context.Context, userID, lessonID string, hs []Highlight) error
+	// UserHighlights — хэрэглэгчийн бүх хичээл, номын ("book:<ID>") тэмдэглэл, сүүлд өөрчилсөн нь эхэндээ.
+	UserHighlights(ctx context.Context, userID string) ([]HighlightSet, error)
+}
+
+// HighlightSet — нэг хичээл (эсвэл ном) дээрх тэмдэглэлүүд (профайлын «story»-д).
+type HighlightSet struct {
+	LessonID  string
+	Items     []Highlight
+	UpdatedAt time.Time
 }
