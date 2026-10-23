@@ -124,6 +124,21 @@ func (h *Hub) Notify(n store.Notification) {
 	h.publish(UserKey(n.UserID), payload)
 }
 
+// SendUsers нь дурын үйл явдлыг (цагаан самбар г.м) хэрэглэгч бүрийн бүх нээлттэй холболт руу түлхэнэ.
+// payload нь нэг удаа JSON болгогдоно.
+func (h *Hub) SendUsers(userIDs []string, event any) {
+	if len(userIDs) == 0 {
+		return
+	}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return
+	}
+	for _, id := range userIDs {
+		h.publish(UserKey(id), payload)
+	}
+}
+
 // Deliver нь мессежийг багш болон зочны сувгууд руу түгээнэ.
 func (h *Hub) Deliver(m store.Message) {
 	payload, err := json.Marshal(Event{Type: "message", Message: m})

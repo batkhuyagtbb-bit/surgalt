@@ -46,6 +46,7 @@ type Memory struct {
 	books       bookMem                    // ном (memory_books.go)
 	pay         payoutMem                  // багшийн данс, татах хүсэлт (memory_payouts.go)
 	hl          hlMem                      // суралцагчийн тодруулгууд (memory_highlights.go)
+	boards      boardMem                   // цагаан самбарын өрөөнүүд (memory_board.go)
 	cloud       cloudMem                   // үүлэн үгийн хариултууд (memory_cloud.go)
 	invoices    map[string]*PaymentInvoice // order → сүүлийн нэхэмжлэх
 	visits      map[string]*PageVisit      // хуудасны үзэлт

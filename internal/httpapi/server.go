@@ -60,6 +60,8 @@ type Server struct {
 	phoneLim *ratelimit.Limiter // багшийн утасны дугаар нээх — дугаар хусуурдахаас сэргийлнэ
 	resetLim *ratelimit.Limiter // нэг имэйл рүү нууц үг сэргээх захидал (2 минутад 1 орчим)
 	admLim   *ratelimit.Limiter // хянагчийн нууц үгээр нэвтрэх оролдлого (IP тус бүрт)
+	boardLim *ratelimit.Limiter // цагаан самбарын өөрчлөлт (хэрэглэгч тус бүрт; анги нэг IP-аас орж болно)
+	boards   boardHub           // цагаан самбарын сессүүд (board.go)
 	hits     hitBuf             // сайтын хандалтын түр сан (admin.go)
 	adm      adminCache         // хянагчийн самбарын агшин зураг
 	sys      sysCache           // хянагчийн «Систем»: файлын сангийн хэмжээ (60 сек кэш)
@@ -96,6 +98,7 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 		phoneLim: ratelimit.New(0.05, 8),
 		resetLim: ratelimit.New(1.0/120, 2),
 		admLim:   ratelimit.New(1.0/30, 5),
+		boardLim: ratelimit.New(25, 100),
 		profiles: cache.New[*Rendered[PublicProfile]](30*time.Second, 5*time.Second, isNF),
 		courses:  cache.New[*Rendered[PublicCourse]](30*time.Second, 5*time.Second, isNF),
 		qrs:      cache.New[[]byte](time.Hour, 5*time.Second, isNF),
@@ -120,6 +123,8 @@ func (s *Server) Background(ctx context.Context) {
 	go s.phoneLim.Janitor(ctx)
 	go s.resetLim.Janitor(ctx)
 	go s.admLim.Janitor(ctx)
+	go s.boardLim.Janitor(ctx)
+	go s.boardLoop(ctx)
 	go s.hitLoop(ctx)
 	go s.notifyLoop(ctx)
 	go s.payoutLoop(ctx)
@@ -184,6 +189,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/courses/{id}/lessons/{lid}/highlights", s.handleSetHighlights)
 	mux.HandleFunc("GET /api/courses/{id}/lessons/{lid}/cloud/{bid}", s.handleGetCloud)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/cloud/{bid}", s.handleSendCloud)
+	mux.HandleFunc("GET /api/courses/{id}/lessons/{lid}/board/{bid}", s.handleGetBoard)
+	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/board/{bid}/ops", s.handleBoardOps)
+	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/board/{bid}/presence", s.handleBoardPresence)
+	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/board/{bid}/state", s.handleBoardState)
+	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/board/{bid}/image", s.handleBoardImage)
+	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/board/{bid}/fetch", s.handleBoardFetch)
+	mux.HandleFunc("GET /board-img/{lid}/{name}", s.handleBoardImg)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/progress/{bid}", s.handleVideoProgress)
 	mux.HandleFunc("GET /api/courses/{id}/lessons/{lid}/discussion", s.handleDiscussion)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/discussion", s.handleAddComment)
@@ -368,13 +380,24 @@ func (s *Server) logMW(next http.Handler) http.Handler {
 
 func (s *Server) limitMW(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/static/") && !s.limiter.Allow(s.clientIP(r)) {
+		if !strings.HasPrefix(r.URL.Path, "/static/") && !boardHot(r) && !s.limiter.Allow(s.clientIP(r)) {
 			w.Header().Set("Retry-After", "1")
 			writeErr(w, http.StatusTooManyRequests, "хэт олон хүсэлт, түр хүлээнэ үү")
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// boardHot — цагаан самбарын байнгын хүсэлтүүд (өөрчлөлт, «байна» дохио, зураг): нэг ангийн хүүхдүүд нэг IP-аас
+// орж болох тул IP-гаар биш, хэрэглэгч тус бүрээр (boardLim) хязгаарлана.
+func boardHot(r *http.Request) bool {
+	p := r.URL.Path
+	if strings.HasPrefix(p, "/board-img/") {
+		return r.Method == http.MethodGet
+	}
+	return r.Method == http.MethodPost && strings.HasPrefix(p, "/api/courses/") && strings.Contains(p, "/board/") &&
+		(strings.HasSuffix(p, "/ops") || strings.HasSuffix(p, "/presence"))
 }
 
 func (s *Server) clientIP(r *http.Request) string {

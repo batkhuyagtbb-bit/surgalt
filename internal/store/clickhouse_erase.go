@@ -36,6 +36,9 @@ func (c *ClickHouse) DeleteUserData(ctx context.Context, uid string) error {
 			return fmt.Errorf("erase %s: %w", t.table, err)
 		}
 	}
+	if err := c.conn.Exec(ctx, "DELETE FROM board_rooms WHERE room = ?", key); err != nil { // цагаан самбар дээрх хувийн самбар
+		return fmt.Errorf("erase board_rooms: %w", err)
+	}
 	for _, t := range []string{"message_reactions", "conversation_reads"} {
 		if err := c.conn.Exec(ctx, "DELETE FROM "+t+" WHERE user_key = ?", key); err != nil {
 			return fmt.Errorf("erase %s: %w", t, err)

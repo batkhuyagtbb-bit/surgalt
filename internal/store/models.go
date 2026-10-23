@@ -360,7 +360,7 @@ type Submission struct {
 }
 
 // BlockTypes — зөвшөөрөгдсөн блокийн төрлүүд.
-var BlockTypes = map[string]bool{"text": true, "heading": true, "image": true, "audio": true, "video": true, "file": true, "quiz": true, "embed": true, "cloud": true}
+var BlockTypes = map[string]bool{"text": true, "heading": true, "image": true, "audio": true, "video": true, "file": true, "quiz": true, "embed": true, "cloud": true, "board": true}
 
 // LessonOrder — чирж зөөсний дараах нэг хичээлийн байр: ID ба бүлэг.
 type LessonOrder struct {
@@ -564,6 +564,7 @@ type Store interface {
 	PayoutStore
 	HighlightStore
 	CloudStore
+	BoardStore
 	AdminStore
 	CreateUser(ctx context.Context, u *User) error
 	UserByID(ctx context.Context, id string) (*User, error)

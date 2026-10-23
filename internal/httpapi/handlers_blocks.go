@@ -106,6 +106,21 @@ func validateBlocks(bs []store.Block, teacherID string) string {
 			if b.Max < 1 || b.Max > 3 {
 				return "нэг хүн 1-3 үг илгээнэ"
 			}
+		case "board": // цагаан самбар: гарчиг/даалгавар (Text) + анхдагч багийн тоо (Max)
+			b.URL, b.Quiz = "", nil
+			b.Text = strings.TrimSpace(b.Text)
+			if b.Text == "" {
+				b.Text = "Цагаан самбар"
+			}
+			if utf8.RuneCountInString(b.Text) > 300 {
+				return "самбарын гарчиг 300 тэмдэгтээс ихгүй"
+			}
+			if b.Max == 0 {
+				b.Max = 4
+			}
+			if b.Max < 2 || b.Max > 12 {
+				return "самбарын багийн тоо 2-12"
+			}
 		case "heading":
 			b.URL, b.Quiz = "", nil
 			b.Text = strings.TrimSpace(b.Text)

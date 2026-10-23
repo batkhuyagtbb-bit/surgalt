@@ -53,6 +53,11 @@ func (m *Memory) DeleteUserData(_ context.Context, uid string) error {
 			delete(m.cloud, k)
 		}
 	}
+	for k := range m.boards {
+		if k[2] == "u:"+uid {
+			delete(m.boards, k)
+		}
+	}
 	for _, members := range m.teamMembers {
 		delete(members, uid)
 	}

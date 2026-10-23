@@ -543,7 +543,7 @@ VIEWS.reports = {
 /* ---------- Систем ---------- */
 const uptime = (sec) => { sec = +sec || 0; const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60); return d ? `${d} өдөр ${h} цаг` : h ? `${h} цаг ${m} мин` : `${m} мин`; };
 const useBar = (used, total) => total ? `<span class="use" title="${pct(used, total)}% ашиглагдсан"><i style="width:${Math.min(100, pct(used, total))}%"></i></span>` : "";
-const FOLDER = { teachers: "Багш нарын файл (хичээл, ном, видео)", "(үндсэн)": "Үндсэн хавтас" };
+const FOLDER = { teachers: "Багш нарын файл (хичээл, ном, видео)", boards: "Цагаан самбарын зураг", "(үндсэн)": "Үндсэн хавтас" };
 VIEWS.system = {
   title: "Систем", sub: "Файлын сан, өгөгдлийн сангийн хэмжээ, дискний сул зай, серверийн төлөв",
   fresh: false,

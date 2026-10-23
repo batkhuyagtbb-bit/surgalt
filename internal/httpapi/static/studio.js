@@ -60,6 +60,8 @@ const ICON = {
   down: '<path d="m6 9 6 6 6-6"/>',
 };
 Object.assign(ICON, {
+  cloud: '<path d="M7 18.5a4.5 4.5 0 0 1-.7-8.95A6 6 0 0 1 17.8 8a4.75 4.75 0 0 1-.55 10.5Z"/>',
+  board: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20l2-4M17 20l-2-4M12 16v4"/><path d="m7 12 3-3 2 2 4-4"/>',
   chart: '<path d="M3 3v18h18"/><path d="M7 16v-4M12 16V8M17 16v-7"/>',
   target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
   pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
@@ -317,7 +319,7 @@ async function loadLibrary() { library = await api("/api/me/files"); return libr
 /* ---------- Хичээлийн блок засварлагч: текст, гарчиг, зураг, дуу, видео, файл, асуулт ---------- */
 const BE = {
   text: ["text", "Текст"], heading: ["heading", "Гарчиг"], image: ["image", "Зураг"], audio: ["mic", "Дуу"],
-  video: ["live", "Видео"], file: ["clip", "Файл"], quiz: ["quiz", "Асуулт"], cloud: ["cloud", "Үүлэн үг"], embed: ["link", "HTML embed"],
+  video: ["live", "Видео"], file: ["clip", "Файл"], quiz: ["quiz", "Асуулт"], cloud: ["cloud", "Үүлэн үг"], board: ["board", "Цагаан самбар"], embed: ["link", "HTML embed"],
 };
 // Төрөл тус бүрийн хэмжээний хязгаар (MB). Зургийг сервер WebP болгож 1000px хүртэл багасгана.
 const BE_LIMIT = { image: 20, audio: 100, video: 2048, file: 200 };
@@ -410,6 +412,9 @@ function beBlockHTML(b) {
   else if (b.type === "cloud") body = `<input class="be-cloud-q" maxlength="200" placeholder="Асуулт — жишээ нь: Фотосинтез гэж сонсоход юу санаанд орж байна?" value="${esc(b.text || "")}">
       <div class="be-embed-bar"><label class="small">Нэг хүн <select class="be-cloud-n" style="width:auto;margin:0 4px">${[1, 2, 3].map((n) => `<option value="${n}" ${(b.max || 1) === n ? "selected" : ""}>${n}</option>`).join("")}</select> үг илгээнэ</label>
       <span class="muted small">Суралцагчдын хариулт үүл болж харагдана — олон хүн бичсэн үг томорно.</span></div>`;
+  else if (b.type === "board") body = `<input class="be-board-t" maxlength="300" placeholder="Самбарын гарчиг эсвэл даалгавар — жишээ нь: Ургамлын хэсгүүдийг зурж нэрлэ" value="${esc(b.text && b.text !== "Цагаан самбар" ? b.text : "")}">
+      <div class="be-embed-bar"><label class="small">Анхдагч багийн тоо <select class="be-board-n" style="width:auto;margin:0 4px">${[2, 3, 4, 5, 6, 8, 10, 12].map((n) => `<option value="${n}" ${(b.max || 4) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+      <span class="muted small">Хичээл дээр «Самбар нээх» дарж та тайлбарлана; хүүхдүүд хувиараа эсвэл багаар зурж, бичиж, зураг оруулна — бүгд танд шууд харагдана.</span></div>`;
   else if (b.type === "embed") body = `<textarea class="be-embed" rows="5" maxlength="60000" spellcheck="false" placeholder="Холбоос (https://…) эсвэл HTML код буулгана уу — Google Docs/Slides/Forms, Canva, YouTube, GeoGebra, Desmos, Padlet, Quizlet… Холбоос хичээл дотроо шууд ажиллана.">${esc(b.text || "")}</textarea>
       <div class="be-embed-bar"><label class="small">Өндөр<input class="be-embed-h" type="number" min="80" max="2000" step="20" value="${b.height || 420}"> px</label><button type="button" class="btn btn-glass btn-sm" data-embed-preview>Урьдчилан харах</button><span class="muted small">Тусгаарлагдсан хүрээнд аюулгүй ажиллана</span></div>
       <div class="be-embed-prev"></div>`;
@@ -689,6 +694,7 @@ function mountBlockEditor(f, blocks) {
         if (type === "text") { const text = domToMd($(".be-rt", el)); return text ? { id, type, text } : null; }
         if (type === "heading") { const text = $(".be-h", el).value.trim(); return text ? { id, type, text } : null; }
         if (type === "embed") { const text = $(".be-embed", el).value.trim(); return text ? { id, type, text, height: +$(".be-embed-h", el).value || 420 } : null; }
+        if (type === "board") return { id, type, text: $(".be-board-t", el).value.trim() || "Цагаан самбар", max: +$(".be-board-n", el).value || 4 };
         if (type === "cloud") { const text = $(".be-cloud-q", el).value.trim(); return text ? { id, type, text, max: +$(".be-cloud-n", el).value || 1 } : null; }
         if (type === "quiz") {
           const quiz = quizOf(el);
@@ -1258,7 +1264,7 @@ async function courseEditor(id) {
     }
     if (t.closest("[data-open-media]") && l) { // агуулгыг суралцагчийн харах байдлаар урьдчилан үзнэ
       const box = $(".post-preview", post) || $(".post-media", post); box.hidden = !box.hidden;
-      if (!box.hidden && !box.innerHTML) { box.innerHTML = SG.blocksHTML(lessonBlocks(l)); hydrateBooks(box); SG.mountQuizzes(box, `/api/courses/${c.id}/lessons/${l.id}`); SG.mountClouds(box, `/api/courses/${c.id}/lessons/${l.id}`, true); }
+      if (!box.hidden && !box.innerHTML) { box.innerHTML = SG.blocksHTML(lessonBlocks(l)); hydrateBooks(box); SG.mountQuizzes(box, `/api/courses/${c.id}/lessons/${l.id}`); SG.mountClouds(box, `/api/courses/${c.id}/lessons/${l.id}`, true); SG.mountBoards(box, `/api/courses/${c.id}/lessons/${l.id}`, true); }
       return;
     }
     if (t.closest("[data-toggle-hidden]") && l) return setHidden(l, !l.hidden);
