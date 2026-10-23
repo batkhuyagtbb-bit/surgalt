@@ -207,3 +207,43 @@ func TestNotesStats(t *testing.T) {
 		t.Fatalf("багшид тэмдэглэлийн агуулга харагдах ёсгүй: %s", b)
 	}
 }
+
+// Урт кирилл нэртэй баримтын тасалбар IIS-ийн 260 тэмдэгтийн хязгаараас богино бөгөөд нээгдэнэ.
+func TestShortMediaTicket(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	name := "ULMS_-_Сургалтын_албаны_зурагтай_алхамчилсан_заавар_дэлгэрэнгүй.pdf"
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, _ := mw.CreateFormFile("file", name)
+	fw.Write([]byte("%PDF-1.4 long name"))
+	mw.Close()
+	req, _ := http.NewRequest("POST", srv.URL+"/api/me/files?visibility=private", &body)
+	req.Header.Set("Authorization", "Bearer "+tt)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	res, err := http.DefaultClient.Do(req)
+	if err != nil || res.StatusCode >= 300 {
+		t.Fatalf("файл: %v %v", err, res.StatusCode)
+	}
+	var info struct {
+		Path string `json:"path"`
+	}
+	json.NewDecoder(res.Body).Decode(&info)
+	res.Body.Close()
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Журам","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true,"blocks":[{"id":"doc1","type":"file","url":"`+info.Path+`","name":"заавар.pdf"}]}`)
+	s1, _ := register(t, srv, "stud", "student")
+	_, got := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+l["id"].(string), s1, "")
+	u := got["blocks"].([]any)[0].(map[string]any)["url"].(string)
+	seg := strings.Split(strings.TrimPrefix(u, "/api/media/"), "/")[0]
+	if !strings.HasPrefix(u, "/api/media/") || len(seg) > 200 {
+		t.Fatalf("тасалбар хэт урт (%d): %s", len(seg), u)
+	}
+	r, err := http.Get(srv.URL + u)
+	if err != nil || r.StatusCode != 200 {
+		t.Fatalf("баримт нээгдэх: %v %v", err, r.StatusCode)
+	}
+	r.Body.Close()
+}

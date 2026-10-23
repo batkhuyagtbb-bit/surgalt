@@ -432,7 +432,7 @@ func OwnedBy(path, teacherID string) bool {
 // base64url("path|uid|exp") + "." + HMAC. Суралцагчийн хөтөч файлын нэр, багшийн ID-г харахгүй.
 func (s *Store) Ticket(path, uid string, ttl time.Duration) string {
 	exp := time.Now().Add(ttl).Unix()
-	payload := fmt.Sprintf("%s|%s|%d", path, uid, exp)
+	payload := fmt.Sprintf("%s|%s|%d", ticketRef(path), uid, exp)
 	mac := hmac.New(sha256.New, append([]byte("ticket:"), s.key...))
 	mac.Write([]byte(payload))
 	return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)[:18])
@@ -462,7 +462,45 @@ func (s *Store) ResolveTicket(t string) (path, uid string, ok bool) {
 	if err != nil || time.Now().Unix() > exp {
 		return "", "", false
 	}
+	if strings.HasPrefix(parts[0], "@") {
+		p, ok := s.resolveRef(parts[0])
+		return p, parts[1], ok
+	}
 	return parts[0], parts[1], true
+}
+
+var hex16Re = regexp.MustCompile(`^[0-9a-f]{16}$`)
+
+// ticketRef — дотоод файлыг тасалбарт богино лавлагаагаар бичнэ: "@<багш>/<visibility>/<16 hex>/<нэрийн хэш>".
+// Кирилл нэр кодлогдохоороо 6 дахин уртасч тасалбар 400+ тэмдэгт болдог бол IIS (http.sys) 260-аас урт
+// URL хэсгийг «400 Bad Request»-ээр татгалздаг.
+func ticketRef(path string) string {
+	t, v, n, ok := SplitPath(path)
+	if !ok || len(n) < 18 || n[16:18] != "__" || !hex16Re.MatchString(n[:16]) {
+		return path
+	}
+	sum := sha256.Sum256([]byte(n))
+	return "@" + t + "/" + v + "/" + n[:16] + "/" + hex.EncodeToString(sum[:4])
+}
+
+// resolveRef — богино лавлагаагаас файлын замыг олно (16 hex угтвартай файлуудаас нэрийн хэшээр).
+func (s *Store) resolveRef(ref string) (string, bool) {
+	parts := strings.Split(strings.TrimPrefix(ref, "@"), "/")
+	if len(parts) != 4 || (parts[1] != Public && parts[1] != Private) || !hex16Re.MatchString(parts[2]) {
+		return "", false
+	}
+	dir, err := s.teacherDir(parts[0])
+	if err != nil {
+		return "", false
+	}
+	ms, _ := filepath.Glob(filepath.Join(dir, parts[1], parts[2]+"__*"))
+	for _, m := range ms {
+		n := filepath.Base(m)
+		if sum := sha256.Sum256([]byte(n)); hex.EncodeToString(sum[:4]) == parts[3] {
+			return "/files/" + parts[0] + "/" + parts[1] + "/" + url.PathEscape(n), true
+		}
+	}
+	return "", false
 }
 
 // SplitPath нь /files/<teacher>/<visibility>/<name> замыг задална (name нь URL-escape-гүй).
