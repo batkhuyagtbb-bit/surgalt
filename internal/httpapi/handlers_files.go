@@ -4,6 +4,7 @@ import (
 	"errors"
 	"mime"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -103,9 +104,19 @@ func (s *Server) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
 // public — хэн ч; private — зөвхөн хүчинтэй exp+sig-тэй. Range дэмжинэ (видео гүйлгэх).
 func (s *Server) handleServeFile(w http.ResponseWriter, r *http.Request) {
 	teacher, vis, name := r.PathValue("teacher"), r.PathValue("visibility"), r.PathValue("name")
+	// IIS (ARR) кирилл зэрэг ASCII бус нэрийн кодчилолыг өөрчилж (жижиг үсгийн %xx, кодлоогүй UTF-8,
+	// давхар кодлолт) дамжуулдаг тул нэрийг хэвийн хэлбэрт оруулж гарын үсэг, файлыг хайна.
+	names := []string{name}
+	if u, err := url.PathUnescape(name); err == nil && u != name {
+		names = append(names, u)
+	}
 	if vis == files.Private {
 		q := r.URL.Query()
-		if !s.files.Verify(r.URL.EscapedPath(), q.Get("exp"), q.Get("sig")) {
+		ok := s.files.Verify(r.URL.EscapedPath(), q.Get("exp"), q.Get("sig"))
+		for _, n := range names {
+			ok = ok || s.files.Verify("/files/"+teacher+"/"+vis+"/"+url.PathEscape(n), q.Get("exp"), q.Get("sig"))
+		}
+		if !ok {
 			writeErr(w, http.StatusForbidden, "холбоосны хугацаа дууссан эсвэл хүчингүй")
 			return
 		}
@@ -113,7 +124,15 @@ func (s *Server) handleServeFile(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 	}
-	f, fi, err := s.files.Open(teacher, vis, name)
+	f, fi, err := s.files.Open(teacher, vis, names[0])
+	for _, n := range names[1:] {
+		if err == nil {
+			break
+		}
+		if f, fi, err = s.files.Open(teacher, vis, n); err == nil {
+			name = n
+		}
+	}
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "файл олдсонгүй")
 		return

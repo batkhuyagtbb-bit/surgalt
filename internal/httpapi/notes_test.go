@@ -2,9 +2,12 @@ package httpapi
 
 import (
 	"bytes"
+	"encoding/json"
 	"image"
 	"image/png"
+	"mime/multipart"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -89,5 +92,118 @@ func TestMediaNotesAndStories(t *testing.T) {
 	}
 	if _, o := call(t, srv, "GET", "/api/me/notes", tt, ""); len(o["stories"].([]any)) != 0 {
 		t.Fatalf("багш бусдын тэмдэглэлийг харах ёсгүй: %v", o)
+	}
+}
+
+// Шинэ хэрэглэгч (Google-ээр «Нэвтрэх»-ээс орсон) багш эсвэл суралцагч болохоо сонгоно; агуулгатай багш суралцагч болохгүй.
+func TestSetRole(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tok, _ := register(t, srv, "newbie", "student")
+	if code, _ := call(t, srv, "POST", "/api/me/role", tok, `{"role":"admin"}`); code != 400 {
+		t.Fatalf("буруу төрөл: %d", code)
+	}
+	code, r := call(t, srv, "POST", "/api/me/role", tok, `{"role":"teacher"}`)
+	if code != 200 || r["user"].(map[string]any)["role"] != "teacher" || r["token"] == "" {
+		t.Fatalf("багш болох: %d %v", code, r)
+	}
+	tt := r["token"].(string)
+	if code, _ := call(t, srv, "POST", "/api/courses", tt, `{"title":"Анхны сургалт","price":0}`); code != 201 && code != 200 {
+		t.Fatalf("шинэ токеноор багшийн эрх: %d", code)
+	}
+	if code, _ := call(t, srv, "POST", "/api/me/role", tt, `{"role":"student"}`); code != 409 {
+		t.Fatalf("сургалттай багш суралцагч болох ёсгүй: %d", code)
+	}
+	if code, _ := call(t, srv, "POST", "/api/me/role", "", `{"role":"teacher"}`); code != 401 {
+		t.Fatalf("нэвтрээгүй: %d", code)
+	}
+}
+
+// Кирилл нэртэй хувийн файлын гарын үсэгтэй холбоос: IIS кодчилолыг өөрчилж дамжуулсан ч (жижиг үсгийн %xx,
+// давхар кодлолт) нээгдэнэ; буруу гарын үсэг татгалзагдана.
+func TestSignedFileEncodings(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, _ := mw.CreateFormFile("file", "Сургалтын журам.pdf")
+	fw.Write([]byte("%PDF-1.4 test"))
+	mw.Close()
+	req, _ := http.NewRequest("POST", srv.URL+"/api/me/files?visibility=private", &body)
+	req.Header.Set("Authorization", "Bearer "+tt)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	res, err := http.DefaultClient.Do(req)
+	if err != nil || res.StatusCode >= 300 {
+		t.Fatalf("файл оруулах: %v %v", err, res.StatusCode)
+	}
+	var info struct {
+		URL string `json:"url"`
+	}
+	json.NewDecoder(res.Body).Decode(&info)
+	res.Body.Close()
+	path, query, _ := strings.Cut(info.URL, "?")
+	lower := regexp.MustCompile(`%[0-9A-F]{2}`).ReplaceAllStringFunc(path, strings.ToLower)
+	double := strings.ReplaceAll(path, "%", "%25")
+	for name, u := range map[string]string{"эх": path, "жижиг үсэг": lower, "давхар кодлолт": double} {
+		r, err := http.Get(srv.URL + u + "?" + query)
+		if err != nil || r.StatusCode != 200 {
+			t.Fatalf("%s: %v %v", name, err, r.StatusCode)
+		}
+		r.Body.Close()
+	}
+	if r, _ := http.Get(srv.URL + path + "?" + strings.Replace(query, "sig=", "sig=x", 1)); r.StatusCode != 403 {
+		t.Fatalf("буруу гарын үсэг: %d", r.StatusCode)
+	}
+}
+
+// Багшийн тэмдэглэлийн статистик: тоо (төрөл, өнгө), story үзэлт; хүрээлсэн хэсгийн зураг зөвхөн өөрийнх.
+func TestNotesStats(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "teach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Биологи","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Эс","is_free":true,"blocks":[{"id":"txt1","type":"text","text":"Эс бол амьдралын нэгж."}]}`)
+	lid := l["id"].(string)
+	s1, u1 := register(t, srv, "stud1", "student")
+	base := "/api/courses/" + cid + "/lessons/" + lid + "/highlights"
+	if code, _ := call(t, srv, "PUT", base, s1, `{"highlights":[{"id":"x1","b":"doc1","s":0,"e":0,"c":"r","t":"2-р хуудас","k":"page","p":2,"box":[10,10,30,20],"img":"/note-img/`+strings.Repeat("a", 24)+`/`+strings.Repeat("b", 32)+`.webp"}]}`); code != 400 {
+		t.Fatalf("бусдын зураг хориотой: %d", code)
+	}
+	ok := `{"highlights":[{"id":"h1","b":"txt1","s":0,"e":2,"c":"y","t":"Эс"},
+		{"id":"x1","b":"doc1","s":0,"e":0,"c":"r","t":"2-р хуудас","k":"page","p":2,"box":[10,10,30,20],"img":"/note-img/` + u1 + `/` + strings.Repeat("b", 32) + `.webp"},
+		{"id":"v1","b":"vid1","s":0,"e":0,"c":"r","t":"0:05","k":"time","sec":5}]}`
+	if code, r := call(t, srv, "PUT", base, s1, ok); code != 200 {
+		t.Fatalf("хүрээтэй тэмдэглэл: %d %v", code, r)
+	}
+	if code, _ := call(t, srv, "PUT", base, s1, `{"highlights":[{"id":"x2","b":"doc1","s":0,"e":0,"c":"y","t":"x","k":"page","p":2,"box":[90,10,30,20]}]}`); code != 400 {
+		t.Fatalf("хуудаснаас хэтэрсэн хүрээ: %d", code)
+	}
+	if code, _ := call(t, srv, "POST", "/api/me/story-view", s1, `{"lessons":["`+lid+`"],"slides":5,"total":5}`); code != 204 {
+		t.Fatalf("story үзэлт: %d", code)
+	}
+	call(t, srv, "POST", "/api/me/story-view", s1, `{"lessons":["`+lid+`"],"slides":2,"total":5}`)
+	if code, _ := call(t, srv, "GET", "/api/me/courses/"+cid+"/notes-stats", s1, ""); code != 403 && code != 404 {
+		t.Fatalf("суралцагч статистик харах ёсгүй: %d", code)
+	}
+	code, st := call(t, srv, "GET", "/api/me/courses/"+cid+"/notes-stats", tt, "")
+	if code != 200 {
+		t.Fatalf("статистик: %d %v", code, st)
+	}
+	sum := st["summary"].(map[string]any)
+	if sum["notes"].(float64) != 3 || sum["writers"].(float64) != 1 || sum["story_views"].(float64) != 2 || sum["story_done"].(float64) != 1 {
+		t.Fatalf("нэгтгэл: %v", sum)
+	}
+	kinds := sum["kinds"].(map[string]any)
+	if kinds["box"].(float64) != 1 || kinds["text"].(float64) != 1 || kinds["time"].(float64) != 1 || sum["colors"].(map[string]any)["r"].(float64) != 2 {
+		t.Fatalf("төрөл, өнгө: %v", sum)
+	}
+	stu := st["students"].([]any)[0].(map[string]any)
+	if stu["name"] != "stud1" || stu["notes"].(float64) != 3 || stu["story_views"].(float64) != 2 {
+		t.Fatalf("суралцагчийн мөр: %v", stu)
+	}
+	if b, _ := json.Marshal(st); strings.Contains(string(b), "Эс бол") || strings.Contains(string(b), "note-img") {
+		t.Fatalf("багшид тэмдэглэлийн агуулга харагдах ёсгүй: %s", b)
 	}
 }

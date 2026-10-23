@@ -97,6 +97,11 @@ func (s *Store) DeleteOwner(ownerID string) error {
 	if err != nil {
 		return err
 	}
+	if nd, err := s.notesDir(ownerID); err == nil { // тэмдэглэлийн зургууд (баримтаас хүрээлж авсан)
+		if err := os.RemoveAll(nd); err != nil {
+			return err
+		}
+	}
 	return os.RemoveAll(dir)
 }
 

@@ -7,7 +7,14 @@
       <button class="tab" data-tab="register" role="tab">Бүртгүүлэх</button>
       <span class="tab-ink"></span>
     </div>
-    <label class="role-toggle"><input type="checkbox" id="asTeacher"><span class="switch"></span>Би бол багш</label>
+    <div class="role-step" id="roleStep" hidden>
+      <p class="role-q" id="roleQ"><b>Та хэн бэ?</b><small>Сонголтоос хамаарч таны хэсэг шууд бэлэн болно</small></p>
+      <div class="role-cards" role="radiogroup" aria-labelledby="roleQ">
+        <button type="button" class="role-card" data-role="student" role="radio" aria-checked="false"><span class="rc-ico" data-i="courses" aria-hidden="true"></span><b>Суралцагч</b><small>Хичээл үзэж, даалгавар, шалгалт өгч, цол ахиулна</small></button>
+        <button type="button" class="role-card" data-role="teacher" role="radio" aria-checked="false"><span class="rc-ico" data-i="teacher" aria-hidden="true"></span><b>Багш</b><small>Сургалт, ном оруулж, ангиа удирдаж орлого олно</small></button>
+      </div>
+    </div>
+    <div class="role-chosen" id="roleChosen" hidden><span></span><button type="button" data-role-change>Солих</button></div>
     <div class="social" id="social"></div>
     <div class="divider"><span>эсвэл имэйлээр</span></div>
     <form id="loginForm" class="form">

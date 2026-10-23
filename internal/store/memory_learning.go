@@ -312,7 +312,7 @@ func (m *Memory) ActivityEvents(_ context.Context, f ActivityFilter, limit int) 
 		if !f.BeforeAt.IsZero() && !(e.At.Before(f.BeforeAt) || (e.At.Equal(f.BeforeAt) && e.ID < f.BeforeID)) {
 			continue
 		}
-		if f.match(e.TeacherID, e.CourseID, e.UserID, e.LessonID, "", e.At) {
+		if f.match(e.TeacherID, e.CourseID, e.UserID, e.LessonID, "", e.At) && (f.Type == "" || e.Type == f.Type) {
 			out = append(out, e)
 		}
 	}

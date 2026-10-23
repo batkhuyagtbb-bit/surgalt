@@ -86,6 +86,8 @@ type ActivityEvent struct {
 // ActivityFilter — хоосон талбар шүүхгүй.
 type ActivityFilter struct {
 	TeacherID, CourseID, UserID, LessonID, Kind string
+	// Type — зөвхөн энэ төрлийн үйл явдал (ActivityEvents; жишээ нь "story_view").
+	Type string
 	Since                                       time.Time
 	// BeforeAt/BeforeID — хуудаслалтын курсор: (at, id)-ээс өмнөх мөрүүд (зөвхөн ActivityEvents).
 	BeforeAt time.Time

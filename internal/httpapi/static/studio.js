@@ -745,7 +745,7 @@ async function courseEditor(id) {
 
   // Бүлгүүд (модуль). Хоосон (хичээлгүй) бүлэг зөвхөн клиент дээр байна: хичээл чирж оруулмагц хадгалагдана.
   let pending = []; // [{name, at}] — хоосон бүлэг ба хөтөлбөр дээрх байр
-  let view = (() => { try { return localStorage.getItem("sg_course_view") === "journal" ? "journal" : "outline"; } catch { return "outline"; } })();
+  let view = (() => { try { const v = localStorage.getItem("sg_course_view"); return v === "journal" || v === "notes" ? v : "outline"; } catch { return "outline"; } })();
   const groupsModel = () => {
     const out = [];
     for (const l of [...lessons].sort((a, b) => a.position - b.position)) {
@@ -949,8 +949,9 @@ async function courseEditor(id) {
             <div id="composerBody" hidden>${editorHTML(null)}</div></section>
           ${lessons.length || pending.length ? `<div class="view-tabs" role="tablist">
             <button role="tab" data-view="outline" aria-selected="${view === "outline"}">${ico("list", 16)}Хөтөлбөр</button>
-            <button role="tab" data-view="journal" aria-selected="${view === "journal"}">${ico("users", 16)}Журнал</button></div>` : ""}
-          <div id="gpView">${view === "journal" && lessons.length ? `<div class="jr" id="journal"><div class="loader"></div></div>` : view === "outline" && (lessons.length || pending.length) ? outlineHTML() : feedHTML()}</div>
+            <button role="tab" data-view="journal" aria-selected="${view === "journal"}">${ico("users", 16)}Журнал</button>
+            <button role="tab" data-view="notes" aria-selected="${view === "notes"}">${ico("edit", 16)}Тэмдэглэл</button></div>` : ""}
+          <div id="gpView">${view === "notes" && lessons.length ? `<div class="ns" id="notesStats"><div class="loader"></div></div>` : view === "journal" && lessons.length ? `<div class="jr" id="journal"><div class="loader"></div></div>` : view === "outline" && (lessons.length || pending.length) ? outlineHTML() : feedHTML()}</div>
         </div></div>
       <div class="modal" id="gpRosterModal"><div class="modal-card" style="width:min(580px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
         <h3 class="h3">Суралцагчид <span class="chip">${roster.length}</span></h3>
@@ -964,6 +965,36 @@ async function courseEditor(id) {
     hydrateBooks(main);
     const cf = $("#composerForm"); if (cf) { cf.dataset.course = c.id; mountBlockEditor(cf, lessonBlocks(null)); }
     if (view === "journal" && $("#journal")) loadJournal();
+    if (view === "notes" && $("#notesStats")) loadNotesStats();
+  };
+
+  /* ---------- Тэмдэглэл: суралцагчид хэдэн тэмдэглэл хөтөлж, story-гоо хэдэн удаа үзсэн (агуулга биш, зөвхөн тоо) ---------- */
+  const NS_KIND = [["text", "Текст тодруулга", "#1f3c8f"], ["time", "Видеоны мөч", "#e11d48"], ["page", "Хуудас, слайд", "#0f766e"], ["box", "Хүрээлсэн хэсэг", "#eaa02e"]];
+  const NS_COL = [["y", "Чухал", "#ffd60a"], ["g", "Ойлгосон", "#34c759"], ["r", "Ойлгоогүй", "#ff453a"], ["b", "Нэр томьёо", "#0a84ff"]];
+  const loadNotesStats = async () => {
+    const box = $("#notesStats"); if (!box) return;
+    let d; try { d = await api(`/api/me/courses/${c.id}/notes-stats`); } catch (e) { box.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
+    const S = d.summary, n = S.notes || 0, pct = (x) => (n ? Math.round((x / n) * 100) : 0);
+    const bar = (rows, obj) => `<div class="ns-bar">${rows.map(([k, t, col]) => obj[k] ? `<i style="flex:${obj[k]};background:${col}" title="${t}: ${obj[k]}"></i>` : "").join("")}</div>
+      <div class="ns-legend">${rows.map(([k, t, col]) => `<span><i style="background:${col}"></i>${t} <b>${obj[k] || 0}</b>${n ? ` <small>${pct(obj[k] || 0)}%</small>` : ""}</span>`).join("")}</div>`;
+    const dots = (o) => NS_COL.map(([k, t, col]) => o[k] ? `<span class="ns-dot" title="${t}"><i style="background:${col}"></i>${o[k]}</span>` : "").join("");
+    const when = (t) => (t ? fmtDate(t) : "—");
+    const maxRed = Math.max(0, ...d.lessons.map((l) => l.colors.r || 0));
+    box.innerHTML = `<div class="jr-head"><div><h2>Тэмдэглэл</h2><span class="muted small">Суралцагчид хичээлдээ хэр идэвхтэй тэмдэглэл хөтөлж, нүүр хуудсандаа story болгон давтаж байгаа нь. Тэмдэглэлийн агуулга хувийнх — зөвхөн тоо харагдана.</span></div></div>
+      <div class="ns-kpis">
+        <div class="ns-kpi"><b>${S.writers}</b><span>тэмдэглэл хөтөлсөн суралцагч</span></div>
+        <div class="ns-kpi"><b>${n}</b><span>нийт тэмдэглэл</span></div>
+        <div class="ns-kpi"><b>${S.story_views}</b><span>story үзэлт · ${S.viewers} хүн</span><small>${S.story_done} нь эцэс хүртэл</small></div>
+        <div class="ns-kpi ns-red"><b>${S.colors.r || 0}</b><span>«Ойлгоогүй» тэмдэглэл</span></div>
+      </div>
+      ${n ? `<div class="ns-grid"><section class="ns-card"><h3>Төрлөөр</h3>${bar(NS_KIND, S.kinds)}</section><section class="ns-card"><h3>Өнгөөр (утга)</h3>${bar(NS_COL, S.colors)}</section></div>` : ""}
+      <section class="ns-card"><h3>Хичээл бүрээр</h3><div class="jr-wrap"><table class="tbl ns-t"><thead><tr><th>Хичээл</th><th>Тэмдэглэл</th><th>Суралцагч</th><th title="Ойлгоогүй гэж тэмдэглэсэн">❓ Ойлгоогүй</th><th>Story үзэлт</th></tr></thead><tbody>
+        ${d.lessons.map((l) => `<tr class="${l.colors.r && l.colors.r === maxRed ? "ns-warn" : ""}"><td><b>${String(l.position).padStart(2, "0")}</b> ${esc(l.title)}${l.colors.r && l.colors.r === maxRed ? ` <span class="chip chip-coral">Анхаарах</span>` : ""}</td><td>${l.notes || "—"}</td><td>${l.students || "—"}</td><td>${l.colors.r || "—"}</td><td>${l.story_views || "—"}</td></tr>`).join("")}</tbody></table></div></section>
+      <section class="ns-card"><h3>Суралцагч бүрээр</h3>${d.students.length ? `<div class="jr-wrap"><table class="tbl ns-t"><thead><tr><th>Суралцагч</th><th>Тэмдэглэл</th><th>Хичээл</th><th>Төрөл</th><th>Өнгө</th><th>Story үзсэн</th><th>Сүүлд</th></tr></thead><tbody>
+        ${d.students.map((s) => `<tr><td><b>${esc(s.name)}</b>${s.username ? `<small class="muted"> @${esc(s.username)}</small>` : ""}</td><td><b>${s.notes}</b></td><td>${s.lessons}</td>
+          <td class="ns-kinds">${NS_KIND.map(([k, t]) => s.kinds[k] ? `<span title="${t}">${{ text: "🖍", time: "▶", page: "📄", box: "▢" }[k]} ${s.kinds[k]}</span>` : "").join("") || "—"}</td>
+          <td>${dots(s.colors) || "—"}</td><td>${s.story_views ? `${s.story_views}${s.story_done ? ` <small class="muted">(${s.story_done} бүрэн)</small>` : ""}` : "—"}</td>
+          <td class="muted small">${when(s.last_view && (!s.last_note || s.last_view > s.last_note) ? s.last_view : s.last_note)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted small">Одоогоор суралцагч тэмдэглэл хөтлөөгүй байна. Хичээлийн текстийг маркераар тодруулах, видеоны мөч, баримтын хуудсанд тэмдэглэх боломжтойг суралцагчиддаа сануулаарай.</p>`}</section>`;
   };
 
   /* ---------- Журнал: суралцагч × хичээл (сургуулийн журнал шиг) — нүд, нэр дээр дарахад дэлгэрэнгүй ---------- */

@@ -6,6 +6,7 @@ import (
 	"net/mail"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"surgalt/internal/auth"
@@ -280,6 +281,62 @@ func (s *Server) handleUpdateUsername(w http.ResponseWriter, r *http.Request) {
 }
 
 // onUserCreated: багш бол түүний файлын сангийн хавтсыг үүсгэнэ.
+// roleChangeWindow — шинэ хэрэглэгч бүртгэлийнхээ төрлийг (багш / суралцагч) сонгох хугацаа.
+const roleChangeWindow = 24 * time.Hour
+
+// handleSetRole: POST /api/me/role {"role":"teacher"|"student"} — Google/Facebook-ээр шинээр орсон (төрлөө
+// сонгоогүй) хэрэглэгч багш эсвэл суралцагч болохоо сонгоно. Зөвхөн бүртгүүлснээс хойш 24 цагт; сургалт, ном
+// оруулсан багш суралцагч болохгүй. Шинэ токен буцаана (токенд төрөл бичигддэг).
+func (s *Server) handleSetRole(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Role string `json:"role"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	role := store.Role(in.Role)
+	if role != store.RoleTeacher && role != store.RoleStudent {
+		writeErr(w, http.StatusBadRequest, "төрөл буруу")
+		return
+	}
+	u, err := s.store.UserByID(r.Context(), c.UID)
+	if s.storeErr(w, r, err) {
+		return
+	}
+	if u.Role == role {
+		s.issue(w, http.StatusOK, u)
+		return
+	}
+	if time.Since(u.CreatedAt) > roleChangeWindow {
+		writeErr(w, http.StatusConflict, "бүртгэлийн төрлийг зөвхөн шинээр бүртгүүлэхдээ сонгоно")
+		return
+	}
+	if u.Role == store.RoleTeacher {
+		cs, err := s.store.CoursesByTeacher(r.Context(), u.ID, false)
+		if s.storeErr(w, r, err) {
+			return
+		}
+		bs, err := s.store.BooksByTeacher(r.Context(), u.ID, false)
+		if s.storeErr(w, r, err) {
+			return
+		}
+		if len(cs) > 0 || len(bs) > 0 {
+			writeErr(w, http.StatusConflict, "сургалт, ном оруулсан тул суралцагч болох боломжгүй")
+			return
+		}
+	}
+	u, err = s.store.UpdateUser(r.Context(), u.ID, func(x *store.User) error { x.Role = role; return nil })
+	if s.storeErr(w, r, err) {
+		return
+	}
+	s.onUserCreated(u)
+	s.issue(w, http.StatusOK, u)
+}
+
 func (s *Server) onUserCreated(u *store.User) {
 	if u.Role == store.RoleTeacher {
 		if err := s.files.EnsureTeacherDir(u.ID); err != nil {

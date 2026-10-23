@@ -70,9 +70,10 @@ func (s *Server) handleOAuthStart(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	st := oauthState{State: randHex(16), Role: string(store.RoleStudent), Next: safeNext(r.URL.Query().Get("next"))}
-	if r.URL.Query().Get("role") == string(store.RoleTeacher) {
-		st.Role = string(store.RoleTeacher)
+	// role: «Бүртгүүлэх»-ээс сонгосон төрөл; хоосон бол («Нэвтрэх»-ээс) шинэ хэрэглэгчээс дараа нь асууна.
+	st := oauthState{State: randHex(16), Next: safeNext(r.URL.Query().Get("next"))}
+	if rl := r.URL.Query().Get("role"); rl == string(store.RoleTeacher) || rl == string(store.RoleStudent) {
+		st.Role = rl
 	}
 	opts := []oauth2.AuthCodeOption{}
 	if p.PKCE {
@@ -129,7 +130,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		fail(p.Label + "-аас мэдээлэл авч чадсангүй")
 		return
 	}
-	u, err := s.loginWithIdentity(ctx, id, store.Role(st.Role))
+	u, created, err := s.loginWithIdentity(ctx, id, store.Role(st.Role))
 	if err != nil {
 		s.log.Error("oauth login", "provider", p.Name, "err", err)
 		fail("Бүртгэл үүсгэж чадсангүй")
@@ -141,7 +142,11 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Токеныг URL fragment-ээр дамжуулна: сервер лог, Referer-т үлдэхгүй.
-	http.Redirect(w, r, "/login#token="+url.QueryEscape(jwt)+"&next="+url.QueryEscape(st.Next), http.StatusFound)
+	ask := ""
+	if created && st.Role == "" {
+		ask = "&ask=role" // шинэ хэрэглэгч: багш уу, суралцагч уу гэдгийг асууна
+	}
+	http.Redirect(w, r, "/login#token="+url.QueryEscape(jwt)+"&next="+url.QueryEscape(st.Next)+ask, http.StatusFound)
 }
 
 var nonUser = regexp.MustCompile(`[^a-z0-9_]+`)
@@ -159,21 +164,21 @@ func usernameBase(id oauth.Identity) string {
 	return "user"
 }
 
-// loginWithIdentity: холбогдсон данс → баталгаажсан имэйлээр холбох → шинэ бүртгэл.
-func (s *Server) loginWithIdentity(ctx context.Context, id oauth.Identity, role store.Role) (*store.User, error) {
+// loginWithIdentity: холбогдсон данс → баталгаажсан имэйлээр холбох → шинэ бүртгэл (created=true).
+func (s *Server) loginWithIdentity(ctx context.Context, id oauth.Identity, role store.Role) (*store.User, bool, error) {
 	if u, err := s.store.UserByIdentity(ctx, id.Provider, id.Subject); err == nil {
-		return u, nil
+		return u, false, nil
 	} else if !errors.Is(err, store.ErrNotFound) {
-		return nil, err
+		return nil, false, err
 	}
 	if id.Email != "" && id.EmailVerified {
 		if u, err := s.store.UserByEmail(ctx, id.Email); err == nil {
 			if err := s.store.LinkIdentity(ctx, u.ID, id.Provider, id.Subject); err != nil {
-				return nil, err
+				return nil, false, err
 			}
-			return u, nil
+			return u, false, nil
 		} else if !errors.Is(err, store.ErrNotFound) {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	name := strings.TrimSpace(id.Name)
@@ -200,24 +205,27 @@ func (s *Server) loginWithIdentity(ctx context.Context, id oauth.Identity, role 
 			uname = base + "_" + randHex(2)
 		}
 		u = &store.User{Username: uname, Email: email, Role: role, DisplayName: name, AvatarURL: avatar}
+		if u.Role == "" { // «Нэвтрэх»-ээс шинээр орсон: эхлээд суралцагч, дараа нь төрлөө сонгоно (handleSetRole)
+			u.Role = store.RoleStudent
+		}
 		err := s.store.CreateUser(ctx, u)
 		if err == nil {
 			break
 		}
 		if !errors.Is(err, store.ErrConflict) {
-			return nil, err
+			return nil, false, err
 		}
 		if attempt == 5 {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	s.onUserCreated(u)
 	if err := s.store.LinkIdentity(ctx, u.ID, id.Provider, id.Subject); err != nil {
 		// Зэрэг хоёр callback: нөгөөх нь түрүүлж холбосон бол түүнийг ашиглана.
 		if existing, e2 := s.store.UserByIdentity(ctx, id.Provider, id.Subject); e2 == nil {
-			return existing, nil
+			return existing, false, nil
 		}
-		return nil, err
+		return nil, false, err
 	}
-	return u, nil
+	return u, true, nil
 }

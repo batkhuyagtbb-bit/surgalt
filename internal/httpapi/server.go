@@ -156,6 +156,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/profile/insights", s.handleProfileInsights)
 	mux.HandleFunc("PUT /api/me/profile", s.handleUpdateProfile)
 	mux.HandleFunc("POST /api/me/consent", s.handleConsent)
+	mux.HandleFunc("POST /api/me/role", s.handleSetRole)
 	mux.HandleFunc("POST /api/auth/forgot", s.handleForgot)
 	mux.HandleFunc("POST /api/auth/reset", s.handleReset)
 	mux.HandleFunc("GET /reset", s.pageStatic("reset"))
@@ -239,6 +240,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/books/{id}/buy", s.handleBuyBook)
 	mux.HandleFunc("POST /api/books/{id}/interest", s.handleBookInterest)
 	mux.HandleFunc("GET /api/me/notes", s.handleMyNotes)
+	mux.HandleFunc("POST /api/me/story-view", s.handleStoryView)
+	mux.HandleFunc("GET /api/me/courses/{id}/notes-stats", s.handleNotesStats)
+	mux.HandleFunc("POST /api/me/note-images", s.handleNoteImage)
+	mux.HandleFunc("GET /note-img/{uid}/{name}", s.handleNoteImg)
 	mux.HandleFunc("GET /api/books/{id}/notes", s.handleGetBookNotes)
 	mux.HandleFunc("PUT /api/books/{id}/notes", s.handleSetBookNotes)
 	mux.HandleFunc("POST /api/me/quiz-import", s.handleQuizImport)
@@ -403,7 +408,7 @@ func (s *Server) limitMW(next http.Handler) http.Handler {
 // орж болох тул IP-гаар биш, хэрэглэгч тус бүрээр (boardLim) хязгаарлана.
 func boardHot(r *http.Request) bool {
 	p := r.URL.Path
-	if strings.HasPrefix(p, "/board-img/") {
+	if strings.HasPrefix(p, "/board-img/") || strings.HasPrefix(p, "/note-img/") {
 		return r.Method == http.MethodGet
 	}
 	return r.Method == http.MethodPost && strings.HasPrefix(p, "/api/courses/") && strings.Contains(p, "/board/") &&

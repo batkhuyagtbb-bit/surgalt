@@ -28,6 +28,22 @@ func (m *Memory) UserHighlights(_ context.Context, userID string) ([]HighlightSe
 	return out, nil
 }
 
+func (m *Memory) LessonHighlights(_ context.Context, lessonIDs []string) ([]HighlightSet, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	want := map[string]bool{}
+	for _, id := range lessonIDs {
+		want[id] = true
+	}
+	out := []HighlightSet{}
+	for k, hs := range m.hl {
+		if want[k[1]] && len(hs) > 0 {
+			out = append(out, HighlightSet{UserID: k[0], LessonID: k[1], Items: slices.Clone(hs), UpdatedAt: m.hlAt[k]})
+		}
+	}
+	return out, nil
+}
+
 func (m *Memory) SetHighlights(_ context.Context, userID, lessonID string, hs []Highlight) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

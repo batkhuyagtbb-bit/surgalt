@@ -20,6 +20,9 @@ type Highlight struct {
 	Kind string  `json:"k,omitempty"`
 	Page int     `json:"p,omitempty"`
 	Sec  float64 `json:"sec,omitempty"`
+	// Box — хуудас дээр хүрээлсэн хэсэг (хувиар: x, y, өргөн, өндөр); Img — тэр хэсгийн зураг (/note-img/...).
+	Box []float64 `json:"box,omitempty"`
+	Img string    `json:"img,omitempty"`
 }
 
 // HighlightColors — маркерын өнгө: y чухал, g ойлгосон, r ойлгоогүй, b нэр томьёо.
@@ -32,10 +35,13 @@ type HighlightStore interface {
 	SetHighlights(ctx context.Context, userID, lessonID string, hs []Highlight) error
 	// UserHighlights — хэрэглэгчийн бүх хичээл, номын ("book:<ID>") тэмдэглэл, сүүлд өөрчилсөн нь эхэндээ.
 	UserHighlights(ctx context.Context, userID string) ([]HighlightSet, error)
+	// LessonHighlights — эдгээр хичээлүүд дээрх бүх суралцагчийн тэмдэглэл (багшийн статистикт, агуулгыг харуулахгүй).
+	LessonHighlights(ctx context.Context, lessonIDs []string) ([]HighlightSet, error)
 }
 
 // HighlightSet — нэг хичээл (эсвэл ном) дээрх тэмдэглэлүүд (профайлын «story»-д).
 type HighlightSet struct {
+	UserID    string
 	LessonID  string
 	Items     []Highlight
 	UpdatedAt time.Time

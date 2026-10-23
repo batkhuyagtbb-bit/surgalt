@@ -263,6 +263,10 @@ func (c *ClickHouse) AddActivityEvents(ctx context.Context, evs []ActivityEvent)
 
 func (c *ClickHouse) ActivityEvents(ctx context.Context, f ActivityFilter, limit int) ([]ActivityEvent, error) {
 	w, args := f.where("at", false)
+	if f.Type != "" {
+		w += " AND type = ?"
+		args = append(args, f.Type)
+	}
 	if !f.BeforeAt.IsZero() {
 		// Параметр болгон дамжуулахад секунд хүртэл тайрагддаг тул миллисекундээр харьцуулна.
 		ms := f.BeforeAt.UnixMilli()

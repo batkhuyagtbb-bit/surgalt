@@ -1,11 +1,15 @@
 package httpapi
 
 import (
+	"errors"
+	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"surgalt/internal/files"
 	"surgalt/internal/store"
 )
 
@@ -49,6 +53,10 @@ func (s *Server) handleSetHighlights(w http.ResponseWriter, r *http.Request) {
 	}
 	if msg := validateHighlights(in.Highlights); msg != "" {
 		writeErr(w, http.StatusBadRequest, msg)
+		return
+	}
+	if !ownNoteImages(in.Highlights, c.UID) {
+		writeErr(w, http.StatusBadRequest, "тэмдэглэлийн зураг буруу")
 		return
 	}
 	if err := s.store.SetHighlights(r.Context(), c.UID, l.ID, in.Highlights); s.storeErr(w, r, err) {
@@ -102,6 +110,10 @@ func (s *Server) handleSetBookNotes(w http.ResponseWriter, r *http.Request) {
 	}
 	if msg := validateHighlights(in.Highlights); msg != "" {
 		writeErr(w, http.StatusBadRequest, msg)
+		return
+	}
+	if !ownNoteImages(in.Highlights, uid) {
+		writeErr(w, http.StatusBadRequest, "тэмдэглэлийн зураг буруу")
 		return
 	}
 	if err := s.store.SetHighlights(r.Context(), uid, key, in.Highlights); s.storeErr(w, r, err) {
@@ -182,6 +194,76 @@ func (s *Server) handleMyNotes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"stories": out})
 }
 
+var noteImgRe = regexp.MustCompile(`^/note-img/[0-9a-f]{24}/[0-9a-f]{32}\.webp$`)
+
+func validBox(b []float64) bool {
+	if len(b) != 4 {
+		return false
+	}
+	for _, v := range b {
+		if v < 0 || v > 100 {
+			return false
+		}
+	}
+	return b[2] > 0 && b[3] > 0 && b[0]+b[2] <= 100.5 && b[1]+b[3] <= 100.5
+}
+
+// ownNoteImages — тэмдэглэлийн зураг зөвхөн тухайн хэрэглэгчийнх байна.
+func ownNoteImages(hs []store.Highlight, uid string) bool {
+	for _, h := range hs {
+		if h.Img != "" && !strings.HasPrefix(h.Img, "/note-img/"+uid+"/") {
+			return false
+		}
+	}
+	return true
+}
+
+// POST /api/me/note-images — баримтаас хүрээлж авсан хэсгийн зураг (түүхий бие, 6MB хүртэл) → {url}.
+func (s *Server) handleNoteImage(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	if !s.boardLim.Allow("note-img:" + c.UID) {
+		writeErr(w, http.StatusTooManyRequests, "хэт олон зураг, түр хүлээнэ үү")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 6<<20)
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeErr(w, http.StatusRequestEntityTooLarge, "зураг хэт том")
+		return
+	}
+	boardImgSem <- struct{}{}
+	name, _, _, err := s.files.SaveNoteImage(c.UID, raw)
+	<-boardImgSem
+	switch {
+	case errors.Is(err, files.ErrImage):
+		writeErr(w, http.StatusBadRequest, "зургийг уншиж чадсангүй")
+	case errors.Is(err, files.ErrNotesFull):
+		writeErr(w, http.StatusRequestEntityTooLarge, err.Error())
+	case err != nil:
+		s.log.Error("тэмдэглэлийн зураг", "err", err)
+		writeErr(w, http.StatusInternalServerError, "зургийг хадгалж чадсангүй")
+	default:
+		writeJSON(w, http.StatusOK, map[string]any{"url": "/note-img/" + c.UID + "/" + name})
+	}
+}
+
+// GET /note-img/{uid}/{name} — тэмдэглэлийн зураг (таамаглах боломжгүй нэртэй, өөрчлөгддөггүй).
+func (s *Server) handleNoteImg(w http.ResponseWriter, r *http.Request) {
+	f, fi, err := s.files.OpenNoteImage(r.PathValue("uid"), r.PathValue("name"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "зураг олдсонгүй")
+		return
+	}
+	defer f.Close()
+	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", "image/webp")
+	http.ServeContent(w, r, "", fi.ModTime(), f)
+}
+
 func validateHighlights(hs []store.Highlight) string {
 	if len(hs) > highlightsMax {
 		return "нэг хичээл дээр 1000-аас олон тодруулга хийхгүй"
@@ -204,10 +286,16 @@ func validateHighlights(hs []store.Highlight) string {
 				return "хуудасны дугаар буруу"
 			case h.Start != 0 || h.End != 0 || utf8.RuneCountInString(h.Text) > 200:
 				return "тэмдэглэлийн мэдээлэл буруу"
+			case (len(h.Box) > 0 || h.Img != "") && h.Kind != "page":
+				return "хүрээ зөвхөн хуудсан дээр"
+			case len(h.Box) > 0 && !validBox(h.Box):
+				return "хүрээлсэн хэсэг буруу"
+			case h.Img != "" && !noteImgRe.MatchString(h.Img):
+				return "тэмдэглэлийн зураг буруу"
 			case utf8.RuneCountInString(h.Note) > highlightNoteMax:
 				return "тэмдэглэл 1000 тэмдэгтээс хэтрэхгүй"
 			}
-		case h.Page != 0 || h.Sec != 0:
+		case h.Page != 0 || h.Sec != 0 || len(h.Box) > 0 || h.Img != "":
 			return "тодруулгын мэдээлэл буруу"
 		case h.Start < 0 || h.End <= h.Start || h.End-h.Start > highlightTextMax:
 			return "тодруулгын байрлал буруу"
