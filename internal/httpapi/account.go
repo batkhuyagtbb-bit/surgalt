@@ -204,43 +204,55 @@ func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "баталгаажуулахын тулд «"+deleteConfirm+"» гэж бичнэ үү")
 		return
 	}
-	ctx, now := r.Context(), time.Now()
-	u, err := s.store.UserByID(ctx, c.UID)
+	u, err := s.store.UserByID(r.Context(), c.UID)
 	if s.storeErr(w, r, err) {
 		return
 	}
+	blocked, err := s.eraseAccount(r.Context(), u)
+	if s.storeErr(w, r, err) {
+		return
+	}
+	if blocked != "" {
+		writeErr(w, http.StatusConflict, blocked)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// eraseAccount — бүртгэл ба хувийн мэдээллийг устгана (store.DeleteUserData, файлууд). Сургалт, номтой эсвэл
+// захиалгатай цагтай багшийг устгахгүй — шалтгааныг blocked-д буцаана.
+func (s *Server) eraseAccount(ctx context.Context, u *store.User) (blocked string, err error) {
+	now := time.Now()
 	if u.Role == store.RoleTeacher {
 		courses, err := s.store.CoursesByTeacher(ctx, u.ID, false)
-		if s.storeErr(w, r, err) {
-			return
+		if err != nil {
+			return "", err
 		}
 		books, err := s.store.BooksByTeacher(ctx, u.ID, false)
-		if s.storeErr(w, r, err) {
-			return
+		if err != nil {
+			return "", err
 		}
 		if len(courses) > 0 || len(books) > 0 {
-			writeErr(w, http.StatusConflict, "Сургалт, номтой багшийн бүртгэлийг шууд устгахгүй — суралцагчдын төлбөр, хандалт хамааралтай. Эхлээд сургалт, номоо устгах эсвэл бидэнтэй холбогдоно уу.")
-			return
+			return "Сургалт, номтой багшийн бүртгэлийг шууд устгахгүй — суралцагчдын төлбөр, хандалт хамааралтай. Эхлээд сургалт, номоо устгах эсвэл бидэнтэй холбогдоно уу.", nil
 		}
 		slots, err := s.store.Slots(ctx, u.ID, now, now.AddDate(2, 0, 0))
-		if s.storeErr(w, r, err) {
-			return
+		if err != nil {
+			return "", err
 		}
 		var free []string
 		for _, sl := range slots {
 			if !sl.Free(now) {
-				writeErr(w, http.StatusConflict, "Захиалгатай цагаа эхлээд цуцлана уу (Хуваарь → Захиалгууд).")
-				return
+				return "Захиалгатай цагаа эхлээд цуцлана уу (Хуваарь → Захиалгууд).", nil
 			}
 			free = append(free, sl.ID)
 		}
-		if _, err := s.store.DeleteFreeSlots(ctx, free, now); s.storeErr(w, r, err) {
-			return
+		if _, err := s.store.DeleteFreeSlots(ctx, free, now); err != nil {
+			return "", err
 		}
 	}
 	s.releaseBookings(ctx, u)
-	if err := s.store.DeleteUserData(ctx, u.ID); s.storeErr(w, r, err) {
-		return
+	if err := s.store.DeleteUserData(ctx, u.ID); err != nil {
+		return "", err
 	}
 	if err := s.files.DeleteOwner(u.ID); err != nil {
 		s.log.Warn("бүртгэл устгах: файл", "err", err, "user", u.ID)
@@ -248,7 +260,7 @@ func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	s.alive.Delete(u.ID)
 	s.profiles.Delete(u.Username)
 	s.log.Info("бүртгэл устгагдлаа", "user", u.ID)
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	return "", nil
 }
 
 // releaseBookings — бүртгэлээ устгасан суралцагчийн удахгүй болох цагийг чөлөөлж, багшид нь мэдэгдэнэ.

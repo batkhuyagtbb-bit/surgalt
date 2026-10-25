@@ -19,7 +19,7 @@ const (
 	maxTextRunes    = 20_000
 	maxQuizOptions  = 8
 	maxBlockURL     = 1000
-	maxBlocksTotalB = 400_000 // нийт текстийн хэмжээ (байт)
+	maxBlocksTotalB = 1_500_000 // нийт текстийн хэмжээ (байт, HTML-тэй)
 )
 
 var blockIDRe = regexp.MustCompile(`^[a-z0-9]{4,16}$`)
@@ -70,14 +70,30 @@ func validateBlocks(bs []store.Block, teacherID string) string {
 			return "агуулгын төрөл буруу: " + b.Type
 		}
 		b.Name = strings.TrimSpace(b.Name)
+		if b.Type != "text" {
+			b.HTML = ""
+		}
 		if utf8.RuneCountInString(b.Name) > 200 || b.Size < 0 {
 			return "файлын нэр хэт урт"
 		}
 		switch b.Type {
 		case "text":
 			b.URL, b.Quiz = "", nil
-			if strings.TrimSpace(b.Text) == "" {
+			imgs := 0
+			if b.HTML != "" { // Word шиг засварлагч: HTML-ийг цэвэрлэж, цэвэр текстийг Text-д
+				if len(b.HTML) > maxRichBytes {
+					return "нэг текстийн хэсэг хэт том — хэд хэдэн хэсэг болгон хуваана уу"
+				}
+				b.HTML, b.Text, imgs = sanitizeRich(b.HTML, teacherID)
+				if imgs >= maxRichImages {
+					return "нэг текстийн хэсэгт 40 хүртэл зураг"
+				}
+			}
+			if strings.TrimSpace(b.Text) == "" && imgs == 0 {
 				return "хоосон текстийн хэсэг байна — бичих эсвэл устгана уу"
+			}
+			if strings.TrimSpace(b.Text) == "" {
+				b.Text = ""
 			}
 			if utf8.RuneCountInString(b.Text) > maxTextRunes {
 				return "нэг текстийн хэсэг 20,000 тэмдэгтээс хэтрэхгүй"
@@ -148,7 +164,7 @@ func validateBlocks(bs []store.Block, teacherID string) string {
 				return msg
 			}
 		}
-		total += len(b.Text) + len(b.Name) + len(b.URL)
+		total += len(b.Text) + len(b.HTML) + len(b.Name) + len(b.URL)
 		if b.Quiz != nil {
 			total += len(b.Quiz.Question) + len(b.Quiz.Explain)
 			for _, o := range slices.Concat(b.Quiz.Options, b.Quiz.Answers, b.Quiz.Left, b.Quiz.Right) {
@@ -183,6 +199,7 @@ func (s *Server) viewerBlocks(bs []store.Block) []store.Block {
 		if b.Quiz != nil {
 			b.Quiz = s.viewerQuiz(b.ID, b.Quiz)
 		}
+		b.HTML = s.richMedia(b.HTML)
 		out[i] = b
 	}
 	return out

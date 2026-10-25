@@ -777,6 +777,24 @@ func (c *ClickHouse) LinkIdentity(ctx context.Context, userID, provider, subject
 	return c.insert(ctx, "identities", []string{"provider", "subject", "user_id", "ver"}, provider, subject, userID, ver())
 }
 
+// UnlinkIdentity — хоосон user_id-тай шинэ хувилбар (UserByIdentity үүнийг ErrNotFound гэж үзнэ).
+func (c *ClickHouse) UnlinkIdentity(ctx context.Context, provider, subject string) error {
+	return c.insert(ctx, "identities", []string{"provider", "subject", "user_id", "ver"}, provider, subject, "", ver())
+}
+
+func (c *ClickHouse) IdentityProviders(ctx context.Context, userID string) ([]string, error) {
+	out := []string{}
+	err := c.query(ctx, "SELECT DISTINCT provider FROM identities FINAL WHERE user_id = ?", []any{userID}, func(r driver.Rows) error {
+		var p string
+		if err := r.Scan(&p); err != nil {
+			return err
+		}
+		out = append(out, p)
+		return nil
+	})
+	return out, err
+}
+
 // ---- мэдэгдэл ----
 
 func (c *ClickHouse) AddNotifications(ctx context.Context, ns []*Notification) error {

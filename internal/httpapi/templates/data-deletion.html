@@ -1,0 +1,50 @@
+{{template "head" (dict "Title" "Өгөгдөл устгах — surgalt.mn" "Desc" "Facebook-ээр нэвтэрсэн мэдээллээ surgalt.mn-ээс устгуулах" "Page" "legal")}}
+<main class="pv">
+  <header class="pv-hero">
+    <p class="pv-eyebrow">Хууль, итгэл</p>
+    <h1>Өгөгдлөө устгуулах</h1>
+    <p class="pv-lede">surgalt.mn-д Facebook-ээр нэвтэрсэн бол Facebook-ээс бидэнд ирсэн мэдээллээ (нэр, имэйл, профайл зураг, Facebook-ийн таних дугаар) хүссэн үедээ устгуулж болно.</p>
+    <nav class="pv-tabs" aria-label="Баримт бичиг"><a href="/privacy">Нууцлалын бодлого</a><a href="/terms">Үйлчилгээний нөхцөл</a><a href="/data-deletion" aria-current="page">Өгөгдөл устгах</a></nav>
+  </header>
+
+  <div class="pv-body pv-one">
+    <article class="pv-doc">
+      {{with .Code}}<section class="dd-status {{if eq $.Status "d" "u"}}dd-ok{{else if eq $.Status "p"}}dd-warn{{end}}" aria-live="polite">
+        {{if eq $.Status "d"}}{{icon "check" 24}}<h2>Устгагдсан</h2>
+          <p>Таны Facebook-ээр нээсэн бүртгэл болон хувийн мэдээлэл (профайл, суралцах ахиц, тэмдэглэл, файл) {{$.At}}-нд устгагдсан.</p>
+        {{else if eq $.Status "u"}}{{icon "check" 24}}<h2>Facebook холболт устгагдсан</h2>
+          <p>Facebook-ээс авсан холболт, профайл зураг {{$.At}}-нд устгагдсан. Таны бүртгэл нууц үг эсвэл өөр нэвтрэх аргатай тул хэвээр үлдсэн.</p>
+        {{else if eq $.Status "p"}}{{icon "clock" 24}}<h2>Хэсэгчлэн устгагдсан</h2>
+          <p>Facebook-ээс авсан холболт, профайл зураг {{$.At}}-нд устгагдсан. Бүртгэлд тань суралцагчдын төлбөр, хандалттай холбоотой сургалт, ном эсвэл захиалгатай цаг байгаа тул бүртгэлийг бүхэлд нь автоматаар устгаагүй.{{with $.Contact}} Үлдсэнийг устгуулах бол <a href="mailto:{{.}}">{{.}}</a> хаягаар бичнэ үү.{{end}}</p>
+        {{else if eq $.Status "n"}}{{icon "search" 24}}<h2>Хадгалсан мэдээлэл алга</h2>
+          <p>Энэ Facebook данстай холбогдсон бүртгэл манай системд олдсонгүй ({{$.At}}) — устгах мэдээлэл байхгүй.</p>
+        {{else}}{{icon "shield" 24}}<h2>Код танигдсангүй</h2>
+          <p>Баталгаажуулах код буруу байна. Facebook-ээс ирсэн холбоосыг бүтнээр нь нээнэ үү.</p>
+        {{end}}<p class="dd-code">Баталгаажуулах код: {{.}}</p>
+      </section>{{end}}
+
+      <section id="how">
+        <h2><span>1</span>Хэрхэн устгуулах вэ</h2>
+        <ol class="dd-steps">
+          <li><span>Facebook-ээ нээгээд <b>Тохиргоо ба нууцлал → Тохиргоо → Апп ба вэбсайт</b> (Apps and Websites) руу орно.</span></li>
+          <li><span>Жагсаалтаас <b>surgalt.mn</b>-ийг олоод <b>Хасах</b> (Remove) дарна.</span></li>
+          <li><span>Гарч ирэх цонхонд өгөгдлөө устгуулах хүсэлт илгээх сонголтыг идэвхжүүлж баталгаажуулна. Facebook хүсэлтийг бидэнд автоматаар дамжуулж, бид тэр даруй устгана.</span></li>
+          <li><span>Facebook танд баталгаажуулах код болон энэ хуудасны холбоосыг харуулна — түүгээр хүсэлтийнхээ төлвийг шалгана.</span></li>
+        </ol>
+      </section>
+
+      <section id="what">
+        <h2><span>2</span>Юу устах вэ</h2>
+        <ul>
+          <li><b>Зөвхөн Facebook-ээр нэвтэрдэг бүртгэл</b> — бүртгэл болон түүнтэй холбоотой хувийн мэдээлэл (профайл, суралцах ахиц, шалгалтын дүн, тэмдэглэл, мэдэгдэл, байршуулсан файл) бүхэлдээ устна. Чатын мессежүүд «Устгагдсан хэрэглэгч» нэртэй болно.</li>
+          <li><b>Нууц үг эсвэл Google зэрэг өөр нэвтрэх аргатай бүртгэл</b> — Facebook холболт ба Facebook-ээс авсан профайл зураг устаж, бүртгэл тань хэвээр үлдэнэ.</li>
+          <li>Төлбөрийн баримт (захиалгын дүн, огноо) хуулийн дагуу хадгалагдана.</li>
+        </ul>
+        {{with .Contact}}<p>Асуулт, хүсэлтээ <a href="mailto:{{.}}">{{.}}</a> хаягаар илгээнэ үү.</p>{{end}}
+        <p class="pv-links"><a href="/privacy">Нууцлалын бодлого →</a></p>
+      </section>
+    </article>
+  </div>
+</main>
+<footer class="footer"><span>© surgalt.mn</span><span class="footer-links"><a href="/privacy">Нууцлал</a><a href="/terms">Нөхцөл</a></span></footer>
+{{template "foot" (dict "Page" "legal")}}

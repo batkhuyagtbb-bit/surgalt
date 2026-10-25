@@ -610,6 +610,25 @@ func (m *Memory) LinkIdentity(_ context.Context, userID, provider, subject strin
 	return nil
 }
 
+func (m *Memory) UnlinkIdentity(_ context.Context, provider, subject string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.identities, provider+":"+subject)
+	return nil
+}
+
+func (m *Memory) IdentityProviders(_ context.Context, userID string) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := []string{}
+	for k, id := range m.identities {
+		if p, _, _ := strings.Cut(k, ":"); id == userID && !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
 func (m *Memory) UpdateUser(_ context.Context, id string, fn func(*User) error) (*User, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

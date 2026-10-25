@@ -27,6 +27,9 @@ func lessonFileRefs(l *store.Lesson) []string {
 		if b.Quiz != nil {
 			add(b.Quiz.Image)
 		}
+		for _, p := range richFileRefs(b.HTML) { // текст доторх зураг
+			add(p)
+		}
 	}
 	return out
 }

@@ -187,6 +187,9 @@ type Block struct {
 	ID   string `json:"id"`
 	Type string `json:"type"`
 	Text string `json:"text,omitempty"`
+	// HTML — текстийн хэсгийн Word шиг агуулга (сервер цэвэрлэсэн: өнгө, хэмжээ, хүснэгт, текст доторх зураг).
+	// Энэ үед Text нь цэвэр текст (хайлт, тойм, AI-д).
+	HTML string `json:"html,omitempty"`
 	URL  string `json:"url,omitempty"`
 	Name string `json:"name,omitempty"`
 	Size int64  `json:"size,omitempty"`
@@ -627,6 +630,10 @@ type Store interface {
 	// Гадаад нэвтрэлт (Google, Facebook ...): provider+subject -> хэрэглэгч.
 	UserByIdentity(ctx context.Context, provider, subject string) (*User, error)
 	LinkIdentity(ctx context.Context, userID, provider, subject string) error
+	// UnlinkIdentity — холболтыг салгана (Facebook-ийн өгөгдөл устгах хүсэлт г.м).
+	UnlinkIdentity(ctx context.Context, provider, subject string) error
+	// IdentityProviders — хэрэглэгчид холбогдсон гадаад нэвтрэлтүүд (google, facebook ...).
+	IdentityProviders(ctx context.Context, userID string) ([]string, error)
 
 	CreateCourse(ctx context.Context, c *Course) error
 	// UpdateCourse нь зөвхөн c.TeacherID эзэмшдэг сургалтыг шинэчилнэ.

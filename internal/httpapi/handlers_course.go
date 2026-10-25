@@ -602,6 +602,7 @@ func (s *Server) handleMyCourse(w http.ResponseWriter, r *http.Request) {
 				qc.Image = s.media(q.Image)
 				lessons[i].Blocks[j].Quiz = &qc
 			}
+			lessons[i].Blocks[j].HTML = s.richMedia(lessons[i].Blocks[j].HTML)
 		}
 	}
 	ids := make([]string, len(lessons))

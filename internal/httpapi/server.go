@@ -149,6 +149,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/auth/providers", s.handleProviders)
 	mux.HandleFunc("GET /auth/{provider}/start", s.handleOAuthStart)
 	mux.HandleFunc("GET /auth/{provider}/callback", s.handleOAuthCallback)
+	mux.HandleFunc("POST /auth/facebook/data-deletion", s.handleFBDataDeletion)
 
 	// Өөрийн мэдээлэл
 	mux.HandleFunc("GET /api/me", s.handleMe)
@@ -348,6 +349,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /privacy", s.pageStatic("privacy"))
 	mux.HandleFunc("GET /intro2", s.pageIntro)
 	mux.HandleFunc("GET /terms", s.pageStatic("terms"))
+	mux.HandleFunc("GET /data-deletion", s.pageDataDeletion)
 	// /me — нэвтэрсэн хүний өөрийн хуудас руу шилжүүлнэ (багш: /t/<нэр>, суралцагч: /). Хуучин /studio холбоос ч мөн.
 	mux.HandleFunc("GET /me", s.pageStatic("me"))
 	mux.HandleFunc("GET /studio", s.pageStatic("me"))

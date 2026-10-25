@@ -338,40 +338,6 @@ function lessonBlocks(l) {
   return out.length ? out : [{ id: beId(), type: "text", text: "" }];
 }
 
-// contenteditable → аюулгүй тэмдэглэгээ (richHTML-ийн эсрэг).
-function domToMd(root) {
-  const inl = (n) => {
-    if (n.nodeType === 3) return n.nodeValue.replace(/ /g, " ");
-    if (n.nodeType !== 1) return "";
-    const t = n.tagName, kids = () => [...n.childNodes].map(inl).join(""), st = n.getAttribute("style") || "";
-    if (t === "BR") return "\n";
-    const k = kids(); if (!k.trim()) return k;
-    if (t === "B" || t === "STRONG" || /font-weight:\s*(bold|[6-9]00)/.test(st)) return `**${k}**`;
-    if (t === "I" || t === "EM" || /font-style:\s*italic/.test(st)) return `*${k}*`;
-    if (t === "U" || /underline/.test(st)) return `__${k}__`;
-    if (t === "MARK" || /background/.test(st)) return `==${k}==`;
-    if (t === "A" && /^https?:\/\//.test(n.getAttribute("href") || "")) return `[${k}](${n.getAttribute("href")})`;
-    return k;
-  };
-  const lines = []; let cur = "";
-  const BLOCK = /^(DIV|P|H\d|UL|OL|BLOCKQUOTE|LI)$/;
-  const flush = () => { if (cur !== "") lines.push(...cur.split("\n")); cur = ""; };
-  const walk = (n) => {
-    for (const c of n.childNodes) {
-      const t = c.nodeType === 1 ? c.tagName : "";
-      if (!BLOCK.test(t)) { cur += inl(c); continue; } // текст ба мөр доторх хэлбэр нэг мөрөнд
-      flush();
-      if (t === "UL" || t === "OL") { [...c.children].forEach((li, i) => lines.push((t === "OL" ? `${i + 1}. ` : "- ") + inl(li).replace(/\n+/g, " ").trim())); lines.push(""); }
-      else if (t === "BLOCKQUOTE") { inl(c).split("\n").forEach((x) => lines.push("> " + x)); lines.push(""); }
-      else if (c.querySelector("ul,ol,blockquote,div,p")) walk(c);
-      else { lines.push(inl(c)); if (t === "P") lines.push(""); }
-    }
-    flush();
-  };
-  walk(root);
-  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
-}
-
 const QKINDS = [["single", "◉ Нэг сонголт"], ["multi", "☑ Олон сонголт"], ["text", "✎ Бичгээр"], ["match", "⇄ Харгалзуулах"], ["image", "🎯 Зурган дээр заах"]];
 function quizBodyHTML(kind, id, q) {
   if (kind === "single" || kind === "multi") {
@@ -399,15 +365,83 @@ function qimgHTML(kind, url, spot) {
   return `<div class="be-spotwrap ${kind === "image" ? "pick" : ""}"><img src="${esc(url)}" alt="" draggable="false">${kind === "image" && spot?.x != null && spot?.x !== "" ? `<i class="be-spot" style="left:${spot.x}%;top:${spot.y}%;width:${r * 2}%;height:${r * 2}%"></i>` : ""}</div>
     <div class="be-media-tools"><span class="muted small">${kind === "image" ? "Зураг дээр дарж зөв хэсгийг заана" : "Асуултын зураг"}</span><span><button type="button" class="btn btn-glass btn-sm" data-qimg>Солих</button> <button type="button" class="btn btn-ghost btn-sm" data-qimg-del>Хасах</button></span></div>`;
 }
+/* ---------- Текстийн хэсэг: Word шиг засварлагч (өнгө, хэмжээ, хүснэгт, текст доторх зураг) ---------- */
+Object.assign(ICON, {
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  redo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>',
+  "al-left": '<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>', "al-center": '<path d="M4 6h16M7 10h10M4 14h16M7 18h10"/>',
+  "al-right": '<path d="M4 6h16M10 10h10M4 14h16M10 18h10"/>', "al-just": '<path d="M4 6h16M4 10h16M4 14h16M4 18h16"/>',
+  ul: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2"/><circle cx="4.5" cy="12" r="1.2"/><circle cx="4.5" cy="18" r="1.2"/>',
+  ol: '<path d="M10 6h10M10 12h10M10 18h10"/><path d="M4 4.5 5.5 4v4.5M3.8 13.2c.3-.8 2.4-.9 2.2.5-.1.7-2.2 2.1-2.2 2.8H6"/>',
+  indent: '<path d="M4 5h16M11 10h9M11 14h9M4 19h16M4 9.5 7 12l-3 2.5"/>', outdent: '<path d="M4 5h16M11 10h9M11 14h9M4 19h16M7 9.5 4 12l3 2.5"/>',
+  table: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10M15 9.5v10"/>',
+  hr: '<path d="M3 12h18"/><path d="M8 7h8M8 17h8" opacity=".45"/>', eraser: '<path d="m7 21-4-4L14 6l6 6-8 9H7z"/><path d="M10 10l6 6M7 21h14"/>',
+});
+const RT_FORE = ["#111827", "#6b7280", "#dc2626", "#ea580c", "#ca8a04", "#16a34a", "#0d9488", "#0891b2", "#1f3c8f", "#7c3aed", "#db2777", "#92400e"];
+const RT_BACK = ["#fff1a8", "#fde68a", "#fecaca", "#fed7aa", "#bbf7d0", "#99f6e4", "#bae6fd", "#c7d2fe", "#e9d5ff", "#fbcfe8", "#e5e7eb", "#f3f4f6"];
+const rtBtn = (cmd, icn, title, inner) => `<button type="button" data-cmd="${cmd}" title="${title}" aria-label="${title}">${inner || ico(icn, 17)}</button>`;
+// Хэрэгслийн самбар доош гүйлгэхэд текст дуустал дээд талд наалттай дагана (.rt-top sticky).
+function rtEditorHTML(b) {
+  return `<div class="rt-top"><div class="be-rt-bar" role="toolbar" aria-label="Текстийн хэлбэр">
+      ${rtBtn("undo", "undo", "Буцаах (Ctrl+Z)")}${rtBtn("redo", "redo", "Дахин хийх (Ctrl+Y)")}<span class="be-sep"></span>
+      <select data-rt-block title="Догол мөрийн хэлбэр" aria-label="Догол мөрийн хэлбэр"><option value="p">Энгийн текст</option><option value="h2">Гарчиг 1</option><option value="h3">Гарчиг 2</option><option value="h4">Гарчиг 3</option><option value="blockquote">Ишлэл</option><option value="pre">Код</option></select>
+      <select data-rt-size title="Үсгийн хэмжээ" aria-label="Үсгийн хэмжээ"><option value="">Хэмжээ</option><option value="2">Жижиг</option><option value="3">Энгийн</option><option value="4">Том</option><option value="5">Илүү том</option><option value="6">Маш том</option></select><span class="be-sep"></span>
+      ${rtBtn("bold", "", "Тод (Ctrl+B)", "<b>B</b>")}${rtBtn("italic", "", "Налуу (Ctrl+I)", "<i>I</i>")}${rtBtn("underline", "", "Доогуур зураас (Ctrl+U)", "<u>U</u>")}${rtBtn("strikeThrough", "", "Дундуур зураас", "<s>S</s>")}${rtBtn("superscript", "", "Дээд индекс (x²)", "x²")}${rtBtn("subscript", "", "Доод индекс (H₂O)", "x₂")}
+      <button type="button" data-pal="fore" title="Үсгийн өнгө" aria-label="Үсгийн өнгө"><span class="rt-a">A</span></button><button type="button" data-pal="back" title="Тодруулах өнгө" aria-label="Тодруулах өнгө"><span class="rt-hl">A</span></button><span class="be-sep"></span>
+      ${rtBtn("justifyLeft", "al-left", "Зүүн тийш")}${rtBtn("justifyCenter", "al-center", "Голлуулах")}${rtBtn("justifyRight", "al-right", "Баруун тийш")}${rtBtn("justifyFull", "al-just", "Хоёр талд тэгшлэх")}<span class="be-sep"></span>
+      ${rtBtn("insertUnorderedList", "ul", "Жагсаалт")}${rtBtn("insertOrderedList", "ol", "Дугаартай жагсаалт")}${rtBtn("outdent", "outdent", "Догол багасгах (Shift+Tab)")}${rtBtn("indent", "indent", "Догол нэмэх (Tab)")}<span class="be-sep"></span>
+      ${rtBtn("link", "link", "Холбоос (Ctrl+K)")}<button type="button" data-rt-img title="Текст дотор зураг оруулах" aria-label="Зураг оруулах">${ico("image", 17)}</button><button type="button" data-rt-table title="Хүснэгт оруулах" aria-label="Хүснэгт оруулах">${ico("table", 17)}</button><button type="button" data-rt-file title="Энэ байрлалд файл (PDF, Word, PowerPoint…) оруулах" aria-label="Файл оруулах">${ico("clip", 17)}</button>${rtBtn("insertHorizontalRule", "hr", "Хэвтээ зураас")}${rtBtn("removeFormat", "eraser", "Хэлбэр арилгах")}</div>
+    <div class="rt-ctx" data-ctx="img" hidden><b>Зураг</b>${[25, 50, 75, 100].map((w) => `<button type="button" data-img-w="${w}">${w}%</button>`).join("")}<span class="be-sep"></span><button type="button" data-img-al="left" title="Зүүн талд, текст хажуугаар нь урсна">⇤ Зүүн</button><button type="button" data-img-al="center">Голд</button><button type="button" data-img-al="right" title="Баруун талд, текст хажуугаар нь урсна">Баруун ⇥</button><button type="button" data-img-al="">Мөрөнд</button><span class="be-sep"></span><button type="button" data-img-del>${ico("x", 14)}Устгах</button></div>
+    <div class="rt-ctx" data-ctx="table" hidden><b>Хүснэгт</b><button type="button" data-tb="row+">+ Мөр</button><button type="button" data-tb="col+">+ Багана</button><button type="button" data-tb="row-">− Мөр</button><button type="button" data-tb="col-">− Багана</button><button type="button" data-tb="head">Толгой мөр</button><button type="button" data-tb="del">Хүснэгт устгах</button></div></div>
+    <div class="be-rt rb-text" contenteditable="true" data-ph="Текстээ бичнэ үү… Word-оос хуулж буулгах, зураг чирж оруулах боломжтой">${b.html || SG.richHTML(b.text || "")}</div>`;
+}
+const RT_TAGS = { P: "p", DIV: "p", BR: "br", B: "b", STRONG: "b", I: "i", EM: "i", U: "u", INS: "u", S: "s", STRIKE: "s", DEL: "s", SUB: "sub", SUP: "sup", MARK: "mark", SPAN: "span", FONT: "span",
+  H1: "h2", H2: "h2", H3: "h3", H4: "h4", H5: "h4", H6: "h4", UL: "ul", OL: "ol", LI: "li", BLOCKQUOTE: "blockquote", PRE: "pre", CODE: "code", A: "a", IMG: "img", HR: "hr",
+  TABLE: "table", THEAD: "thead", TBODY: "tbody", TFOOT: "tbody", TR: "tr", TH: "th", TD: "td" };
+const RT_SKIP = /^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|NOSCRIPT|TEMPLATE|SVG|MATH|HEAD|TITLE|TEXTAREA|SELECT|BUTTON|FORM|AUDIO|VIDEO|CANVAS|META|LINK)$/i;
+const RT_CSS = ["color", "background-color", "font-size", "text-align", "font-weight", "font-style", "text-decoration-line", "vertical-align", "margin-left"];
+// Энгийн (анхдагч) утгууд — Word, Google Docs бүх үсэгт тавьдаг тул хасна (сайтын фонт, өнгөөрөө харагдана).
+const RT_PLAIN = /^(rgb\(0, 0, 0\)|#000(000)?|black|windowtext|transparent|rgba\(0, 0, 0, 0\)|rgb\(255, 255, 255\)|#fff(fff)?|white|window|1[0-2](\.\d+)?pt|1[3-6](\.\d+)?px|normal|baseline|start|left|0px|0pt|none)$/i;
+// Word, Google Docs, вэбээс буулгасан HTML → зөвхөн хэлбэржүүлэлт үлдэнэ (фонт, mso-* загвар, скрипт хасагдана; сервер дахин цэвэрлэнэ).
+function cleanPaste(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html"), out = document.createElement("div");
+  const walk = (src, dst, pre) => {
+    for (const n of src.childNodes) {
+      if (n.nodeType === 3) { dst.append(pre ? n.nodeValue : n.nodeValue.replace(/[\r\n\t ]+/g, " ")); continue; }
+      if (n.nodeType !== 1 || RT_SKIP.test(n.tagName)) continue;
+      const tag = RT_TAGS[n.tagName];
+      if (!tag) { walk(n, dst, pre); continue; }
+      const el = document.createElement(tag);
+      if (tag === "img") {
+        const s = n.getAttribute("src") || "";
+        if (/^https:\/\//i.test(s) || s.startsWith("/files/")) { el.setAttribute("src", s); el.alt = n.getAttribute("alt") || ""; dst.append(el); }
+        continue;
+      }
+      if (tag === "a") { const h = n.getAttribute("href") || ""; if (!/^(https?:|mailto:)/i.test(h)) { walk(n, dst, pre); continue; } el.setAttribute("href", h); }
+      for (const p of RT_CSS) { const v = n.style?.getPropertyValue(p); if (v && !RT_PLAIN.test(v.trim()) && !/url|expression/i.test(v)) el.style.setProperty(p, v); }
+      if (n.tagName === "FONT" && n.getAttribute("color")) el.style.color = n.getAttribute("color");
+      for (const k of ["colspan", "rowspan"]) if (+n.getAttribute(k) > 1) el.setAttribute(k, n.getAttribute(k));
+      dst.append(el);
+      if (tag !== "br" && tag !== "hr") walk(n, el, pre || tag === "pre");
+    }
+  };
+  walk(doc.body, out, false);
+  $$("span:not([style])", out).forEach((s) => s.replaceWith(...s.childNodes));
+  $$("b[style*='font-weight']", out).forEach((s) => { if (/normal|400/.test(s.style.fontWeight)) s.replaceWith(...s.childNodes); }); // Google Docs-ийн гадна <b style="font-weight:normal">
+  return out.innerHTML.trim();
+}
+// Засварлагчийн HTML (сонголтын тэмдэг, хуулагдаж буй зураггүй).
+function rtHTML(rt) {
+  const c = rt.cloneNode(true);
+  $$("img[data-up]", c).forEach((x) => x.remove());
+  $$(".rt-sel", c).forEach((x) => x.classList.remove("rt-sel"));
+  $$("[class='']", c).forEach((x) => x.removeAttribute("class"));
+  return c.innerHTML.trim();
+}
 function beBlockHTML(b) {
   const [icn, label] = BE[b.type];
   let body = "";
-  if (b.type === "text") body = `<div class="be-rt-bar" role="toolbar" aria-label="Текстийн хэлбэр">
-      <button type="button" data-cmd="bold" title="Тод (Ctrl+B)"><b>B</b></button><button type="button" data-cmd="italic" title="Налуу (Ctrl+I)"><i>I</i></button>
-      <button type="button" data-cmd="underline" title="Доогуур зураас (Ctrl+U)"><u>U</u></button><button type="button" data-cmd="mark" title="Тодруулах"><mark>A</mark></button>
-      <span class="be-sep"></span><button type="button" data-cmd="insertUnorderedList" title="Жагсаалт">• —</button><button type="button" data-cmd="insertOrderedList" title="Дугаартай жагсаалт">1.</button>
-      <button type="button" data-cmd="quote" title="Ишлэл">❝</button><button type="button" data-cmd="link" title="Холбоос">${ico("link", 15)}</button><button type="button" data-cmd="removeFormat" title="Хэлбэр арилгах">⨯</button></div>
-    <div class="be-rt rb-text" contenteditable="true" data-ph="Текстээ бичнэ үү… (сонгоод дээрх товчоор хэлбэржүүлнэ)">${SG.richHTML(b.text || "")}</div>`;
+  if (b.type === "text") body = rtEditorHTML(b);
   else if (b.type === "heading") body = `<input class="be-h" maxlength="200" placeholder="Гарчиг бичнэ үү" value="${esc(b.text || "")}">`;
   else if (b.type === "cloud") body = `<input class="be-cloud-q" maxlength="200" placeholder="Асуулт — жишээ нь: Фотосинтез гэж сонсоход юу санаанд орж байна?" value="${esc(b.text || "")}">
       <div class="be-embed-bar"><label class="small">Нэг хүн <select class="be-cloud-n" style="width:auto;margin:0 4px">${[1, 2, 3].map((n) => `<option value="${n}" ${(b.max || 1) === n ? "selected" : ""}>${n}</option>`).join("")}</select> үг илгээнэ</label>
@@ -435,7 +469,8 @@ function beBlockHTML(b) {
   return `<div class="be-block" data-id="${esc(b.id)}" data-type="${b.type}">
     <div class="be-side"><button type="button" class="ol-handle" data-be-drag title="Чирж зөөх" aria-label="${label} хэсгийг зөөх (↑↓ товч)">${ico("grip", 18)}</button></div>
     <div class="be-main"><span class="be-tag">${ico(icn, 14)}${label}</span>${body}</div>
-    <div class="be-acts"><button type="button" class="icon-btn" data-be-del title="Устгах" aria-label="Устгах">${ico("x", 16)}</button></div></div>`;
+    <div class="be-acts"><button type="button" class="icon-btn" data-be-del title="Устгах" aria-label="Устгах">${ico("x", 16)}</button>
+      <button type="button" class="icon-btn" data-be-up title="Дээш зөөх" aria-label="Дээш зөөх">${ico("up", 16)}</button><button type="button" class="icon-btn" data-be-down title="Доош зөөх" aria-label="Доош зөөх">${ico("down", 16)}</button></div></div>`;
 }
 const beOptHTML = (id, multi, val, on) => `<div class="be-opt"><input type="${multi ? "checkbox" : "radio"}" name="c-${esc(id)}" ${on ? "checked" : ""} title="Зөв хариулт" aria-label="Зөв хариулт">
   <input class="be-opt-t" maxlength="300" placeholder="Хариулт" value="${esc(val)}"><button type="button" class="icon-btn" data-opt-del aria-label="Хариулт хасах">${ico("x", 14)}</button></div>`;
@@ -506,20 +541,53 @@ function mountBlockEditor(f, blocks) {
   if (rb) { let init = null; try { init = JSON.parse(rb.dataset.rubric || "null"); } catch {} f._rb = mountRubricEditor(rb, init); }
   const box = $(".be", f);
   box.innerHTML = `<div class="be-list">${blocks.map(beBlockHTML).join("")}</div>
-    <div class="be-add"><span class="muted small">Нэмэх:</span>${Object.entries(BE).map(([t, [icn, label]]) => `<button type="button" class="btn btn-glass btn-sm" data-add="${t}">${ico(icn, 15)}${label}</button>`).join("")}</div>
+    <div class="be-add" role="toolbar" aria-label="Хэсэг нэмэх"><span class="be-add-lbl muted small">Нэмэх<span class="be-add-at"></span>:</span>${Object.entries(BE).map(([t, [icn, label]]) => `<button type="button" class="btn btn-glass btn-sm" data-add="${t}">${ico(icn, 15)}${label}</button>`).join("")}
+      <button type="button" class="btn btn-ghost btn-sm be-sort" data-sort aria-pressed="false" title="Бүх хэсгийг нэг мөр болгон хураагаад байрлалыг амархан солих">${ico("grip", 15)}<span>Байрлал солих</span></button></div>
     <div class="be-import"><button type="button" class="btn btn-glass btn-sm" data-import>${ico("files", 15)}Excel-ээс асуулт оруулах</button>
       <a class="link small" href="/api/quiz-template.xlsx" download>Excel загвар татах</a><input type="file" class="be-xlsx" accept=".xlsx,.csv" hidden></div>
-    <p class="muted small be-tip">${ico("grip", 13)} Хэсгүүдийг бариад чирж байрлалыг солино. Компьютерээсээ файл чирж оруулж болно.</p>
-    <input type="file" class="be-file" hidden>`;
+    <p class="muted small be-tip">${ico("grip", 13)} Шинэ хэсэг идэвхтэй хэсгийн доор нэмэгдэнэ. Байрлалыг ↑↓ товчоор эсвэл бариад чирж солино — «Байрлал солих» дарвал бүх хэсэг хураагдана. Компьютерээсээ файл чирж оруулж болно.</p>
+    <input type="file" class="be-file" hidden><input type="file" class="be-rtimg" accept="image/*" multiple hidden>`;
   const list = $(".be-list", box), fileIn = $(".be-file", box);
+  // «Хадгалах» мөр доод талд наалттай бол «Нэмэх» цэс түүний дээр байрлана.
+  const foot = f.querySelector?.(".pe-foot");
+  if (foot && window.ResizeObserver) new ResizeObserver(() => box.style.setProperty("--pe-foot-h", getComputedStyle(foot).position === "sticky" ? foot.offsetHeight + 6 + "px" : "0px")).observe(foot);
   hydrateBooks(list); // хадгалсан PDF/Word/PowerPoint хэсгүүдийг суралцагчийн харагчаар нээнэ
   let target = null;
+  // Шинэ хэсэг идэвхтэй (сүүлд дарсан) хэсгийн доор нэмэгдэнэ; идэвхтэй хэсэггүй бол төгсгөлд.
+  let cur = null;
+  const atLbl = $(".be-add-at", box);
+  const showAt = () => { atLbl.innerHTML = cur ? ` · ${[...list.children].indexOf(cur) + 1}-р хэсгийн доор<button type="button" class="be-at-x" data-at-end title="Төгсгөлд нэмэх" aria-label="Төгсгөлд нэмэх">${ico("x", 11)}</button>` : ""; };
+  const setCur = (el) => { cur?.classList.remove("be-cur"); cur = el && list.contains(el) ? el : null; cur?.classList.add("be-cur"); showAt(); };
+  const flash = (el) => { el.classList.remove("be-flash"); void el.offsetWidth; el.classList.add("be-flash"); setTimeout(() => el.classList.remove("be-flash"), 1300); };
+  const inView = (el) => { const r = el.getBoundingClientRect(); if (r.top < 80 || r.top > innerHeight - 160) el.scrollIntoView({ block: "center", behavior: "smooth" }); };
   const add = (type, after, data = {}) => {
+    if (list.classList.contains("be-compact")) setCompact(false);
     const b = { id: beId(), type, ...data }; const tmp = document.createElement("div"); tmp.innerHTML = beBlockHTML(b);
-    const el = tmp.firstElementChild; after ? after.after(el) : list.append(el);
-    (el.querySelector(".be-rt, .be-h, .be-q") || el).focus?.();
+    const el = tmp.firstElementChild; after && list.contains(after) ? after.after(el) : list.append(el);
+    (el.querySelector(".be-rt, .be-h, .be-q") || el).focus?.({ preventScroll: true });
+    setCur(el); flash(el); requestAnimationFrame(() => inView(el));
     return el;
   };
+  // Дээш/доош: хэсэг хулганын доороо үлдэнэ (дахин дарж үргэлжлүүлэн зөөнө).
+  const move = (el, dir) => {
+    const sib = dir < 0 ? el.previousElementSibling : el.nextElementSibling; if (!sib) return;
+    const y0 = el.getBoundingClientRect().top;
+    if (dir < 0) sib.before(el); else sib.after(el);
+    scrollBy(0, el.getBoundingClientRect().top - y0); flash(el); showAt();
+  };
+  // Байрлал солих: бүх хэсэг нэг мөр болж хураагдана (урт текст, асуулттай ч чирэхэд амар).
+  const sumOf = (el) => {
+    const t = el.dataset.type, v = (s) => $(s, el)?.value || "";
+    const s = t === "text" ? $(".be-rt", el).innerText : t === "heading" ? v(".be-h") : t === "quiz" ? v(".be-q") : t === "cloud" ? v(".be-cloud-q") : t === "board" ? v(".be-board-t") : t === "embed" ? v(".be-embed") : $(".be-media", el)?.dataset.name || "";
+    return s.replace(/\s+/g, " ").trim().slice(0, 140);
+  };
+  const setCompact = (on) => {
+    if (on) $$(":scope > .be-block", list).forEach((el) => { let s = $(".be-sum", el); if (!s) { s = document.createElement("span"); s.className = "be-sum"; $(".be-tag", el).after(s); } s.textContent = sumOf(el) || "(хоосон)"; }); // харагдаж байхад нь (мөр таслалттай)
+    list.classList.toggle("be-compact", on);
+    const b = $("[data-sort]", box); b.setAttribute("aria-pressed", on); b.classList.toggle("btn-gold", on); $("span", b).textContent = on ? "Дэлгэх" : "Байрлал солих";
+  };
+  list.addEventListener("focusin", (e) => { const el = e.target.closest(".be-block"); if (el && el.parentElement === list) setCur(el); });
+  list.addEventListener("pointerdown", (e) => { const el = e.target.closest(".be-block"); if (el && el.parentElement === list && !e.target.closest("[data-be-drag]")) setCur(el); });
   const setMedia = (el, info) => {
     const m = $(".be-media", el); m.dataset.url = info.path; m.dataset.name = info.original_name || ""; m.dataset.size = info.size || 0;
     m.innerHTML = beMediaPreview({ type: el.dataset.type, url: info.path, preview: info.url, name: info.original_name, size: info.size });
@@ -595,14 +663,153 @@ function mountBlockEditor(f, blocks) {
       if (d.problems.length) alert("Дараах мөрүүдийг алгаслаа:\n\n" + d.problems.join("\n"));
     } catch (e) { toast(e.message, true); }
   };
-  const exec = (cmd, rt) => {
-    rt.focus();
-    if (cmd === "mark") document.execCommand("hiliteColor", false, "#fff1a8");
-    else if (cmd === "quote") document.execCommand("formatBlock", false, "blockquote");
-    else if (cmd === "link") { const u = prompt("Холбоос (https://…)"); if (u && /^https?:\/\//.test(u.trim())) document.execCommand("createLink", false, u.trim()); else if (u) toast("Холбоос https:// -ээр эхэлнэ", true); }
-    else document.execCommand(cmd);
+  // ---- Word шиг текст: сүүлийн сонголтыг хадгална (жагсаалтаас сонгох, өнгө дарахад алдагдахгүй) ----
+  let rtRange = null, rtTarget = null;
+  const rtOf = (n) => n.closest(".rt-top")?.nextElementSibling;
+  const onSel = () => {
+    if (!box.isConnected) return document.removeEventListener("selectionchange", onSel);
+    const g = getSelection(); if (!g.rangeCount) return;
+    const r = g.getRangeAt(0), n = r.commonAncestorContainer, rt = (n.nodeType === 1 ? n : n.parentElement)?.closest(".be-rt");
+    if (!rt || !box.contains(rt)) return;
+    rtRange = r.cloneRange(); rtRange._rt = rt; syncBar(rt);
   };
-  box.addEventListener("mousedown", (e) => { if (e.target.closest("[data-cmd]")) e.preventDefault(); }); // сонголтыг алдахгүй
+  document.addEventListener("selectionchange", onSel);
+  const restore = (rt) => {
+    if (document.activeElement !== rt) rt.focus({ preventScroll: true });
+    const g = getSelection();
+    if (rtRange?._rt === rt && rt.contains(rtRange.startContainer)) { g.removeAllRanges(); g.addRange(rtRange); }
+    else if (!g.rangeCount || !rt.contains(g.anchorNode)) { const r = document.createRange(); r.selectNodeContents(rt); r.collapse(false); g.removeAllRanges(); g.addRange(r); }
+  };
+  const rtCell = (rt) => { const n = rtRange?._rt === rt ? rtRange.startContainer : null, el = n && (n.nodeType === 1 ? n : n.parentElement), c = el?.closest("td,th"); return c && rt.contains(c) ? c : null; };
+  const syncBar = (rt) => {
+    const top = rt.previousElementSibling; if (!top?.classList.contains("rt-top")) return;
+    if (rt.contains(getSelection().anchorNode)) {
+      for (const b of $$("[data-cmd]", top)) { const c = b.dataset.cmd; if (/^(bold|italic|underline|strikeThrough|superscript|subscript|insertUnorderedList|insertOrderedList|justify\w+)$/.test(c)) { let s = false; try { s = document.queryCommandState(c); } catch {} b.classList.toggle("on", s); } }
+      let fb = ""; try { fb = String(document.queryCommandValue("formatBlock") || "").toLowerCase(); } catch {}
+      $("[data-rt-block]", top).value = ["h2", "h3", "h4", "blockquote", "pre"].includes(fb) ? fb : "p";
+    }
+    $('[data-ctx="table"]', top).hidden = !rtCell(rt);
+    $('[data-ctx="img"]', top).hidden = !$("img.rt-sel", rt);
+  };
+  // Догол: жагсаалтад дэд түвшин, бусад үед мөрийн зүүн зай (2em-ээр).
+  const indent = (rt, dir) => {
+    const at = () => { const n = getSelection().anchorNode; return n && (n.nodeType === 1 ? n : n.parentElement); };
+    if (at()?.closest("li") && rt.contains(at().closest("li"))) return document.execCommand(dir);
+    let blk = at()?.closest("p,div,h2,h3,h4,blockquote,pre");
+    if (!blk || blk === rt || !rt.contains(blk)) { document.execCommand("formatBlock", false, "p"); blk = at()?.closest("p,div,h2,h3,h4,blockquote,pre"); }
+    if (!blk || blk === rt || !rt.contains(blk)) return;
+    const n = Math.max(0, Math.min(12, (parseFloat(blk.style.marginLeft) || 0) + (dir === "indent" ? 2 : -2)));
+    blk.style.marginLeft = n ? n + "em" : "";
+  };
+  const exec = (cmd, rt, val) => {
+    restore(rt);
+    document.execCommand("styleWithCSS", false, true);
+    if (cmd === "quote") document.execCommand("formatBlock", false, "blockquote");
+    else if (cmd === "link") { const u = prompt("Холбоос (https://…)"); if (u && /^https?:\/\//.test(u.trim())) document.execCommand("createLink", false, u.trim()); else if (u) toast("Холбоос https:// -ээр эхэлнэ", true); }
+    else if (cmd === "indent" || cmd === "outdent") indent(rt, cmd);
+    else if (cmd === "removeFormat") { document.execCommand("removeFormat"); document.execCommand("unlink"); }
+    else document.execCommand(cmd, false, val);
+    syncBar(rt);
+  };
+  // Өнгө арилгах: түр өнгө тавиад тэр өнгөтэй бүх загварыг хасна.
+  const clearColor = (rt, kind) => {
+    exec(kind === "fore" ? "foreColor" : "hiliteColor", rt, "#010203");
+    const prop = kind === "fore" ? "color" : "background-color";
+    $$("[style]", rt).forEach((x) => { if (x.style.getPropertyValue(prop).replace(/\s/g, "") === "rgb(1,2,3)") { x.style.removeProperty(prop); if (!x.getAttribute("style")) x.removeAttribute("style"); if (x.tagName === "SPAN" && !x.attributes.length) x.replaceWith(...x.childNodes); } });
+    $$("font[color='#010203']", rt).forEach((f) => f.replaceWith(...f.childNodes));
+  };
+  const closePops = () => $$(".rt-pop", box).forEach((p) => p.remove());
+  const openPop = (btn, html) => {
+    const top = btn.closest(".rt-top"), open = $(".rt-pop", top);
+    closePops(); if (open?._btn === btn) return null;
+    const p = document.createElement("div"); p.className = "rt-pop"; p.innerHTML = html; p._btn = btn;
+    top.append(p); p.style.left = Math.max(0, Math.min(btn.offsetLeft - (btn.closest(".be-rt-bar")?.scrollLeft || 0), top.clientWidth - p.offsetWidth)) + "px"; p.style.top = btn.offsetTop + btn.offsetHeight + 6 + "px";
+    return p;
+  };
+  const palHTML = (kind) => `<div class="rt-sws">${(kind === "fore" ? RT_FORE : RT_BACK).map((c) => `<button type="button" data-color="${c}" data-kind="${kind}" style="background:${c}" title="${c}" aria-label="${c}"></button>`).join("")}</div>
+    <button type="button" class="rt-none" data-color="" data-kind="${kind}">${kind === "fore" ? "Анхны өнгө" : "Тодруулга арилгах"}</button>`;
+  const gridHTML = () => `<div class="rt-grid">${Array.from({ length: 48 }, (_, i) => `<i data-grid="${Math.floor(i / 8) + 1}x${(i % 8) + 1}"></i>`).join("")}</div><small class="rt-grid-l">Хүснэгтийн хэмжээ</small>`;
+  const insertTable = (rt, r, c) => {
+    restore(rt); document.execCommand("insertHTML", false, `<table data-new="1"><tbody>${`<tr>${"<td><br></td>".repeat(c)}</tr>`.repeat(r)}</tbody></table><p><br></p>`);
+    const t = $("table[data-new]", rt); if (!t) return;
+    t.removeAttribute("data-new"); const g = getSelection(), rg = document.createRange(); rg.selectNodeContents(t.querySelector("td")); rg.collapse(true); g.removeAllRanges(); g.addRange(rg); // курсор эхний нүдэнд
+  };
+  box.addEventListener("focusin", (e) => { if (e.target.closest?.(".be-rt")) document.execCommand("defaultParagraphSeparator", false, "p"); }); // Enter → <p> (догол мөрийн зай)
+  const tableOp = (rt, op) => {
+    const cell = rtCell(rt); if (!cell) return;
+    const tr = cell.parentElement, table = cell.closest("table"), ci = [...tr.children].indexOf(cell), rows = [...table.rows];
+    if (op === "row+") { const nr = tr.cloneNode(true); [...nr.cells].forEach((x) => (x.innerHTML = "<br>")); tr.after(nr); }
+    else if (op === "row-") { if (rows.length > 1) tr.remove(); else table.remove(); }
+    else if (op === "col+") rows.forEach((r) => { const x = r.cells[Math.min(ci, r.cells.length - 1)], n = document.createElement(x?.tagName === "TH" ? "th" : "td"); n.innerHTML = "<br>"; if (x) x.after(n); else r.append(n); });
+    else if (op === "col-") { if (tr.cells.length > 1) rows.forEach((r) => r.cells[ci]?.remove()); else table.remove(); }
+    else if (op === "head") [...table.rows[0].cells].forEach((x) => { const n = document.createElement(x.tagName === "TH" ? "td" : "th"); n.innerHTML = x.innerHTML; for (const a of ["colspan", "rowspan"]) if (x.getAttribute(a)) n.setAttribute(a, x.getAttribute(a)); x.replaceWith(n); });
+    else if (op === "del") table.remove();
+    rtRange = null; syncBar(rt);
+  };
+  // Текст доторх зураг: байрлалд нь түр дүрс тавьж, хуулагдсаны дараа жинхэнэ зураг болно.
+  const PIX = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+  const send = (file) => new Promise((ok, fail) => {
+    const x = new XMLHttpRequest(), fd = new FormData(); fd.append("file", file);
+    x.open("POST", "/api/me/files?visibility=private"); x.setRequestHeader("Authorization", "Bearer " + Auth.token);
+    x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {} if (x.status < 300 && d) ok(d); else fail(new Error(d?.error || "Хуулж чадсангүй")); };
+    x.onerror = () => fail(new Error("Сүлжээний алдаа — дахин оролдоно уу")); x.send(fd);
+  });
+  const rtImage = (rt, file) => {
+    if (file.size > BE_LIMIT.image * 1048576) return toast(`Зураг ${BE_LIMIT.image} MB хүртэл`, true);
+    const key = beId(); restore(rt);
+    document.execCommand("insertHTML", false, `<img src="${PIX}" data-up="${key}" class="rt-uploading" alt="">`);
+    send(file).then((d) => { const im = $(`img[data-up="${key}"]`, rt); if (!im) return; im.src = d.url; im.removeAttribute("data-up"); im.classList.remove("rt-uploading"); library = null; })
+      .catch((err) => { $(`img[data-up="${key}"]`, rt)?.remove(); toast(err.message, true); });
+  };
+  $(".be-rtimg", box).onchange = (e) => { [...e.target.files].forEach((f) => rtTarget && rtImage(rtTarget, f)); e.target.value = ""; };
+  // Текстийг курсорын байрлалаар хувааж (үлдсэнийг шинэ текст хэсэг болгож), дундаа хэсэг оруулах зай гаргана.
+  const splitText = (el) => {
+    const rt = $(".be-rt", el), r = rtRange?._rt === rt && rt.contains(rtRange.endContainer) ? rtRange : null;
+    if (!r) return el;
+    const tail = document.createRange(); tail.setStart(r.endContainer, r.endOffset); tail.setEnd(rt, rt.childNodes.length);
+    const d = document.createElement("div"); d.append(tail.extractContents());
+    if (d.textContent.trim() || $("img, table, hr", d)) add("text", el, { html: d.innerHTML });
+    return el;
+  };
+  box.addEventListener("mousedown", (e) => { if (e.target.closest(".be-rt-bar button, .rt-pop, .rt-ctx button")) e.preventDefault(); }); // сонголтыг алдахгүй
+  box.addEventListener("click", (e) => {
+    const t = e.target;
+    if (!t.closest(".rt-pop, [data-pal], [data-rt-table]")) closePops();
+    const pal = t.closest("[data-pal]"); if (pal) { openPop(pal, palHTML(pal.dataset.pal)); return; }
+    const col = t.closest("[data-color]");
+    if (col) { const rt = rtOf(col); closePops(); if (!col.dataset.color) clearColor(rt, col.dataset.kind); else exec(col.dataset.kind === "fore" ? "foreColor" : "hiliteColor", rt, col.dataset.color); return; }
+    const tb = t.closest("[data-rt-table]"); if (tb) { openPop(tb, gridHTML()); return; }
+    const gc = t.closest("[data-grid]"); if (gc) { const rt = rtOf(gc), [r, c] = gc.dataset.grid.split("x").map(Number); closePops(); insertTable(rt, r, c); return; }
+    const ri = t.closest("[data-rt-img]"); if (ri) { rtTarget = rtOf(ri); const fi = $(".be-rtimg", box); fi.value = ""; fi.click(); return; }
+    const rf = t.closest("[data-rt-file]"); if (rf) { const el = rf.closest(".be-block"); pick(add("file", splitText(el))); return; }
+    const op = t.closest("[data-tb]"); if (op) { tableOp(rtOf(op), op.dataset.tb); return; }
+    const iw = t.closest("[data-img-w], [data-img-al], [data-img-del]");
+    if (iw) {
+      const rt = rtOf(iw), im = $("img.rt-sel", rt); if (!im) return;
+      if (iw.dataset.imgW) im.style.width = iw.dataset.imgW + "%";
+      if (iw.dataset.imgAl != null) { im.classList.remove("rt-left", "rt-right", "rt-center"); if (iw.dataset.imgAl) im.classList.add("rt-" + iw.dataset.imgAl); }
+      if (iw.dataset.imgDel != null) im.remove();
+      syncBar(rt); return;
+    }
+    const rt = t.closest(".be-rt");
+    if (rt) {
+      $$("img.rt-sel", rt).forEach((x) => x !== t && x.classList.remove("rt-sel"));
+      if (t.tagName === "IMG") { t.classList.add("rt-sel"); const r = document.createRange(); r.setStartAfter(t); r.collapse(true); rtRange = r; rtRange._rt = rt; }
+      syncBar(rt);
+    }
+  });
+  box.addEventListener("mouseover", (e) => {
+    const gc = e.target.closest("[data-grid]"); if (!gc) return;
+    const [R, C] = gc.dataset.grid.split("x").map(Number), pop = gc.closest(".rt-pop");
+    $$("[data-grid]", pop).forEach((x) => { const [r, c] = x.dataset.grid.split("x").map(Number); x.classList.toggle("on", r <= R && c <= C); });
+    $(".rt-grid-l", pop).textContent = `${R} мөр × ${C} багана`;
+  });
+  box.addEventListener("change", (e) => {
+    const s = e.target.closest("[data-rt-block], [data-rt-size]"); if (!s) return;
+    const rt = rtOf(s);
+    if (s.dataset.rtBlock != null) exec("formatBlock", rt, s.value);
+    else if (s.value) { exec("fontSize", rt, s.value); s.value = ""; }
+  });
   // Хадгалагдсан хичээлийн блокууд (самбар, үүлэн үг серверт байгаа эсэх).
   const saved = new Map((f.dataset.edit ? blocks : []).map((b) => [b.id, b]));
   const lessonBase = (lid) => `/api/courses/${f.dataset.course}/lessons/${lid}`;
@@ -628,9 +835,14 @@ function mountBlockEditor(f, blocks) {
     const ep = t.closest("[data-embed-preview]");
     // Суралцагчид харагдах яг тэр байдлаар (холбоос бол хичээл дотор шууд, HTML бол тусгаарласан хүрээнд).
     if (ep) { const el = ep.closest(".be-block"), text = $(".be-embed", el).value.trim(), box = $(".be-embed-prev", el); box.innerHTML = text ? SG.blocksHTML([{ id: "prev", type: "embed", text, height: +$(".be-embed-h", el).value || 420 }]) : ""; return; }
-    const a = t.closest("[data-add]"); if (a) { const nb = add(a.dataset.add); if (["image", "audio", "video", "file"].includes(a.dataset.add) && a.dataset.add !== "video") pick(nb); return; }
+    const a = t.closest("[data-add]"); if (a) { const nb = add(a.dataset.add, cur); if (["image", "audio", "video", "file"].includes(a.dataset.add) && a.dataset.add !== "video") pick(nb); return; }
+    if (t.closest("[data-sort]")) { setCompact(!list.classList.contains("be-compact")); return; }
+    if (t.closest("[data-at-end]")) { setCur(null); return; }
     if (!el) return;
-    if (t.closest("[data-be-del]")) { if ((el.dataset.type === "text" && $(".be-rt", el).textContent.trim()) || el.dataset.type === "quiz") { if (!confirm("Энэ хэсгийг устгах уу?")) return; } el.remove(); return; }
+    if (t.closest("[data-be-del]")) { if ((el.dataset.type === "text" && $(".be-rt", el).textContent.trim()) || el.dataset.type === "quiz") { if (!confirm("Энэ хэсгийг устгах уу?")) return; } el.remove(); if (cur === el) setCur(null); else showAt(); return; }
+    if (t.closest("[data-be-up]")) return move(el, -1);
+    if (t.closest("[data-be-down]")) return move(el, 1);
+    if (t.closest(".be-sum")) { setCompact(false); el.scrollIntoView({ block: "center" }); flash(el); (el.querySelector(".be-rt, .be-h, .be-q") || el).focus?.({ preventScroll: true }); return; }
     if (t.closest("[data-pick], [data-replace]")) return pick(el);
     if (t.closest("[data-rec]")) return record(el, t.closest("[data-rec]"));
     if (t.closest("[data-vurl]")) { const u = prompt("YouTube эсвэл Vimeo холбоос"); if (u && /^https?:\/\//.test(u.trim())) setMedia(el, { path: u.trim(), url: u.trim(), original_name: "Видео холбоос" }); return; }
@@ -665,35 +877,52 @@ function mountBlockEditor(f, blocks) {
   box.addEventListener("keydown", (e) => {
     if (e.target.closest("[contenteditable]") && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); exec("link", e.target.closest("[contenteditable]")); }
     if (e.target.closest(".be-h, .be-q, .be-opt-t, .be-cap, .be-ex") && e.key === "Enter") e.preventDefault(); // маягт илгээгдэхгүй
+    const rt = e.target.closest?.(".be-rt");
+    if (rt && (e.key === "Delete" || e.key === "Backspace") && $("img.rt-sel", rt)) { e.preventDefault(); $("img.rt-sel", rt).remove(); syncBar(rt); return; }
+    if (rt && e.key === "Tab") { // жагсаалтад догол, хүснэгтэд дараагийн нүд
+      const n = getSelection().anchorNode, at = n && (n.nodeType === 1 ? n : n.parentElement), cell = at?.closest("td,th");
+      if (cell && rt.contains(cell)) { e.preventDefault(); const cs = $$("td,th", cell.closest("table")), nx = cs[cs.indexOf(cell) + (e.shiftKey ? -1 : 1)]; if (nx) { const r = document.createRange(); r.selectNodeContents(nx); r.collapse(false); getSelection().removeAllRanges(); getSelection().addRange(r); } return; }
+      if (at?.closest("li") && rt.contains(at.closest("li"))) { e.preventDefault(); exec(e.shiftKey ? "outdent" : "indent", rt); return; }
+    }
     const h = e.target.closest("[data-be-drag]"); if (!h || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
-    e.preventDefault(); const el = h.closest(".be-block");
-    if (e.key === "ArrowUp" && el.previousElementSibling) el.previousElementSibling.before(el);
-    if (e.key === "ArrowDown" && el.nextElementSibling) el.nextElementSibling.after(el);
+    e.preventDefault(); move(h.closest(".be-block"), e.key === "ArrowUp" ? -1 : 1);
     h.focus();
   });
   // Буулгах (paste): зураг шууд зураг блок болно, бусад нь энгийн текст.
+  // Буулгах (paste): Word, Google Docs-ийн хэлбэржүүлэлт үлдэнэ; дэлгэцийн зураг текст дотроо орно.
   box.addEventListener("paste", (e) => {
-    const rt = e.target.closest?.("[contenteditable]"); if (!rt) return;
-    const img = [...(e.clipboardData?.files || [])].find((f) => /^image\//.test(f.type));
+    const rt = (e.target.nodeType === 1 ? e.target : e.target.parentElement)?.closest(".be-rt"); if (!rt) return;
+    const cd = e.clipboardData, imgs = [...(cd?.files || [])].filter((f) => /^image\//.test(f.type)), html = cd?.getData("text/html") || "";
     e.preventDefault();
-    if (img) { upload(add("image", rt.closest(".be-block")), img); return; }
-    document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+    if (imgs.length && !html) { imgs.forEach((f) => rtImage(rt, f)); return; }
+    const clean = html ? cleanPaste(html) : "";
+    if (clean.replace(/<br>/g, "").trim()) { document.execCommand("insertHTML", false, clean); return; }
+    if (imgs.length) { imgs.forEach((f) => rtImage(rt, f)); return; }
+    document.execCommand("insertText", false, cd.getData("text/plain"));
   });
   // Хэсгүүдийг чирж зөөх (хулгана, хуруу).
   let drag = null;
   box.addEventListener("pointerdown", (e) => {
     const h = e.target.closest("[data-be-drag]"); if (!h || e.button > 0) return;
-    e.preventDefault(); const el = h.closest(".be-block"), r = el.getBoundingClientRect();
-    const ghost = el.cloneNode(true); ghost.classList.add("ol-ghost", "be-ghost"); Object.assign(ghost.style, { width: r.width + "px", left: r.left + "px", top: r.top + "px", maxHeight: "120px", overflow: "hidden" });
+    e.preventDefault(); const el = h.closest(".be-block");
+    // Чирэх үед бүх хэсэг түр хураагдана — урт хэсгүүдийг ч амархан зөөнө.
+    const temp = !list.classList.contains("be-compact");
+    if (temp) { setCompact(true); const r0 = el.getBoundingClientRect(); scrollBy(0, r0.top + r0.height / 2 - e.clientY); }
+    const r = el.getBoundingClientRect();
+    const ghost = document.createElement("div"); ghost.className = "ol-ghost be-ghost"; ghost.innerHTML = `<span class="be-tag">${$(".be-tag", el).innerHTML}</span><span class="be-ghost-sum">${esc(sumOf(el) || "")}</span>`;
+    Object.assign(ghost.style, { width: r.width + "px", left: r.left + "px", top: r.top + "px" });
     document.body.append(ghost); el.classList.add("ol-dragging"); drag = { el, ghost, dy: Math.min(e.clientY - r.top, 60) };
-    const move = (ev) => {
+    const mv = (ev) => {
       ghost.style.top = ev.clientY - drag.dy + "px";
       if (ev.clientY < 90) scrollBy(0, -14); else if (ev.clientY > innerHeight - 60) scrollBy(0, 14);
       const sibs = $$(":scope > .be-block:not(.ol-dragging)", list), before = sibs.find((x) => { const b = x.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
       list.insertBefore(el, before || null);
     };
-    const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); removeEventListener("pointercancel", up); ghost.remove(); el.classList.remove("ol-dragging"); drag = null; };
-    addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
+    const up = () => {
+      removeEventListener("pointermove", mv); removeEventListener("pointerup", up); removeEventListener("pointercancel", up); ghost.remove(); el.classList.remove("ol-dragging"); drag = null;
+      setCur(el); if (temp) { setCompact(false); el.scrollIntoView({ block: "center" }); } flash(el);
+    };
+    addEventListener("pointermove", mv); addEventListener("pointerup", up); addEventListener("pointercancel", up);
   });
   // Компьютерээс файл чирж оруулах: байрлалд нь төрлөөр нь блок үүснэ.
   box.addEventListener("dragover", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { e.preventDefault(); box.classList.add("be-dropping"); } });
@@ -701,6 +930,15 @@ function mountBlockEditor(f, blocks) {
   box.addEventListener("drop", (e) => {
     const fl = [...(e.dataTransfer?.files || [])]; if (!fl.length) return;
     e.preventDefault(); box.classList.remove("be-dropping");
+    const rt = e.target.closest(".be-rt");
+    if (rt) { // текст дээр: зураг тэр байрлалдаа, бусад файл текстийг хувааж дундаа
+      const pos = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+      if (pos && rt.contains(pos.startContainer)) { rtRange = pos; rtRange._rt = rt; }
+      fl.filter((f) => typeOfFile(f) === "image").forEach((f) => rtImage(rt, f));
+      const others = fl.filter((f) => typeOfFile(f) !== "image");
+      if (others.length) { let after = splitText(rt.closest(".be-block")); for (const f of others) { after = add(typeOfFile(f), after); upload(after, f); } }
+      return;
+    }
     const onBlock = e.target.closest(".be-block"), emptyMedia = onBlock && $(".be-drop", onBlock) && fl.length === 1;
     if (emptyMedia) return upload(onBlock, fl[0]);
     let after = onBlock || null;
@@ -711,7 +949,7 @@ function mountBlockEditor(f, blocks) {
     collect() {
       return $$(":scope > .be-block", list).map((el) => {
         const id = el.dataset.id, type = el.dataset.type;
-        if (type === "text") { const text = domToMd($(".be-rt", el)); return text ? { id, type, text } : null; }
+        if (type === "text") { const rt = $(".be-rt", el), html = rtHTML(rt), text = rt.innerText.trim(); return text || /<(img|table|hr)\b/i.test(html) ? { id, type, html, text } : null; }
         if (type === "heading") { const text = $(".be-h", el).value.trim(); return text ? { id, type, text } : null; }
         if (type === "embed") { const text = $(".be-embed", el).value.trim(); return text ? { id, type, text, height: +$(".be-embed-h", el).value || 420 } : null; }
         if (type === "board") return { id, type, text: $(".be-board-t", el).value.trim() || "Цагаан самбар", max: +$(".be-board-n", el).value || 4 };
@@ -725,7 +963,7 @@ function mountBlockEditor(f, blocks) {
         return { id, type, url: m.dataset.url, name: m.dataset.name, size: +m.dataset.size || 0, text: $(".be-cap", el).value.trim(), download: !!$(".be-dl input", el)?.checked };
       }).filter(Boolean);
     },
-    uploading: () => $$(".be-drop .progress:not([hidden])", box).length > 0,
+    uploading: () => $$(".be-drop .progress:not([hidden])", box).length > 0 || !!$("img[data-up]", box),
   };
 }
 // Блокуудаас товч текст (нийтлэлийн жагсаалт, хайлтад).
