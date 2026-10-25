@@ -37,6 +37,9 @@ func TestSanitizeRich(t *testing.T) {
 	if !strings.HasPrefix(text, "Гарчиг\n") || !strings.Contains(text, "Сайн тод улаан H2O x2") || strings.Contains(text, "alert") || !strings.Contains(text, "нэг\nхоёр") {
 		t.Errorf("цэвэр текст: %q", text)
 	}
+	if o, _, _ := sanitizeRich(`<p style="line-height:1.5;margin-bottom:1.6em;margin-top:0px">a</p><p style="line-height:99;margin-bottom:url(x)">b</p>`, tid); o != `<p style="line-height:1.5;margin-bottom:1.6em;margin-top:0px">a</p><p>b</p>` {
+		t.Errorf("зай: %s", o)
+	}
 	if o, _, _ := sanitizeRich(`<b><i>хаагаагүй`, tid); o != "<b><i>хаагаагүй</i></b>" {
 		t.Errorf("хаах: %s", o)
 	}

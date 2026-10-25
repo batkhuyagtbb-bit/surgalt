@@ -375,6 +375,7 @@ Object.assign(ICON, {
   ol: '<path d="M10 6h10M10 12h10M10 18h10"/><path d="M4 4.5 5.5 4v4.5M3.8 13.2c.3-.8 2.4-.9 2.2.5-.1.7-2.2 2.1-2.2 2.8H6"/>',
   indent: '<path d="M4 5h16M11 10h9M11 14h9M4 19h16M4 9.5 7 12l-3 2.5"/>', outdent: '<path d="M4 5h16M11 10h9M11 14h9M4 19h16M7 9.5 4 12l3 2.5"/>',
   table: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10M15 9.5v10"/>',
+  spacing: '<path d="M11 6h9M11 12h9M11 18h9"/><path d="M5 4v16M3 6.5 5 4l2 2.5M3 17.5 5 20l2-2.5"/>',
   hr: '<path d="M3 12h18"/><path d="M8 7h8M8 17h8" opacity=".45"/>', eraser: '<path d="m7 21-4-4L14 6l6 6-8 9H7z"/><path d="M10 10l6 6M7 21h14"/>',
 });
 const RT_FORE = ["#111827", "#6b7280", "#dc2626", "#ea580c", "#ca8a04", "#16a34a", "#0d9488", "#0891b2", "#1f3c8f", "#7c3aed", "#db2777", "#92400e"];
@@ -388,7 +389,7 @@ function rtEditorHTML(b) {
       <select data-rt-size title="Үсгийн хэмжээ" aria-label="Үсгийн хэмжээ"><option value="">Хэмжээ</option><option value="2">Жижиг</option><option value="3">Энгийн</option><option value="4">Том</option><option value="5">Илүү том</option><option value="6">Маш том</option></select><span class="be-sep"></span>
       ${rtBtn("bold", "", "Тод (Ctrl+B)", "<b>B</b>")}${rtBtn("italic", "", "Налуу (Ctrl+I)", "<i>I</i>")}${rtBtn("underline", "", "Доогуур зураас (Ctrl+U)", "<u>U</u>")}${rtBtn("strikeThrough", "", "Дундуур зураас", "<s>S</s>")}${rtBtn("superscript", "", "Дээд индекс (x²)", "x²")}${rtBtn("subscript", "", "Доод индекс (H₂O)", "x₂")}
       <button type="button" data-pal="fore" title="Үсгийн өнгө" aria-label="Үсгийн өнгө"><span class="rt-a">A</span></button><button type="button" data-pal="back" title="Тодруулах өнгө" aria-label="Тодруулах өнгө"><span class="rt-hl">A</span></button><span class="be-sep"></span>
-      ${rtBtn("justifyLeft", "al-left", "Зүүн тийш")}${rtBtn("justifyCenter", "al-center", "Голлуулах")}${rtBtn("justifyRight", "al-right", "Баруун тийш")}${rtBtn("justifyFull", "al-just", "Хоёр талд тэгшлэх")}<span class="be-sep"></span>
+      ${rtBtn("justifyLeft", "al-left", "Зүүн тийш")}${rtBtn("justifyCenter", "al-center", "Голлуулах")}${rtBtn("justifyRight", "al-right", "Баруун тийш")}${rtBtn("justifyFull", "al-just", "Хоёр талд тэгшлэх")}<button type="button" data-rt-spacing title="Мөр, догол мөр хоорондын зай" aria-label="Мөр хоорондын зай">${ico("spacing", 17)}</button><span class="be-sep"></span>
       ${rtBtn("insertUnorderedList", "ul", "Жагсаалт")}${rtBtn("insertOrderedList", "ol", "Дугаартай жагсаалт")}${rtBtn("outdent", "outdent", "Догол багасгах (Shift+Tab)")}${rtBtn("indent", "indent", "Догол нэмэх (Tab)")}<span class="be-sep"></span>
       ${rtBtn("link", "link", "Холбоос (Ctrl+K)")}<button type="button" data-rt-img title="Текст дотор зураг оруулах" aria-label="Зураг оруулах">${ico("image", 17)}</button><button type="button" data-rt-table title="Хүснэгт оруулах" aria-label="Хүснэгт оруулах">${ico("table", 17)}</button><button type="button" data-rt-file title="Энэ байрлалд файл (PDF, Word, PowerPoint…) оруулах" aria-label="Файл оруулах">${ico("clip", 17)}</button>${rtBtn("insertHorizontalRule", "hr", "Хэвтээ зураас")}${rtBtn("removeFormat", "eraser", "Хэлбэр арилгах")}</div>
     <div class="rt-ctx" data-ctx="img" hidden><b>Зураг</b>${[25, 50, 75, 100].map((w) => `<button type="button" data-img-w="${w}">${w}%</button>`).join("")}<span class="be-sep"></span><button type="button" data-img-al="left" title="Зүүн талд, текст хажуугаар нь урсна">⇤ Зүүн</button><button type="button" data-img-al="center">Голд</button><button type="button" data-img-al="right" title="Баруун талд, текст хажуугаар нь урсна">Баруун ⇥</button><button type="button" data-img-al="">Мөрөнд</button><span class="be-sep"></span><button type="button" data-img-del>${ico("x", 14)}Устгах</button></div>
@@ -728,6 +729,32 @@ function mountBlockEditor(f, blocks) {
   };
   const palHTML = (kind) => `<div class="rt-sws">${(kind === "fore" ? RT_FORE : RT_BACK).map((c) => `<button type="button" data-color="${c}" data-kind="${kind}" style="background:${c}" title="${c}" aria-label="${c}"></button>`).join("")}</div>
     <button type="button" class="rt-none" data-color="" data-kind="${kind}">${kind === "fore" ? "Анхны өнгө" : "Тодруулга арилгах"}</button>`;
+  // Мөр хоорондын зай (line-height), догол мөрийн дараах зай (margin-bottom) — сонгосон догол мөрүүдэд.
+  const RT_LH = ["1", "1.15", "1.5", "2", "2.5", "3"], RT_PM = [["0", "Байхгүй"], ["0.4em", "Бага"], ["0.8em", "Дунд"], ["1.6em", "Их"]];
+  const spacingHTML = () => `<div class="rt-menu"><b>Мөр хоорондын зай</b><div>${RT_LH.map((v) => `<button type="button" data-lh="${v}">${v.replace(".", ",")}</button>`).join("")}<button type="button" data-lh="">Анхны</button></div>
+    <b>Догол мөрийн дараах зай</b><div>${RT_PM.map(([v, t]) => `<button type="button" data-pm="${v}">${t}</button>`).join("")}<button type="button" data-pm="">Анхны</button></div></div>`;
+  const RT_BLK = "p,div,h2,h3,h4,li,blockquote,pre";
+  const selBlocks = (rt) => {
+    restore(rt);
+    const g = getSelection(), r = g.rangeCount && g.getRangeAt(0);
+    let bs = r ? $$(RT_BLK, rt).filter((b) => r.intersectsNode(b) && !b.querySelector(RT_BLK)) : [];
+    if (!bs.length) { // догол мөргүй (шууд) текст: эхлээд догол мөр болгоно
+      document.execCommand("formatBlock", false, "p");
+      const n = getSelection().anchorNode, b = (n && (n.nodeType === 1 ? n : n.parentElement))?.closest(RT_BLK);
+      bs = b && b !== rt && rt.contains(b) ? [b] : [];
+    }
+    return bs;
+  };
+  const spacing = (rt, prop, v) => {
+    selBlocks(rt).forEach((b) => { b.style[prop] = v; if (!b.getAttribute("style")) b.removeAttribute("style"); });
+    syncBar(rt);
+  };
+  const markSpacing = (rt, pop) => {
+    const n = rtRange?._rt === rt ? rtRange.startContainer : null, b = (n && (n.nodeType === 1 ? n : n.parentElement))?.closest(RT_BLK);
+    const cur = b && rt.contains(b) && b !== rt ? b : null;
+    $$("[data-lh]", pop).forEach((x) => x.classList.toggle("on", (cur?.style.lineHeight || "") === x.dataset.lh));
+    $$("[data-pm]", pop).forEach((x) => x.classList.toggle("on", (cur?.style.marginBottom || "") === x.dataset.pm.replace(/^0$/, "0px")));
+  };
   const gridHTML = () => `<div class="rt-grid">${Array.from({ length: 48 }, (_, i) => `<i data-grid="${Math.floor(i / 8) + 1}x${(i % 8) + 1}"></i>`).join("")}</div><small class="rt-grid-l">Хүснэгтийн хэмжээ</small>`;
   const insertTable = (rt, r, c) => {
     restore(rt); document.execCommand("insertHTML", false, `<table data-new="1"><tbody>${`<tr>${"<td><br></td>".repeat(c)}</tr>`.repeat(r)}</tbody></table><p><br></p>`);
@@ -774,7 +801,10 @@ function mountBlockEditor(f, blocks) {
   box.addEventListener("mousedown", (e) => { if (e.target.closest(".be-rt-bar button, .rt-pop, .rt-ctx button")) e.preventDefault(); }); // сонголтыг алдахгүй
   box.addEventListener("click", (e) => {
     const t = e.target;
-    if (!t.closest(".rt-pop, [data-pal], [data-rt-table]")) closePops();
+    if (!t.closest(".rt-pop, [data-pal], [data-rt-table], [data-rt-spacing]")) closePops();
+    const sp = t.closest("[data-rt-spacing]"); if (sp) { const p = openPop(sp, spacingHTML()); if (p) markSpacing(rtOf(sp), p); return; }
+    const lh = t.closest("[data-lh], [data-pm]");
+    if (lh) { const rt = rtOf(lh); closePops(); if (lh.dataset.lh != null) spacing(rt, "lineHeight", lh.dataset.lh); else spacing(rt, "marginBottom", lh.dataset.pm); return; }
     const pal = t.closest("[data-pal]"); if (pal) { openPop(pal, palHTML(pal.dataset.pal)); return; }
     const col = t.closest("[data-color]");
     if (col) { const rt = rtOf(col); closePops(); if (!col.dataset.color) clearColor(rt, col.dataset.kind); else exec(col.dataset.kind === "fore" ? "foreColor" : "hiliteColor", rt, col.dataset.color); return; }

@@ -48,6 +48,7 @@ var (
 	cssSizeRe  = regexp.MustCompile(`^(\d{1,3}(\.\d{1,2})?(px|pt|em|rem|%)|xx-small|x-small|small|medium|large|x-large|xx-large|xxx-large|smaller|larger)$`)
 	cssLenRe   = regexp.MustCompile(`^\d{1,4}(\.\d{1,2})?(px|em|rem|%)$`)
 	cssDecoRe  = regexp.MustCompile(`^((underline|line-through|overline|none)\s*){1,3}$`)
+	cssLineRe  = regexp.MustCompile(`^(0\.[89]|[1-3](\.\d{1,2})?|4|\d{2,3}%|normal)$`) // мөр хоорондын зай
 	richSrcRe  = regexp.MustCompile(`src="(/files/[^"?]+)"`)
 )
 
@@ -58,7 +59,7 @@ var cssEnum = map[string]map[string]bool{
 	"vertical-align": {"super": true, "sub": true, "baseline": true, "top": true, "middle": true, "bottom": true},
 }
 
-// cleanStyle — зөвшөөрсөн CSS шинжүүд (өнгө, хэмжээ, зэрэгцүүлэлт, догол, зургийн өргөн).
+// cleanStyle — зөвшөөрсөн CSS шинжүүд (өнгө, хэмжээ, зэрэгцүүлэлт, догол, мөр хоорондын зай, зургийн өргөн).
 func cleanStyle(tag, style string) string {
 	var out []string
 	seen := map[string]bool{}
@@ -83,7 +84,9 @@ func cleanStyle(tag, style string) string {
 			good = cssSizeRe.MatchString(lv)
 		case "text-decoration", "text-decoration-line":
 			k, good = "text-decoration", cssDecoRe.MatchString(lv)
-		case "margin-left", "padding-left", "text-indent":
+		case "line-height":
+			good = cssLineRe.MatchString(lv)
+		case "margin-left", "padding-left", "text-indent", "margin-top", "margin-bottom":
 			good = cssLenRe.MatchString(lv)
 		case "width", "max-width":
 			good = (tag == "img" || tag == "table" || tag == "td" || tag == "th") && cssLenRe.MatchString(lv)

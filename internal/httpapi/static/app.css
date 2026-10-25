@@ -1212,6 +1212,11 @@ body.dragging-ol{user-select:none}
 .rt-sws button{width:26px;height:26px;padding:0;border:1px solid rgba(15,23,42,.14);border-radius:7px;cursor:pointer}
 .rt-sws button:hover{transform:scale(1.12)}
 .rt-none{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font:600 .8rem var(--sans);color:var(--text-2);cursor:pointer}
+.rt-menu{display:grid;gap:6px;min-width:250px}
+.rt-menu>b{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.rt-menu>div{display:flex;flex-wrap:wrap;gap:4px}
+.rt-menu button{min-width:40px;padding:5px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font:600 .82rem var(--sans);color:var(--text-2);cursor:pointer}
+.rt-menu button:hover,.rt-menu button.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
 .rt-grid{display:grid;grid-template-columns:repeat(8,18px);gap:3px}
 .rt-grid i{width:18px;height:18px;border:1px solid var(--line-2);border-radius:3px;cursor:pointer}
 .rt-grid i.on{background:var(--brand-soft);border-color:var(--brand)}
