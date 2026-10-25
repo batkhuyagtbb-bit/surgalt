@@ -521,12 +521,11 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Цол: элссэн сургалтууд + элсээгүй ч үнэгүй хичээл үзэж оноо авсан сургалтууд (myProgress → RankCourseIDs).
-	if u.Role != store.RoleTeacher {
-		rank, byCourse, tasks, awarded := s.myProgress(ctx, c.UID, out.Courses)
-		out.CourseRanks, out.Tasks, out.RankAwarded = byCourse, tasks, awarded
-		if len(byCourse) > 0 {
-			out.Rank, out.RankLadder = &rank, RankLadder()
-		}
+	// Багш ч бусдын сургалтад суралцагчтай яг адил суралцана (өөрийн сургалт тооцогдохгүй).
+	rank, byCourse, tasks, awarded := s.myProgress(ctx, c.UID, out.Courses)
+	out.CourseRanks, out.Tasks, out.RankAwarded = byCourse, tasks, awarded
+	if len(byCourse) > 0 {
+		out.Rank, out.RankLadder = &rank, RankLadder()
 	}
 	if out.CourseRanks == nil {
 		out.CourseRanks = []HomeCourseRank{}

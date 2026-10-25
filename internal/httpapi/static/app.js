@@ -3811,17 +3811,17 @@ async function homePage() {
   const accessLabel = { full: "Бүх хичээл нээлттэй", enrolled: "Элссэн", lessons: "" };
   const last = store.get("sg_last");
   const resume = last && h.courses.find((c) => c.course.id === last.course);
-  const SEC_ICO = { "my-rank": "medal", "my-study": "chart", "my-tasks": "exam", "my-pending": "money", "my-studio": "gear", "my-live": "live", "my-courses": "courses", "my-lessons": "play", "my-teachers": "teacher", "my-chats": "chat" };
+  const SEC_ICO = { "my-rank": "medal", "my-study": "chart", "my-tasks": "exam", "my-pending": "money", "my-live": "live", "my-courses": "courses", "my-lessons": "play", "my-teachers": "teacher", "my-chats": "chat" };
   const sec = (id, title, body, extra = "") => `<section class="dash-sec" id="${id}"><header><h2>${SEC_ICO[id] ? `<span class="sec-ico">${icon(SEC_ICO[id], 17)}</span>` : ""}${title}</h2>${extra}</header>${body}</section>`;
   const courseCard = (c, i) => `<a class="course-card tilt" href="/c/${esc(c.course.id)}" style="--h:${hueOfName(c.course.title)}">
     <div class="course-art"><div class="course-flags"><span class="flag flag-own">✓ ${c.access === "lessons" ? c.owned_lessons + " хичээл" : accessLabel[c.access]}</span></div><span class="course-num">${String(i + 1).padStart(2, "0")}</span><span class="glare"></span></div>
     <div class="course-body"><h3>${esc(c.course.title)}</h3>${c.teacher ? `<div class="course-by">${avatarHTML(c.teacher)}${esc(c.teacher.display_name)}</div>` : ""}
     <div class="course-meta"><span>${c.course.lesson_count} хичээл</span><span class="price free">▶ Үргэлжлүүлэх</span></div></div></a>`;
 
-  const tp = h.teacher;
+  // «Сурах» хуудас багш, суралцагч хоёрт яг ижил (багш ч бусдын сургалтад суралцана; багшлах хэсэг нь дээд цэсний «Багшлах»).
   const parts = [`<div class="dash-head">${avatarHTML(u, "avatar-md")}<div class="grow"><h1>${hello}, ${esc(u.display_name.split(" ")[0])}</h1>
-      <p>${h.courses.length ? `Танд ${h.courses.length} сургалт${h.meetings.length ? `, ${h.meetings.length} шууд хичээл` : ""} байна.` : tp ? "Багшийн самбар болон суралцах хэсэг тань энд байна." : "Багшийнхаа профайлаас анхны сургалтаа сонгоорой."}</p></div>
-      ${tp ? `<a class="btn" href="/t/${esc(u.username)}#overview">Багшлах →</a>` : `<button class="btn" data-student-settings>Профайл засах</button>`}</div>`,
+      <p>${h.courses.length ? `Танд ${h.courses.length} сургалт${h.meetings.length ? `, ${h.meetings.length} шууд хичээл` : ""} байна.` : "Багшийнхаа профайлаас анхны сургалтаа сонгоорой."}</p></div>
+      <button class="btn" data-student-settings>Профайл засах</button></div>`,
     `<div class="tiles">
       <a class="tile" href="#my-courses"><em>${icon("courses")}</em><b>${h.courses.length}</b><span>Миний сургалт</span></a>
       <a class="tile" href="#my-lessons"><em>${icon("play")}</em><b>${h.lessons.length}</b><span>Авсан хичээл</span></a>
@@ -3933,14 +3933,6 @@ async function homePage() {
   if (h.pending.length) parts.push(sec("my-pending", "Төлбөр хүлээгдэж буй", `<ul class="items">${h.pending.map((o) => `
       <li><a class="item warn" href="/c/${esc(o.course_id)}${o.lesson_id ? "#l=" + esc(o.lesson_id) : ""}"><span class="item-ico">${icon("money", 20)}</span><span class="grow"><strong>${esc(o.title)}</strong><small>${fmtDate(o.created_at)} · ${o.kind === "lesson" ? "нэг хичээл" : "бүтэн сургалт"}</small></span><strong>${money(o.amount)}</strong><span class="chip chip-amber">Төлөх →</span></a></li>`).join("")}</ul>`));
 
-  if (tp) {
-    const ins = tp.insights, todo = ins.tips.filter((t) => !t.done).slice(0, 3);
-    parts.push(sec("my-studio", "Багшийн самбар", `<div class="panel"><div class="strength">${ringHTML(ins.score)}<div><strong>Профайлын бүрдэл · ${esc(ins.level)}</strong>
-        <p class="muted small" style="margin:.2em 0 0">${tp.published}/${tp.courses} сургалт нийтлэгдсэн · ${tp.students} суралцагч · ${tp.profile_views} профайл үзэлт</p>
-        <div class="hero-cta" style="margin-top:12px"><a class="btn btn-gold btn-sm" href="/t/${esc(u.username)}#overview">Удирдлага нээх</a><a class="btn btn-ghost btn-sm" href="/t/${esc(u.username)}">Нээлттэй профайл</a><a class="btn btn-ghost btn-sm" href="/t/${esc(u.username)}#chat">Чат</a></div></div></div>
-        ${todo.length ? `<ul class="tips">${todo.map((t) => `<li><a class="tip" href="/t/${esc(u.username)}${esc(t.link)}"><i>✓</i><span><strong>${esc(t.title)}</strong><small>${esc(t.hint)}</small></span><span class="chip chip-gold">Хийх →</span></a></li>`).join("")}</ul>` : ""}</div>`));
-  }
-
   if (h.meetings.length) parts.push(sec("my-live", "Шууд хичээл", `<ul class="items">${h.meetings.map((m) => m.booking ? `
       <li><div class="item live"><span class="item-ico">${icon("cal", 20)}</span><span class="grow"><strong>${esc(m.title)}</strong><small>${fmtDate(m.starts_at)} · ${m.duration_min} мин · ${m.mode === "offline" ? "Биечлэн · " + esc(m.location || "") : "Онлайн"}${m.price ? " · ✓ төлсөн" : ""}</small></span><span class="chip chip-amber">${until(m.starts_at)}</span>
       ${m.meet_url ? `<a class="btn btn-accent btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">Нэгдэх</a>` : `<a class="btn btn-ghost btn-sm" href="/t/${esc(m.teacher_username || "")}">Багш</a>`}</div></li>` : `
@@ -3964,7 +3956,7 @@ async function homePage() {
       <li><a class="item" href="${c.kind === "group" ? `/c/${esc(c.course_id)}#chat=group` : c.teacher?.username && !c.kind ? `/t/${esc(c.teacher.username)}#chat` : "#my-chats"}" data-rail-open="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group">${c.kind === "team" ? "🧑‍🤝‍🧑" : "👥"}</span>` : c.teacher ? avatarHTML(c.teacher) : `<span class="avatar avatar-sm">?</span>`}<span class="grow"><strong>${esc(c.kind === "group" || c.kind === "team" ? c.title : c.teacher?.display_name || c.title || "")}</strong><small>${c.kind === "group" ? "Бүлэг · " + esc(c.teacher?.display_name || "") + " · " : c.kind === "team" ? "Сурагчдын бүлэг · " : c.kind === "dm" ? "Ангийн найз · " : ""}${esc(c.last_message || "")}</small></span><time class="muted small">${fmtDate(c.last_message_at)}</time></a></li>`).join("")}</ul>`) : `<span id="my-chats"></span>`;
   parts.push(`<div class="dash-cols">${teachers}${chats}</div>`);
 
-  dash.innerHTML = parts.join("") + (tp ? "" : `<div class="modal" id="stuModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
+  dash.innerHTML = parts.join("") + (`<div class="modal" id="stuModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
       <h3 class="h3">Профайл засах</h3><form class="form" id="stuForm"><label>Нэр<input name="display_name" required maxlength="80" value="${esc(u.display_name)}"></label>
       <p class="muted small" style="margin:0">Имэйл: ${esc(u.email || "")}</p><p class="form-error" role="alert"></p>
       <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`);

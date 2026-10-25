@@ -269,3 +269,26 @@ func TestRankWithoutEnrollment(t *testing.T) {
 		t.Fatalf("элсээгүй суралцагчийн цол: rank=%v courses=%v", h["rank"], h["courses"])
 	}
 }
+
+// Багш ч бусдын сургалтад суралцагчтай адил цол, явцтай; өөрийн сургалтаа үзсэн нь тооцогдохгүй.
+func TestTeacherLearnsLikeStudent(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	ta, _ := register(t, srv, "teacha", "teacher")
+	tb, _ := register(t, srv, "teachb", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", ta, `{"title":"Физик","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", ta, `{"title":"Нэг","is_free":true,"blocks":[{"id":"txt1","type":"text","text":"Текст."}]}`)
+	for _, tok := range []string{tb, ta} {
+		call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+l["id"].(string), tok, "")
+		call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+l["id"].(string)+"/complete", tok, "")
+		call(t, srv, "GET", "/api/courses/"+cid+"/access", tok, "")
+	}
+	_, hb := call(t, srv, "GET", "/api/me/home", tb, "")
+	if rk, _ := hb["rank"].(map[string]any); rk == nil || rk["points"].(float64) <= 0 || len(hb["course_ranks"].([]any)) != 1 {
+		t.Fatalf("суралцаж буй багшийн цол: rank=%v ranks=%v", hb["rank"], hb["course_ranks"])
+	}
+	if _, ha := call(t, srv, "GET", "/api/me/home", ta, ""); ha["rank"] != nil || len(ha["course_ranks"].([]any)) != 0 {
+		t.Fatalf("өөрийн сургалт цолонд орохгүй: rank=%v ranks=%v", ha["rank"], ha["course_ranks"])
+	}
+}
