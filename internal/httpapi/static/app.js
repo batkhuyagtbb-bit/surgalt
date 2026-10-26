@@ -655,9 +655,9 @@ function richHTML(src) {
   return out.join("");
 }
 const fmtBytes = (b) => !b ? "" : b >= 1 << 20 ? (b / (1 << 20)).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
-// Embed-ийн HTML-ийг бүтэн баримт болгоно (хоосон зай, хэмжээ тохируулна). Scroll-гүй: агуулгын өндрийг
-// эх хуудас руу postMessage-ээр илгээж, iframe өөрөө тэр өндөртэй болно. Өндөр (height) заасан дотоод
-// iframe (Google Forms гэх мэт) тэр өндрөөрөө; өндөргүй ганц iframe багшийн тавьсан өндрийг дүүргэнэ.
+// Embed-ийн HTML-ийг бүтэн баримт болгоно (хоосон зай, хэмжээ тохируулна). Цонх нь багшийн тавьсан өндөртэй
+// (px) тогтмол — агуулга урт бол дотроо гүйлгэнэ (өөрөө сунаж томрохгүй). Өндөр (height) заасан дотоод
+// iframe (Google Forms гэх мэт) тэр өндрөөрөө; өндөргүй ганц iframe цонхыг бүтэн дүүргэнэ.
 // HTML embed доторх маркер: эх хуудасны lessonMarker-тэй postMessage-ээр ажиллана (sandbox тул DOM-д хүрэхгүй).
 // эх → embed: {sgHL:{list, marking, quiz}}; embed → эх: {sgHLready}, {sgHLsel:{s,e,t}}, {sgHLclick:{id,x,y}}.
 const EMBED_HL_JS = `(function(){var list=[],marking=false,B=document.body;
@@ -674,7 +674,7 @@ addEventListener("message",function(ev){var d=ev.data&&ev.data.sgHL;if(!d||ev.so
 document.addEventListener("pointerup",function(){if(marking)setTimeout(sel,0)});
 document.addEventListener("click",function(ev){var ln=ev.target.closest&&ev.target.closest("a[href]");if(ln&&/^https?:/i.test(ln.href)){ev.preventDefault();parent.postMessage({sgLink:ln.href},"*");return}var m=ev.target.closest&&ev.target.closest("mark.hl");if(!m)return;if(document.documentElement.classList.contains("hlq")){m.classList.toggle("shown");return}if(!getSelection().isCollapsed)return;var rc=m.getBoundingClientRect();parent.postMessage({sgHLclick:{id:m.dataset.hid,x:rc.left,y:rc.bottom}},"*")});
 parent.postMessage({sgHLready:1},"*")})()`;
-const embedDoc = (html) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;overflow:hidden;font-family:system-ui,sans-serif}body{display:flow-root}iframe,video,img{max-width:100%}iframe[height]{width:100%;border:0;display:block}body>iframe:only-child:not([height]){width:100%;height:100vh;border:0;display:block}</style></head><body>${html}<script>(function(){var l=0;function s(){var h=Math.ceil(document.body.scrollHeight);if(h&&h!==l){l=h;parent.postMessage({sgEmbedH:h},"*")}}addEventListener("load",s);if(window.ResizeObserver)new ResizeObserver(s).observe(document.body);setInterval(s,1000);s()})()</script><script>${EMBED_HL_JS}</script></body></html>`;
+const embedDoc = (html) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;height:100%;font-family:system-ui,sans-serif}html{overflow:auto}body{display:flow-root}iframe,video,img{max-width:100%}iframe[height]{width:100%;border:0;display:block}body>iframe:only-child:not([height]){width:100%;height:100%;border:0;display:block}</style></head><body>${html}<script>${EMBED_HL_JS}</script></body></html>`;
 // Embed-д зөвхөн холбоос (https://…) буулгасан бол: хичээл дотор шууд ажиллах хаяг. Түгээмэл үйлчилгээг
 // embed хэлбэрт нь хувиргана. Өөрийн сайтын хаягийг зөвшөөрөхгүй (sandbox-оос гарахаас сэргийлнэ).
 function embedLink(text) {
@@ -691,12 +691,6 @@ function embedLink(text) {
   else if (host === "canva.com" && /^\/design\/[\w-]+/.test(p) && !u.searchParams.has("embed")) { u.search = u.search ? u.search + "&embed" : "?embed"; src = u.toString(); }
   return { src, url: t };
 }
-// Embed iframe-ээс ирсэн өндрийг тухайн iframe-д тавина (scroll гаргахгүй).
-addEventListener("message", (e) => {
-  const h = e.data && +e.data.sgEmbedH;
-  if (!h) return;
-  for (const f of document.querySelectorAll("iframe[srcdoc]")) if (f.contentWindow === e.source) { f.style.height = Math.min(20000, Math.max(40, h)) + "px"; break; }
-});
 function blockHTML(b) {
   const cap = b.text && b.type !== "text" && b.type !== "heading" ? `<figcaption>${esc(b.text)}</figcaption>` : "";
   switch (b.type) {
@@ -708,7 +702,7 @@ function blockHTML(b) {
       const lk = embedLink(b.text), h = Math.max(80, Math.min(2000, +b.height || 420));
       if (lk?.video) return `<figure class="rb-video"><div class="player">${mediaHTML(lk.src)}</div></figure>`;
       if (lk) return `<figure class="rb-embed rb-embed-link"><iframe src="${esc(lk.src)}" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin" style="height:${h}px" title="Embed"></iframe></figure>`;
-      return `<figure class="rb-embed" data-bid="${esc(b.id || "")}"><iframe sandbox="allow-scripts allow-forms allow-presentation" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" referrerpolicy="no-referrer" scrolling="no" style="height:${Math.max(80, Math.min(2000, +b.height || 420))}px" srcdoc="${esc(embedDoc(b.text))}" title="Embed"></iframe></figure>`;
+      return `<figure class="rb-embed" data-bid="${esc(b.id || "")}"><iframe sandbox="allow-scripts allow-forms allow-presentation" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" referrerpolicy="no-referrer" style="height:${h}px" srcdoc="${esc(embedDoc(b.text))}" title="Embed"></iframe></figure>`;
     }
     case "text": return `<div class="rb-text" data-bid="${esc(b.id || "")}">${b.html || richHTML(b.text)}</div>`; // html: сервер цэвэрлэсэн Word шиг агуулга
     case "image": return `<figure class="rb-fig"><img src="${esc(b.url)}" alt="${esc(b.text || "")}" loading="lazy">${cap}</figure>`;
