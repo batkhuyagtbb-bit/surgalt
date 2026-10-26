@@ -1169,6 +1169,59 @@ body.dragging-ol{user-select:none}
 .rb-text sub,.rb-text sup{font-size:.72em;line-height:0}
 @media (max-width:640px){.rb-text img.rt-left,.rb-text img.rt-right{float:none;display:block;margin:10px auto;max-width:100%}}
 .rb figure{margin:0}
+/* ===== Хүртээмж: хичээл унших хэсэгт харааны бэрхшээлтэй хүмүүст зориулсан байнга дагадаг цэс ===== */
+.a11y-fab{position:fixed;left:18px;bottom:18px;z-index:2500;display:none;place-items:center;width:60px;height:60px;padding:0;border:3px solid rgba(255,255,255,.6);border-radius:50%;background:#3b2fa0;color:#fff;box-shadow:0 10px 26px rgba(30,20,90,.45);cursor:pointer;transition:transform .15s}
+html.lp-focus .a11y-fab{display:grid}
+html.lp-focus:has(.lp .hl-a11y) .a11y-fab{display:none} /* маркерын самбарт товч байвал дугуй товч хэрэггүй */
+.hl-a11y{color:#3b2fa0}
+.hl-a11y svg{vertical-align:-4px}
+.hl-a11y[aria-expanded="true"],html[class*=" a11y-"] .hl-a11y,html[class^="a11y-"] .hl-a11y{background:#e7e3fb;border-color:#3b2fa0}
+.a11y-fab:hover{transform:scale(1.06)}
+.a11y-fab:focus-visible,.a11y-opt:focus-visible,.a11y-reset:focus-visible,.a11y-x:focus-visible{outline:3px solid #ffd60a;outline-offset:3px}
+.a11y-fab.on::after{content:"";position:absolute;top:1px;right:1px;width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:#34c759}
+.a11y-panel{position:fixed;left:18px;bottom:90px;z-index:2501;width:min(350px,calc(100vw - 36px));max-height:calc(100vh - 112px);max-height:calc(100svh - 112px);overflow:auto;padding:14px;border:1px solid #d9d4f2;border-radius:20px;background:#f1effb;box-shadow:0 24px 60px -14px rgba(30,20,90,.55);color:#1d1a3a}
+.a11y-panel[hidden],html:not(.lp-focus) .a11y-panel{display:none}
+.a11y-head{display:flex;align-items:center;justify-content:space-between;margin:0 2px 10px}
+.a11y-head b{font:800 1.08rem var(--sans);color:#2b2370}
+.a11y-x{width:36px;height:36px;border:0;border-radius:50%;background:#fff;color:#2b2370;font-size:1rem;cursor:pointer}
+.a11y-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.a11y-opt{display:grid;justify-items:center;align-content:center;gap:7px;min-height:124px;padding:12px 8px;border:2px solid #d4cfee;border-radius:16px;background:#fff;color:#1d1a3a;font:700 .92rem/1.25 var(--sans);text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.a11y-opt:hover{border-color:#8f86d6}
+.a11y-opt[aria-pressed="true"]{border-color:#3b2fa0;background:#e7e3fb}
+.a11y-ic{display:grid;place-items:center;height:36px;color:#3b2fa0}
+.a11y-df{font:700 1.7rem/1 Georgia,"Times New Roman",serif;color:#3b2fa0}
+.a11y-sub{min-height:1em;font-size:.74rem;font-weight:600;color:#5b55a0}
+.a11y-lv{display:flex;gap:6px}
+.a11y-lv i{width:22px;height:6px;border-radius:4px;background:#cfc9ee}
+.a11y-lv i.on{background:#3b2fa0}
+.a11y-reset{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:12px;padding:15px;border:0;border-radius:14px;background:#8b84c6;color:#fff;font:800 1rem var(--sans);cursor:pointer}
+.a11y-reset:hover{background:#6f67b8}
+.a11y-live{position:absolute;width:1px;height:1px;margin:0;overflow:hidden;clip:rect(0 0 0 0)}
+@media (max-width:640px){.a11y-fab{left:12px;bottom:12px;width:54px;height:54px}.a11y-panel{left:8px;right:8px;width:auto;bottom:76px}.a11y-opt{min-height:112px}}
+/* Хэрэглэх: зөвхөн хичээл унших хэсэгт (.lp) */
+html.lp-focus.a11y-fs1{font-size:112.5%}
+html.lp-focus.a11y-fs2{font-size:125%}
+html.lp-focus.a11y-fs3{font-size:150%}
+html.a11y-lh1 .lp .lesson-content :is(p,li,blockquote,td,th,figcaption,div,.rq-q,.rq-opt){line-height:1.9!important}
+html.a11y-lh2 .lp .lesson-content :is(p,li,blockquote,td,th,figcaption,div,.rq-q,.rq-opt){line-height:2.3!important}
+html.a11y-lh3 .lp .lesson-content :is(p,li,blockquote,td,th,figcaption,div,.rq-q,.rq-opt){line-height:2.7!important}
+html.a11y-ls1 .lp .lesson-content,html.a11y-ls1 .lp .lesson-content *{letter-spacing:.05em!important;word-spacing:.14em!important}
+html.a11y-ls2 .lp .lesson-content,html.a11y-ls2 .lp .lesson-content *{letter-spacing:.1em!important;word-spacing:.26em!important}
+html.a11y-ls3 .lp .lesson-content,html.a11y-ls3 .lp .lesson-content *{letter-spacing:.16em!important;word-spacing:.4em!important}
+html.a11y-zm1 .lp .lesson-content{zoom:1.15}
+html.a11y-zm2 .lp .lesson-content{zoom:1.3}
+html.a11y-zm3 .lp .lesson-content{zoom:1.5}
+html.a11y-tx .lp .lesson-content,html.a11y-tx .lp .lesson-content :not(code,pre,kbd,samp,svg,svg *){font-family:Verdana,Tahoma,"Segoe UI",Arial,sans-serif!important}
+html.a11y-tx .lp .lesson-content :is(p,li,td,th,blockquote,figcaption,span,.rq-q,.rq-opt){font-weight:600}
+html.a11y-tx .lp .lesson-content :is(b,strong,h2,h3,h4,.rb-h){font-weight:800!important}
+html.a11y-ln .lp a:not(.btn){background:#fff200!important;color:#000!important;font-weight:800!important;text-decoration:underline!important;text-decoration-thickness:3px!important;text-underline-offset:3px;outline:2px solid #000;border-radius:2px}
+html.a11y-ln .lp :is(button,.btn,a):focus-visible{outline:4px solid #ffd60a!important;outline-offset:2px}
+html.a11y-cur.lp-focus,html.a11y-cur.lp-focus *{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24'%3E%3Cpath d='M4 2l15 11-7 1.2 4 7.8-3 1.4-4-7.9-5 4.7z' fill='black' stroke='white' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E") 8 4,auto!important}
+html.a11y-cur.lp-focus :is(a,button,[role=button],label,select,summary,input[type=checkbox],input[type=radio]),html.a11y-cur.lp-focus :is(a,button) *{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24'%3E%3Cpath d='M4 2l15 11-7 1.2 4 7.8-3 1.4-4-7.9-5 4.7z' fill='%233b2fa0' stroke='white' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E") 8 4,pointer!important}
+html.a11y-ct1 .lp-main:not(:has(.dv-max)){filter:contrast(1.35) saturate(1.15)}
+html.a11y-ct2 .lp-main:not(:has(.dv-max)){background:#fff;filter:invert(1) hue-rotate(180deg)}
+html.a11y-ct2 .lp-main:not(:has(.dv-max)) :is(img,video,iframe,canvas){filter:invert(1) hue-rotate(180deg)}
+html.a11y-ct3 .lp-main:not(:has(.dv-max)){filter:grayscale(1) contrast(1.3)}
 /* Зураг томруулах (2 удаа товшиход) */
 .rb-fig img,.rb-text img,.rq-img{cursor:zoom-in}
 .lbx{position:fixed;inset:0;z-index:3000;background:rgba(10,14,28,.93);opacity:0;transition:opacity .2s;touch-action:pan-x pan-y}

@@ -1108,6 +1108,7 @@ function lessonMarker(body, base, ctx = {}) {
   let hs = [], color = "y", saveT = 0, dirty = false, pop = null;
   const bar = document.createElement("div"); bar.className = "hl-bar";
   bar.innerHTML = `<button type="button" class="hl-btn hl-toggle" aria-pressed="false" title="Асаагаад тодруулах текстээ чирж сонгоно" aria-label="Маркер">🖍<span class="hl-lbl"> Маркер</span></button>
+    <button type="button" class="hl-btn hl-a11y" data-a11y-open aria-expanded="false" aria-controls="a11yPanel" title="Хүртээмж — харааны бэрхшээлтэй хүмүүст: фонт, контраст, зай, zoom" aria-label="Хүртээмжийн тохиргоо">${A11Y_SVG('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="6.8" r="1.5" fill="currentColor" stroke="none"/><path d="M6.8 9.6 12 10.6l5.2-1M12 10.6v4.2M12 14.8l-2.6 4.4M12 14.8l2.6 4.4"/>', 18)}<span class="hl-lbl"> Хүртээмж</span></button>
     <span class="hl-colors" role="radiogroup" aria-label="Маркерын өнгө" hidden>${HL_COLORS.map(([c, t], i) => { const ask = c === "r" && ctx.teacher, tt = ask ? `${t} — тодруулаад багшаасаа асууж эсвэл тэмдэглэж үлдээнэ` : t; return `<button type="button" role="radio" class="hl-sw" data-c="${c}" aria-checked="${i === 0}" title="${tt}" aria-label="${tt}"><i class="hl-dot hl-${c}"></i><span class="hl-lbl">${t}${ask ? " 💬" : ""}</span></button>`; }).join("")}</span>
     <span class="grow"></span>
     <button type="button" class="hl-btn hl-quiz-btn" aria-pressed="false" title="Тодруулсан хэсгүүдийг нууна — санаж байгаад дарж шалгана" aria-label="Давтах" disabled>🧠<span class="hl-lbl"> Давтах</span></button>
@@ -4986,6 +4987,79 @@ document.addEventListener("pointerup", (e) => {
   if (lbxTap?.im === im && now - lbxTap.t < 320) { lbxTap = null; getSelection()?.removeAllRanges(); lightbox(im); }
   else lbxTap = { im, t: now };
 });
+
+/* ---------- Хүртээмж: хичээл унших хэсэгт харааны бэрхшээлтэй хүмүүст зориулсан байнга дагадаг цэс ---------- */
+// Сонголт бүр дарах тутам түвшин нэмэгдэж (3 хүрээд унтарна), тохиргоо энэ төхөөрөмж дээр хадгалагдана.
+const A11Y_SVG = (p, w = 34) => `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const A11Y = [ // [түлхүүр, нэр, түвшний тоо (1 = асаах/унтраах), түвшний нэр, дүрс]
+  ["fs", "Фонт томруулах", 3, ["", "Том", "Илүү том", "Маш том"], A11Y_SVG('<path d="M3 10h7M6.5 10v9M12 5h9M16.5 5v14"/>')],
+  ["cur", "Хулгана томруулах", 1, null, A11Y_SVG('<path d="M5 3l14 8-6.5 1.6L9.6 19z"/>')],
+  ["ln", "Холбоос тодруулах", 1, null, A11Y_SVG('<path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8"/>')],
+  ["ct", "Контраст +", 3, ["", "Өндөр контраст", "Хар дэвсгэр", "Хар цагаан"], A11Y_SVG('<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>')],
+  ["tx", "Текст тодруулах", 1, null, '<span class="a11y-df" aria-hidden="true">Df</span>'],
+  ["lh", "Текстийн мөрийн зай ихэсгэх", 3, ["", "1.9", "2.3", "2.7"], A11Y_SVG('<path d="M5 4v16M3 6.5 5 4l2 2.5M3 17.5 5 20l2-2.5M10 6h11M10 10h11M10 14h11M10 18h11"/>')],
+  ["ls", "Үсгийн зай ихэсгэх", 3, ["", "Бага", "Дунд", "Их"], A11Y_SVG('<path d="M6 9l-3 3 3 3M18 9l3 3-3 3"/><path d="M7 12h10" stroke-dasharray="2 2.4"/>')],
+  ["zm", "Zoom", 3, ["", "115%", "130%", "150%"], A11Y_SVG('<circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.6-4.6M10.5 7.5v6M7.5 10.5h6"/>')],
+];
+function mountA11y() {
+  let st = {}; try { st = JSON.parse(localStorage.getItem("sg_a11y") || "{}") || {}; } catch {}
+  const fab = document.createElement("button"), panel = document.createElement("div");
+  fab.type = "button"; fab.className = "a11y-fab"; fab.title = "Хүртээмжийн тохиргоо";
+  fab.setAttribute("aria-label", "Хүртээмжийн тохиргоо — харааны бэрхшээлтэй хүмүүст"); fab.setAttribute("aria-controls", "a11yPanel"); fab.setAttribute("aria-expanded", "false");
+  fab.innerHTML = A11Y_SVG('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="6.8" r="1.5" fill="currentColor" stroke="none"/><path d="M6.8 9.6 12 10.6l5.2-1M12 10.6v4.2M12 14.8l-2.6 4.4M12 14.8l2.6 4.4"/>', 32);
+  panel.className = "a11y-panel"; panel.id = "a11yPanel"; panel.hidden = true;
+  panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", "Хүртээмжийн тохиргоо");
+  const apply = () => {
+    const h = document.documentElement;
+    [...h.classList].filter((c) => c.startsWith("a11y-")).forEach((c) => h.classList.remove(c));
+    for (const [k, , n] of A11Y) { const v = st[k] | 0; if (v) h.classList.add(n === 1 ? `a11y-${k}` : `a11y-${k}${v}`); }
+    fab.classList.toggle("on", A11Y.some(([k]) => st[k]));
+    try { localStorage.setItem("sg_a11y", JSON.stringify(st)); } catch {}
+  };
+  const draw = () => {
+    panel.innerHTML = `<div class="a11y-head"><b>Хүртээмж</b><button type="button" class="a11y-x" aria-label="Хаах">✕</button></div>
+      <div class="a11y-grid">${A11Y.map(([k, t, n, subs, ic]) => { const v = st[k] | 0; return `<button type="button" class="a11y-opt" data-a11y="${k}" aria-pressed="${v > 0}" aria-label="${t}${n > 1 ? `, ${v ? v + "-р түвшин" : "унтраалттай"}` : ""}">
+        <span class="a11y-ic">${ic}</span><span class="a11y-t">${t}</span>${n > 1 ? `<span class="a11y-sub">${subs[v] || ""}</span><span class="a11y-lv">${[1, 2, 3].map((x) => `<i class="${x <= v ? "on" : ""}"></i>`).join("")}</span>` : ""}</button>`; }).join("")}</div>
+      <button type="button" class="a11y-reset">${A11Y_SVG('<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>', 22)}Тохиргоог шинэчлэх</button><p class="a11y-live" aria-live="polite"></p>`;
+  };
+  const say = (t) => { const l = $(".a11y-live", panel); if (l) l.textContent = t; };
+  const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); const a = anchor; toggle(false); (a || fab).focus(); } };
+  // Маркерын самбар дахь товчноос нээвэл цонх товчны доор (самбар гүйлгэхэд дагадаг), эс бөгөөс зүүн доод буланд.
+  let anchor = null;
+  const place = () => {
+    if (!anchor || panel.hidden) return;
+    const r = anchor.getBoundingClientRect(), top = Math.max(8, Math.min(r.bottom + 8, innerHeight - 240));
+    Object.assign(panel.style, { top: top + "px", bottom: "auto", maxHeight: innerHeight - top - 12 + "px" });
+    if (innerWidth > 640) panel.style.left = Math.max(8, Math.min(r.left, innerWidth - panel.offsetWidth - 8)) + "px";
+  };
+  const toggle = (on, from) => {
+    panel.hidden = !on; anchor = on ? from || null : null;
+    $$("[data-a11y-open]").concat(fab).forEach((b) => b.setAttribute("aria-expanded", String(on && (b === from || (!from && b === fab)))));
+    panel.removeAttribute("style");
+    if (on) { draw(); place(); addEventListener("keydown", onKey, true); addEventListener("scroll", place, { passive: true }); addEventListener("resize", place); $(".a11y-opt", panel)?.focus(); }
+    else { removeEventListener("keydown", onKey, true); removeEventListener("scroll", place); removeEventListener("resize", place); }
+  };
+  fab.addEventListener("click", () => toggle(panel.hidden));
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-a11y-open]");
+    if (b) return toggle(panel.hidden || anchor !== b, b);
+    const path = e.composedPath(); // цонх дахин зурагдахад дарсан товч DOM-оос салдаг тул анхны замаар шалгана
+    if (!panel.hidden && !path.includes(panel) && !path.includes(fab)) toggle(false); // гадуур дарвал хаана
+  });
+  panel.addEventListener("click", (e) => {
+    const o = e.target.closest("[data-a11y]");
+    if (o) {
+      const [k, t, n, subs] = A11Y.find((x) => x[0] === o.dataset.a11y);
+      st[k] = ((st[k] | 0) + 1) % (n + 1); if (!st[k]) delete st[k];
+      apply(); draw(); $(`[data-a11y="${k}"]`, panel).focus();
+      return say(`${t}: ${st[k] ? (n > 1 ? subs[st[k]] : "асаалттай") : "унтраалттай"}`);
+    }
+    if (e.target.closest(".a11y-reset")) { st = {}; apply(); draw(); $(".a11y-reset", panel).focus(); return say("Бүх тохиргоо анхны байдалдаа орлоо"); }
+    if (e.target.closest(".a11y-x")) { const a = anchor; toggle(false); (a || fab).focus(); }
+  });
+  document.body.append(fab, panel); apply();
+}
+if (document.getElementById("lessonStage")) mountA11y();
 
 window.SG = { THREAD_EVENTS, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
