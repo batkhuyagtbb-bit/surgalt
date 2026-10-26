@@ -1169,6 +1169,24 @@ body.dragging-ol{user-select:none}
 .rb-text sub,.rb-text sup{font-size:.72em;line-height:0}
 @media (max-width:640px){.rb-text img.rt-left,.rb-text img.rt-right{float:none;display:block;margin:10px auto;max-width:100%}}
 .rb figure{margin:0}
+/* Зураг томруулах (2 удаа товшиход) */
+.rb-fig img,.rb-text img,.rq-img{cursor:zoom-in}
+.lbx{position:fixed;inset:0;z-index:3000;background:rgba(10,14,28,.93);opacity:0;transition:opacity .2s;touch-action:pan-x pan-y}
+.lbx.on{opacity:1}
+.lbx-stage{position:absolute;inset:0;display:grid;place-items:center;overflow:auto;padding:56px 72px 76px;overscroll-behavior:contain}
+.lbx-stage img{max-width:100%;max-height:calc(100vh - 132px);max-height:calc(100svh - 132px);object-fit:contain;border-radius:8px;background:#fff;box-shadow:0 24px 70px rgba(0,0,0,.55);cursor:zoom-in;transform:scale(.95);transition:transform .2s;user-select:none;-webkit-user-drag:none}
+.lbx.on .lbx-stage img{transform:none}
+.lbx-stage.z{display:block;padding:0}
+.lbx-stage.z img{display:block;max-width:none;max-height:none;margin:auto;border-radius:0;cursor:zoom-out}
+.lbx-x{position:absolute;top:12px;right:12px;z-index:2;display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;cursor:pointer}
+.lbx-x:hover,.lbx-x:focus-visible{background:rgba(255,255,255,.28)}
+.lbx-nav{position:absolute;top:50%;z-index:2;width:50px;height:66px;margin-top:-33px;border:0;border-radius:14px;background:rgba(255,255,255,.12);color:#fff;font:300 2.6rem/1 var(--sans);cursor:pointer}
+.lbx-nav:hover,.lbx-nav:focus-visible{background:rgba(255,255,255,.26)}
+.lbx-prev{left:12px}.lbx-next{right:12px}
+.lbx-bar{position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;justify-content:center;align-items:center;gap:14px;padding:16px 72px;color:rgba(255,255,255,.92);font-size:.92rem;text-align:center;pointer-events:none}
+.lbx-n{opacity:.7;white-space:nowrap}
+html.lbx-open{overflow:hidden}
+@media (max-width:640px){.lbx-stage{padding:56px 8px 68px}.lbx-nav{width:40px;height:54px;margin-top:-27px;font-size:2.1rem;background:rgba(0,0,0,.4)}.lbx-prev{left:6px}.lbx-next{right:6px}.lbx-bar{padding:14px 52px}}
 .rb figcaption{font-size:.85rem;color:var(--muted);margin-top:6px;text-align:center}
 .rb-fig img{display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:12px;border:1px solid var(--line)}
 .rb-audio{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}

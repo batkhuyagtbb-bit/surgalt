@@ -4912,6 +4912,81 @@ function resetPage() {
 
 /* ---------- эхлүүлэх ---------- */
 store.set("sg_guest", null); // зочны чат хасагдсан — хуучин зочны токеныг устгана
+/* ---------- Зураг томруулах: хичээл доторх зураг дээр 2 удаа товшиход хуудсан дотроо цонхолж харуулна ---------- */
+// Олон зурагтай бол ‹ › (сум товч, шудрах), зураг дээр дарахад томорно; Escape хичээлээс гаргахгүй, зөвхөн цонхыг хаана.
+const LBX_SEL = ".rb-fig img, .rb-text img, .rq-img";
+const lbxOK = (im) => im && !im.closest(".be-rt, .rq-spotwrap, a, .lbx") && !document.querySelector(".lbx");
+function lightbox(img) {
+  const scope = img.closest(".lesson-content, .rb, .modal-card") || document;
+  const list = $$(LBX_SEL, scope).filter((x) => !x.closest(".be-rt, .rq-spotwrap, a") && x.naturalWidth);
+  let i = Math.max(0, list.indexOf(img));
+  const el = document.createElement("div");
+  el.className = "lbx"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", "Зураг томруулж харах");
+  el.innerHTML = `<div class="lbx-stage"><img alt="" draggable="false"></div>
+    <button type="button" class="lbx-x" aria-label="Хаах" title="Хаах (Esc)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    ${list.length > 1 ? `<button type="button" class="lbx-nav lbx-prev" aria-label="Өмнөх зураг">‹</button><button type="button" class="lbx-nav lbx-next" aria-label="Дараах зураг">›</button>` : ""}
+    <div class="lbx-bar"><span class="lbx-cap"></span>${list.length > 1 ? `<span class="lbx-n"></span>` : ""}</div>`;
+  document.body.append(el); document.documentElement.classList.add("lbx-open");
+  const stage = $(".lbx-stage", el), im = $("img", stage), last = document.activeElement, t0 = Date.now();
+  const unzoom = () => { stage.classList.remove("z"); im.style.width = ""; };
+  const show = () => {
+    const src = list[i] || img;
+    unzoom(); im.src = src.currentSrc || src.src; im.alt = src.alt || "";
+    $(".lbx-cap", el).textContent = src.closest("figure")?.querySelector("figcaption")?.textContent || src.alt || "";
+    const n = $(".lbx-n", el); if (n) n.textContent = `${i + 1} / ${list.length}`;
+  };
+  const go = (d) => { if (list.length > 1) { i = (i + d + list.length) % list.length; show(); } };
+  // Томруулах: дарсан цэг нь төвдөө үлдэнэ.
+  const zoom = (e) => {
+    if (stage.classList.contains("z")) return unzoom();
+    const r = im.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+    const w = Math.max(im.naturalWidth, r.width * 2);
+    if (w <= r.width + 4) return;
+    stage.classList.add("z"); im.style.width = w + "px";
+    stage.scrollLeft = fx * im.offsetWidth - stage.clientWidth / 2; stage.scrollTop = fy * im.offsetHeight - stage.clientHeight / 2;
+  };
+  const close = () => {
+    removeEventListener("keydown", onKey, true);
+    el.classList.remove("on"); document.documentElement.classList.remove("lbx-open");
+    setTimeout(() => el.remove(), 200); last?.focus?.({ preventScroll: true });
+  };
+  const onKey = (e) => {
+    const k = { Escape: close, ArrowRight: () => go(1), ArrowLeft: () => go(-1) }[e.key];
+    if (k) { e.preventDefault(); e.stopImmediatePropagation(); k(); }
+  };
+  addEventListener("keydown", onKey, true);
+  let sw = null; // шудрах (хуруу)
+  stage.addEventListener("pointerdown", (e) => { sw = stage.classList.contains("z") ? null : { x: e.clientX, y: e.clientY }; });
+  stage.addEventListener("pointerup", (e) => {
+    if (!sw) return;
+    const dx = e.clientX - sw.x, dy = e.clientY - sw.y; sw = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) { el._swiped = true; go(dx < 0 ? 1 : -1); }
+  });
+  el.addEventListener("click", (e) => {
+    if (el._swiped) { el._swiped = false; return; }
+    if (Date.now() - t0 < 450) return; // нээсэн 2 дахь товшилт цонхны зураг дээр давхар бууна
+    if (e.target.closest(".lbx-x")) return close();
+    if (e.target.closest(".lbx-prev")) return go(-1);
+    if (e.target.closest(".lbx-next")) return go(1);
+    if (e.target === im) return zoom(e);
+    if (e.target === el || e.target === stage) close();
+  });
+  show(); requestAnimationFrame(() => el.classList.add("on")); $(".lbx-x", el).focus({ preventScroll: true });
+}
+// 2 удаа товшиход: хулгана — dblclick; хуруу — 2 товшилт 320мс дотор (dblclick ирэхгүй хөтөчид).
+document.addEventListener("dblclick", (e) => {
+  const im = e.target.closest?.(LBX_SEL); if (!lbxOK(im)) return;
+  e.preventDefault(); getSelection()?.removeAllRanges(); lightbox(im);
+});
+let lbxTap = null;
+document.addEventListener("pointerup", (e) => {
+  if (e.pointerType !== "touch") return;
+  const im = e.target.closest?.(LBX_SEL); if (!lbxOK(im)) { lbxTap = null; return; }
+  const now = Date.now();
+  if (lbxTap?.im === im && now - lbxTap.t < 320) { lbxTap = null; getSelection()?.removeAllRanges(); lightbox(im); }
+  else lbxTap = { im, t: now };
+});
+
 window.SG = { THREAD_EVENTS, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
