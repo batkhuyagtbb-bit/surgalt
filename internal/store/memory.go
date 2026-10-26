@@ -444,8 +444,8 @@ func (m *Memory) MarkOrderPaid(_ context.Context, orderID string, amount, fee in
 		if o.Kind == OrderKindLate {
 			p.Quiz[LatePassKey] = true
 		}
-	case OrderKindBook:
-		m.books.grant(o.UserID, o.BookID, o.ID, o.Amount)
+	case OrderKindBook, OrderKindBookDL:
+		m.books.grant(o.UserID, o.BookID, o.ID, o.Amount, o.Kind == OrderKindBookDL)
 	case OrderKindSlot: // захиалгыг API давхарга баталгаажуулна (Meet үүсгэх, мэдэгдэх)
 	case OrderKindMeeting:
 		if m.meetAcc == nil {

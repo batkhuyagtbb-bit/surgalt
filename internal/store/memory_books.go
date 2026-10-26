@@ -11,6 +11,7 @@ type bookMem struct {
 	mu      sync.RWMutex
 	books   map[string]*Book
 	access  map[[2]string]bool   // (user, book)
+	dl      map[[2]string]bool   // (user, book) татах эрх
 	pending map[[2]string]string // (user, book) -> order
 	granted map[string]bool      // хэрэгжсэн захиалга
 	events  []BookEvent
@@ -18,21 +19,32 @@ type bookMem struct {
 
 func (b *bookMem) init() {
 	if b.books == nil {
-		b.books, b.access, b.pending, b.granted = map[string]*Book{}, map[[2]string]bool{}, map[[2]string]string{}, map[string]bool{}
+		b.books, b.access, b.dl, b.pending, b.granted = map[string]*Book{}, map[[2]string]bool{}, map[[2]string]bool{}, map[[2]string]string{}, map[string]bool{}
 	}
 }
 
 // grant нь Memory.mu түгжээтэй үед дуудагдана (bookMem өөрийн түгжээтэй, эсрэг дараалал байхгүй).
-func (b *bookMem) grant(userID, bookID, orderID string, amount int64) {
+// bookPendingKey — унших, татах эрхийн хүлээгдэж буй захиалга тусдаа.
+func bookPendingKey(bookID string, download bool) string {
+	if download {
+		return bookID + ":dl"
+	}
+	return bookID
+}
+
+func (b *bookMem) grant(userID, bookID, orderID string, amount int64, download bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.init()
-	delete(b.pending, [2]string{userID, bookID})
+	delete(b.pending, [2]string{userID, bookPendingKey(bookID, download)})
 	if b.granted[orderID] {
 		return
 	}
 	b.granted[orderID] = true
 	b.access[[2]string{userID, bookID}] = true
+	if download {
+		b.dl[[2]string{userID, bookID}] = true
+	}
 	if bk := b.books[bookID]; bk != nil {
 		bk.Revenue += amount
 	}
@@ -60,6 +72,7 @@ func (m *Memory) UpdateBook(_ context.Context, bk *Book) error {
 	}
 	cur.Kind, cur.Title, cur.Author, cur.Description, cur.CoverURL = bk.Kind, bk.Title, bk.Author, bk.Description, bk.CoverURL
 	cur.Price, cur.Published, cur.PreviewN, cur.UpdatedAt = bk.Price, bk.Published, bk.PreviewN, time.Now()
+	cur.Download, cur.DownloadPrice, cur.FileURL = bk.Download, bk.DownloadPrice, bk.FileURL
 	*bk = *cur
 	return nil
 }
@@ -123,23 +136,34 @@ func (m *Memory) HasBookAccess(_ context.Context, userID, bookID string) (bool, 
 	return b.access[[2]string{userID, bookID}], nil
 }
 
-func (m *Memory) CreateOrGetPendingBookOrder(_ context.Context, userID string, bk *Book) (*Order, error) {
+func (m *Memory) HasBookDownload(_ context.Context, userID, bookID string) (bool, error) {
+	b := &m.books
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.dl[[2]string{userID, bookID}], nil
+}
+
+func (m *Memory) CreateOrGetPendingBookOrder(_ context.Context, userID string, bk *Book, download bool, amount int64) (*Order, error) {
 	b := &m.books
 	b.mu.Lock()
 	b.init()
-	k := [2]string{userID, bk.ID}
+	k := [2]string{userID, bookPendingKey(bk.ID, download)}
 	id, ok := b.pending[k]
 	b.mu.Unlock()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if ok {
 		if o := m.orders[id]; o != nil && o.Status == OrderPending {
-			o.Amount = bk.Price
+			o.Amount = amount
 			oc := *o
 			return &oc, nil
 		}
 	}
-	o := &Order{ID: m.next(), Kind: OrderKindBook, Title: bk.Title, UserID: userID, BookID: bk.ID, TeacherID: bk.TeacherID, Amount: bk.Price, Status: OrderPending, CreatedAt: time.Now()}
+	kind := OrderKindBook
+	if download {
+		kind = OrderKindBookDL
+	}
+	o := &Order{ID: m.next(), Kind: kind, Title: bk.Title, UserID: userID, BookID: bk.ID, TeacherID: bk.TeacherID, Amount: amount, Status: OrderPending, CreatedAt: time.Now()}
 	m.orders[o.ID] = o
 	b.mu.Lock()
 	b.pending[k] = o.ID

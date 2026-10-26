@@ -93,6 +93,11 @@ func (s *Server) requireTeacher(w http.ResponseWriter, r *http.Request) (auth.Cl
 		return c, false
 	}
 	if c.Role != string(store.RoleTeacher) {
+		// Хянагч багш болгосон бол хуучин токен «суралцагч» хэвээр — өгөгдлийн сангаас шалгана.
+		if u, err := s.store.UserByID(r.Context(), c.UID); err == nil && u.Role == store.RoleTeacher {
+			c.Role = string(store.RoleTeacher)
+			return c, true
+		}
 		writeErr(w, http.StatusForbidden, "зөвхөн багш")
 		return c, false
 	}

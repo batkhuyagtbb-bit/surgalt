@@ -387,7 +387,7 @@ function rtEditorHTML(b) {
       ${rtBtn("undo", "undo", "Буцаах (Ctrl+Z)")}${rtBtn("redo", "redo", "Дахин хийх (Ctrl+Y)")}<span class="be-sep"></span>
       <select data-rt-block title="Догол мөрийн хэлбэр" aria-label="Догол мөрийн хэлбэр"><option value="p">Энгийн текст</option><option value="h2">Гарчиг 1</option><option value="h3">Гарчиг 2</option><option value="h4">Гарчиг 3</option><option value="blockquote">Ишлэл</option><option value="pre">Код</option></select>
       <select data-rt-size title="Үсгийн хэмжээ" aria-label="Үсгийн хэмжээ"><option value="">Хэмжээ</option><option value="2">Жижиг</option><option value="3">Энгийн</option><option value="4">Том</option><option value="5">Илүү том</option><option value="6">Маш том</option></select><span class="be-sep"></span>
-      ${rtBtn("bold", "", "Тод (Ctrl+B)", "<b>B</b>")}${rtBtn("italic", "", "Налуу (Ctrl+I)", "<i>I</i>")}${rtBtn("underline", "", "Доогуур зураас (Ctrl+U)", "<u>U</u>")}${rtBtn("strikeThrough", "", "Дундуур зураас", "<s>S</s>")}${rtBtn("superscript", "", "Дээд индекс (x²)", "x²")}${rtBtn("subscript", "", "Доод индекс (H₂O)", "x₂")}
+      ${rtBtn("bold", "", "Тод (Ctrl+B)", "<b>B</b>")}${rtBtn("italic", "", "Налуу (Ctrl+I)", "<i>I</i>")}${rtBtn("underline", "", "Доогуур зураас (Ctrl+U)", "<u>U</u>")}${rtBtn("superscript", "", "Дээд индекс (x²)", "x²")}${rtBtn("subscript", "", "Доод индекс (H₂O)", "x₂")}
       <button type="button" data-pal="fore" title="Үсгийн өнгө" aria-label="Үсгийн өнгө"><span class="rt-a">A</span></button><button type="button" data-pal="back" title="Тодруулах өнгө" aria-label="Тодруулах өнгө"><span class="rt-hl">A</span></button><span class="be-sep"></span>
       ${rtBtn("justifyLeft", "al-left", "Зүүн тийш")}${rtBtn("justifyCenter", "al-center", "Голлуулах")}${rtBtn("justifyRight", "al-right", "Баруун тийш")}${rtBtn("justifyFull", "al-just", "Хоёр талд тэгшлэх")}<button type="button" data-rt-spacing title="Мөр, догол мөр хоорондын зай" aria-label="Мөр хоорондын зай">${ico("spacing", 17)}</button><span class="be-sep"></span>
       ${rtBtn("insertUnorderedList", "ul", "Жагсаалт")}${rtBtn("insertOrderedList", "ol", "Дугаартай жагсаалт")}${rtBtn("outdent", "outdent", "Догол багасгах (Shift+Tab)")}${rtBtn("indent", "indent", "Догол нэмэх (Tab)")}<span class="be-sep"></span>
@@ -685,7 +685,7 @@ function mountBlockEditor(f, blocks) {
   const syncBar = (rt) => {
     const top = rt.previousElementSibling; if (!top?.classList.contains("rt-top")) return;
     if (rt.contains(getSelection().anchorNode)) {
-      for (const b of $$("[data-cmd]", top)) { const c = b.dataset.cmd; if (/^(bold|italic|underline|strikeThrough|superscript|subscript|insertUnorderedList|insertOrderedList|justify\w+)$/.test(c)) { let s = false; try { s = document.queryCommandState(c); } catch {} b.classList.toggle("on", s); } }
+      for (const b of $$("[data-cmd]", top)) { const c = b.dataset.cmd; if (/^(bold|italic|underline|superscript|subscript|insertUnorderedList|insertOrderedList|justify\w+)$/.test(c)) { let s = false; try { s = document.queryCommandState(c); } catch {} b.classList.toggle("on", s); } }
       let fb = ""; try { fb = String(document.queryCommandValue("formatBlock") || "").toLowerCase(); } catch {}
       $("[data-rt-block]", top).value = ["h2", "h3", "h4", "blockquote", "pre"].includes(fb) ? fb : "p";
     }
@@ -1688,7 +1688,7 @@ function scrollRows(box, items, rowFn, step = 20) {
 
 /* ---------- Ном, өгүүлэл: зарах, хамгаалах, лог ----------
    Файлыг багшийн хөтөч дээр хуудас бүрээр зураг болгож илгээнэ — эх PDF уншигчид огт очихгүй. */
-const BOOK_EVENTS = { view: [ico("eye", 14), "Хуудсыг үзсэн"], preview: [ico("book", 14), "Үнэгүй хэсгийг уншсан"], read: [ico("check", 14), "Бүтнээр уншсан"], interest: ["♥", "Сонирхсон"],
+const BOOK_EVENTS = { view: [ico("eye", 14), "Хуудсыг үзсэн"], preview: [ico("book", 14), "Үнэгүй хэсгийг уншсан"], read: [ico("check", 14), "Бүтнээр уншсан"], interest: ["♥", "Сонирхсон"], download: ["⬇", "Эх файлыг татсан"],
   paywall: ["🔒", "Төлбөрийн хананд хүрсэн"], purchase: ["💰", "Худалдаж авсан"], limit: ["⚠️", "Хэт хурдан татах гэсэн"] };
 async function books() {
   let [list, evs] = await Promise.all([api("/api/me/books"), api("/api/me/book-events?limit=1000")]);
@@ -1702,7 +1702,7 @@ async function books() {
       <div class="bk-manage">${list.map((b) => `<article class="card bk-row" data-bid="${esc(b.id)}">
           <span class="bc-cover">${cover(b) ? `<img src="${esc(cover(b))}" alt="" loading="lazy">` : ""}</span>
           <div class="grow"><strong>${esc(b.title)}</strong><small class="muted">${b.kind === "article" ? "Өгүүлэл" : "Ном"}${b.author ? " · " + esc(b.author) : ""} · ${b.pages ? b.pages + " хуудас" : "<b style='color:var(--coral)'>файл оруулаагүй</b>"}</small>
-            <span class="find-tagrow"><span class="ftag ${b.price ? "ftag-paid" : "ftag-free"}">${b.price ? money(b.price) : "Үнэгүй"}</span><span class="ftag ${b.published ? "ftag-free" : ""}">${b.published ? "Нийтлэгдсэн" : "Ноорог"}</span>${b.price ? `<span class="ftag">Эхний ${b.preview_pages} хуудас үнэгүй</span>` : ""}</span>
+            <span class="find-tagrow"><span class="ftag ${b.price ? "ftag-paid" : "ftag-free"}">📖 ${b.price ? money(b.price) : "Үнэгүй"}</span>${b.download ? `<span class="ftag ftag-paid">⬇ ${b.download_price ? money(b.download_price) : "Үнэгүй"}</span>` : ""}<span class="ftag ${b.published ? "ftag-free" : ""}">${b.published ? "Нийтлэгдсэн" : "Ноорог"}</span>${b.price ? `<span class="ftag">Эхний ${b.preview_pages} хуудас үнэгүй</span>` : ""}</span>
             <small class="muted">${ico("eye", 13)} ${b.views} · ${ico("book", 13)} ${b.previews} · ${ico("check", 13)} ${b.reads} · ♥ ${b.interest} · 💰 ${b.sales} (${money(b.revenue)})</small></div>
           <div class="bk-acts"><button class="btn btn-glass btn-sm" data-edit>${ico("edit", 15)}Засах</button>${b.published ? `<a class="btn btn-glass btn-sm" href="/b/${esc(b.id)}" target="_blank" rel="noopener">${ico("eye", 15)}Харах</a>` : ""}<button class="btn btn-ghost btn-sm" data-log>Лог</button></div></article>`).join("") || `<div class="empty">Ном хараахан алга.<br>PDF, Word (DOC, DOCX) файлаа оруулж зарж эхлээрэй.</div>`}</div>
       <section class="card"><div class="card-head"><h2>Үйлдлийн лог</h2><select id="bkLogFilter" aria-label="Номоор шүүх"><option value="">Бүх ном</option>${list.map((b) => `<option value="${esc(b.id)}">${esc(b.title)}</option>`).join("")}</select></div>
@@ -1721,10 +1721,14 @@ async function books() {
       <label>Нэр<input name="title" required maxlength="200" value="${esc(b.title || "")}"></label>
       <label>Зохиогч<input name="author" maxlength="120" value="${esc(b.author || me.display_name || "")}"></label>
       <label>Тайлбар<textarea name="description" rows="4" placeholder="Энэ номонд юу байгаа вэ?">${esc(b.description || "")}</textarea></label>
-      <div class="kind-row"><label>Үнэ (₮, 0 = үнэгүй)<input name="price" type="number" min="0" step="500" value="${b.price ?? 0}"></label>
-        <label>Үнэгүй үзүүлэх хуудас<input name="preview_pages" type="number" min="1" max="20" value="${b.preview_pages || 3}"></label></div>
+      <fieldset class="bk-sell"><legend>Худалдах хэлбэр</legend>
+        <div class="kind-row"><label>📖 Онлайн унших эрхийн үнэ (₮, 0 = үнэгүй)<input name="price" type="number" min="0" step="500" value="${b.price ?? 0}"></label>
+          <label>Үнэгүй үзүүлэх хуудас<input name="preview_pages" type="number" min="1" max="20" value="${b.preview_pages || 3}"></label></div>
+        <label class="check"><input type="checkbox" name="download" ${b.download ? "checked" : ""}> ⬇ Татаж авах эрхээр бас зарах</label>
+        <div class="bk-dl" ${b.download ? "" : "hidden"}><label>⬇ Татаж авах эрхийн үнэ (₮, 0 = үнэгүй)<input name="download_price" type="number" min="0" step="500" value="${b.download_price ?? 0}"></label>
+          <p class="muted small" style="margin:0">Худалдаж авсан хүн номын эх файлыг (PDF) татаж авахаас гадна онлайн уншина. Онлайн унших эрхтэй хүн зөрүүг л төлж шилжинэ. ${b.file_url ? "✓ Татах файл бэлэн — доор шинэ файл оруулбал солигдоно." : "Татах файлаар доорх номын файл ашиглагдана."}</p></div></fieldset>
       <fieldset><legend>Номын файл</legend>
-        <p class="muted small" style="margin:0 0 8px">PDF, Word (DOC, DOCX) эсвэл PowerPoint. Хуудас бүр зураг болж хамгаалагдана — эх файл уншигчид очихгүй.${b.pages ? ` Одоо: <b>${b.pages} хуудас</b>.` : ""}</p>
+        <p class="muted small" style="margin:0 0 8px">PDF, Word (DOC, DOCX) эсвэл PowerPoint. Хуудас бүр зураг болж хамгаалагдана — эх файл зөвхөн «татаж авах эрх» худалдаж авсан хүнд очно.${b.pages ? ` Одоо: <b>${b.pages} хуудас</b>.` : ""}</p>
         <input type="file" name="file" accept=".pdf,.doc,.docx,.odt,.rtf,.ppt,.pptx">
         <div class="progress" hidden><i></i></div><p class="muted small bk-prog" aria-live="polite"></p></fieldset>
       <fieldset><legend>Нүүр зураг (заавал биш)</legend><input type="file" name="cover" accept="image/*"><small class="muted">Оруулахгүй бол эхний хуудас нүүр болно.</small></fieldset>
@@ -1736,6 +1740,7 @@ async function books() {
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="bkModal"><div class="modal-card" style="width:min(640px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button><h3 class="h3">${b ? "Ном засах" : "Ном нэмэх"}</h3>${formHTML(b || {})}</div></div>`);
     const modal = $("#bkModal"), f = $("#bkForm", modal);
     SG.openModal(modal);
+    f.download.onchange = () => { $(".bk-dl", f).hidden = !f.download.checked; };
     const closeIt = () => { SG.closeModal(modal); setTimeout(() => modal.remove(), 300); };
     modal.addEventListener("click", (e) => { if (e.target === modal || e.target.closest("[data-close]")) { e.preventDefault(); closeIt(); } });
     $("[data-del]", f)?.addEventListener("click", async () => {
@@ -1749,10 +1754,15 @@ async function books() {
       try {
         let coverURL = b?.cover_url || "";
         if (f.cover.files[0]) { const fd = new FormData(); fd.append("file", f.cover.files[0]); coverURL = (await api("/api/me/files?visibility=public", { method: "POST", body: fd })).path; }
-        const body = { kind: f.kind.value, title: f.title.value, author: f.author.value, description: f.description.value, price: +f.price.value || 0, preview_pages: +f.preview_pages.value || 3, cover_url: coverURL, published: false };
+        // Татаж авах эрх: эх файлыг (Word бол PDF болгож) хаалттай сан руу хуулна — хуудсыг ч түүнээс бэлтгэнэ.
+        const dl = f.download.checked; let fileURL = b?.file_url || "", pre = null;
+        if (dl && f.file.files[0]) { pre = await uploadOriginal(f.file.files[0], f); fileURL = pre.path; }
+        if (dl && !fileURL) throw new Error("Татаж авах эрхээр зарахын тулд номын файлаа оруулна уу");
+        const body = { kind: f.kind.value, title: f.title.value, author: f.author.value, description: f.description.value, price: +f.price.value || 0, preview_pages: +f.preview_pages.value || 3, cover_url: coverURL, published: false,
+          download: dl, download_price: +f.download_price.value || 0, file_url: fileURL };
         const saved = b ? await api(`/api/me/books/${b.id}`, { method: "PUT", body: { ...body, published: b.pages ? f.published.checked : false } }) : await api("/api/me/books", { method: "POST", body });
         let pages = saved.pages || b?.pages || 0;
-        if (f.file.files[0]) pages = await preparePages(saved.id, f.file.files[0], f);
+        if (f.file.files[0]) pages = await preparePages(saved.id, f.file.files[0], f, pre);
         if (f.published.checked && pages) await api(`/api/me/books/${saved.id}`, { method: "PUT", body: { ...body, published: true } });
         else if (f.published.checked) throw new Error("Нийтлэхийн тулд номын файлаа оруулна уу");
         toast("Хадгалагдлаа ✓"); closeIt(); reload();
@@ -1760,23 +1770,29 @@ async function books() {
     };
   };
   // Файл → PDF → хуудас бүрийг JPEG болгож илгээнэ.
-  const preparePages = async (bookId, file, f) => {
+  // Файлыг хаалттай сан руу хуулна; Word/PowerPoint-ыг сервер PDF болгоно (ном: заавал PDF).
+  const uploadOriginal = async (file, f) => {
+    const bar = $(".progress", f), fill = $("i", bar), msg = $(".bk-prog", f);
+    const say = (t, pct) => { msg.textContent = t; bar.hidden = pct == null; if (pct != null) fill.style.width = pct + "%"; };
+    const word = !/\.pdf$/i.test(file.name);
+    say(word ? "Word файлыг PDF болгож байна…" : "Татах файлыг хуулж байна…", 10);
+    const fd = new FormData(); fd.append("file", file);
+    let info = await api(`/api/me/files?visibility=private${word ? "&convert=pdf" : ""}`, { method: "POST", body: fd });
+    if (word && !/\.pdf$/i.test(info.path)) throw new Error("Сервер дээр LibreOffice суугаагүй тул Word файлыг хөрвүүлэх боломжгүй — PDF болгож оруулна уу");
+    for (let i = 0; info.status === "processing" && i < 120; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const lib = await api("/api/me/files"); info = lib.files.find((x) => x.path === info.path) || info;
+    }
+    if (info.status && info.status !== "ready") throw new Error("PDF болгож чадсангүй");
+    library = null;
+    return info;
+  };
+  const preparePages = async (bookId, file, f, pre) => {
     const bar = $(".progress", f), fill = $("i", bar), msg = $(".bk-prog", f);
     const say = (t, pct) => { msg.textContent = t; bar.hidden = pct == null; if (pct != null) fill.style.width = pct + "%"; };
     let src;
     if (/\.pdf$/i.test(file.name)) src = { data: new Uint8Array(await file.arrayBuffer()) };
-    else { // Word/PowerPoint: сервер PDF болгоно (LibreOffice)
-      say("Word файлыг PDF болгож байна…", 10);
-      const fd = new FormData(); fd.append("file", file);
-      let info = await api("/api/me/files?visibility=private&convert=pdf", { method: "POST", body: fd }); // ном: заавал PDF
-      if (!/\.pdf$/i.test(info.path)) throw new Error("Сервер дээр LibreOffice суугаагүй тул Word файлыг хөрвүүлэх боломжгүй — PDF болгож оруулна уу");
-      for (let i = 0; info.status === "processing" && i < 120; i++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const lib = await api("/api/me/files"); info = lib.files.find((x) => x.path === info.path) || info;
-      }
-      if (info.status !== "ready") throw new Error("PDF болгож чадсангүй");
-      src = { url: info.url };
-    }
+    else src = { url: (pre || await uploadOriginal(file, f)).url }; // Word/PowerPoint: сервер PDF болгоно (LibreOffice)
     const pdf = await (await SG.pdfLib()).getDocument(src).promise, n = pdf.numPages;
     if (n > 3000) throw new Error("3000-аас олон хуудастай");
     let done = 0;

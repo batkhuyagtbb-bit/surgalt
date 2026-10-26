@@ -2978,24 +2978,42 @@ function bookPage() {
       if (buyBtn) buyBtn.hidden = true;
       note.textContent = access.owner ? "Энэ таны ном — уншигчид хуудас бүр дээр өөрийн нэр шингэсэн байдлаар харна." : "✓ Танд энэ ном бүтнээрээ нээлттэй. Хуудас бүрд таны нэр шингэсэн тул бусдад тараахгүй байна уу.";
     }
+    const dl = $("#bkBuyDl");
+    if (dl && access.download) dl.textContent = "⬇ Эх файлыг татаж авах";
+    else if (dl && access.full && access.download_price > 0 && access.download_price < +dl.dataset.price) dl.textContent = `⬇ Татах эрх рүү шилжих · ${money(access.download_price)}`;
     return access;
   }).catch(() => access);
   refresh();
   const login = () => (location.href = "/login?next=" + encodeURIComponent(location.pathname));
-  const buy = async () => {
+  // download=true — татаж авах эрх (онлайн уншихыг агуулна; унших эрхтэй бол зөрүүг төлнө).
+  const buy = async (download) => {
     if (!Auth.token) return login();
-    if (!+root.dataset.price) return login();
+    if (!download && !+root.dataset.price) return login();
     try {
-      const d = await api(`/api/books/${id}/buy`, { method: "POST" });
-      if (d.unlocked) { await refresh(); return read(); }
+      const d = await api(`/api/books/${id}/buy${download ? "?mode=download" : ""}`, { method: "POST" });
+      if (d.unlocked) { await refresh(); return download ? save() : read(); }
       BookReader.close?.(); // уншигч нээлттэй бол төлбөрийн цонх дээр нь гарна
-      payWindow(d.order, d.payment, `«${title}» ном`, async () => { toast("🎉 Ном нээгдлээ!"); celebrate(); await refresh(); read(); }, { name: "Энэ ном" });
+      payWindow(d.order, d.payment, `«${title}» ном${download ? " · татах эрх" : ""}`, async () => { toast(download ? "🎉 Татах эрх нээгдлээ!" : "🎉 Ном нээгдлээ!"); celebrate(); await refresh(); download ? save() : read(); }, { name: "Энэ ном" });
     } catch (e) { toast(e.message, true); }
   };
+  // Эх файлыг татна: нэвтрэлтийн токентой авч (холбоос тараагдахгүй), хөтчөөр хадгална.
+  const save = async () => {
+    const b = $("#bkBuyDl"), was = b?.textContent;
+    if (b) { b.disabled = true; b.textContent = "Татаж байна…"; }
+    try {
+      const r = await fetch(`/api/books/${id}/download`, { headers: { Authorization: "Bearer " + Auth.token } });
+      if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || "Татаж чадсангүй");
+      const blob = await r.blob(), m = /filename\*=UTF-8''([^;]+)/.exec(r.headers.get("Content-Disposition") || "");
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = m ? decodeURIComponent(m[1]) : title + ".pdf";
+      document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    } catch (e) { toast(e.message, true); } finally { if (b) { b.disabled = false; b.textContent = was; } }
+  };
   const read = () => BookReader.open({ id, title, pages: access.full ? pages : Math.min(access.preview_pages || 3, pages), full: access.full || pages <= (access.preview_pages || 3),
-    price: +root.dataset.price, loggedIn: !!Auth.token, onBuy: +root.dataset.price ? buy : login });
+    price: +root.dataset.price, loggedIn: !!Auth.token, onBuy: +root.dataset.price ? () => buy(false) : login });
   readBtn.onclick = read;
-  if (buyBtn) buyBtn.onclick = buy;
+  if (buyBtn) buyBtn.onclick = () => buy(false);
+  const dlBtn = $("#bkBuyDl");
+  if (dlBtn) dlBtn.onclick = () => (access.download ? save() : buy(true));
   $("#bkLike").onclick = async (e) => { const b = e.currentTarget; await api(`/api/books/${id}/interest`, { method: "POST" }).catch(() => {}); b.textContent = "♥ Сонирхлоо"; b.disabled = true; toast("Багшид таны сонирхлыг мэдэгдлээ"); };
   if (new URLSearchParams(location.hash.slice(1)).has("read")) refresh().then(read);
 }

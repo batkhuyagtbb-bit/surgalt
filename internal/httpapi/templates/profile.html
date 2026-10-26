@@ -151,7 +151,7 @@
         <div class="book-grid">{{range .D.Books}}
           <a class="book-card" href="/b/{{.ID}}"><span class="bc-cover"><img src="{{.Cover}}" alt="" loading="lazy" draggable="false"></span>
             <strong>{{.Title}}</strong>{{with .Author}}<small class="muted">{{.}}</small>{{end}}
-            <span class="find-tagrow"><span class="ftag {{if .Price}}ftag-paid{{else}}ftag-free{{end}}">{{if .Price}}{{money .Price}}{{else}}Үнэгүй{{end}}</span>{{if eq .Kind "article"}}<span class="ftag">Өгүүлэл</span>{{end}}<span class="ftag">{{.Pages}} х.</span></span></a>
+            <span class="find-tagrow"><span class="ftag {{if .Price}}ftag-paid{{else}}ftag-free{{end}}">📖 {{if .Price}}{{money .Price}}{{else}}Үнэгүй{{end}}</span>{{if .Download}}<span class="ftag ftag-paid">⬇ {{if .DownloadPrice}}{{money .DownloadPrice}}{{else}}Үнэгүй{{end}}</span>{{end}}{{if eq .Kind "article"}}<span class="ftag">Өгүүлэл</span>{{end}}<span class="ftag">{{.Pages}} х.</span></span></a>
         {{else}}<p class="empty">Ном, өгүүлэл хараахан алга.</p>{{end}}</div>
       </div>
       <div class="pf-panel" data-panel="live" id="live" hidden>
@@ -201,8 +201,9 @@
   <div class="modal-card qr-modal">
     <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
     <img src="/t/{{$t.Username}}/qr.png?size=512" alt="QR" width="280" height="280" loading="lazy">
-    <p><strong>{{$t.DisplayName}}</strong><br><span class="muted small">Камераа чиглүүлээд уншуулна уу</span></p>
-    <a class="btn btn-gold btn-block" href="/t/{{$t.Username}}/qr.png?size=1024&download=1">{{icon "down"}}Татах</a>
+    <p><strong>{{$t.DisplayName}}</strong><br><span class="muted small">Камераа чиглүүлээд уншуулна уу — эсвэл доорх холбоосоор орно</span></p>
+    <a class="qr-link" href="/t/{{$t.Username}}" title="Профайл руу орох">{{icon "link" 20}}<span>surgalt.mn/t/<b>{{$t.Username}}</b></span></a>
+    <div class="qr-acts"><button type="button" class="btn btn-ghost" data-copy-link>{{icon "link"}}Холбоос хуулах</button><a class="btn btn-gold" href="/t/{{$t.Username}}/qr.png?size=1024&download=1">{{icon "down"}}QR татах</a></div>
   </div>
 </div>
 

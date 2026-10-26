@@ -359,12 +359,19 @@ async function openStudent(id) {
       ${kpi("Багш", num(s.teachers))}
       ${kpi("Зарцуулсан", tg(s.spent), `${num(s.orders)} худалдан авалт`, "good")}
     </section>
+    <div class="dr-acts"><button type="button" class="btn btn-gold btn-sm" data-make-teacher>🎓 Багш болгох</button><small>Суралцсан түүх, элсэлт хэвээр үлдэж, багшийн студи, профайл нээгдэнэ.</small></div>
     <h3 class="dr-h">Элсэлт</h3>
     ${d.enrollments.length ? `<div class="adm-table-wrap"><table class="adm-table mini"><thead><tr><th>Сургалт</th><th>Багш</th><th>Огноо</th></tr></thead><tbody>${d.enrollments.map((e) =>
       `<tr><td><a class="link" href="/c/${esc(e.course_id)}" target="_blank" rel="noopener">${esc(e.course || "—")}</a><small>${e.lesson ? "Нэг хичээл" : "Бүтэн сургалт"}</small></td><td>${who(e.teacher)}</td><td>${dd(e.at)}</td></tr>`).join("")}</tbody></table></div>` : empty("Элсэлт алга")}
     <h3 class="dr-h">Захиалга, төлбөр</h3>
     ${d.orders.length ? `<div class="adm-table-wrap"><table class="adm-table mini"><thead><tr><th>Огноо</th><th>Юу</th><th>Багш</th><th>Дүн</th><th>Төлөв</th></tr></thead><tbody>${d.orders.map((o) =>
       `<tr><td>${dt(o.paid_at || o.created_at)}</td><td>${esc(o.title || "—")}<small>${esc(o.kind_label)}</small></td><td>${who(o.teacher)}</td><td class="n"><b>${tg(o.amount)}</b></td><td>${chip(o.status)}</td></tr>`).join("")}</tbody></table></div>` : empty("Захиалга алга")}`;
+  $("[data-make-teacher]", body).onclick = async (e) => {
+    if (!confirm(`«${s.name || s.username}»-г багш болгох уу?\nТэр сургалт, ном нийтэлж, суралцагчидтай ажиллах боломжтой болно.`)) return;
+    const b = e.currentTarget; b.disabled = true;
+    try { await api(`/api/admin/students/${encodeURIComponent(id)}/make-teacher`, { method: "POST" }); toast("Багш болголоо ✓"); route(); openTeacher(id); }
+    catch (x) { toast(x.message, true); b.disabled = false; }
+  };
 }
 
 /* ---------- Гүйлгээ ---------- */

@@ -51,8 +51,13 @@ func (s *Server) teacherFilesInUse(ctx context.Context, teacherID, excludeLesson
 	}
 	books, _ := s.store.BooksByTeacher(ctx, teacherID, false)
 	for _, b := range books {
-		if b.ID != excludeBook && b.CoverURL != "" {
-			used[strings.SplitN(b.CoverURL, "?", 2)[0]] = true
+		if b.ID == excludeBook {
+			continue
+		}
+		for _, u := range []string{b.CoverURL, b.FileURL} {
+			if u != "" {
+				used[strings.SplitN(u, "?", 2)[0]] = true
+			}
 		}
 	}
 	return used

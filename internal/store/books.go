@@ -27,6 +27,11 @@ type Book struct {
 	Revenue     int64     `json:"revenue"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+
+	// Download — татаж авах эрхээр бас зарна: худалдаж авсан хүн эх файлыг (FileURL) татаж, онлайн уншина.
+	Download      bool   `json:"download"`
+	DownloadPrice int64  `json:"download_price"`     // 0 = нэвтэрсэн хүн үнэгүй татна
+	FileURL       string `json:"file_url,omitempty"` // багшийн хаалттай сан дахь эх файл (уншигчид илгээгдэхгүй)
 }
 
 // BookEvent — номын лог: view (хуудас үзсэн), preview (үнэгүй хэсгийг уншсан), read (бүтэн уншиж эхэлсэн),
@@ -43,7 +48,10 @@ type BookEvent struct {
 	At        time.Time `json:"at"`
 }
 
-const OrderKindBook = "book" // ном, өгүүлэл
+const (
+	OrderKindBook   = "book"    // ном, өгүүлэл — онлайн унших эрх
+	OrderKindBookDL = "book_dl" // ном — татаж авах эрх (онлайн уншихыг агуулна; унших эрхтэй бол зөрүүг төлнө)
+)
 
 type BookStore interface {
 	CreateBook(ctx context.Context, b *Book) error
@@ -53,8 +61,12 @@ type BookStore interface {
 	DeleteBook(ctx context.Context, id, teacherID string) error
 	BookByID(ctx context.Context, id string) (*Book, error)
 	BooksByTeacher(ctx context.Context, teacherID string, onlyPublished bool) ([]Book, error)
+	// HasBookAccess — онлайн унших эсвэл татах эрхтэй эсэх.
 	HasBookAccess(ctx context.Context, userID, bookID string) (bool, error)
-	CreateOrGetPendingBookOrder(ctx context.Context, userID string, b *Book) (*Order, error)
+	// HasBookDownload — эх файлыг татаж авах эрхтэй эсэх.
+	HasBookDownload(ctx context.Context, userID, bookID string) (bool, error)
+	// CreateOrGetPendingBookOrder — унших (download=false) эсвэл татах эрхийн хүлээгдэж буй захиалга (amount төгрөг).
+	CreateOrGetPendingBookOrder(ctx context.Context, userID string, b *Book, download bool, amount int64) (*Order, error)
 	// AddBookEvent нь логт бичиж, номын тоолуурыг (views, reads …) нэмнэ.
 	AddBookEvent(ctx context.Context, e BookEvent) error
 	BookEvents(ctx context.Context, teacherID, bookID string, limit int) ([]BookEvent, error)

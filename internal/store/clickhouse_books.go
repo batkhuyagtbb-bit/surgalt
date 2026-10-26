@@ -8,23 +8,23 @@ import (
 )
 
 const bookCols = `id, teacher_id, kind, title, author, description, cover_url, price, published, pages, preview_n,
-	created_at, updated_at, deleted`
+	created_at, updated_at, deleted, download, download_price, file_url`
 
 func scanBook(r driver.Rows) (Book, bool, error) {
 	var b Book
 	var deleted bool
 	var pages, preview int32
 	err := r.Scan(&b.ID, &b.TeacherID, &b.Kind, &b.Title, &b.Author, &b.Description, &b.CoverURL, &b.Price, &b.Published,
-		&pages, &preview, &b.CreatedAt, &b.UpdatedAt, &deleted)
+		&pages, &preview, &b.CreatedAt, &b.UpdatedAt, &deleted, &b.Download, &b.DownloadPrice, &b.FileURL)
 	b.Pages, b.PreviewN = int(pages), int(preview)
 	return b, deleted, err
 }
 
 func (c *ClickHouse) writeBook(ctx context.Context, b *Book, deleted bool) error {
 	return c.insert(ctx, "books", []string{"id", "teacher_id", "kind", "title", "author", "description", "cover_url", "price",
-		"published", "pages", "preview_n", "created_at", "updated_at", "ver", "deleted"},
+		"published", "pages", "preview_n", "created_at", "updated_at", "ver", "deleted", "download", "download_price", "file_url"},
 		b.ID, b.TeacherID, b.Kind, b.Title, b.Author, b.Description, b.CoverURL, b.Price, b.Published, int32(b.Pages),
-		int32(b.PreviewN), b.CreatedAt.UTC(), b.UpdatedAt.UTC(), ver(), deleted)
+		int32(b.PreviewN), b.CreatedAt.UTC(), b.UpdatedAt.UTC(), ver(), deleted, b.Download, b.DownloadPrice, b.FileURL)
 }
 
 // enrichBooks — тоолуурууд (үзэлт, уншилт, борлуулалт, орлого) counters-оос.
@@ -94,6 +94,7 @@ func (c *ClickHouse) UpdateBook(ctx context.Context, b *Book) error {
 	}
 	cur.Kind, cur.Title, cur.Author, cur.Description, cur.CoverURL = b.Kind, b.Title, b.Author, b.Description, b.CoverURL
 	cur.Price, cur.Published, cur.PreviewN, cur.UpdatedAt = b.Price, b.Published, b.PreviewN, time.Now()
+	cur.Download, cur.DownloadPrice, cur.FileURL = b.Download, b.DownloadPrice, b.FileURL
 	if err := c.writeBook(ctx, cur, false); err != nil {
 		return err
 	}
@@ -152,21 +153,39 @@ func (c *ClickHouse) HasBookAccess(ctx context.Context, userID, bookID string) (
 	return n > 0, err
 }
 
+func (c *ClickHouse) HasBookDownload(ctx context.Context, userID, bookID string) (bool, error) {
+	n, err := c.count(ctx, "SELECT count() FROM book_access FINAL WHERE user_id = ? AND book_id = ? AND download", userID, bookID)
+	return n > 0, err
+}
+
 // grantBook — захиалга төлөгдөхөд (MarkOrderPaid-ийн түгжээн дотор, applied тэмдгээр нэг л удаа).
-func (c *ClickHouse) grantBook(ctx context.Context, userID, bookID string, amount int64) error {
+// Татах эрх нь унших эрхийг агуулна; унших эрхтэй хүн татах эрх авбал мөр шинэ хувилбараар солигдоно.
+func (c *ClickHouse) grantBook(ctx context.Context, userID, bookID string, amount int64, download bool) error {
 	ok, err := c.HasBookAccess(ctx, userID, bookID)
-	if err != nil || ok {
+	if err != nil {
 		return err
 	}
-	if err := c.insert(ctx, "book_access", []string{"user_id", "book_id", "created_at", "ver"}, userID, bookID, time.Now().UTC(), ver()); err != nil {
+	if ok {
+		if !download {
+			return nil
+		}
+		if dl, err := c.HasBookDownload(ctx, userID, bookID); err != nil || dl {
+			return err
+		}
+	}
+	if err := c.insert(ctx, "book_access", []string{"user_id", "book_id", "created_at", "ver", "download"}, userID, bookID, time.Now().UTC(), ver(), download); err != nil {
 		return err
 	}
 	return c.counterAdd(ctx, "book", bookID, "revenue", amount)
 }
 
-func (c *ClickHouse) CreateOrGetPendingBookOrder(ctx context.Context, userID string, b *Book) (*Order, error) {
-	return c.pendingOrder(ctx, userID+":b:"+b.ID, "user_id = ? AND book_id = ? AND kind = ?", []any{userID, b.ID, OrderKindBook},
-		&Order{Kind: OrderKindBook, Title: b.Title, UserID: userID, BookID: b.ID, TeacherID: b.TeacherID, Amount: b.Price})
+func (c *ClickHouse) CreateOrGetPendingBookOrder(ctx context.Context, userID string, b *Book, download bool, amount int64) (*Order, error) {
+	kind, key := OrderKindBook, userID+":b:"+b.ID
+	if download {
+		kind, key = OrderKindBookDL, userID+":bd:"+b.ID
+	}
+	return c.pendingOrder(ctx, key, "user_id = ? AND book_id = ? AND kind = ?", []any{userID, b.ID, kind},
+		&Order{Kind: kind, Title: b.Title, UserID: userID, BookID: b.ID, TeacherID: b.TeacherID, Amount: amount})
 }
 
 func (c *ClickHouse) AddBookEvent(ctx context.Context, e BookEvent) error {

@@ -197,6 +197,8 @@ html.adm-noscroll{overflow:hidden}
 .dr-tabs{display:flex;gap:4px;margin-bottom:12px;padding:4px;border-radius:12px;background:#e6eaf3;overflow-x:auto}
 .dr-tabs button{flex:none;padding:7px 12px;border:0;border-radius:9px;background:none;font-weight:700;font-size:.84rem;color:var(--muted);cursor:pointer;white-space:nowrap}
 .dr-tabs button.on{background:#fff;color:var(--brand);box-shadow:var(--shadow-sm)}
+.dr-acts{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:4px 0 8px;padding:12px 14px;border:1px dashed var(--line);border-radius:12px}
+.dr-acts small{flex:1;min-width:180px;color:var(--muted);font-size:.82rem}
 .dr-h{margin:18px 0 10px;font-size:.8rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 
 /* дэлгэцийн өргөн */

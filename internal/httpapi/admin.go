@@ -371,7 +371,7 @@ func (s *Server) adminSnapshot(ctx context.Context) (*adminSnap, error) {
 var orderKindLabel = map[string]string{
 	store.OrderKindCourse: "Сургалт", store.OrderKindLesson: "Хичээл", store.OrderKindStorage: "Файлын багтаамж",
 	store.OrderKindLate: "Хоцролтын төлбөр", store.OrderKindFee: "Оролцооны төлбөр", store.OrderKindMeeting: "Шууд хичээл",
-	store.OrderKindBook: "Ном", store.OrderKindSlot: "Уулзалтын цаг",
+	store.OrderKindBook: "Ном", store.OrderKindBookDL: "Ном (татах эрх)", store.OrderKindSlot: "Уулзалтын цаг",
 }
 
 func kindLabel(k string) string {
@@ -1060,7 +1060,7 @@ func (s *Server) handleAdminTransactions(w http.ResponseWriter, r *http.Request)
 	}
 	sort.Slice(kinds, func(i, j int) bool { return kinds[i]["total"].(int64) > kinds[j]["total"].(int64) })
 	labels := []map[string]string{}
-	for _, k := range []string{store.OrderKindCourse, store.OrderKindLesson, store.OrderKindBook, store.OrderKindMeeting, store.OrderKindSlot,
+	for _, k := range []string{store.OrderKindCourse, store.OrderKindLesson, store.OrderKindBook, store.OrderKindBookDL, store.OrderKindMeeting, store.OrderKindSlot,
 		store.OrderKindFee, store.OrderKindLate, store.OrderKindStorage} {
 		labels = append(labels, map[string]string{"key": k, "label": kindLabel(k)})
 	}

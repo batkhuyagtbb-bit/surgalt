@@ -294,7 +294,7 @@ func (s *Server) runAutoPayouts(ctx context.Context, now time.Time) {
 var earningKinds = map[string]string{
 	store.OrderKindCourse: "Сургалтын багц", store.OrderKindLesson: "Дан хичээл", store.OrderKindLate: "Шалгалт, даалгаврын төлбөр",
 	store.OrderKindFee: "Шалгалт, даалгаврын төлбөр", store.OrderKindMeeting: "Шууд хичээл", store.OrderKindSlot: "Цаг захиалга",
-	store.OrderKindBook: "Ном",
+	store.OrderKindBook: "Ном", store.OrderKindBookDL: "Ном",
 }
 
 type earnRow struct {

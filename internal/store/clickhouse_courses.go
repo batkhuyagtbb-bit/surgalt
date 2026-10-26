@@ -766,8 +766,8 @@ func (c *ClickHouse) MarkOrderPaid(ctx context.Context, orderID string, amount, 
 		if err := c.applyStorage(ctx, &o); err != nil {
 			return nil, err
 		}
-	case OrderKindBook:
-		if err := c.grantBook(ctx, o.UserID, o.BookID, o.Amount); err != nil {
+	case OrderKindBook, OrderKindBookDL:
+		if err := c.grantBook(ctx, o.UserID, o.BookID, o.Amount, o.Kind == OrderKindBookDL); err != nil {
 			return nil, err
 		}
 	case OrderKindSlot: // захиалгыг API давхарга баталгаажуулна (Meet үүсгэх, мэдэгдэх)

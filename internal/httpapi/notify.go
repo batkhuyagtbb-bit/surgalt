@@ -241,17 +241,21 @@ func (s *Server) notifyPaid(ctx context.Context, o *store.Order) {
 			Title: "💾 Файлын сангийн багтаамж нэмэгдлээ", Body: fmt.Sprintf("%s · %d сар", sizeLabel(o.StorageMB), o.Months), Link: "/me#files"})
 		return
 	}
-	if o.Kind == store.OrderKindBook {
+	if o.Kind == store.OrderKindBook || o.Kind == store.OrderKindBookDL {
 		buyer := "Уншигч"
 		if u, err := s.store.UserByID(ctx, o.UserID); err == nil {
 			buyer = u.DisplayName
 		}
+		what, done := "", "✅ Номыг худалдаж авлаа — бүтнээр нь уншина уу"
+		if o.Kind == store.OrderKindBookDL {
+			what, done = " (татах эрх)", "✅ Номыг татаж авах эрх нээгдлээ — «Татаж авах» дарна уу"
+		}
 		cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
-		_ = s.store.AddBookEvent(cctx, store.BookEvent{BookID: o.BookID, TeacherID: o.TeacherID, UserID: o.UserID, UserName: buyer, Type: "purchase", Detail: money(o.Amount)})
+		_ = s.store.AddBookEvent(cctx, store.BookEvent{BookID: o.BookID, TeacherID: o.TeacherID, UserID: o.UserID, UserName: buyer, Type: "purchase", Detail: money(o.Amount) + what})
 		s.notify(ctx,
-			&store.Notification{UserID: o.TeacherID, Type: NotifPurchase, Count: 1, Title: fmt.Sprintf("📚 Ном зарагдлаа · %s", money(o.Amount)), Body: buyer + " — " + o.Title, Link: "/me#books"},
-			&store.Notification{UserID: o.UserID, Type: NotifPurchase, Count: 1, Title: "✅ Номыг худалдаж авлаа — бүтнээр нь уншина уу", Body: o.Title, Link: "/b/" + o.BookID})
+			&store.Notification{UserID: o.TeacherID, Type: NotifPurchase, Count: 1, Title: fmt.Sprintf("📚 Ном зарагдлаа%s · %s", what, money(o.Amount)), Body: buyer + " — " + o.Title, Link: "/me#books"},
+			&store.Notification{UserID: o.UserID, Type: NotifPurchase, Count: 1, Title: done, Body: o.Title, Link: "/b/" + o.BookID})
 		return
 	}
 	if o.Kind == store.OrderKindMeeting {

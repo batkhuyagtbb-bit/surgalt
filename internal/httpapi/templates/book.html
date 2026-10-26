@@ -13,14 +13,16 @@
         <span class="avatar avatar-sm" style="--h:{{hue $t.Username}}">{{if $t.AvatarURL}}<img src="{{$t.AvatarURL}}" alt="">{{else}}{{initials $t.DisplayName}}{{end}}</span>
         <span>{{$t.DisplayName}}{{with $t.Headline}}<small>{{.}}</small>{{end}}</span></a>
       <div class="bk-facts">
-        <span class="ftag {{if $b.Price}}ftag-paid{{else}}ftag-free{{end}}">{{if $b.Price}}{{money $b.Price}}{{else}}Үнэгүй{{end}}</span>
+        <span class="ftag {{if $b.Price}}ftag-paid{{else}}ftag-free{{end}}">📖 Унших · {{if $b.Price}}{{money $b.Price}}{{else}}үнэгүй{{end}}</span>
+        {{if $b.Download}}<span class="ftag ftag-paid">⬇ Татах · {{if $b.DownloadPrice}}{{money $b.DownloadPrice}}{{else}}үнэгүй{{end}}</span>{{end}}
         <span class="ftag">{{$b.Pages}} хуудас</span>
         {{if $b.Price}}<span class="ftag ftag-cert">Эхний {{$b.PreviewN}} хуудас үнэгүй</span>{{end}}
         <span class="ftag">🔒 Хамгаалагдсан</span>
       </div>
       <div class="hero-cta bk-cta">
         <button class="btn btn-gold" id="bkRead">📖 {{if $b.Price}}Эхний {{$b.PreviewN}} хуудсыг унших{{else}}Унших{{end}}</button>
-        {{if $b.Price}}<button class="btn btn-gold" id="bkBuy">Худалдаж авах · {{money $b.Price}}</button>{{end}}
+        {{if $b.Price}}<button class="btn btn-gold" id="bkBuy">📖 Унших эрх авах · {{money $b.Price}}</button>{{end}}
+        {{if $b.Download}}<button class="btn btn-gold" id="bkBuyDl" data-price="{{$b.DownloadPrice}}">⬇ {{if $b.DownloadPrice}}Татаж авах эрх · {{money $b.DownloadPrice}}{{else}}Үнэгүй татаж авах{{end}}</button>{{end}}
         <button class="btn btn-glass" id="bkLike">♡ Сонирхож байна</button>
       </div>
       <p class="muted small bk-note" id="bkNote"></p>

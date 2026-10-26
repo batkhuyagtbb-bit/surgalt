@@ -83,10 +83,15 @@ type bookInput struct {
 	Price       int64  `json:"price"`
 	Published   bool   `json:"published"`
 	PreviewN    int    `json:"preview_pages"`
+
+	Download      bool   `json:"download"`
+	DownloadPrice int64  `json:"download_price"`
+	FileURL       string `json:"file_url"`
 }
 
 func (in *bookInput) validate(teacherID string) string {
 	in.Title, in.Author, in.CoverURL = strings.TrimSpace(in.Title), strings.TrimSpace(in.Author), strings.TrimSpace(in.CoverURL)
+	in.FileURL = stripSig(strings.TrimSpace(in.FileURL))
 	if in.Kind != "article" {
 		in.Kind = "book"
 	}
@@ -104,6 +109,14 @@ func (in *bookInput) validate(teacherID string) string {
 		return "үнэ 0-100,000,000₮"
 	case in.PreviewN < 1 || in.PreviewN > 20:
 		return "үнэгүй үзүүлэх хуудас 1-20"
+	case in.DownloadPrice < 0 || in.DownloadPrice > maxPrice:
+		return "татаж авах эрхийн үнэ 0-100,000,000₮"
+	case in.Download && in.Price > 0 && in.DownloadPrice <= in.Price:
+		return "татаж авах эрхийн үнэ онлайн унших эрхийн үнээс их байх ёстой"
+	case in.FileURL != "" && (!files.OwnedBy(in.FileURL, teacherID) || strings.Contains(in.FileURL, "..") || len(in.FileURL) > maxBlockURL):
+		return "татах файл: өөрийн файлын сангийн файл"
+	case in.Download && in.FileURL == "":
+		return "татаж авах эрхээр зарахын тулд номын файлаа оруулна уу"
 	case in.CoverURL != "" && !validURL(in.CoverURL) && !(files.OwnedBy(in.CoverURL, teacherID) && strings.Contains(in.CoverURL, "/"+files.Public+"/")):
 		return "нүүр зураг: өөрийн нээлттэй зураг эсвэл http(s) холбоос"
 	}
@@ -121,10 +134,14 @@ type PublicBook struct {
 	Price       int64  `json:"price"`
 	Pages       int    `json:"pages"`
 	PreviewN    int    `json:"preview_pages"`
+
+	Download      bool  `json:"download"`
+	DownloadPrice int64 `json:"download_price"`
 }
 
 func publicBook(b *store.Book, withDesc bool) PublicBook {
-	p := PublicBook{ID: b.ID, Kind: b.Kind, Title: b.Title, Author: b.Author, Cover: b.CoverURL, Price: b.Price, Pages: b.Pages, PreviewN: b.PreviewN}
+	p := PublicBook{ID: b.ID, Kind: b.Kind, Title: b.Title, Author: b.Author, Cover: b.CoverURL, Price: b.Price, Pages: b.Pages, PreviewN: b.PreviewN,
+		Download: b.Download && b.FileURL != "", DownloadPrice: b.DownloadPrice}
 	if p.Cover == "" {
 		p.Cover = "/api/books/" + b.ID + "/cover"
 	}
@@ -175,7 +192,8 @@ func (s *Server) handleCreateBook(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, msg)
 		return
 	}
-	b := &store.Book{TeacherID: c.UID, Kind: in.Kind, Title: in.Title, Author: in.Author, Description: in.Description, CoverURL: in.CoverURL, Price: in.Price, PreviewN: in.PreviewN}
+	b := &store.Book{TeacherID: c.UID, Kind: in.Kind, Title: in.Title, Author: in.Author, Description: in.Description, CoverURL: in.CoverURL, Price: in.Price, PreviewN: in.PreviewN,
+		Download: in.Download, DownloadPrice: in.DownloadPrice, FileURL: in.FileURL}
 	if err := s.store.CreateBook(r.Context(), b); s.storeErr(w, r, err) {
 		return
 	}
@@ -203,7 +221,8 @@ func (s *Server) handleUpdateBook(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, "эхлээд номын файлаа оруулна уу")
 		return
 	}
-	b := &store.Book{ID: cur.ID, TeacherID: c.UID, Kind: in.Kind, Title: in.Title, Author: in.Author, Description: in.Description, CoverURL: in.CoverURL, Price: in.Price, Published: in.Published, PreviewN: in.PreviewN}
+	b := &store.Book{ID: cur.ID, TeacherID: c.UID, Kind: in.Kind, Title: in.Title, Author: in.Author, Description: in.Description, CoverURL: in.CoverURL, Price: in.Price, Published: in.Published, PreviewN: in.PreviewN,
+		Download: in.Download, DownloadPrice: in.DownloadPrice, FileURL: in.FileURL}
 	if err := s.store.UpdateBook(r.Context(), b); s.storeErr(w, r, err) {
 		return
 	}
@@ -231,9 +250,15 @@ func (s *Server) handleDeleteBook(w http.ResponseWriter, r *http.Request) {
 	}
 	// Цаана нь байгаа файлууд: хуудасны зургууд (номын хавтас) ба өөр хаана ч ашиглаагүй нүүр зураг.
 	_ = s.files.DeleteBookPages(c.UID, b.ID)
+	var refs []string
+	for _, u := range []string{b.CoverURL, b.FileURL} { // нүүр зураг, татах эх файл
+		if u != "" {
+			refs = append(refs, strings.SplitN(u, "?", 2)[0])
+		}
+	}
 	removed := 0
-	if b.CoverURL != "" {
-		removed = s.deleteOrphanFiles(c.UID, []string{strings.SplitN(b.CoverURL, "?", 2)[0]}, s.teacherFilesInUse(r.Context(), c.UID, "", b.ID))
+	if len(refs) > 0 {
+		removed = s.deleteOrphanFiles(c.UID, refs, s.teacherFilesInUse(r.Context(), c.UID, "", b.ID))
 	}
 	s.bookChanged(r, c.UID, c.Name)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted_files": removed})
@@ -364,7 +389,8 @@ func (s *Server) handleBook(w http.ResponseWriter, r *http.Request) {
 	}
 	full := s.bookFull(r, b, uid)
 	writeJSON(w, http.StatusOK, map[string]any{"book": publicBook(b, true), "teacher": publicTeacher(t),
-		"access": map[string]any{"full": full, "owner": uid == b.TeacherID, "logged_in": uid != "", "preview_pages": min(b.PreviewN, b.Pages)}})
+		"access": map[string]any{"full": full, "owner": uid == b.TeacherID, "logged_in": uid != "", "preview_pages": min(b.PreviewN, b.Pages),
+			"download": s.bookDownload(r, b, uid), "download_price": s.bookDownloadPrice(r, b, uid)}})
 }
 
 // handleBookPage: GET /api/books/{id}/pages/{n} — уншигчийн тэмдэгтэй JPEG.
@@ -470,12 +496,33 @@ func (s *Server) handleBuyBook(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "ном олдсонгүй")
 		return
 	}
-	if s.bookFull(r, b, c.UID) {
+	// ?mode=download — татаж авах эрх (унших эрхтэй бол зөрүүг төлнө).
+	download, amount := r.URL.Query().Get("mode") == "download", b.Price
+	if download {
+		if !b.Download || b.FileURL == "" {
+			writeErr(w, http.StatusBadRequest, "энэ номыг татаж авах боломжгүй")
+			return
+		}
+		if s.bookDownload(r, b, c.UID) {
+			writeJSON(w, http.StatusOK, map[string]any{"unlocked": true})
+			return
+		}
+		amount = s.bookDownloadPrice(r, b, c.UID)
+	} else if s.bookFull(r, b, c.UID) {
 		writeJSON(w, http.StatusOK, map[string]any{"unlocked": true})
 		return
 	}
-	o, err := s.store.CreateOrGetPendingBookOrder(r.Context(), c.UID, b)
+	o, err := s.store.CreateOrGetPendingBookOrder(r.Context(), c.UID, b, download, amount)
 	if s.storeErr(w, r, err) {
+		return
+	}
+	if o.Amount <= 0 { // үнэ өөрчлөгдөж зөрүүгүй болсон: шууд нээнэ
+		po, err := s.store.MarkOrderPaid(r.Context(), o.ID, 0, 0)
+		if s.storeErr(w, r, err) {
+			return
+		}
+		s.notifyPaid(r.Context(), po)
+		writeJSON(w, http.StatusOK, map[string]any{"unlocked": true})
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"unlocked": false, "order": o,
