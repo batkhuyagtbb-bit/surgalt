@@ -6,9 +6,15 @@
 <title>{{.Title}}</title>
 <meta name="description" content="{{.Desc}}">
 <meta name="terms-version" content="{{terms}}">
+<meta property="og:site_name" content="surgalt.mn">
+<meta property="og:locale" content="mn_MN">
+<meta property="og:type" content="{{or .Type "website"}}">
 <meta property="og:title" content="{{.Title}}">
 <meta property="og:description" content="{{.Desc}}">
-{{with .Image}}<meta property="og:image" content="{{.}}">{{end}}
+{{with .URL}}<meta property="og:url" content="{{.}}"><link rel="canonical" href="{{.}}">{{end}}
+{{with .Image}}<meta property="og:image" content="{{.}}"><meta name="twitter:image" content="{{.}}">{{end}}
+{{if .ImageW}}<meta property="og:image:type" content="image/jpeg"><meta property="og:image:width" content="{{.ImageW}}"><meta property="og:image:height" content="{{.ImageH}}"><meta name="twitter:card" content="summary_large_image">{{end}}
+{{with .ImageAlt}}<meta property="og:image:alt" content="{{.}}">{{end}}
 <meta name="theme-color" content="#f5f7fc">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -1,5 +1,5 @@
 {{$t := .D.Teacher}}
-{{template "head" (dict "Title" (printf "%s — %s" $t.DisplayName (or $t.Headline "Багш")) "Desc" (or $t.Headline $t.Bio) "Image" (or $t.AvatarURL $t.CoverURL) "Page" "profile")}}
+{{template "head" (dict "Title" (printf "%s — %s" $t.DisplayName (or $t.Headline "Багш")) "Desc" .D.OGDesc "Image" .D.OGImage "ImageW" 1200 "ImageH" 630 "ImageAlt" (printf "%s — surgalt.mn дээрх багшийн профайл" $t.DisplayName) "URL" (printf "%s/t/%s" .PublicURL $t.Username) "Type" "profile" "Page" "profile")}}
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Person","name":{{$t.DisplayName}},"jobTitle":{{or $t.Headline "Багш"}},"description":{{$t.Bio}},"knowsAbout":{{$t.Subjects}}}</script>
 
 {{/* Бүтэц: нүүр зураг → давхцсан зураг + нэр + үйлдлүүд → таб цэс → зүүн танилцуулга / баруун агуулга.

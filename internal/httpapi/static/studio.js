@@ -903,7 +903,10 @@ function mountBlockEditor(f, blocks) {
     if (e.target.classList.contains("be-xlsx")) return importXlsx(e.target);
     if (e.target.classList.contains("be-qfile") && el) return uploadQimg(el, e.target.files[0]);
   });
-  box.addEventListener("input", (e) => { const el = e.target.closest(".be-block"); if (e.target.classList.contains("be-r") && el) drawSpot(el); });
+  box.addEventListener("input", (e) => {
+    const el = e.target.closest(".be-block"); if (e.target.classList.contains("be-r") && el) drawSpot(el);
+    if (e.target.classList.contains("be-embed-h") && el) { const f = $(".be-embed-prev iframe", el); if (f) f.style.height = Math.max(80, Math.min(2000, +e.target.value || 420)) + "px"; } // урьдчилан харах тавьсан өндрөөр
+  });
   box.addEventListener("keydown", (e) => {
     if (e.target.closest("[contenteditable]") && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); exec("link", e.target.closest("[contenteditable]")); }
     if (e.target.closest(".be-h, .be-q, .be-opt-t, .be-cap, .be-ex") && e.key === "Enter") e.preventDefault(); // маягт илгээгдэхгүй

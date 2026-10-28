@@ -73,7 +73,8 @@ type Server struct {
 	profiles  *cache.Cache[*Rendered[PublicProfile]]
 	courses   *cache.Cache[*Rendered[PublicCourse]]
 	qrs       *cache.Cache[[]byte]
-	alive     *cache.Cache[int64] // хэрэглэгч бүрийн «энэ цагаас өмнөх токен хүчингүй» (миллисекунд; account.go)
+	ogs       *cache.Cache[[]byte] // профайлыг хуваалцах зураг (og.go)
+	alive     *cache.Cache[int64]  // хэрэглэгч бүрийн «энэ цагаас өмнөх токен хүчингүй» (миллисекунд; account.go)
 	notif     *notifier
 	search    *searchIndex
 
@@ -107,6 +108,7 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 		profiles:  cache.New[*Rendered[PublicProfile]](30*time.Second, 5*time.Second, isNF),
 		courses:   cache.New[*Rendered[PublicCourse]](30*time.Second, 5*time.Second, isNF),
 		qrs:       cache.New[[]byte](time.Hour, 5*time.Second, isNF),
+		ogs:       cache.New[[]byte](time.Hour, 5*time.Second, isNF),
 		alive:     cache.New[int64](5*time.Minute, 5*time.Minute, isNF),
 	}
 	s.notif = newNotifier()
@@ -303,6 +305,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/views/{id}/end", s.handleVisitEnd)
 	mux.HandleFunc("GET /api/me/visits", s.handleMyVisits)
 	mux.HandleFunc("GET /t/{username}/qr.png", s.handleQR)
+	mux.HandleFunc("GET /t/{username}/og.jpg", s.handleProfileOG)
 
 	// Чат
 	mux.HandleFunc("POST /api/teachers/{username}/chat", s.handleStartChat)

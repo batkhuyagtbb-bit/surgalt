@@ -73,6 +73,10 @@ type PublicProfile struct {
 	TopCourseID string          `json:"top_course_id,omitempty"`
 	Meetings    []PublicMeeting `json:"meetings"`
 	Books       []PublicBook    `json:"books"`
+
+	// Facebook, Messenger-т хуваалцахад: зураг (og.go) ба тайлбар.
+	OGImage string `json:"-"`
+	OGDesc  string `json:"-"`
 }
 
 // PublicLesson: хичээлийн гарчиг, тохиргоо (агуулга нь нэвтэрсэн хэрэглэгчид л — handleGetLesson).
@@ -236,7 +240,10 @@ func (s *Server) publicProfile(ctx context.Context, username string) (*Rendered[
 				books = append(books, publicBook(&bs[i], false))
 			}
 		}
-		return render(s, PublicProfile{Teacher: t, Courses: courses, TopCourseID: topCourse(courses), Meetings: meetings, Books: books}, "profile.html")
+		pp := PublicProfile{Teacher: t, Courses: courses, TopCourseID: topCourse(courses), Meetings: meetings, Books: books}
+		pp.OGImage = s.cfg.PublicURL + "/t/" + t.Username + "/og.jpg?v=" + ogVersion(t, len(books))
+		pp.OGDesc = profileShareDesc(t, len(books))
+		return render(s, pp, "profile.html")
 	})
 }
 
