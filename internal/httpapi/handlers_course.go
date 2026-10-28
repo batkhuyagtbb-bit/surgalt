@@ -28,6 +28,14 @@ type courseInput struct {
 	MaxWarnings   int    `json:"max_warnings"`    // таб солих сануулгын тоо (1-20, 0 = 3)
 	BlockHours    int    `json:"block_hours"`     // (хуучин) хориг, цаг
 	BlockMinutes  int    `json:"block_minutes"`   // хэтэрвэл хэдэн минутын дараа автоматаар нээгдэх (0 = анхдагч 30 мин, -1 = багш нээтэл)
+	// AccessCode — нууц үгтэй сургалт ("" = нууц үггүй); ирээгүй (nil) бол одоогийнхоо хэвээр.
+	AccessCode *string `json:"access_code"`
+}
+
+// teacherCourse — багшид: нууц үгтэй сургалтын нууц үг харагдана (нийтэд хэзээ ч гарахгүй).
+type teacherCourse struct {
+	*store.Course
+	AccessCode string `json:"access_code"`
 }
 
 func (in *courseInput) validate() string {
@@ -53,6 +61,13 @@ func (in *courseInput) validate() string {
 		in.BlockMinutes = in.BlockHours * 60
 	}
 	in.BlockHours = 0
+	if in.AccessCode != nil {
+		code := strings.Join(strings.Fields(*in.AccessCode), " ")
+		if n := utf8.RuneCountInString(code); code != "" && (n < minCodeLen || n > maxCodeLen) {
+			return "нууц үг 4-64 тэмдэгт"
+		}
+		in.AccessCode = &code
+	}
 	switch in.Camera {
 	case "":
 		in.Camera = "optional"
@@ -88,12 +103,15 @@ func (s *Server) handleCreateCourse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	course := &store.Course{TeacherID: c.UID, Title: in.Title, Description: in.Description, Price: in.Price, Published: in.Published, Drip: in.Drip, UnlockAllPaid: in.UnlockAllPaid, Camera: in.Camera, Certificate: in.Certificate, MaxWarnings: in.MaxWarnings, BlockHours: in.BlockHours, BlockMinutes: in.BlockMinutes}
+	if in.AccessCode != nil {
+		course.AccessCode, course.Locked = *in.AccessCode, *in.AccessCode != ""
+	}
 	if err := s.store.CreateCourse(r.Context(), course); s.storeErr(w, r, err) {
 		return
 	}
 	s.profiles.Delete(c.Name)
 	s.search.markDirty()
-	writeJSON(w, http.StatusCreated, course)
+	writeJSON(w, http.StatusCreated, teacherCourse{course, course.AccessCode})
 }
 
 func (s *Server) handleUpdateCourse(w http.ResponseWriter, r *http.Request) {
@@ -110,13 +128,18 @@ func (s *Server) handleUpdateCourse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	course := &store.Course{ID: r.PathValue("id"), TeacherID: c.UID, Title: in.Title, Description: in.Description, Price: in.Price, Published: in.Published, Drip: in.Drip, UnlockAllPaid: in.UnlockAllPaid, Camera: in.Camera, Certificate: in.Certificate, MaxWarnings: in.MaxWarnings, BlockHours: in.BlockHours, BlockMinutes: in.BlockMinutes}
+	if in.AccessCode != nil {
+		course.AccessCode = *in.AccessCode
+	} else if cur, err := s.store.CourseByID(r.Context(), course.ID); err == nil && cur.TeacherID == c.UID {
+		course.AccessCode = cur.AccessCode // «Нийтлэх» г.м хэсэгчилсэн хадгалалт нууц үгийг арилгахгүй
+	}
 	if err := s.store.UpdateCourse(r.Context(), course); s.storeErr(w, r, err) {
 		return
 	}
 	s.courses.Delete(course.ID)
 	s.search.markDirty()
 	s.profiles.Delete(c.Name)
-	writeJSON(w, http.StatusOK, course)
+	writeJSON(w, http.StatusOK, teacherCourse{course, course.AccessCode})
 }
 
 // ownCourse нь сургалтыг ачаалж, дуудагч эзэмшигч мөн эсэхийг шалгана.
@@ -171,7 +194,7 @@ func (in *lessonInput) validate(teacherID string, course *store.Course) string {
 		return "медиа: http(s) холбоос эсвэл өөрийн файлын сангийн файл"
 	case in.Price < 0 || in.Price > maxPrice:
 		return "үнэ 0-100,000,000₮"
-	case !in.IsFree && in.Price == 0 && course.Price == 0:
+	case !in.IsFree && in.Price == 0 && course.Price == 0 && !course.Locked: // нууц үгтэй сургалтад нууц үгээр нээгдэнэ
 		return "төлбөртэй хичээлийн үнийг заана уу (эсвэл сургалтад багц үнэ тавина уу)"
 	case in.UnlockAfterH < 0 || in.UnlockAfterH > maxUnlockHours:
 		return "нээгдэх хугацаа 0-8760 цаг"
@@ -305,8 +328,15 @@ func (s *Server) handleReorderLessons(w http.ResponseWriter, r *http.Request) {
 }
 
 // lessonAccess: үнэгүй, багш, дангаар худалдаж авсан, эсвэл үнэтэй багцад элссэн.
+// Нууц үгтэй сургалт: зөвхөн багш болон (нууц үгээр эсвэл өмнө нь) элссэн хүн — үнэгүй хичээл ч түгжээтэй.
 func (s *Server) lessonAccess(ctx context.Context, uid string, course *store.Course, l *store.Lesson) (bool, error) {
-	if l.IsFree || course.TeacherID == uid {
+	if course.TeacherID == uid {
+		return true, nil
+	}
+	if course.Locked {
+		return s.store.IsEnrolled(ctx, uid, course.ID)
+	}
+	if l.IsFree {
 		return true, nil
 	}
 	if course.Price > 0 {
@@ -546,6 +576,10 @@ func (s *Server) handleBuyLesson(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"unlocked": true})
 		return
 	}
+	if course.Locked { // нууц үгтэй сургалтын хичээлийг дангаар зарахгүй
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "Энэ сургалт нууц үгтэй — багшаасаа авсан нууц үгээ оруулна уу", "need_code": true})
+		return
+	}
 	if l.Price <= 0 {
 		writeErr(w, http.StatusBadRequest, "энэ хичээл зөвхөн сургалтын багцаар нээгдэнэ")
 		return
@@ -610,7 +644,7 @@ func (s *Server) handleMyCourse(w http.ResponseWriter, r *http.Request) {
 		ids[i] = lessons[i].ID
 	}
 	counts, _ := s.store.CommentCounts(r.Context(), ids) // хэлэлцүүлгийн сэтгэгдлийн тоо (жагсаалтад)
-	writeJSON(w, http.StatusOK, map[string]any{"course": course, "lessons": lessons, "comments": counts})
+	writeJSON(w, http.StatusOK, map[string]any{"course": teacherCourse{course, course.AccessCode}, "lessons": lessons, "comments": counts})
 }
 
 func (s *Server) handleMyEnrollments(w http.ResponseWriter, r *http.Request) {
@@ -694,7 +728,7 @@ func (s *Server) handleCourseAccess(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, no-store")
 	// all: бүх хичээл төлбөрийн хувьд нээлттэй (багш эсвэл үнэтэй багц худалдаж авсан).
 	writeJSON(w, http.StatusOK, map[string]any{"enrolled": enrolled, "owner": owner,
-		"all": owner || (enrolled && course.Price > 0), "lessons": bought,
+		"all": owner || (enrolled && (course.Price > 0 || course.Locked)), "lessons": bought,
 		"states": states, "progress": progress, "done": done, "total": len(lessons),
 		"ranks": rankBy, "rank": rank, "rank_total": total, "rank_awarded": awarded,
 		"blocks":       s.lessonBlocks(r.Context(), c.UID, store.ActivityFilter{CourseID: course.ID}, func(string) int { return blockMinutes(course) }),
@@ -808,6 +842,10 @@ func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 	}
 	if enrolled {
 		writeJSON(w, http.StatusOK, map[string]any{"enrolled": true})
+		return
+	}
+	if course.Locked {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "Энэ сургалт нууц үгтэй — багшаасаа авсан нууц үгээ оруулна уу", "need_code": true})
 		return
 	}
 	if course.Price == 0 {

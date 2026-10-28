@@ -58,6 +58,7 @@ type Server struct {
 	tmpl      *template.Template
 	limiter   *ratelimit.Limiter
 	authLim   *ratelimit.Limiter // нэвтрэлт/бүртгэл/зочин токен — илүү чанга
+	codeLim   *ratelimit.Limiter // сургалтын нууц үг таах оролдлого (course_code.go)
 	chatLim   *ratelimit.Limiter // мессеж илгээх
 	phoneLim  *ratelimit.Limiter // багшийн утасны дугаар нээх — дугаар хусуурдахаас сэргийлнэ
 	resetLim  *ratelimit.Limiter // нэг имэйл рүү нууц үг сэргээх захидал (2 минутад 1 орчим)
@@ -99,6 +100,7 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 		tmpl:      parseTemplates(),
 		limiter:   ratelimit.New(cfg.RateLimitRPS, cfg.RateBurst),
 		authLim:   ratelimit.New(1, 10),
+		codeLim:   ratelimit.New(1.0/30, 6),
 		chatLim:   ratelimit.New(2, 10),
 		phoneLim:  ratelimit.New(0.05, 8),
 		resetLim:  ratelimit.New(1.0/120, 2),
@@ -126,6 +128,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.alive.Janitor(ctx, 10*time.Minute)
 	go s.limiter.Janitor(ctx)
 	go s.authLim.Janitor(ctx)
+	go s.codeLim.Janitor(ctx)
 	go s.chatLim.Janitor(ctx)
 	go s.phoneLim.Janitor(ctx)
 	go s.resetLim.Janitor(ctx)
@@ -191,6 +194,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/courses/{id}/lessons/{lid}/visibility", s.handleLessonVisibility)
 	mux.HandleFunc("PUT /api/courses/{id}/lesson-order", s.handleReorderLessons)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/buy", s.handleBuyLesson)
+	mux.HandleFunc("POST /api/courses/{id}/unlock", s.handleUnlockCourse)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/complete", s.handleCompleteLesson)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/quiz/{bid}", s.handleAnswerQuiz)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/watched/{bid}", s.handleVideoWatched)

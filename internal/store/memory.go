@@ -223,6 +223,7 @@ func (m *Memory) TeacherStudentCount(_ context.Context, teacherID string) (int64
 func (m *Memory) courseCopyLocked(c *Course) Course {
 	cc := *c
 	cc.LessonCount, cc.FreeLessonCount = 0, 0
+	cc.Locked = cc.AccessCode != ""
 	for _, l := range m.lessons[c.ID] {
 		if l.Hidden { // хаалттай хичээл суралцагчдад тоологдохгүй
 			continue
@@ -258,6 +259,7 @@ func (m *Memory) UpdateCourse(_ context.Context, c *Course) error {
 	cur.Title, cur.Description, cur.Price, cur.Published, cur.UpdatedAt = c.Title, c.Description, c.Price, c.Published, time.Now()
 	cur.Drip, cur.UnlockAllPaid, cur.Camera, cur.Certificate = c.Drip, c.UnlockAllPaid, c.Camera, c.Certificate
 	cur.MaxWarnings, cur.BlockHours, cur.BlockMinutes = c.MaxWarnings, c.BlockHours, c.BlockMinutes
+	cur.AccessCode = c.AccessCode
 	*c = m.courseCopyLocked(cur)
 	return nil
 }

@@ -193,6 +193,7 @@ var chMigrations = []string{
 	"ALTER TABLE books ADD COLUMN IF NOT EXISTS download_price Int64 DEFAULT 0",
 	"ALTER TABLE books ADD COLUMN IF NOT EXISTS file_url String DEFAULT ''",
 	"ALTER TABLE book_access ADD COLUMN IF NOT EXISTS download Bool DEFAULT false",
+	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS access_code String DEFAULT ''",
 	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_body String DEFAULT ''",
 	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_name String DEFAULT ''",
 	"ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment String DEFAULT ''",

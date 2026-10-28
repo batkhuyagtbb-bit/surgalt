@@ -84,6 +84,7 @@ type PublicLesson struct {
 	ID       string `json:"id"`
 	Title    string `json:"title"`
 	IsFree   bool   `json:"is_free"`
+	Locked   bool   `json:"locked,omitempty"` // нууц үгтэй сургалтын хичээл
 	Price    int64  `json:"price"`
 	Position int    `json:"position"`
 	// Дараалсан нээлтийн тохиргоо (харуулахад): өмнөхийн дараа хэдэн цаг хүлээх, дарааллаас гадуур эсэх.
@@ -267,7 +268,7 @@ func (s *Server) publicCourse(ctx context.Context, id string) (*Rendered[PublicC
 		lessons = visibleLessons(lessons, false) // нийтэд (кэштэй хуудас) хаалттай хичээл огт орохгүй
 		pls := make([]PublicLesson, len(lessons))
 		for i, l := range lessons {
-			pls[i] = PublicLesson{ID: l.ID, Title: l.Title, IsFree: l.IsFree, Price: l.Price, Position: l.Position, UnlockAfterH: l.UnlockAfterH, AlwaysOpen: l.AlwaysOpen, Format: l.Format, Mode: l.Mode, Section: l.Section, ActiveMin: l.ActiveMin, Exam: l.Exam, Assignment: l.Assignment, Discussion: l.Discussion, UnlockRule: l.UnlockRule}
+			pls[i] = PublicLesson{ID: l.ID, Title: l.Title, IsFree: l.IsFree && !c.Locked, Locked: c.Locked, Price: l.Price, Position: l.Position, UnlockAfterH: l.UnlockAfterH, AlwaysOpen: l.AlwaysOpen, Format: l.Format, Mode: l.Mode, Section: l.Section, ActiveMin: l.ActiveMin, Exam: l.Exam, Assignment: l.Assignment, Discussion: l.Discussion, UnlockRule: l.UnlockRule}
 		}
 		secs, grouped := groupLessons(pls)
 		return render(s, PublicCourse{Course: *c, Teacher: publicTeacher(u), Lessons: pls, Sections: secs, Grouped: grouped}, "course.html")

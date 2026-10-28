@@ -274,6 +274,11 @@ const courseFormHTML = (c = {}) => `
   <label>Тайлбар<textarea name="description" rows="4" placeholder="Энэ сургалтаар юу сурах вэ?">${esc(c.description || "")}</textarea></label>
   <div class="form-row"><label>Багц үнэ (₮)<input name="price" type="number" min="0" step="1000" value="${c.price || 0}"><small class="muted">0 бол хичээл тус бүрээр зарна</small></label>
   <label class="check" style="align-self:center"><input type="checkbox" name="published" ${c.published ? "checked" : ""}> Нийтлэх (профайл дээр харагдана)</label></div>
+  <fieldset class="cs-lock"><legend>🔒 Нууц үгтэй сургалт</legend>
+    <label class="check"><input type="checkbox" name="locked" ${c.access_code ? "checked" : ""}> Зөвхөн нууц үг мэдэх суралцагч үзнэ — оруулсан хүн үнэ төлөхгүй элсэж, бүх хичээлийг нээнэ</label>
+    <div class="cs-code" ${c.access_code ? "" : "hidden"}><div class="cs-code-row"><input name="access_code" maxlength="64" value="${esc(c.access_code || "")}" placeholder="Жишээ: 10a-mat" autocomplete="off" spellcheck="false" aria-label="Нууц үг">
+      <button type="button" class="btn btn-ghost btn-sm" data-gen-code>Санамсаргүй</button><button type="button" class="btn btn-ghost btn-sm" data-copy-code>Хуулах</button></div>
+      <small class="muted">Энэ үгийг суралцагчдадаа өгнө (том, жижиг үсэг хамаагүй). Үгээ солибол шинэ хүмүүс шинэ үгээр орно, өмнө элссэн хүмүүс эрхээ хадгална.</small></div></fieldset>
   <fieldset><legend>Хичээлийн нээлт</legend>
     <label class="check"><input type="checkbox" name="drip" ${c.drip ? "checked" : ""}> Дарааллаар нээгдэнэ — суралцагч өмнөх хичээлээ үзэж, доторх асуултуудад нь бүгдэд нь зөв хариулсны дараа дараагийнх нь (тохируулсан цаг/хоногийн дараа) нээгдэнэ</label>
     <fieldset class="warn-set"><legend>Анхаарлын хяналт</legend>
@@ -284,7 +289,20 @@ const courseFormHTML = (c = {}) => `
   <input type="hidden" name="camera" value="${esc(c.camera || "optional")}">
   <label class="check"><input type="checkbox" name="certificate" ${c.certificate ? "checked" : ""}><span>${ico("medal", 16)} Сургалтыг дүүргэсэн суралцагчид сертификат олгоно (хайлтад «Сертификаттай» шошго гарна)</span></label>`;
 const courseBody = (f) => ({ title: f.title.value, description: f.description.value, price: +f.price.value || 0, published: f.published.checked, drip: f.drip.checked, unlock_all_paid: f.unlock_all_paid.checked, certificate: f.certificate.checked, camera: f.camera.value,
-  max_warnings: f.max_warnings ? +f.max_warnings.value || 3 : undefined, block_minutes: f.block_minutes ? +f.block_minutes.value || 30 : undefined, block_hours: 0 });
+  max_warnings: f.max_warnings ? +f.max_warnings.value || 3 : undefined, block_minutes: f.block_minutes ? +f.block_minutes.value || 30 : undefined, block_hours: 0,
+  access_code: f.locked ? (f.locked.checked ? f.access_code.value.trim() : "") : undefined });
+// Нууц үгтэй сургалт: асаахад санамсаргүй үг санал болгоно, хуулах.
+const genCode = () => { const a = "abcdefghjkmnpqrstuvwxyz23456789"; return Array.from(crypto.getRandomValues(new Uint8Array(6)), (x) => a[x % a.length]).join(""); };
+document.addEventListener("change", (e) => {
+  const t = e.target; if (t.name !== "locked" || !t.form) return;
+  const box = $(".cs-code", t.form); if (!box) return;
+  box.hidden = !t.checked;
+  if (t.checked && !t.form.access_code.value.trim()) t.form.access_code.value = genCode();
+});
+document.addEventListener("click", (e) => {
+  const g = e.target.closest("[data-gen-code]"); if (g?.form) { g.form.access_code.value = genCode(); return; }
+  const cp = e.target.closest("[data-copy-code]"); if (cp?.form) navigator.clipboard?.writeText(cp.form.access_code.value).then(() => toast("Нууц үг хуулагдлаа ✓")).catch(() => {});
+});
 const FORMATS = [["", "— Сургалтын хэлбэр —"], ["lecture", "Лекц"], ["seminar", "Семинар"], ["practice", "Дадлага"], ["lab", "Лаборатори"]];
 const MODES = [["", "— Заах аргын төрөл —"], ["classroom", "Танхимын"], ["online", "Цахим"], ["blended", "Холимог"]];
 const kindName = (k) => (FORMATS.find(([v]) => v === k)?.[1] || MODES.find(([v]) => v === k)?.[1] || "");

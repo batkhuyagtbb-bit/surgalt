@@ -1172,6 +1172,14 @@ body.dragging-ol{user-select:none}
 .rb-text sub,.rb-text sup{font-size:.72em;line-height:0}
 @media (max-width:640px){.rb-text img.rt-left,.rb-text img.rt-right{float:none;display:block;margin:10px auto;max-width:100%}}
 .rb figure{margin:0}
+/* Нууц үгтэй сургалт */
+.cs-code{display:grid;gap:6px;margin-top:8px}
+.cs-code[hidden]{display:none}
+.cs-code-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cs-code-row input{flex:1;min-width:170px;font:700 1.05rem ui-monospace,Consolas,monospace;letter-spacing:.06em}
+.code-card{width:min(420px,100%);text-align:center}
+.code-ico{font-size:2.6rem;line-height:1;margin:6px 0 4px}
+.code-card input{text-align:center;font:700 1.2rem ui-monospace,Consolas,monospace;letter-spacing:.1em}
 /* ===== Хүртээмж: хичээл унших хэсэгт харааны бэрхшээлтэй хүмүүст зориулсан байнга дагадаг цэс ===== */
 .a11y-fab{position:fixed;left:18px;bottom:18px;z-index:2500;display:none;place-items:center;width:60px;height:60px;padding:0;border:3px solid rgba(255,255,255,.6);border-radius:50%;background:#3b2fa0;color:#fff;box-shadow:0 10px 26px rgba(30,20,90,.45);cursor:pointer;transition:transform .15s}
 html.lp-focus .a11y-fab{display:grid}

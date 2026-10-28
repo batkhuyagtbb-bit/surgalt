@@ -4010,7 +4010,7 @@ window.SG_humanHours = humanHours;
 async function coursePage() {
   const root = $(".course-page");
   if (!root) return;
-  const id = root.dataset.course, bundle = +root.dataset.price, mode = root.dataset.mode, buy = $("#buyBtn"), drip = root.dataset.drip === "1";
+  const id = root.dataset.course, bundle = +root.dataset.price, mode = root.dataset.mode, buy = $("#buyBtn"), drip = root.dataset.drip === "1", locked = root.dataset.locked === "1";
   let all = false, access = null;
   // Дараалсан нээлтийн төлөв, явцыг хичээл бүр дээр харуулна.
   const applyStates = (a) => {
@@ -4146,6 +4146,7 @@ async function coursePage() {
   // Төлбөртэй (худалдаж аваагүй) хичээл дээр дарах → шууд төлбөрийн цонх.
   const paywall = async (li) => {
     if (needLogin()) return;
+    if (locked) return askCode(() => expandRow(li, true)); // нууц үгтэй сургалт
     const lid = li.dataset.lesson, price = +li.dataset.price;
     try {
       if (price > 0) {
@@ -4164,10 +4165,33 @@ async function coursePage() {
       toast("Энэ хичээл одоогоор нээгдээгүй байна");
     } catch (err) { toast(err.message, true); }
   };
+  // Нууц үгтэй сургалт: багшаас авсан нууц үгээ оруулж бүх хичээлийг нээнэ.
+  const askCode = (then) => {
+    if (needLogin()) return;
+    $("#codeModal")?.remove();
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="codeModal"><div class="modal-card code-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
+      <div class="code-ico" aria-hidden="true">🔑</div><h3 class="h3">Нууц үгтэй сургалт</h3>
+      <p class="muted">Багшаасаа авсан нууц үгээ оруулаад сургалтын бүх хичээлийг нээнэ.</p>
+      <form class="form" id="codeForm" autocomplete="off"><input name="code" required minlength="4" maxlength="64" placeholder="Нууц үг" aria-label="Нууц үг" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <p class="form-error" role="alert"></p><button class="btn btn-gold btn-block">🔓 Нээх</button></form></div></div>`);
+    const m = $("#codeModal"), f = $("#codeForm", m);
+    const done = () => { closeModal(m); setTimeout(() => m.remove(), 300); };
+    openModal(m); setTimeout(() => f.code.focus(), 60);
+    m.addEventListener("click", (e) => { if (e.target === m || e.target.closest("[data-close]")) done(); });
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = $("button", f), err = $(".form-error", f); err.textContent = ""; btn.disabled = true;
+      try {
+        await api(`/api/courses/${id}/unlock`, { method: "POST", body: { code: f.code.value } });
+        done(); unlockAll(); toast("🔓 Сургалт нээгдлээ — амжилт хүсье!"); celebrate(); await refreshAccess(); then?.();
+      } catch (x) { err.textContent = x.message; f.code.select(); } finally { btn.disabled = false; }
+    };
+  };
   const isLocked = (li) => li.classList.contains("is-locked") && !li.classList.contains("unlocked");
 
 
   buy.addEventListener("click", async () => {
+    if (locked && !all) return askCode();
     if (all || mode === "lessons") { $("#lessons").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (needLogin()) return;
     buy.disabled = true;

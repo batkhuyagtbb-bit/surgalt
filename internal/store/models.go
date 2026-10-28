@@ -126,6 +126,10 @@ type Course struct {
 	Camera string `json:"camera"`
 	// Certificate — сургалтыг дүүргэсэн суралцагчид сертификат олгоно (хайлтад шошго болно).
 	Certificate bool `json:"certificate"`
+	// AccessCode — нууц үгтэй сургалт: багшийн өгсөн үгийг оруулсан суралцагч элсэж бүх хичээлийг үзнэ.
+	// Нийтэд хэзээ ч гарахгүй (json:"-"); Locked нь зөвхөн нууц үгтэй эсэхийг харуулна.
+	AccessCode string `json:"-"`
+	Locked     bool   `json:"locked"`
 	// MaxWarnings — хичээл үзэж байхад таб/цонх солих сануулгын тоо (0 = анхдагч 3). Хэтэрвэл хичээл зогсоно.
 	MaxWarnings int `json:"max_warnings"`
 	// BlockHours — (хуучин) хориг хэдэн цаг; BlockMinutes байвал түүнийг ашиглана.
