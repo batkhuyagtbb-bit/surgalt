@@ -328,13 +328,13 @@ func (s *Server) handleReorderLessons(w http.ResponseWriter, r *http.Request) {
 }
 
 // lessonAccess: үнэгүй, багш, дангаар худалдаж авсан, эсвэл үнэтэй багцад элссэн.
-// Нууц үгтэй сургалт: зөвхөн багш болон (нууц үгээр эсвэл өмнө нь) элссэн хүн — үнэгүй хичээл ч түгжээтэй.
+// Нууц үгтэй сургалт: зөвхөн багш болон одоогийн нууц үгийг оруулсан хүн (өмнө нь элссэн ч) — үнэгүй хичээл ч түгжээтэй.
 func (s *Server) lessonAccess(ctx context.Context, uid string, course *store.Course, l *store.Lesson) (bool, error) {
 	if course.TeacherID == uid {
 		return true, nil
 	}
 	if course.Locked {
-		return s.store.IsEnrolled(ctx, uid, course.ID)
+		return s.codeUnlocked(ctx, uid, course)
 	}
 	if l.IsFree {
 		return true, nil
@@ -725,10 +725,11 @@ func (s *Server) handleCourseAccess(w http.ResponseWriter, r *http.Request) {
 	if !owner && len(ranks) > 0 {
 		total, awarded = s.autoAward(r.Context(), c.UID, course.ID, "/c/"+course.ID, rank.Points) // систем өөрөө олгоно
 	}
+	codeOK, _ := s.codeUnlocked(r.Context(), c.UID, course)
 	w.Header().Set("Cache-Control", "private, no-store")
-	// all: бүх хичээл төлбөрийн хувьд нээлттэй (багш эсвэл үнэтэй багц худалдаж авсан).
+	// all: бүх хичээл төлбөрийн хувьд нээлттэй (багш, үнэтэй багц худалдаж авсан, эсвэл нууц үгээр нээсэн).
 	writeJSON(w, http.StatusOK, map[string]any{"enrolled": enrolled, "owner": owner,
-		"all": owner || (enrolled && (course.Price > 0 || course.Locked)), "lessons": bought,
+		"all": owner || (course.Locked && codeOK) || (!course.Locked && enrolled && course.Price > 0), "lessons": bought, "need_code": course.Locked && !owner && !codeOK,
 		"states": states, "progress": progress, "done": done, "total": len(lessons),
 		"ranks": rankBy, "rank": rank, "rank_total": total, "rank_awarded": awarded,
 		"blocks":       s.lessonBlocks(r.Context(), c.UID, store.ActivityFilter{CourseID: course.ID}, func(string) int { return blockMinutes(course) }),
@@ -836,16 +837,16 @@ func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "өөрийн сургалтыг худалдан авах боломжгүй")
 		return
 	}
+	if ok, _ := s.codeUnlocked(r.Context(), c.UID, course); course.Locked && !ok {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "Энэ сургалт нууц үгтэй — багшаасаа авсан нууц үгээ оруулна уу", "need_code": true})
+		return
+	}
 	enrolled, err := s.store.IsEnrolled(r.Context(), c.UID, course.ID)
 	if s.storeErr(w, r, err) {
 		return
 	}
 	if enrolled {
 		writeJSON(w, http.StatusOK, map[string]any{"enrolled": true})
-		return
-	}
-	if course.Locked {
-		writeJSON(w, http.StatusForbidden, map[string]any{"error": "Энэ сургалт нууц үгтэй — багшаасаа авсан нууц үгээ оруулна уу", "need_code": true})
 		return
 	}
 	if course.Price == 0 {

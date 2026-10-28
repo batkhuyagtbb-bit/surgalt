@@ -1173,6 +1173,8 @@ body.dragging-ol{user-select:none}
 @media (max-width:640px){.rb-text img.rt-left,.rb-text img.rt-right{float:none;display:block;margin:10px auto;max-width:100%}}
 .rb figure{margin:0}
 /* Нууц үгтэй сургалт */
+.flag.flag-lock{background:#1d1a3a;color:#ffd60a}
+.price.price-lock{color:var(--brand);font-weight:800}
 .cs-code{display:grid;gap:6px;margin-top:8px}
 .cs-code[hidden]{display:none}
 .cs-code-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}

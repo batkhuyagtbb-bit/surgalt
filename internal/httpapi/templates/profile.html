@@ -108,16 +108,17 @@
         <div class="course-grid" id="courseGrid">
           {{range $i, $c := .D.Courses}}
           {{$paid := sub $c.LessonCount $c.FreeLessonCount}}
-          <a class="course-card tilt reveal" href="/c/{{$c.ID}}" style="--h:{{hue $c.Title}};--d:{{$i}}" data-course="{{$c.ID}}" data-free="{{$c.FreeLessonCount}}" data-paid="{{if or $c.Price $paid}}1{{else}}0{{end}}">
-            <div class="course-art"><div class="course-flags">{{if eq $c.ID $.D.TopCourseID}}<span class="flag">Эрэлттэй</span>{{end}}{{if recent $c.CreatedAt}}<span class="flag flag-new">Шинэ</span>{{end}}</div><span class="course-num">{{printf "%02d" (inc $i)}}</span><span class="glare"></span></div>
+          <a class="course-card tilt reveal" href="/c/{{$c.ID}}{{if $c.Locked}}#unlock{{end}}" style="--h:{{hue $c.Title}};--d:{{$i}}" data-course="{{$c.ID}}" data-free="{{$c.FreeLessonCount}}" data-paid="{{if or $c.Price $paid}}1{{else}}0{{end}}">
+            <div class="course-art"><div class="course-flags">{{if $c.Locked}}<span class="flag flag-lock">🔒 Нууц үгтэй</span>{{end}}{{if eq $c.ID $.D.TopCourseID}}<span class="flag">Эрэлттэй</span>{{end}}{{if recent $c.CreatedAt}}<span class="flag flag-new">Шинэ</span>{{end}}</div><span class="course-num">{{printf "%02d" (inc $i)}}</span><span class="glare"></span></div>
             <div class="course-body">
               <h3>{{$c.Title}}</h3>
               <p class="clamp muted">{{$c.Description}}</p>
               <div class="course-meta">
                 <span>{{$c.LessonCount}} хичээл</span>
+                {{if $c.Locked}}<span class="price price-lock">🔒 Нууц үгээр нээх</span>{{else}}
                 {{if $c.FreeLessonCount}}<span class="chip chip-amber">{{$c.FreeLessonCount}} үнэгүй</span>{{end}}
                 {{if $paid}}<span class="chip chip-gold">{{$paid}} төлбөртэй</span>{{end}}
-                <span class="price {{if and (eq $c.Price 0) (eq $paid 0)}}free{{end}}">{{if $c.Price}}{{money $c.Price}}{{else if $paid}}Хичээлээр{{else}}Үнэгүй{{end}}</span>
+                <span class="price {{if and (eq $c.Price 0) (eq $paid 0)}}free{{end}}">{{if $c.Price}}{{money $c.Price}}{{else if $paid}}Хичээлээр{{else}}Үнэгүй{{end}}</span>{{end}}
               </div>
             </div>
           </a>

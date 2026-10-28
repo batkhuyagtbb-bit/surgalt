@@ -153,6 +153,8 @@ func (s *Server) buildSearch(ctx context.Context) ([]*searchDoc, error) {
 		}
 		d.course.LessonCount, d.course.FreeLessonCount = len(ls), free // тоолуурыг бодит хичээлээс
 		switch {
+		case c.Locked: // нууц үгтэй: багшаас авсан үгээр л нээгдэнэ
+			d.tags, d.labels = append(d.tags, "locked"), append(d.labels, "🔒 Нууц үгтэй")
 		case c.Price == 0 && paid == 0:
 			d.tags, d.labels = append(d.tags, "free"), append(d.labels, "Үнэгүй")
 		default:

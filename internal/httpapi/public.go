@@ -229,7 +229,9 @@ func (s *Server) publicProfile(ctx context.Context, username string) (*Rendered[
 		t.StudentCount, t.CourseCount, t.SlotCount = students, len(courses), s.freeSlotCount(ctx, u.ID)
 		for _, c := range courses {
 			t.LessonCount += c.LessonCount
-			t.FreeLessonCount += c.FreeLessonCount
+			if !c.Locked { // нууц үгтэй сургалтын хичээл үнэгүй нээлттэй биш
+				t.FreeLessonCount += c.FreeLessonCount
+			}
 		}
 		meetings, err := s.publicMeetings(ctx, courses)
 		if err != nil {

@@ -24,6 +24,11 @@ func (m *Memory) DeleteUserData(_ context.Context, uid string) error {
 			delete(m.identities, k)
 		}
 	}
+	for k := range m.unlocks {
+		if k[0] == uid {
+			delete(m.unlocks, k)
+		}
+	}
 	for k := range m.enrollments {
 		if k[0] == uid {
 			delete(m.enrollments, k)

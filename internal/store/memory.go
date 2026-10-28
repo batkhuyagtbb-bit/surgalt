@@ -18,6 +18,7 @@ type Memory struct {
 	byEmail     map[string]string
 	byUsername  map[string]string
 	courses     map[string]*Course
+	unlocks     map[[2]string]string // (user, course) -> нууц үгийн хэш (course_unlocks.go)
 	lessons     map[string][]*Lesson // course_id -> lessons
 	orders      map[string]*Order
 	pending     map[[2]string]string // (user,course) -> order id

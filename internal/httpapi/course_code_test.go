@@ -92,3 +92,40 @@ func TestLockedCourse(t *testing.T) {
 		t.Fatal("нууц үг арилсны дараа үнэгүй хичээл нээлттэй байх ёстой")
 	}
 }
+
+// Заавал багшаас нууц үг авна: түгжихээс өмнө элссэн хүн ч, багш үгээ сольсон үед ч одоогийн үгийг оруулна.
+func TestLockedCourseStrict(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "strictteach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Анги","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true,"blocks":[{"id":"t1","type":"text","text":"А"}]}`)
+	lid := l["id"].(string)
+	s1, _ := register(t, srv, "earlybird", "student")
+	call(t, srv, "POST", "/api/courses/"+cid+"/enroll", s1, "")
+	lesson := func() int { code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid, s1, ""); return code }
+	if lesson() != 200 {
+		t.Fatal("түгжихээс өмнө үнэгүй хичээл нээлттэй")
+	}
+	call(t, srv, "PUT", "/api/courses/"+cid, tt, `{"title":"Анги","price":0,"published":true,"access_code":"Нэгдүгээр"}`)
+	if lesson() == 200 {
+		t.Fatal("өмнө элссэн ч нууц үг шаардах ёстой")
+	}
+	if _, a := call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, ""); a["need_code"] != true || a["all"] == true {
+		t.Fatalf("need_code: %v all: %v", a["need_code"], a["all"])
+	}
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/enroll", s1, ""); code != 403 {
+		t.Fatalf("элсэлтээр тойрч болохгүй: %d", code)
+	}
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/unlock", s1, `{"code":"нэгдүгээр"}`); code != 201 || lesson() != 200 {
+		t.Fatalf("нууц үгээр нээх: %d", code)
+	}
+	call(t, srv, "PUT", "/api/courses/"+cid, tt, `{"title":"Анги","price":0,"published":true,"access_code":"Хоёрдугаар"}`)
+	if lesson() == 200 {
+		t.Fatal("багш үгээ сольсон бол шинэ үгийг оруулах ёстой")
+	}
+	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/unlock", s1, `{"code":"Хоёрдугаар"}`); code != 201 || lesson() != 200 {
+		t.Fatalf("шинэ үгээр нээх: %d", code)
+	}
+}

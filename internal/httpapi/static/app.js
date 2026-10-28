@@ -3499,7 +3499,7 @@ function profilePage() {
   api("/api/me/home").then((h) => {
     const mine = new Map(h.courses.map((c) => [c.course.id, c]));
     cards.forEach((card) => {
-      const m = mine.get(card.dataset.course); if (!m) return;
+      const m = mine.get(card.dataset.course); if (!m || $(".flag-lock", card)) return; // нууц үгтэй: элссэн ч нууц үгээр л нээгдэнэ
       $(".course-flags", card)?.insertAdjacentHTML("afterbegin", `<span class="flag flag-own">✓ ${m.access === "lessons" ? m.owned_lessons + " хичээл таных" : "Таных"}</span>`);
       const price = $(".price", card); if (price) { price.textContent = "▶ Үргэлжлүүлэх"; price.classList.add("free"); }
     });
@@ -4103,7 +4103,14 @@ async function coursePage() {
     buy.textContent = "✓ Бүх хичээл нээлттэй — үзэж эхлэх";
     $$(".lesson").forEach((l) => unlockLesson(l.dataset.lesson));
   };
-  const ready = Auth.token ? refreshAccess().then((a) => { if (!a) return; if (a.all) unlockAll(); a.lessons.forEach(unlockLesson); if (mode === "free" && a.enrolled) buy.textContent = "✓ Та элссэн — үзэж эхлэх"; drawStage(); }) : Promise.resolve();
+  const ready = Auth.token ? refreshAccess().then((a) => {
+    if (!a) return;
+    if (a.all) unlockAll(); a.lessons.forEach(unlockLesson);
+    if (mode === "free" && a.enrolled && !locked) buy.textContent = "✓ Та элссэн — үзэж эхлэх";
+    if (locked && a.need_code && location.hash === "#unlock") askCode(); // картан дээрх 🔒-оос ирсэн
+    drawStage();
+  }) : Promise.resolve();
+  if (!Auth.token && locked && location.hash === "#unlock") setTimeout(() => askCode(), 300); // нэвтрэх рүү хөтөлнө
   if (!Auth.token) $$(".lesson.is-free [data-play]").forEach((b) => (b.textContent = "▶ Нэвтэрч үзэх")); // үнэгүй хичээлийг ч нэвтэрч үзнэ
   if (!Auth.token && drip) $$(".lesson:not(.is-free)").forEach((li) => { const lbl = $(".lesson-state", li); if (lbl && +li.dataset.unlock && li.dataset.always !== "1") { lbl.hidden = false; lbl.textContent = `⏱ Өмнөхийг үзснээс ${humanHours(li.dataset.unlock)}-ийн дараа`; } });
   // Товлосон шууд хичээлүүд (Google Meet): үнэгүй нь сургалтын дүрмээр, төлбөртэйг тусад нь худалдаж авна.
