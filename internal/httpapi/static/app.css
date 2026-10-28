@@ -366,6 +366,9 @@ a.tip:hover{border-color:var(--brand);background:var(--brand-soft)}
 .qr-link svg{flex:none}
 .qr-link:hover,.qr-link:focus-visible{background:var(--brand);color:#fff}
 .qr-link:hover b,.qr-link:focus-visible b{color:#fff}
+.btn.qr-fb{display:inline-flex;align-items:center;justify-content:center;gap:10px;border-color:#1877f2;background:#1877f2;color:#fff;font-weight:800}
+.btn.qr-fb:hover,.btn.qr-fb:focus-visible{border-color:#0f63d6;background:#0f63d6;color:#fff}
+.qr-modal .btn.qr-fb{width:100%;padding-top:13px;padding-bottom:13px;font-size:1rem}
 .qr-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
 .qr-acts .btn{justify-content:center}
 @media (max-width:480px){.qr-acts{grid-template-columns:1fr}}

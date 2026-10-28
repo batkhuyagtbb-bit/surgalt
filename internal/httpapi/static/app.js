@@ -3371,6 +3371,12 @@ function profilePage() {
     try { await navigator.clipboard.writeText(location.origin + location.pathname); toast("Холбоос хуулагдлаа ✓"); } catch { toast(location.href); }
   }));
   $$("[data-share]").forEach((b) => b.addEventListener("click", () => share(b.dataset.title)));
+  // Facebook-т хуваалцах: компьютер дээр жижиг цонхоор (профайлын загварлаг карт пост болно), утсан дээр апп/таб.
+  $$("[data-fb-share]").forEach((a) => a.addEventListener("click", (e) => {
+    if (!matchMedia("(pointer:fine) and (min-width:700px)").matches) return;
+    const w = 620, h = 640, win = window.open(a.href, "fbshare", `width=${w},height=${h},left=${Math.round((screen.width - w) / 2)},top=${Math.round((screen.height - h) / 2)}`);
+    if (win) { e.preventDefault(); win.opener = null; }
+  }));
   // Цаг авах: багшийн календарьт тэмдэглэсэн сул цагаас сонгож захиална (#appt холбоосоор шууд нээгдэнэ).
   const apptOpen = () => apptWindow(root.dataset.teacher, $(".pf-id h1")?.firstChild?.textContent.trim() || "Багш");
   $$("[data-appt]").forEach((b) => b.addEventListener("click", apptOpen));
