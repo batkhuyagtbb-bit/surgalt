@@ -427,7 +427,9 @@ func (s *Server) handleMyConversations(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, s.dropHiddenConvs(r.Context(), c.UID, convs))
+	convs = s.dropHiddenConvs(r.Context(), c.UID, convs)
+	s.knowConvs(c.UID, convs)
+	writeJSON(w, http.StatusOK, convs)
 }
 
 // handleWS: /api/chat/ws?token=... — шинэ мессежийг бодит цагт түлхэнэ.

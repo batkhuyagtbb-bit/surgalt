@@ -125,6 +125,9 @@ func (s *Server) handleClassmates(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
+	for _, cm := range out {
+		s.seen.book.add(c.UID, cm.User.ID)
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 

@@ -136,3 +136,78 @@ func TestJournalActiveFirst(t *testing.T) {
 		t.Fatalf("идэвхтэй нь дээрээ байх ёстой: %v", sts)
 	}
 }
+
+// Чатын харилцагчдын онлайн төлөв: зөвхөн жагсаалтад нь харагдсан хүмүүсийнх (танихгүй хүнийх биш).
+func TestContactPresence(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, tid := register(t, srv, "cpteach", "teacher")
+	st, sid := register(t, srv, "cpstud", "student")
+	other, _ := register(t, srv, "cpother", "student")
+	_, ch := call(t, srv, "POST", "/api/teachers/cpteach/chat", st, "")
+	conv := ch["conversation"].(map[string]any)["id"].(string)
+	call(t, srv, "POST", "/api/chat/"+conv+"/messages", st, `{"body":"Сайн байна уу"}`)
+	pres := func(tok string) ([]any, map[string]any) {
+		code, d := call(t, srv, "GET", "/api/me/presence", tok, "")
+		if code != 200 {
+			t.Fatalf("presence: %d %v", code, d)
+		}
+		on, _ := d["online"].([]any)
+		seen, _ := d["seen"].(map[string]any)
+		return on, seen
+	}
+	has := func(l []any, id string) bool {
+		for _, x := range l {
+			if x == id {
+				return true
+			}
+		}
+		return false
+	}
+	if code, _ := call(t, srv, "GET", "/api/me/presence", "", ""); code != 401 {
+		t.Fatalf("нэвтрээгүй: %d", code)
+	}
+	dial := func(tok string) *websocket.Conn {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		c, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http")+"/api/chat/ws?token="+tok, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	wait := func(tok, id string, want bool) map[string]any {
+		for i := 0; i < 100; i++ {
+			if on, seen := pres(tok); has(on, id) == want {
+				return seen
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		t.Fatalf("%s online=%v болсонгүй", id, want)
+		return nil
+	}
+	sc := dial(st)
+	defer sc.Close(websocket.StatusNormalClosure, "")
+	time.Sleep(50 * time.Millisecond)
+	if on, _ := pres(tt); len(on) != 0 {
+		t.Fatalf("жагсаалт ачаалаагүй бол хэнийг ч харуулахгүй: %v", on)
+	}
+	callArr(t, srv, "GET", "/api/me/conversations", tt, "")
+	wait(tt, sid, true)
+	// Танихгүй хүн (жагсаалтад нь байхгүй) суралцагчийг онлайн гэж харахгүй.
+	call(t, srv, "GET", "/api/me/home", other, "")
+	if on, _ := pres(other); has(on, sid) {
+		t.Fatalf("танихгүй хүнд онлайн төлөв харагдах ёсгүй: %v", on)
+	}
+	// Суралцагч: багш нь жагсаалтад нь → багш холбогдвол online, салбал seen.
+	call(t, srv, "GET", "/api/me/home", st, "")
+	if on, _ := pres(st); has(on, tid) {
+		t.Fatalf("багш эхэндээ офлайн: %v", on)
+	}
+	tc := dial(tt)
+	wait(st, tid, true)
+	tc.Close(websocket.StatusNormalClosure, "")
+	if seen := wait(st, tid, false); seen[tid] == nil {
+		t.Fatalf("салсны дараа seen-д байх ёстой: %v", seen)
+	}
+}

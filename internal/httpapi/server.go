@@ -321,6 +321,7 @@ func (s *Server) Handler() http.Handler {
 	// Чат
 	mux.HandleFunc("POST /api/teachers/{username}/chat", s.handleStartChat)
 	mux.HandleFunc("GET /api/teachers/{username}/presence", s.handleTeacherPresence)
+	mux.HandleFunc("GET /api/me/presence", s.handleMyPresence)
 	mux.HandleFunc("DELETE /api/chat/{id}", s.handleHideChat)
 	mux.HandleFunc("POST /api/courses/{id}/chat", s.handleCourseChat)
 	mux.HandleFunc("GET /api/chat/{id}/messages", s.handleListMessages)

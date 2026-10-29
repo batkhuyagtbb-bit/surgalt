@@ -343,6 +343,7 @@ function chatRail() {
   $(".nav-links").insertAdjacentHTML("afterbegin", `<button class="icon-btn rail-toggle" id="railToggle" aria-label="Чат" aria-controls="studioRail" aria-expanded="false">${I.chat}<span class="bell-badge" id="railBadge" hidden></span></button>`);
   const rail = $("#studioRail"), home = $("#railHome"), thread = $("#railThread"), msgs = $("#railMsgs"), body = $("#railBody"), form = $("#railForm");
   let convs = [], unread = new Map(), timer = 0, cur = null, curGroup = false, myRole = "visitor";
+  let online = new Set(), seenAt = {}; // жагсаалтын хүмүүсээс одоо сайтад байгаа нь, сүүлд идэвхтэй байсан мөч (/api/me/presence)
   // Өргөн дэлгэцэд чат баруун талд наалддаг; хумих (⟩) товчоор нуугдаж, баруун ирмэгийн хавтсаар дахин нээгдэнэ.
   const wide = () => matchMedia("(min-width:1280px)").matches;
   document.body.insertAdjacentHTML("beforeend", `<button class="rail-tab" id="railTab" aria-label="Чат нээх" title="Чат нээх"><span class="rail-tab-ico">${I.chat}<i class="rail-tab-dot"></i></span><span class="rail-tab-txt">Чат</span><span class="bell-badge" id="railTabBadge" hidden></span></button>`);
@@ -367,10 +368,10 @@ function chatRail() {
     const out = new Map();
     if (teacher) {
       const list = await api("/api/me/conversations").catch(() => []);
-      list.forEach((c) => out.set(c.id, { id: c.id, kind: c.kind || "", title: c.visitor_name, sub: c.kind === "group" ? "Бүлэг · сургалтын суралцагчид" : c.user_id ? "Суралцагч" : "Зочин", last: c.last_message, at: c.last_message_at }));
+      list.forEach((c) => out.set(c.id, { id: c.id, kind: c.kind || "", title: c.visitor_name, sub: c.kind === "group" ? "Бүлэг · сургалтын суралцагчид" : c.user_id ? "Суралцагч" : "Зочин", peer: c.kind === "group" || c.kind === "team" ? "" : (c.teacher_id === u.id ? c.user_id : c.teacher_id) || "", last: c.last_message, at: c.last_message_at }));
     }
     const h = await api("/api/me/home").catch(() => null);
-    (h?.chats || []).forEach((c) => { if (!out.has(c.id)) out.set(c.id, { id: c.id, kind: c.kind || "", title: c.kind === "group" || c.kind === "team" ? c.title : c.teacher?.display_name || "", sub: c.kind === "group" ? "Бүлэг · " + (c.teacher?.display_name || "") : c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : "Багш", user: c.kind === "team" ? null : c.teacher, course: c.course_id || "", last: c.last_message, at: c.last_message_at }); });
+    (h?.chats || []).forEach((c) => { if (!out.has(c.id)) out.set(c.id, { id: c.id, kind: c.kind || "", title: c.kind === "group" || c.kind === "team" ? c.title : c.teacher?.display_name || "", sub: c.kind === "group" ? "Бүлэг · " + (c.teacher?.display_name || "") : c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : "Багш", user: c.kind === "team" ? null : c.teacher, peer: c.kind === "group" || c.kind === "team" ? "" : c.teacher?.id || "", course: c.course_id || "", last: c.last_message, at: c.last_message_at }); });
     return [...out.values()].sort((a, b) => new Date(b.at) - new Date(a.at));
   };
   // Хүмүүс: багшид — суралцагчид нь, суралцагчид — багш нар нь (яриа эхлээгүй байсан ч нэг дарж эхэлнэ).
@@ -393,14 +394,27 @@ function chatRail() {
     const q = $("#railSearch").value.trim().toLowerCase(), hit = (s) => !q || s.toLowerCase().includes(q);
     const shown = convs.filter((c) => hit(c.title));
     const convUsers = new Set(convs.map((c) => c.user?.id).filter(Boolean));
-    const ppl = people.filter((p) => hit(p.name) && !(p.convId && convs.some((c) => c.id === p.convId)) && !convUsers.has(p.id));
+    const isOn = (id) => !!id && online.has(id);
+    const ppl = people.filter((p) => hit(p.name) && !(p.convId && convs.some((c) => c.id === p.convId)) && !convUsers.has(p.id))
+      .sort((a, b) => isOn(b.id) - isOn(a.id)); // онлайн нь дээрээ
+    const userOf = (c) => c.user || people.find((p) => p.id === c.peer)?.user; // багшийн талын яриад зураг алга — суралцагчийн жагсаалтаас
+    const letter = (name) => `<span class="avatar avatar-sm" style="--h:${hueOfName(name)}">${esc(name.slice(0, 1).toUpperCase())}</span>`;
+    // Онлайн: яг одоо сайтад байгаа хүмүүс хамгийн дээр нэг мөрөнд (ногоон цагирагтай) — нэг дарж чатлана.
+    const live = new Map();
+    for (const c of convs) if (isOn(c.peer) && !live.has(c.peer)) { const cu = userOf(c); live.set(c.peer, { id: c.peer, name: cu?.display_name || c.title || "", user: cu, conv: c.id }); }
+    for (const p of people) if (isOn(p.id) && !live.has(p.id)) live.set(p.id, { id: p.id, name: p.name || "", user: p.user, conv: p.convId });
+    const lv = [...live.values()].filter((x) => hit(x.name));
     let i = 0;
+    // Нэр: 1-р мөрөнд эхний үг, 2-р мөрөнд үлдсэн нь (үгийн дундуур тасрахгүй, урт бол «…»).
+    const twoLines = (n) => { const [a = "", ...b] = n.trim().split(/\s+/); return `<b>${esc(a)}</b>` + (b.length ? `<b>${esc(b.join(" "))}</b>` : ""); };
+    const liveItem = (x) => `<button type="button" class="rail-live-item ${anim}" style="--i:${i++}" data-live="${esc(x.id)}" data-conv="${esc(x.conv || "")}" title="${esc(x.name)} · онлайн">${x.user ? avatarHTML(x.user) : letter(x.name)}<span>${twoLines(x.name)}</span></button>`;
     // Мөр бүрд hover-д дугуй «⋯» товч (товч дотор товч байж болохгүй тул хажууд нь, мөрийн бүрхүүл дотор).
-    const item = (c) => { const n = unread.get(c.id) || 0; return `<div class="rail-row ${anim}" style="--i:${i++}"><button class="rail-item ${n ? "unread" : ""} ${c.id === cur ? "active" : ""}" data-id="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group ${c.kind}">${c.kind === "team" ? I.people : I.group}</span>` : c.user ? avatarHTML(c.user) : `<span class="avatar avatar-sm" style="--h:${hueOfName(c.title)}">${esc(c.title.slice(0, 1).toUpperCase())}</span>`}
+    const item = (c) => { const n = unread.get(c.id) || 0, cu = userOf(c); return `<div class="rail-row ${anim}" style="--i:${i++}"><button class="rail-item ${n ? "unread" : ""} ${c.id === cur ? "active" : ""} ${isOn(c.peer) ? "on" : ""}" data-id="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group ${c.kind}">${c.kind === "team" ? I.people : I.group}</span>` : cu ? avatarHTML(cu) : letter(c.title)}
       <span class="grow"><span class="rail-row1"><strong>${esc(c.title)}</strong>${c.at ? `<time class="rail-time">${sameDay(c.at) ? fmtTime(c.at) : fmtDay(c.at)}</time>` : ""}</span><small>${c.last ? esc(c.last) : `<i>${esc(c.sub)}</i>`}</small></span>${n ? `<span class="rail-unread">${n > 9 ? "9+" : n}</span>` : ""}</button><button type="button" class="rail-more" data-more="${esc(c.id)}" aria-label="Чатын үйлдэл" aria-haspopup="menu" aria-expanded="false" title="Бусад">${I.more}</button></div>`; };
-    const person = (p) => `<button class="rail-item ${anim} rail-person" style="--i:${Math.min(i++, 12)}" data-person="${esc(p.id)}">${avatarHTML(p.user)}<span class="grow"><strong>${esc(p.name)}</strong><small><b>${esc(p.sub)}</b></small></span><span class="rail-new" aria-hidden="true">${I.chat}</span></button>`;
-    const sec = (title, n) => `<div class="rail-sec"><span>${title}</span><em>${n}</em></div>`;
-    $("#railList").innerHTML = (shown.length ? sec("Сүүлийн яриа", shown.length) + shown.map(item).join("") : "") + (ppl.length ? sec("Хүмүүс", ppl.length) + ppl.map(person).join("") : "") ||
+    const person = (p) => `<button class="rail-item ${anim} rail-person ${isOn(p.id) ? "on" : ""}" style="--i:${Math.min(i++, 12)}" data-person="${esc(p.id)}">${avatarHTML(p.user)}<span class="grow"><strong>${esc(p.name)}</strong><small><b>${isOn(p.id) ? "Онлайн · " : ""}${esc(p.sub)}</b></small></span><span class="rail-new" aria-hidden="true">${I.chat}</span></button>`;
+    const sec = (title, n, cls = "") => `<div class="rail-sec ${cls}"><span>${title}</span><em>${n}</em></div>`;
+    $("#railList").innerHTML = (lv.length ? sec("Онлайн", lv.length, "live") + `<div class="rail-live">${lv.map(liveItem).join("")}</div>` : "") +
+      (shown.length ? sec("Сүүлийн яриа", shown.length) + shown.map(item).join("") : "") + (ppl.length ? sec("Хүмүүс", ppl.length) + ppl.map(person).join("") : "") ||
       `<p class="muted small" style="padding:16px">${q ? "Илэрц алга" : teacher ? "Одоогоор чат алга. Профайлаа түгээгээрэй!" : "Багшийн профайл дээрх «Чатлах» эсвэл сургалтын «Бүлэг чат»-аар яриа эхэлнэ."}</p>`;
   };
   const load = async () => { convs = await norm(); draw(); };
@@ -439,12 +453,16 @@ function chatRail() {
   let curConv = null;
   const whoHTML = (c) => {
     const known = convs.find((x) => x.id === c.id), name = known?.title || c.visitor_name || "?";
+    // Хувийн ярианы нөгөө тал: онлайн бол аватар дээр ногоон цэг + «Онлайн», эс бөгөөс «Идэвхтэй байсан · 5 минутын өмнө».
+    const pid = c.kind === "group" || c.kind === "team" ? "" : known?.peer || (c.teacher_id === u.id ? c.user_id : c.teacher_id) || "";
+    const on = !!pid && online.has(pid), was = !on && pid && seenAt[pid], ku = known?.user || people.find((p) => p.id === pid)?.user;
     const av = c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group ${c.kind}">${c.kind === "team" ? I.people : I.group}</span>`
-      : known?.user ? avatarHTML(known.user, "avatar-sm") : `<span class="avatar avatar-sm" style="--h:${hueOfName(name)}">${esc(name.slice(0, 1).toUpperCase())}</span>`;
+      : ku ? avatarHTML(ku, "avatar-sm") : `<span class="avatar avatar-sm" style="--h:${hueOfName(name)}">${esc(name.slice(0, 1).toUpperCase())}</span>`;
     // Чатлаж буй багш дээр дарвал профайл руу, сургалтын бүлэг дээр дарвал сургалт руу (суралцагч, ангийн найз — нээлттэй профайлгүй).
     const course = known?.course || c.course_id || "";
     const href = c.kind === "group" && course ? `/c/${encodeURIComponent(course)}` : !teacher && !c.kind && known?.user?.username ? `/t/${encodeURIComponent(known.user.username)}` : "";
-    const body = `<span class="rw-av">${av}</span><span class="rw-txt"><strong>${esc(name)}</strong><small class="muted">${c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин")}</small></span>`;
+    const role = c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин");
+    const body = `<span class="rw-av ${on ? "on" : ""}">${av}</span><span class="rw-txt"><strong>${esc(name)}</strong><small class="muted">${on ? `<b class="rw-on">Онлайн</b> · ` : was ? `Идэвхтэй байсан · ${seenAgo(was)} · ` : ""}${role}</small></span>`;
     return href ? `<a class="rw-link" href="${href}" title="${c.kind === "group" ? "Сургалт руу очих" : "Багшийн профайл руу очих"}">${body}</a>` : body;
   };
   // show=false: самбарын нээлттэй/хумьсан төлөвийг өөрчлөхгүй (refresh-ийн дараа сэргээх, дахин холбогдох).
@@ -468,7 +486,7 @@ function chatRail() {
   };
   $("#railBack").onclick = () => { cur = null; ss.set("sg_rail_conv", null); thread.hidden = true; home.hidden = false; draw(); };
   $("#railSearch").addEventListener("input", draw);
-  $("#railList").addEventListener("click", (e) => { const mo = e.target.closest("[data-more]"); if (mo) return moreMenu(mo); const p = e.target.closest("[data-person]"); if (p) return startWith(p.dataset.person); const it = e.target.closest(".rail-item"); if (it) open(it.dataset.id); });
+  $("#railList").addEventListener("click", (e) => { const mo = e.target.closest("[data-more]"); if (mo) return moreMenu(mo); const lv = e.target.closest("[data-live]"); if (lv) return lv.dataset.conv ? open(lv.dataset.conv) : startWith(lv.dataset.live); const p = e.target.closest("[data-person]"); if (p) return startWith(p.dataset.person); const it = e.target.closest(".rail-item"); if (it) open(it.dataset.id); });
   $("#railList").addEventListener("scroll", () => closeMenu(), { passive: true });
   // «⋯» цэс: «Чат устгах» → баталгаажуулах (зөвхөн өөрийн талд устгана, нөгөө тал хэвээр харна).
   function closeMenu() { const m = $(".rail-menu"); if (!m) return; m._off?.(); m.remove(); $$(".rail-more[aria-expanded=true]").forEach((b) => b.setAttribute("aria-expanded", "false")); }
@@ -502,8 +520,24 @@ function chatRail() {
     try { const d = await api(`/api/chat/${cur}/meet`, { method: "POST" }); append(d.message); toast("Meet холбоос илгээгдлээ"); }
     catch (x) { toast(x.message, true); }
   });
+  // Онлайн төлөв: жагсаалтын хүмүүсээс хэн одоо сайтад байгааг 30 секунд тутам асууна (таб нуугдсан үед асуухгүй).
+  // Сервер зөвхөн жагсаалтад тань харагдсан хүмүүсийнхийг өгдөг тул жагсаалт ачаалсны дараа асууна.
+  let presT = 0;
+  const pollPresence = async () => {
+    clearTimeout(presT);
+    if (document.hidden) return;
+    try {
+      const d = await api("/api/me/presence"), next = new Set(d.online || []);
+      const changed = next.size !== online.size || [...next].some((id) => !online.has(id));
+      online = next; seenAt = d.seen || {};
+      if (changed) draw();
+      if (curConv && cur === curConv.id && !thread.hidden) $("#railWho").innerHTML = whoHTML(curConv);
+    } catch {}
+    presT = setTimeout(pollPresence, 30000);
+  };
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) pollPresence(); });
   Live.on((d) => {
-    if (d.type === "reconnected") { if (cur) open(cur, false); load(); return; } // тасарсан хугацааны мессежүүд
+    if (d.type === "reconnected") { if (cur) open(cur, false); loadPeople().then(load).then(pollPresence); return; } // тасарсан хугацааны мессежүүд; сервер дахин асвал онлайн төлөвийн жагсаалт ч шинэчлэгдэнэ
     if (THREAD_EVENTS.includes(d.type)) { th.event(d); return; }
     if (d.type !== "message") return;
     const m = d.message;
@@ -516,7 +550,7 @@ function chatRail() {
   // нарийн дэлгэцэд самбар нээлттэй байсан бол шууд нээнэ.
   if (ss.get("sg_rail_open") === "1" && !wide()) setRail(true);
   { const saved = ss.get("sg_rail_conv"); if (saved) open(saved, false); } // жагсаалт хүлээлгүй шууд яриа (жагсаалт→яриа солигдож анивчихгүй)
-  loadPeople().then(load).then(() => { if (curConv && cur === curConv.id) $("#railWho").innerHTML = whoHTML(curConv); });
+  loadPeople().then(load).then(() => { if (curConv && cur === curConv.id) $("#railWho").innerHTML = whoHTML(curConv); pollPresence(); });
   window.openRailChat = (id) => (id ? open(id) : setRail(true));
   // Сургалтын хуудасны товчнууд: нэвтэрсэн хүнд яриа энэ самбарт нээгдэнэ.
   window.railStartDirect = async (username) => { const d = await api(`/api/teachers/${username}/chat`, { method: "POST" }); await load(); open(d.conversation.id); };
@@ -3405,12 +3439,14 @@ async function share(title) {
   try { await navigator.clipboard.writeText(url); toast("Холбоос хуулагдлаа ✓"); } catch { toast(url); }
 }
 
+// «Идэвхтэй байсан · 12 минутын өмнө» — сүүлд сайтад байсан мөч (профайл, чатын гарчиг).
+function seenAgo(t) { const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 1 ? "саяхан" : m < 60 ? m + " минутын өмнө" : m < 1440 ? Math.floor(m / 60) + " цагийн өмнө" : "өчигдөр"; }
+
 // Багшийн онлайн төлөв: одоо сайтад байвал аватар дээр ногоон цэг + «Онлайн», эс бөгөөс сүүлийн 24 цагт
 // идэвхтэй байсан бол «Идэвхтэй байсан · 12 мин өмнө». Таб харагдаж байх үед 45 секунд тутам шинэчилнэ.
 function presence(username) {
   const pill = $("#pfLive"), dot = $("#pfPresence");
   if (!pill || !username) return;
-  const ago = (t) => { const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 1 ? "саяхан" : m < 60 ? m + " минутын өмнө" : m < 1440 ? Math.floor(m / 60) + " цагийн өмнө" : "өчигдөр"; };
   let busy = false;
   const tick = async () => {
     if (document.hidden || busy) return;
@@ -3419,7 +3455,7 @@ function presence(username) {
       const d = await api(`/api/teachers/${encodeURIComponent(username)}/presence`);
       const recent = !d.online && d.last_seen && Date.now() - new Date(d.last_seen) < 864e5;
       pill.classList.toggle("on", !!d.online); dot.hidden = !d.online; pill.hidden = !d.online && !recent;
-      pill.innerHTML = d.online ? `<i></i><b>Онлайн</b><span>· одоо сайтад байна</span>` : recent ? `<i></i><span>Идэвхтэй байсан · ${ago(d.last_seen)}</span>` : "";
+      pill.innerHTML = d.online ? `<i></i><b>Онлайн</b><span>· одоо сайтад байна</span>` : recent ? `<i></i><span>Идэвхтэй байсан · ${seenAgo(d.last_seen)}</span>` : "";
     } catch {} finally { busy = false; }
   };
   setTimeout(tick, 1200); // эзэмшигч өөрөө: WebSocket холбогдсоны дараа

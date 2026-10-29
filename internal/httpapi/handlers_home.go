@@ -534,6 +534,11 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if out.Tasks == nil {
 		out.Tasks = []HomeTask{}
 	}
+	// Чатын жагсаалтын хүмүүс (багш нар, ярианы нөгөө тал) — онлайн төлөвийг нь харж болно.
+	s.knowConvs(c.UID, convs)
+	for _, t := range out.Teachers {
+		s.seen.book.add(c.UID, t.ID)
+	}
 	w.Header().Set("Cache-Control", "private, no-store")
 	writeJSON(w, http.StatusOK, out)
 }
@@ -668,6 +673,9 @@ func (s *Server) handleMyStudents(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.studentRows(r.Context(), c.UID, courses)
 	if s.storeErr(w, r, err) {
 		return
+	}
+	for _, row := range rows {
+		s.seen.book.add(c.UID, row.User.ID)
 	}
 	w.Header().Set("Cache-Control", "private, no-store")
 	writeJSON(w, http.StatusOK, rows)

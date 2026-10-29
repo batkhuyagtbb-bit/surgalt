@@ -4603,3 +4603,32 @@ ol.thread .msg-day{letter-spacing:.03em}
 .dash-head .inl-pen:hover{background:rgba(255,255,255,.28);color:#fff}
 .dash-head .inl-hint{color:rgba(255,255,255,.78)}
 .dash-head .inl-hint kbd{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.35);color:#fff}
+
+/* ===== Чат: онлайн хүмүүс — хамгийн дээр нэг мөрөнд (ногоон цагираг), жагсаалтад аватар дээр ногоон цэг ===== */
+.rail-item .avatar{overflow:visible}
+.rail-item .avatar img{border-radius:50%}
+.rail-item .avatar::after,.rail-item.unread .avatar::after{display:none;animation:none}
+.rail-item.on .avatar::after{display:block;width:13px;height:13px;right:-2px;bottom:-2px;background:#22c55e;border:2.5px solid var(--surface)}
+.rail-row:hover .rail-item.on .avatar::after,.rail-item.rail-person.on:hover .avatar::after{border-color:var(--ink-2)}
+.rail-row .rail-item.active.on .avatar::after{border-color:var(--brand-soft)}
+.rail-sec.live{color:#15803d}
+.rail-sec.live span{display:inline-flex;align-items:center;gap:7px}
+.rail-sec.live span::before{content:"";width:7px;height:7px;border-radius:50%;background:#22c55e;animation:live-ping 1.8s ease-out infinite}
+.rail-sec.live em{background:#dcfce7;color:#15803d}
+.rail-live{display:flex;gap:2px;overflow-x:auto;overscroll-behavior-x:contain;padding:2px 4px 8px;margin-bottom:2px;scrollbar-width:none;border-bottom:1px solid var(--line)}
+.rail-live::-webkit-scrollbar{display:none}
+.rail-live-item{flex:0 0 68px;min-width:0;display:flex;flex-direction:column;align-items:center;gap:7px;padding:8px 3px 7px;border:0;border-radius:14px;background:none;color:var(--text);font:inherit;cursor:pointer;transition:background .18s,transform .18s}
+.rail-live-item:hover{background:var(--ink-2)}
+.rail-live-item:active{transform:scale(.95)}
+.rail-live-item:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+.rail-live-item .avatar{width:50px;height:50px;font-size:1rem;position:relative;overflow:visible;box-shadow:0 0 0 2px var(--surface),0 0 0 4px #4ade80}
+.rail-live-item .avatar img{border-radius:50%}
+.rail-live-item .avatar::after{content:"";position:absolute;right:-2px;bottom:-2px;width:14px;height:14px;border-radius:50%;background:#22c55e;border:2.5px solid var(--surface)}
+.rail-live-item:hover .avatar::after{border-color:var(--ink-2)}
+.rail-live-item>span:last-child{width:100%;min-width:0;font-size:.72rem;line-height:1.25;text-align:center}
+.rail-live-item>span:last-child b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rail-live-item>span:last-child b+b{font-weight:500;color:var(--muted)}
+#railWho .rw-av{position:relative}
+#railWho .rw-av.on::after{content:"";position:absolute;right:-2px;bottom:-2px;width:12px;height:12px;border-radius:50%;background:#22c55e;border:2px solid var(--surface)}
+#railWho .rw-on{color:#16a34a;font-weight:700}
+@media (prefers-reduced-motion:reduce){.rail-sec.live span::before{animation:none}}
