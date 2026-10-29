@@ -46,6 +46,9 @@ type Config struct {
 	AdminPath     string
 	AdminLogin    string
 	AdminPassHash string // bcrypt
+
+	// Хайлтын системд сайтаа баталгаажуулах код (Google Search Console, Bing Webmaster) — seo.go.
+	GoogleSiteVerification, BingSiteVerification string
 }
 
 type Server struct {
@@ -76,6 +79,8 @@ type Server struct {
 	qrs       *cache.Cache[[]byte]
 	ogs       *cache.Cache[[]byte] // профайлыг хуваалцах зураг (og.go)
 	alive     *cache.Cache[int64]  // хэрэглэгч бүрийн «энэ цагаас өмнөх токен хүчингүй» (миллисекунд; account.go)
+	seen      presence             // багшийн онлайн төлөв, сүүлд идэвхтэй байсан мөч (presence.go)
+	smap      sitemapCache         // /sitemap.xml (seo.go)
 	notif     *notifier
 	search    *searchIndex
 
@@ -95,6 +100,7 @@ type Server struct {
 
 func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore *files.Store, log *slog.Logger) *Server {
 	isNF := func(err error) bool { return errors.Is(err, store.ErrNotFound) }
+	siteVerifyGoogle, siteVerifyBing = cfg.GoogleSiteVerification, cfg.BingSiteVerification
 	s := &Server{
 		cfg: cfg, store: st, tokens: tokens, hub: hub, files: fstore, log: log,
 		tmpl:      parseTemplates(),
@@ -161,6 +167,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/home", s.handleHome)
 	mux.HandleFunc("GET /api/me/profile/insights", s.handleProfileInsights)
 	mux.HandleFunc("PUT /api/me/profile", s.handleUpdateProfile)
+	mux.HandleFunc("PUT /api/me/name", s.handleUpdateName)
 	mux.HandleFunc("POST /api/me/consent", s.handleConsent)
 	mux.HandleFunc("POST /api/me/role", s.handleSetRole)
 	mux.HandleFunc("POST /api/auth/forgot", s.handleForgot)
@@ -313,6 +320,8 @@ func (s *Server) Handler() http.Handler {
 
 	// Чат
 	mux.HandleFunc("POST /api/teachers/{username}/chat", s.handleStartChat)
+	mux.HandleFunc("GET /api/teachers/{username}/presence", s.handleTeacherPresence)
+	mux.HandleFunc("DELETE /api/chat/{id}", s.handleHideChat)
 	mux.HandleFunc("POST /api/courses/{id}/chat", s.handleCourseChat)
 	mux.HandleFunc("GET /api/chat/{id}/messages", s.handleListMessages)
 	mux.HandleFunc("POST /api/chat/{id}/messages", s.handleSendMessage)
@@ -351,6 +360,8 @@ func (s *Server) Handler() http.Handler {
 
 	// Хуудсууд
 	mux.HandleFunc("GET /{$}", s.pageHome)
+	mux.HandleFunc("GET /robots.txt", s.handleRobots)
+	mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
 	mux.HandleFunc("GET /t/{username}", s.pageProfile)
 	mux.HandleFunc("GET /c/{id}", s.pageCourse)
 	mux.HandleFunc("GET /b/{id}", s.pageBook)

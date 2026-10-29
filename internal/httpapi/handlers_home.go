@@ -301,6 +301,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	teams, _ := s.store.UserTeamConversations(ctx, c.UID, homeMaxChats)
 	convs = append(append(convs, dms...), teams...)
 	sort.SliceStable(convs, func(i, j int) bool { return convs[i].LastMessageAt.After(convs[j].LastMessageAt) })
+	convs = s.dropHiddenConvs(ctx, c.UID, convs)
 
 	out := Home{User: s.me(u), Courses: []HomeCourse{}, Lessons: []HomeLesson{}, Pending: []HomeOrder{},
 		Meetings: []HomeMeeting{}, Teachers: []TeacherBrief{}, Chats: []HomeChat{}}
@@ -707,5 +708,6 @@ func (s *Server) handleStudentChat(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
+	msgs = s.dropHiddenMsgs(r.Context(), c.UID, conv.ID, msgs)
 	writeJSON(w, http.StatusOK, map[string]any{"conversation": conv, "messages": msgs, "me": store.SenderTeacher})
 }

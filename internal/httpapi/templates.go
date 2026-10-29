@@ -142,6 +142,10 @@ func parseTemplates() *template.Template {
 			}
 			return ""
 		},
+		// SEO (seo.go): бүтэцтэй өгөгдөл, гарчиг, тайлбар, баталгаажуулах код.
+		"ldProfile": ldProfile, "ldCourse": ldCourse, "ldBook": ldBook, "ldHome": ldHome,
+		"metaDesc": metaDesc, "courseDesc": courseDesc, "pageTitle": pageTitle, "abs": absURL,
+		"gsv": func() string { return siteVerifyGoogle }, "bsv": func() string { return siteVerifyBing },
 		"sub": func(a, b int) int { return a - b },
 		"add": func(a, b int) int { return a + b },
 		"dict": func(kv ...any) map[string]any {

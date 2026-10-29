@@ -1,6 +1,6 @@
 {{$t := .D.Teacher}}
-{{template "head" (dict "Title" (printf "%s — %s" $t.DisplayName (or $t.Headline "Багш")) "Desc" .D.OGDesc "Image" .D.OGImage "ImageW" 1200 "ImageH" 630 "ImageAlt" (printf "%s — surgalt.mn дээрх багшийн профайл" $t.DisplayName) "URL" (printf "%s/t/%s" .PublicURL $t.Username) "Type" "profile" "Page" "profile")}}
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Person","name":{{$t.DisplayName}},"jobTitle":{{or $t.Headline "Багш"}},"description":{{$t.Bio}},"knowsAbout":{{$t.Subjects}}}</script>
+{{template "head" (dict "Title" (pageTitle $t.DisplayName (or $t.Headline "Багш")) "Desc" .D.OGDesc "Image" .D.OGImage "ImageW" 1200 "ImageH" 630 "ImageAlt" (printf "%s — surgalt.mn дээрх багшийн профайл" $t.DisplayName) "URL" (printf "%s/t/%s" .PublicURL $t.Username) "Type" "profile" "Page" "profile")}}
+<script type="application/ld+json">{{ldProfile .D .PublicURL}}</script>
 
 {{/* Бүтэц: нүүр зураг → давхцсан зураг + нэр + үйлдлүүд → таб цэс → зүүн танилцуулга / баруун агуулга.
      Хуудас бүх зочинд ижил кэшлэгдэнэ; эзэмшигчийн засах хэрэгслийг ([data-owner]) app.js нэвтэрсэн эзэнд л нээнэ. */}}
@@ -19,9 +19,11 @@
       <div class="pf-avatar">
         <div class="avatar" id="pfAvatar" style="--h:{{hue $t.Username}}">{{if $t.AvatarURL}}<img src="{{$t.AvatarURL}}" alt="{{$t.DisplayName}}">{{else}}{{initials $t.DisplayName}}{{end}}</div>
         <button class="pf-avatar-btn" data-owner data-upload="avatar" hidden aria-label="Профайл зураг солих">{{icon "camera"}}</button>
+        <span class="pf-presence" id="pfPresence" hidden title="Онлайн — одоо сайтад байна"></span>
       </div>
       <div class="pf-id">
-        <h1>{{$t.DisplayName}}<span class="pf-verified" title="Баталгаажсан багш">{{icon "check" 14}}</span></h1>
+        <h1><span class="pf-name" id="pfName">{{$t.DisplayName}}</span><span class="pf-verified" title="Баталгаажсан багш">{{icon "check" 14}}</span></h1>
+        <p class="pf-live" id="pfLive" hidden aria-live="polite"></p>
         {{with $t.Headline}}<p class="pf-headline">{{.}}</p>{{end}}
         <p class="pf-counts"><b data-count="{{$t.StudentCount}}">{{$t.StudentCount}}</b> суралцагч · <b data-count="{{$t.CourseCount}}">{{$t.CourseCount}}</b> сургалт · <b data-count="{{$t.LessonCount}}">{{$t.LessonCount}}</b> хичээл</p>
       </div>

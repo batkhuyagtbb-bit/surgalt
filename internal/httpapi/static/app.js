@@ -38,6 +38,7 @@ const UI_ICONS = {
   chev: '<path d="M6 9l6 6 6-6"/>',
   next: '<path d="M9 6l6 6-6 6"/>',
   expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
 };
 const icon = (n, size = 18) => `<svg data-ico="${n}" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI_ICONS[n] || ""}</svg>`;
 // Хөдөлгөөнт дүрсэнд (animateIcons) шинээр ашигласан нэрсийн статик зам (байхгүй бол л нэмнэ).
@@ -164,6 +165,14 @@ function reveals() {
   $$(".reveal:not(.in), .split:not(.in)").forEach((el) => io.observe(el));
 }
 
+// Хэсэг солигдоход зөөлөн гарч ирнэ (профайлын таб, студийн хэсэг). Дуусахад класс авна — дараагийн дахин рендерт хөдлөхгүй.
+function panelIn(el) {
+  if (!el || reduce) return;
+  clearTimeout(el._pfIn);
+  el.classList.remove("pf-in", "fade-in"); void el.offsetWidth; el.classList.add("pf-in");
+  el._pfIn = setTimeout(() => el.classList.remove("pf-in"), 900);
+}
+
 function counters() {
   const io = new IntersectionObserver((es) => es.forEach((e) => {
     if (!e.isIntersecting) return;
@@ -240,7 +249,8 @@ function ripples() {
     if (!el || el.disabled) return;
     const r = el.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2.2;
     if (getComputedStyle(el).position === "static") el.style.position = "relative";
-    el.style.overflow = "hidden";
+    // clip — hidden шиг scroll container болдоггүй: grid/flex жагсаалтын мөр (ж: чатын жагсаалт) агуулгаасаа доош шахагдахгүй.
+    if (!el.style.overflow) el.style.overflow = CSS.supports?.("overflow", "clip") ? "clip" : "hidden";
     const s = document.createElement("span");
     s.className = "ripple";
     s.style.cssText = `width:${d}px;height:${d}px;left:${e.clientX - r.left - d / 2}px;top:${e.clientY - r.top - d / 2}px`;
@@ -301,6 +311,8 @@ function chatRail() {
   }
   const teacher = u.role === "teacher";
   const I = {
+    more: `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>`,
+    trash: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>`,
     chat: `<svg data-ico="chat" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>`,
     x: `<svg data-ico="x" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>`,
     back: `<svg data-ico="back" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>`,
@@ -383,8 +395,9 @@ function chatRail() {
     const convUsers = new Set(convs.map((c) => c.user?.id).filter(Boolean));
     const ppl = people.filter((p) => hit(p.name) && !(p.convId && convs.some((c) => c.id === p.convId)) && !convUsers.has(p.id));
     let i = 0;
-    const item = (c) => { const n = unread.get(c.id) || 0; return `<button class="rail-item ${anim} ${n ? "unread" : ""} ${c.id === cur ? "active" : ""}" style="--i:${i++}" data-id="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group ${c.kind}">${c.kind === "team" ? I.people : I.group}</span>` : c.user ? avatarHTML(c.user) : `<span class="avatar avatar-sm" style="--h:${hueOfName(c.title)}">${esc(c.title.slice(0, 1).toUpperCase())}</span>`}
-      <span class="grow"><span class="rail-row1"><strong>${esc(c.title)}</strong>${c.at ? `<time class="rail-time">${sameDay(c.at) ? fmtTime(c.at) : fmtDay(c.at)}</time>` : ""}</span><small>${c.last ? esc(c.last) : `<i>${esc(c.sub)}</i>`}</small></span>${n ? `<span class="rail-unread">${n > 9 ? "9+" : n}</span>` : ""}</button>`; };
+    // Мөр бүрд hover-д дугуй «⋯» товч (товч дотор товч байж болохгүй тул хажууд нь, мөрийн бүрхүүл дотор).
+    const item = (c) => { const n = unread.get(c.id) || 0; return `<div class="rail-row ${anim}" style="--i:${i++}"><button class="rail-item ${n ? "unread" : ""} ${c.id === cur ? "active" : ""}" data-id="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group ${c.kind}">${c.kind === "team" ? I.people : I.group}</span>` : c.user ? avatarHTML(c.user) : `<span class="avatar avatar-sm" style="--h:${hueOfName(c.title)}">${esc(c.title.slice(0, 1).toUpperCase())}</span>`}
+      <span class="grow"><span class="rail-row1"><strong>${esc(c.title)}</strong>${c.at ? `<time class="rail-time">${sameDay(c.at) ? fmtTime(c.at) : fmtDay(c.at)}</time>` : ""}</span><small>${c.last ? esc(c.last) : `<i>${esc(c.sub)}</i>`}</small></span>${n ? `<span class="rail-unread">${n > 9 ? "9+" : n}</span>` : ""}</button><button type="button" class="rail-more" data-more="${esc(c.id)}" aria-label="Чатын үйлдэл" aria-haspopup="menu" aria-expanded="false" title="Бусад">${I.more}</button></div>`; };
     const person = (p) => `<button class="rail-item ${anim} rail-person" style="--i:${Math.min(i++, 12)}" data-person="${esc(p.id)}">${avatarHTML(p.user)}<span class="grow"><strong>${esc(p.name)}</strong><small><b>${esc(p.sub)}</b></small></span><span class="rail-new" aria-hidden="true">${I.chat}</span></button>`;
     const sec = (title, n) => `<div class="rail-sec"><span>${title}</span><em>${n}</em></div>`;
     $("#railList").innerHTML = (shown.length ? sec("Сүүлийн яриа", shown.length) + shown.map(item).join("") : "") + (ppl.length ? sec("Хүмүүс", ppl.length) + ppl.map(person).join("") : "") ||
@@ -455,7 +468,35 @@ function chatRail() {
   };
   $("#railBack").onclick = () => { cur = null; ss.set("sg_rail_conv", null); thread.hidden = true; home.hidden = false; draw(); };
   $("#railSearch").addEventListener("input", draw);
-  $("#railList").addEventListener("click", (e) => { const p = e.target.closest("[data-person]"); if (p) return startWith(p.dataset.person); const it = e.target.closest(".rail-item"); if (it) open(it.dataset.id); });
+  $("#railList").addEventListener("click", (e) => { const mo = e.target.closest("[data-more]"); if (mo) return moreMenu(mo); const p = e.target.closest("[data-person]"); if (p) return startWith(p.dataset.person); const it = e.target.closest(".rail-item"); if (it) open(it.dataset.id); });
+  $("#railList").addEventListener("scroll", () => closeMenu(), { passive: true });
+  // «⋯» цэс: «Чат устгах» → баталгаажуулах (зөвхөн өөрийн талд устгана, нөгөө тал хэвээр харна).
+  function closeMenu() { const m = $(".rail-menu"); if (!m) return; m._off?.(); m.remove(); $$(".rail-more[aria-expanded=true]").forEach((b) => b.setAttribute("aria-expanded", "false")); }
+  function moreMenu(btn) {
+    const was = btn.getAttribute("aria-expanded") === "true"; closeMenu(); if (was) return;
+    const id = btn.dataset.more, conv = convs.find((x) => x.id === id); if (!conv) return;
+    const m = document.createElement("div"); m.className = "rail-menu"; m.setAttribute("role", "menu");
+    const place = () => { const r = btn.getBoundingClientRect(); m.style.top = Math.max(8, Math.min(r.bottom + 6, innerHeight - m.offsetHeight - 8)) + "px"; m.style.left = Math.max(8, Math.min(r.right - m.offsetWidth, innerWidth - m.offsetWidth - 8)) + "px"; };
+    const step1 = () => { m.innerHTML = `<button type="button" role="menuitem" class="danger" data-rm="ask">${I.trash}<span>Чат устгах</span></button>`; place(); };
+    m.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-rm]"); if (!b) return;
+      e.stopPropagation();
+      if (b.dataset.rm === "ask") { m.innerHTML = `<p><b>«${esc(conv.title || "Чат")}» чатыг устгах уу?</b>Мессежүүд зөвхөн таны талд устгагдана — нөгөө тал харсаар байна.</p><div class="rm-acts"><button type="button" data-rm="no">Болих</button><button type="button" class="rm-del" data-rm="yes">Устгах</button></div>`; place(); $(".rm-del", m).focus(); return; }
+      if (b.dataset.rm === "no") return closeMenu();
+      b.disabled = true;
+      try {
+        await api(`/api/chat/${encodeURIComponent(id)}`, { method: "DELETE" });
+        closeMenu(); convs = convs.filter((x) => x.id !== id); unread.delete(id); badge();
+        if (cur === id) { cur = null; ss.set("sg_rail_conv", null); thread.hidden = true; home.hidden = false; }
+        draw(); toast("🗑 Чат устгагдлаа");
+      } catch (x) { b.disabled = false; toast(x.message, true); }
+    });
+    document.body.append(m); step1(); btn.setAttribute("aria-expanded", "true");
+    const away = (e) => { if (!m.contains(e.target) && e.target !== btn && !btn.contains(e.target)) closeMenu(); };
+    const esc_ = (e) => { if (e.key === "Escape") closeMenu(); };
+    setTimeout(() => { document.addEventListener("pointerdown", away); document.addEventListener("keydown", esc_); addEventListener("resize", closeMenu); }, 0);
+    m._off = () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", esc_); removeEventListener("resize", closeMenu); };
+  }
   form.addEventListener("click", async (e) => {
     if (!e.target.closest("#railMeet") || !cur) return;
     try { const d = await api(`/api/chat/${cur}/meet`, { method: "POST" }); append(d.message); toast("Meet холбоос илгээгдлээ"); }
@@ -3364,8 +3405,31 @@ async function share(title) {
   try { await navigator.clipboard.writeText(url); toast("Холбоос хуулагдлаа ✓"); } catch { toast(url); }
 }
 
+// Багшийн онлайн төлөв: одоо сайтад байвал аватар дээр ногоон цэг + «Онлайн», эс бөгөөс сүүлийн 24 цагт
+// идэвхтэй байсан бол «Идэвхтэй байсан · 12 мин өмнө». Таб харагдаж байх үед 45 секунд тутам шинэчилнэ.
+function presence(username) {
+  const pill = $("#pfLive"), dot = $("#pfPresence");
+  if (!pill || !username) return;
+  const ago = (t) => { const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 1 ? "саяхан" : m < 60 ? m + " минутын өмнө" : m < 1440 ? Math.floor(m / 60) + " цагийн өмнө" : "өчигдөр"; };
+  let busy = false;
+  const tick = async () => {
+    if (document.hidden || busy) return;
+    busy = true;
+    try {
+      const d = await api(`/api/teachers/${encodeURIComponent(username)}/presence`);
+      const recent = !d.online && d.last_seen && Date.now() - new Date(d.last_seen) < 864e5;
+      pill.classList.toggle("on", !!d.online); dot.hidden = !d.online; pill.hidden = !d.online && !recent;
+      pill.innerHTML = d.online ? `<i></i><b>Онлайн</b><span>· одоо сайтад байна</span>` : recent ? `<i></i><span>Идэвхтэй байсан · ${ago(d.last_seen)}</span>` : "";
+    } catch {} finally { busy = false; }
+  };
+  setTimeout(tick, 1200); // эзэмшигч өөрөө: WebSocket холбогдсоны дараа
+  setInterval(tick, 45000);
+  document.addEventListener("visibilitychange", tick);
+}
+
 function profilePage() {
   const root = $(".pf");
+  presence(root.dataset.teacher);
   $$("[data-open-qr]").forEach((b) => b.addEventListener("click", () => openModal($("#qrModal"))));
   $$("[data-copy-link]").forEach((b) => b.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(location.origin + location.pathname); toast("Холбоос хуулагдлаа ✓"); } catch { toast(location.href); }
@@ -3403,21 +3467,30 @@ function profilePage() {
   const moveInk = () => { const a = $(".pf-tab.active", tabs); if (a) { ink.style.width = a.offsetWidth + "px"; ink.style.transform = `translateX(${a.offsetLeft}px)`; } };
   // Эзэмшигчийн горимд зарим таб студийн удирдлагын хэсгийг (m-*) харуулна.
   const MANAGED = { overview: "overview", courses: "courses", books: "books", live: "live", files: "files", students: "students", wallet: "wallet" };
-  let courseArg = null;
-  const showTab = (name, scroll) => {
+  let courseArg = null, swapT = 0;
+  // fx: таб дээр дарсан — хуучин хэсэг богино бүдгэрээд, шинэ хэсэг шатлан гарч ирнэ.
+  const showTab = (name, scroll, fx) => {
     const btn = tabBtns.find((b) => b.dataset.tab === name);
     if (!btn || (btn.hasAttribute("data-owner-tab") && !root.classList.contains("is-owner"))) return false;
     tabBtns.forEach((b) => { const on = b.dataset.tab === name; b.classList.toggle("active", on); b.setAttribute("aria-selected", on); });
     const manage = root.classList.contains("is-owner") && MANAGED[name];
     const want = manage ? "m-" + name : name;
-    panels.forEach((p) => (p.hidden = p.dataset.panel !== want));
-    root.classList.toggle("manage", !!manage);
+    const cur = panels.find((p) => !p.hidden), next = panels.find((p) => p.dataset.panel === want);
+    const swap = () => {
+      panels.forEach((p) => { p.hidden = p !== next; p.classList.remove("pf-out"); });
+      root.classList.toggle("manage", !!manage);
+      if (cur !== next) panelIn(next);
+      moveInk(); reveals();
+    };
+    clearTimeout(swapT);
+    if (fx && cur && next && cur !== next && !reduce) { panels.forEach((p) => p.classList.toggle("pf-out", p === cur)); swapT = setTimeout(swap, 140); }
+    else swap();
     if (manage && window.Studio) {
       const box = $(`[data-panel="m-${name}"]`);
       if (name === "courses" && courseArg) window.Studio.mount(box, "course", courseArg);
       else window.Studio.mount(box, MANAGED[name]);
     }
-    moveInk(); reveals();
+    moveInk();
     $(".pf-tab.active", tabs)?.scrollIntoView({ block: "nearest", inline: "center" });
     if (scroll && root.classList.contains("pf-stuck")) scrollTo({ top: $(".pf-body").offsetTop - 60, behavior: "smooth" });
     return true;
@@ -3425,14 +3498,14 @@ function profilePage() {
   tabs.addEventListener("click", (e) => {
     const b = e.target.closest(".pf-tab"); if (!b) return;
     if (b.dataset.tab === "chat") { window.openRailChat?.(); return; } // чат баруун самбарт нээгдэнэ
-    courseArg = null; showTab(b.dataset.tab, true); history.replaceState(null, "", "#" + b.dataset.tab);
+    courseArg = null; showTab(b.dataset.tab, true, true); history.replaceState(null, "", "#" + b.dataset.tab);
   });
   root.addEventListener("click", (e) => {
     const el = e.target.closest("[data-quick]"); if (!el) return;
     if (el.dataset.quick === "chat") { e.preventDefault(); window.openRailChat?.(); }
     if (el.dataset.quick === "new-course") { try { sessionStorage.setItem("sg_new_course", "1"); } catch {} if (location.hash === "#courses") fromHash(); }
   });
-  $$("[data-tab-go]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); showTab(a.dataset.tabGo); $(".pf-body").scrollIntoView({ behavior: "smooth" }); }));
+  $$("[data-tab-go]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); showTab(a.dataset.tabGo, false, true); $(".pf-body").scrollIntoView({ behavior: "smooth" }); }));
   // Хаяг (#courses, #course=<id>, #settings …) студийн хэсгүүдтэй ижил үгсээр ажиллана.
   const fromHash = () => {
     const h = new URLSearchParams(location.hash.slice(1));
@@ -3507,6 +3580,56 @@ function profilePage() {
   }).catch(() => {});
 }
 
+const nameInitials = (n) => (n || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+
+/* Нэрийг шууд (inline) засах: нэр эсвэл ✎ дээр дарахад тэр дор нь засварлана — Enter/гадна дарах — хадгална,
+   Esc — болино. Зөвхөн нэр солигдоно (PUT /api/me/name). can() худал бол (ж: «зочны нүдээр») идэвхгүй. */
+function inlineName(el, done, can = () => true) {
+  if (!el || el._inl) return;
+  el._inl = true;
+  const host = el.closest("h1,h2") || el.parentElement;
+  el.classList.add("inl-name"); el.tabIndex = 0; el.setAttribute("role", "button");
+  el.setAttribute("aria-label", "Нэр: " + el.textContent.trim() + " — засахын тулд дарна уу"); el.title = "Нэрээ засах";
+  host.insertAdjacentHTML("beforeend", `<button type="button" class="inl-pen" aria-label="Нэрээ засах" title="Нэрээ засах">${icon("edit", 15)}</button>`);
+  const pen = host.lastElementChild;
+  let orig = "", hint = null;
+  const start = () => {
+    if (!can() || el.isContentEditable || el.classList.contains("saving")) return;
+    orig = el.textContent;
+    el.contentEditable = "plaintext-only"; if (el.contentEditable !== "plaintext-only") el.contentEditable = "true";
+    el.classList.add("editing"); el.removeAttribute("role"); el.spellcheck = false;
+    el.focus();
+    const r = document.createRange(); r.selectNodeContents(el); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    hint = document.createElement("small"); hint.className = "inl-hint"; hint.innerHTML = "<kbd>Enter</kbd> хадгалах · <kbd>Esc</kbd> болих";
+    host.after(hint);
+  };
+  const finish = async (save) => {
+    if (!el.isContentEditable) return;
+    const v = el.textContent.replace(/\s+/g, " ").trim();
+    el.contentEditable = "false"; el.classList.remove("editing"); el.setAttribute("role", "button"); hint?.remove(); hint = null;
+    if (!save || v === orig.trim()) { el.textContent = orig; return; }
+    if (!v || [...v].length > 80) { el.textContent = orig; toast("Нэр 1–80 тэмдэгт байна", true); return; }
+    el.textContent = v; el.classList.add("saving");
+    try {
+      const me = await api("/api/me/name", { method: "PUT", body: { display_name: v } });
+      Auth.set(Auth.token, me); el.textContent = me.display_name;
+      el.setAttribute("aria-label", "Нэр: " + me.display_name + " — засахын тулд дарна уу");
+      el.classList.remove("saved"); void el.offsetWidth; el.classList.add("saved");
+      toast("✓ Нэр шинэчлэгдлээ"); done?.(me, orig.trim());
+    } catch (x) { el.textContent = orig; toast(x.message, true); }
+    finally { el.classList.remove("saving"); }
+  };
+  el.addEventListener("click", start);
+  pen.addEventListener("click", (e) => { e.preventDefault(); start(); });
+  el.addEventListener("keydown", (e) => {
+    if (!el.isContentEditable) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); start(); } return; }
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); }
+  });
+  el.addEventListener("blur", () => finish(true));
+  el.addEventListener("paste", (e) => { if (!el.isContentEditable) return; e.preventDefault(); document.execCommand("insertText", false, (e.clipboardData?.getData("text/plain") || "").replace(/\s+/g, " ").slice(0, 80)); });
+}
+
 /* Эзэмшигч профайл дээрээ шууд засна: зураг солих, мэдээлэл засах, зочны нүдээр харах. */
 function profileOwner(root, h) {
   const LINK_KEYS = ["website", "facebook", "instagram", "youtube"];
@@ -3522,6 +3645,12 @@ function profileOwner(root, h) {
     $(".pf-ink").style.width = "0"; requestAnimationFrame(() => dispatchEvent(new Event("resize")));
   };
   setMode(true);
+  // Нэрээ профайл дээрээ шууд засна (зочны нүдээр харах үед идэвхгүй).
+  inlineName($("#pfName"), (me, old) => {
+    $$(".pf-mini strong").forEach((s) => (s.textContent = me.display_name));
+    document.title = document.title.replace(old, me.display_name);
+    if (!me.avatar_url) $$("#pfAvatar, .pf-mini .avatar").forEach((a) => { if (!a.querySelector("img")) a.textContent = nameInitials(me.display_name); });
+  }, () => root.classList.contains("is-owner"));
   $$("[data-view-as]").forEach((b) => b.addEventListener("click", () => { setMode(!root.classList.contains("is-owner")); root._fromHash() || root._showTab("courses"); }));
   // Студийн хэсгүүд (тойм, сургалт, файл, шууд хичээл, тохиргоо, чат) энэ хуудсан дээр ачаалагдана.
   $$("[data-owner-tab]").forEach((b) => (b.hidden = false));
@@ -3838,7 +3967,7 @@ async function homePage() {
     <div class="course-meta"><span>${c.course.lesson_count} хичээл</span><span class="price free">▶ Үргэлжлүүлэх</span></div></div></a>`;
 
   // «Сурах» хуудас багш, суралцагч хоёрт яг ижил (багш ч бусдын сургалтад суралцана; багшлах хэсэг нь дээд цэсний «Багшлах»).
-  const parts = [`<div class="dash-head">${avatarHTML(u, "avatar-md")}<div class="grow"><h1>${hello}, ${esc(u.display_name.split(" ")[0])}</h1>
+  const parts = [`<div class="dash-head">${avatarHTML(u, "avatar-md")}<div class="grow"><h1>${hello}, <span id="stuName">${esc(u.display_name)}</span></h1>
       <p>${h.courses.length ? `Танд ${h.courses.length} сургалт${h.meetings.length ? `, ${h.meetings.length} шууд хичээл` : ""} байна.` : "Багшийнхаа профайлаас анхны сургалтаа сонгоорой."}</p></div>
       <button class="btn" data-student-settings>Профайл засах</button></div>`,
     `<div class="tiles">
@@ -3981,6 +4110,11 @@ async function homePage() {
       <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`);
   noteStories($("#stRail"));
   $("[data-student-settings]")?.addEventListener("click", () => openModal($("#stuModal")));
+  // Нэрээ мэндчилгээн дээрээ шууд засна.
+  inlineName($("#stuName"), (me) => {
+    const f = $("#stuForm"); if (f) f.display_name.value = me.display_name;
+    const av = $(".dash-head .avatar"); if (av && !av.querySelector("img")) av.textContent = nameInitials(me.display_name);
+  });
   $("#stuForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = e.target;
@@ -5092,7 +5226,7 @@ function mountA11y() {
 }
 if (document.getElementById("lessonStage")) mountA11y();
 
-window.SG = { THREAD_EVENTS, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
+window.SG = { THREAD_EVENTS, panelIn, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх

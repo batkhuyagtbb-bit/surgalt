@@ -152,6 +152,7 @@ func (s *Server) handleStartDM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	msgs, _ := s.store.Messages(r.Context(), conv.ID, "", 50)
+	msgs = s.dropHiddenMsgs(r.Context(), c.UID, conv.ID, msgs)
 	role := store.SenderTeacher
 	if conv.TeacherID != c.UID {
 		role = store.SenderVisitor

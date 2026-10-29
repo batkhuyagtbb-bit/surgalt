@@ -23,6 +23,7 @@ type Memory struct {
 	orders      map[string]*Order
 	pending     map[[2]string]string // (user,course) -> order id
 	enrollments map[[2]string]time.Time
+	chatHides   map[[2]string]time.Time // (user, conversation) -> «устгасан» мөч (chat_hides.go)
 	convs       map[string]*Conversation
 	convByKey   map[string]string // teacherID|visitorKey
 	messages    map[string][]*Message

@@ -298,6 +298,8 @@ var chTables = []chTable{
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, lesson_id)`},
 	{"enrollments", `(user_id String, course_id String, teacher_id String, created_at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, course_id)`},
+	{"chat_hides", `(user_id String, conversation_id String, at ` + tsType + `, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, conversation_id)`},
 	{"course_unlocks", `(user_id String, course_id String, code_hash String, at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, course_id)`},
 	{"lesson_access", `(user_id String, lesson_id String, course_id String, teacher_id String,

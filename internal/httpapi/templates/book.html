@@ -1,5 +1,6 @@
 {{$b := .D.Book}}{{$t := .D.Teacher}}
-{{template "head" (dict "Title" (printf "%s — %s" $b.Title $t.DisplayName) "Desc" $b.Description "Image" $b.Cover "Page" "book")}}
+{{template "head" (dict "Title" (pageTitle $b.Title $t.DisplayName) "Desc" (metaDesc (or $b.Description (printf "%s — %s. Цахим ном, surgalt.mn" $b.Title $t.DisplayName))) "Image" (abs $b.Cover .PublicURL) "URL" (printf "%s/b/%s" .PublicURL $b.ID) "Type" "book" "Page" "book")}}
+<script type="application/ld+json">{{ldBook .D .PublicURL}}</script>
 <main class="book-page" data-book="{{$b.ID}}" data-price="{{$b.Price}}" data-pages="{{$b.Pages}}" data-preview="{{$b.PreviewN}}" data-title="{{$b.Title}}">
   <section class="bk-hero">
     <div class="bk-cover-wrap">

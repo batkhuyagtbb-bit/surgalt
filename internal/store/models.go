@@ -571,6 +571,7 @@ type Store interface {
 	PayoutStore
 	HighlightStore
 	CourseUnlockStore
+	ChatHideStore
 	CloudStore
 	BoardStore
 	AdminStore

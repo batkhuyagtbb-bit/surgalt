@@ -91,7 +91,8 @@ window.Studio = {
     main.innerHTML = `<div class="loader"></div>`;
     try { await (views[view] || views.overview)(arg); }
     catch (e) { main.innerHTML = panel(`<p class="form-error">${esc(e.message)}</p>`); }
-    main.classList.remove("fade-in"); void main.offsetWidth; main.classList.add("fade-in"); // хэсэг солигдоход зөөлөн
+    if (window.SG?.panelIn) window.SG.panelIn(main); // хэсэг солигдоход зөөлөн, шатлан гарч ирнэ
+    else { main.classList.remove("fade-in"); void main.offsetWidth; main.classList.add("fade-in"); }
   },
 };
 
@@ -1269,6 +1270,11 @@ async function courseEditor(id) {
     const dots = (o) => NS_COL.map(([k, t, col]) => o[k] ? `<span class="ns-dot" title="${t}"><i style="background:${col}"></i>${o[k]}</span>` : "").join("");
     const when = (t) => (t ? fmtDate(t) : "—");
     const maxRed = Math.max(0, ...d.lessons.map((l) => l.colors.r || 0));
+    // Идэвхтэй (сүүлийн 7 хоногт тэмдэглэл хөтөлсөн, story үзсэн) суралцагчид дээрээ — дотроо тэмдэглэлийн тоогоор.
+    const wk = Date.now() - 7 * 864e5, lastOf = (s) => Math.max(s.last_note ? new Date(s.last_note) : 0, s.last_view ? new Date(s.last_view) : 0);
+    d.students.forEach((s) => (s.recent = lastOf(s) >= wk));
+    d.students.sort((a, b) => (b.recent - a.recent) || (b.notes - a.notes) || ((b.story_views || 0) - (a.story_views || 0)) || (lastOf(b) - lastOf(a)));
+    const nsRecent = d.students.filter((s) => s.recent).length;
     box.innerHTML = `<div class="jr-head"><div><h2>Тэмдэглэл</h2><span class="muted small">Суралцагчид хичээлдээ хэр идэвхтэй тэмдэглэл хөтөлж, нүүр хуудсандаа story болгон давтаж байгаа нь. Тэмдэглэлийн агуулга хувийнх — зөвхөн тоо харагдана.</span></div></div>
       <div class="ns-kpis">
         <div class="ns-kpi"><b>${S.writers}</b><span>тэмдэглэл хөтөлсөн суралцагч</span></div>
@@ -1279,15 +1285,16 @@ async function courseEditor(id) {
       ${n ? `<div class="ns-grid"><section class="ns-card"><h3>Төрлөөр</h3>${bar(NS_KIND, S.kinds)}</section><section class="ns-card"><h3>Өнгөөр (утга)</h3>${bar(NS_COL, S.colors)}</section></div>` : ""}
       <section class="ns-card"><h3>Хичээл бүрээр</h3><div class="jr-wrap"><table class="tbl ns-t"><thead><tr><th>Хичээл</th><th>Тэмдэглэл</th><th>Суралцагч</th><th title="Ойлгоогүй гэж тэмдэглэсэн">❓ Ойлгоогүй</th><th>Story үзэлт</th></tr></thead><tbody>
         ${d.lessons.map((l) => `<tr class="${l.colors.r && l.colors.r === maxRed ? "ns-warn" : ""}"><td><b>${String(l.position).padStart(2, "0")}</b> ${esc(l.title)}${l.colors.r && l.colors.r === maxRed ? ` <span class="chip chip-coral">Анхаарах</span>` : ""}</td><td>${l.notes || "—"}</td><td>${l.students || "—"}</td><td>${l.colors.r || "—"}</td><td>${l.story_views || "—"}</td></tr>`).join("")}</tbody></table></div></section>
-      <section class="ns-card"><h3>Суралцагч бүрээр</h3>${d.students.length ? `<div class="jr-wrap"><table class="tbl ns-t"><thead><tr><th>Суралцагч</th><th>Тэмдэглэл</th><th>Хичээл</th><th>Төрөл</th><th>Өнгө</th><th>Story үзсэн</th><th>Сүүлд</th></tr></thead><tbody>
-        ${d.students.map((s) => `<tr><td><b>${esc(s.name)}</b>${s.username ? `<small class="muted"> @${esc(s.username)}</small>` : ""}</td><td><b>${s.notes}</b></td><td>${s.lessons}</td>
+      <section class="ns-card"><h3>Суралцагч бүрээр${nsRecent ? ` <small class="jr-live-n"><i class="jr-live"></i>${nsRecent} идэвхтэй — дээрээ</small>` : ""}</h3>${d.students.length ? `<div class="jr-wrap"><table class="tbl ns-t"><thead><tr><th>Суралцагч</th><th>Тэмдэглэл</th><th>Хичээл</th><th>Төрөл</th><th>Өнгө</th><th>Story үзсэн</th><th>Сүүлд</th></tr></thead><tbody>
+        ${d.students.map((s) => `<tr><td>${s.recent ? `<i class="jr-live" title="Сүүлийн 7 хоногт тэмдэглэл хөтөлсөн / story үзсэн"></i>` : ""}<b>${esc(s.name)}</b>${s.username ? `<small class="muted"> @${esc(s.username)}</small>` : ""}</td><td><b>${s.notes}</b></td><td>${s.lessons}</td>
           <td class="ns-kinds">${NS_KIND.map(([k, t]) => s.kinds[k] ? `<span title="${t}">${{ text: "🖍", time: "▶", page: "📄", box: "▢" }[k]} ${s.kinds[k]}</span>` : "").join("") || "—"}</td>
           <td>${dots(s.colors) || "—"}</td><td>${s.story_views ? `${s.story_views}${s.story_done ? ` <small class="muted">(${s.story_done} бүрэн)</small>` : ""}` : "—"}</td>
           <td class="muted small">${when(s.last_view && (!s.last_note || s.last_view > s.last_note) ? s.last_view : s.last_note)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted small">Одоогоор суралцагч тэмдэглэл хөтлөөгүй байна. Хичээлийн текстийг маркераар тодруулах, видеоны мөч, баримтын хуудсанд тэмдэглэх боломжтойг суралцагчиддаа сануулаарай.</p>`}</section>`;
   };
 
   /* ---------- Журнал: суралцагч × хичээл (сургуулийн журнал шиг) — нүд, нэр дээр дарахад дэлгэрэнгүй ---------- */
-  let jr = null;
+  let jr = null, jrSort = "active";
+  try { if (localStorage.getItem("sg_jr_sort") === "name") jrSort = "name"; } catch {}
   const dur2 = (s) => !s ? "0" : s < 60 ? s + " сек" : s < 3600 ? Math.round(s / 60) + " мин" : Math.floor(s / 3600) + " ц " + Math.round((s % 3600) / 60) + " мин";
   const jrCell = (l, x) => { // нүдний текст, ангилал
     if (!x) return ["", ""];
@@ -1304,16 +1311,20 @@ async function courseEditor(id) {
   };
   const drawJournal = (q = "") => {
     const box = $("#journal"); if (!box || !jr) return;
-    const L = jr.lessons, S = jr.students.filter((s) => !q || s.name.toLowerCase().includes(q.toLowerCase())), C = jr.cells;
+    // Сервер идэвхтэй суралцагчдыг дээр нь эрэмбэлж өгнө; «Нэрээр» сонговол цагаан толгойн дарааллаар.
+    const L = jr.lessons, C = jr.cells, S = jr.students.filter((s) => !q || s.name.toLowerCase().includes(q.toLowerCase()));
+    if (jrSort === "name") S.sort((a, b) => a.name.localeCompare(b.name, "mn"));
+    const nRecent = jr.students.filter((s) => s.recent).length;
     const secs = []; for (const l of L) { const k = l.section || ""; const last = secs[secs.length - 1]; if (last && last.name === k) last.n++; else secs.push({ name: k, n: 1 }); }
     const hasSecs = secs.some((x) => x.name);
     const head = `<thead>${hasSecs ? `<tr class="jr-secs"><th class="jr-name" rowspan="2">Суралцагч</th>${secs.map((x) => `<th colspan="${x.n}" title="${esc(x.name || "Бүлэггүй")}">${esc(x.name || "—")}</th>`).join("")}<th rowspan="2">Дууссан</th><th rowspan="2">Дундаж</th><th rowspan="2">Цол</th></tr>` : ""}
       <tr>${hasSecs ? "" : `<th class="jr-name">Суралцагч</th>`}${L.map((l) => `<th class="jr-l ${l.hidden ? "is-hidden" : ""}" title="${esc(l.title)}${l.hidden ? " (хаалттай)" : ""}">${String(l.position).padStart(2, "0")}${l.kind === "exam" ? `<i>${ico("exam", 14)}</i>` : l.kind === "assignment" ? "<i>📎</i>" : ""}</th>`).join("")}${hasSecs ? "" : "<th>Дууссан</th><th>Дундаж</th><th>Цол</th>"}</tr></thead>`;
-    const body = S.map((s) => `<tr data-uid="${esc(s.user_id)}"><th class="jr-name" data-jr-student><span class="jr-who">${esc(s.name)}</span><small>${s.enrolled ? (s.username ? "@" + esc(s.username) : "") : "элсээгүй · үнэгүй хичээл"}</small></th>
+    const body = S.map((s) => `<tr data-uid="${esc(s.user_id)}"><th class="jr-name" data-jr-student><span class="jr-who">${s.recent ? `<i class="jr-live" title="Сүүлийн 7 хоногт хичээллэсэн"></i>` : ""}${esc(s.name)}</span><small>${s.enrolled ? (s.username ? "@" + esc(s.username) : "") : "элсээгүй · үнэгүй хичээл"}</small></th>
       ${L.map((l) => { const [t, k] = jrCell(l, C[s.user_id]?.[l.id]); return `<td class="jr-c ${k}" data-lid="${esc(l.id)}">${t}</td>`; }).join("")}
       <td class="jr-sum">${s.done}/${L.filter((l) => !l.hidden).length}</td><td class="jr-sum">${s.avg || "—"}</td><td class="jr-rank" title="${s.rank.points} оноо">${esc(s.rank.insignia || "")} ${esc(s.rank.name)}</td></tr>`).join("");
     const foot = `<tfoot><tr><th class="jr-name">Дууссан</th>${L.map((l) => { const n = S.filter((s) => { const x = C[s.user_id]?.[l.id]; return l.kind === "exam" ? x?.exam?.passed : l.kind === "assignment" ? x?.asg : x?.done; }).length; return `<td>${S.length ? n + "/" + S.length : ""}</td>`; }).join("")}<td colspan="3"></td></tr></tfoot>`;
-    box.innerHTML = `<div class="jr-head"><div><h2>Журнал</h2><span class="muted small">${jr.students.length} суралцагч · ${L.length} хичээл · нүд дээр дарж дэлгэрэнгүйг харна</span></div>
+    box.innerHTML = `<div class="jr-head"><div><h2>Журнал</h2><span class="muted small">${jr.students.length} суралцагч${nRecent ? ` · <b class="jr-live-n"><i class="jr-live"></i>${nRecent} идэвхтэй</b>` : ""} · ${L.length} хичээл · нүд дээр дарж дэлгэрэнгүйг харна</span></div>
+        <div class="jr-sort" role="group" aria-label="Эрэмбэлэх"><button type="button" data-jr-sort="active" aria-pressed="${jrSort !== "name"}">${ico("chart", 14)}Идэвхээр</button><button type="button" data-jr-sort="name" aria-pressed="${jrSort === "name"}">А–Я</button></div>
         <label class="rail-search jr-search">${ico("search", 15)}<input type="search" placeholder="Нэрээр шүүх…" value="${esc(q)}" aria-label="Нэрээр шүүх"></label>
         <button class="btn btn-glass btn-sm" data-jr-csv>${ico("files", 15)}Excel</button></div>
       <div class="jr-legend"><span class="jr-c ok">68</span>дууссан<span class="jr-c part">24</span>үзэж байна<span class="jr-c bad">40%</span>тэнцээгүй<span class="jr-c wait">✓</span>дүгнээгүй<span class="jr-c disq">⛔</span>хуулах оролдлого</div>
@@ -1552,6 +1563,8 @@ async function courseEditor(id) {
       if (td) return jrCellModal(td.closest("tr").dataset.uid, td.dataset.lid);
       if (nm) return jrStudentModal(nm.closest("tr").dataset.uid);
       if (t.closest("[data-jr-csv]")) return jrCSV();
+      const so = t.closest("[data-jr-sort]");
+      if (so) { jrSort = so.dataset.jrSort; try { localStorage.setItem("sg_jr_sort", jrSort); } catch {} return drawJournal($("#journal .jr-search input")?.value || ""); }
     }
     const tab = t.closest("[data-view]");
     if (tab) { view = tab.dataset.view; try { localStorage.setItem("sg_course_view", view); } catch {} return render(); }

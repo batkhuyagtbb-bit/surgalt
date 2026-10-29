@@ -236,6 +236,42 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.me(u))
 }
 
+// handleUpdateName: PUT /api/me/name {"display_name"} — профайл, «Сурах» хуудсан дээрх нэрийг шууд (inline) засна.
+// Зөвхөн нэр солигдоно; бусад талбар (танилцуулга, холбоос, утас …) одоогийнхоороо үлдэнэ.
+func (s *Server) handleUpdateName(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		DisplayName string `json:"display_name"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	name := strings.Join(strings.Fields(in.DisplayName), " ")
+	if name == "" || utf8.RuneCountInString(name) > 80 {
+		writeErr(w, http.StatusBadRequest, "нэр 1-80 тэмдэгт")
+		return
+	}
+	cur, err := s.store.UserByID(r.Context(), c.UID)
+	if s.storeErr(w, r, err) {
+		return
+	}
+	if cur.DisplayName != name {
+		err = s.store.UpdateProfile(r.Context(), c.UID, store.ProfileUpdate{DisplayName: name, Headline: cur.Headline, Bio: cur.Bio,
+			AvatarURL: cur.AvatarURL, CoverURL: cur.CoverURL, Subjects: cur.Subjects, Location: cur.Location, Links: cur.Links, Phone: cur.Phone})
+		if s.storeErr(w, r, err) {
+			return
+		}
+		s.invalidateTeacher(r, c.UID, cur.Username)
+		if cur, err = s.store.UserByID(r.Context(), c.UID); s.storeErr(w, r, err) {
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, s.me(cur))
+}
+
 // handleUpdateUsername: багш профайлын холбоосоо (/t/<нэр>) солино.
 // Токенд хэрэглэгчийн нэр агуулагддаг тул шинэ токен буцаана.
 func (s *Server) handleUpdateUsername(w http.ResponseWriter, r *http.Request) {

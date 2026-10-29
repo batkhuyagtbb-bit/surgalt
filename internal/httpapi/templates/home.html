@@ -1,4 +1,5 @@
-{{template "head" (dict "Title" "surgalt.mn — Сур, сур, бас дахин сур" "Desc" "Сур, сур, бас дахин сур — багш нар сургалтаа зарж, суралцагчид нэг дороос суралцах платформ" "Page" "home")}}
+{{template "head" (dict "Title" "surgalt.mn — Сур, сур, бас дахин сур" "Desc" "Сур, сур, бас дахин сур — багш нар сургалтаа зарж, суралцагчид нэг дороос суралцах платформ" "URL" (printf "%s/" .PublicURL) "Page" "home")}}
+<script type="application/ld+json">{{ldHome .PublicURL}}</script>
 <main>
   <section class="home-top">
     {{/* Зочинд: зүүнд уриа ба товчнууд, баруунд танилцуулга кино (intro2). Нэвтэрсэн хүнд .landing нуугдана. */}}

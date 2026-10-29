@@ -72,6 +72,40 @@ type JournalStudent struct {
 	Avg      int        `json:"avg"`    // үнэлэгдсэн хичээлийн дундаж оноо
 	Active   int        `json:"active"` // нийт идэвхтэй секунд
 	Last     *time.Time `json:"last,omitempty"`
+	Recent   bool       `json:"recent,omitempty"` // сүүлийн 7 хоногт хичээллэсэн
+}
+
+// recentDays — журнал, тэмдэглэлд «идэвхтэй» гэж тооцох хугацаа.
+const recentDays = 7
+
+// sortJournal — идэвхтэй суралцагчид дээрээ: сүүлийн 7 хоногт хичээллэсэн → өмнө нь хичээллэсэн
+// (оноо, дууссан хичээл, идэвхтэй хугацаагаар) → огт эхлээгүй (цагаан толгойн дарааллаар).
+func sortJournal(out []JournalStudent) {
+	tier := func(js *JournalStudent) int {
+		switch {
+		case js.Recent:
+			return 0
+		case js.Last != nil || js.Rank.Points > 0 || js.Done > 0 || js.Active > 0:
+			return 1
+		}
+		return 2
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		a, b := &out[i], &out[j]
+		if ta, tb := tier(a), tier(b); ta != tb {
+			return ta < tb
+		}
+		if a.Rank.Points != b.Rank.Points {
+			return a.Rank.Points > b.Rank.Points
+		}
+		if a.Done != b.Done {
+			return a.Done > b.Done
+		}
+		if a.Active != b.Active {
+			return a.Active > b.Active
+		}
+		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
+	})
 }
 
 // handleCourseJournal: GET /api/me/courses/{id}/journal
@@ -127,6 +161,12 @@ func (s *Server) handleCourseJournal(w http.ResponseWriter, r *http.Request) {
 		evOf(watches[i].UserID).addWatch(&watches[i])
 	}
 
+	workAt := map[string]time.Time{} // шалгалт, даалгаврын сүүлийн хугацаа (идэвхээр эрэмбэлэхэд)
+	touch := func(uid string, t time.Time) {
+		if t.After(workAt[uid]) {
+			workAt[uid] = t
+		}
+	}
 	cells := map[string]map[string]*JournalCell{}
 	cell := func(uid, lid string) *JournalCell {
 		if cells[uid] == nil {
@@ -142,6 +182,10 @@ func (s *Server) handleCourseJournal(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		users[a.UserID] = true
+		touch(a.UserID, a.StartedAt)
+		if a.FinishedAt != nil {
+			touch(a.UserID, *a.FinishedAt)
+		}
 		cl := cell(a.UserID, a.LessonID)
 		if cl.Exam == nil {
 			cl.Exam = &JournalExam{Best: -1}
@@ -163,6 +207,7 @@ func (s *Server) handleCourseJournal(w http.ResponseWriter, r *http.Request) {
 			if subs, err := s.store.Submissions(ctx, l.ID); err == nil {
 				for _, sb := range subs {
 					users[sb.UserID] = true
+					touch(sb.UserID, sb.SubmittedAt)
 					cell(sb.UserID, l.ID).Asg = &JournalAsg{Score: sb.Score, Max: l.Assignment.MaxScore, Late: sb.Late, At: sb.SubmittedAt, Feedback: sb.Feedback, Rubric: sb.Rubric}
 				}
 			}
@@ -198,6 +243,10 @@ func (s *Server) handleCourseJournal(w http.ResponseWriter, r *http.Request) {
 		if len(ranks) > 0 {
 			js.Avg = sum / len(ranks)
 		}
+		if t, ok := workAt[uid]; ok && (js.Last == nil || t.After(*js.Last)) {
+			js.Last = &t
+		}
+		js.Recent = js.Last != nil && time.Since(*js.Last) <= recentDays*24*time.Hour
 		out = append(out, js)
 	}
 	ids := make([]string, 0, len(out))
@@ -220,7 +269,7 @@ func (s *Server) handleCourseJournal(w http.ResponseWriter, r *http.Request) {
 			out[i].Name = "Суралцагч"
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name) }) // журнал шиг цагаан толгойн дарааллаар
+	sortJournal(out)
 	w.Header().Set("Cache-Control", "private, no-store")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"course":   map[string]any{"id": course.ID, "title": course.Title},

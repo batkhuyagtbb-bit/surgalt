@@ -112,6 +112,7 @@ func (s *Server) handleStartChat(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
+	msgs = s.dropHiddenMsgs(r.Context(), c.UID, conv.ID, msgs)
 	if err := s.attachReactions(r, msgs); s.storeErr(w, r, err) {
 		return
 	}
@@ -130,6 +131,7 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
+	msgs = s.dropHiddenMsgs(r.Context(), c.UID, conv.ID, msgs)
 	if err := s.attachReactions(r, msgs); s.storeErr(w, r, err) {
 		return
 	}
@@ -412,6 +414,7 @@ func (s *Server) handleCourseChat(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
+	msgs = s.dropHiddenMsgs(r.Context(), c.UID, conv.ID, msgs)
 	writeJSON(w, http.StatusOK, map[string]any{"conversation": conv, "messages": msgs, "me": role})
 }
 
@@ -424,7 +427,7 @@ func (s *Server) handleMyConversations(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, convs)
+	writeJSON(w, http.StatusOK, s.dropHiddenConvs(r.Context(), c.UID, convs))
 }
 
 // handleWS: /api/chat/ws?token=... — шинэ мессежийг бодит цагт түлхэнэ.
@@ -477,6 +480,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	client := chat.NewClient()
 	s.hub.Subscribe(client, keys...)
 	defer s.hub.Unsubscribe(client, keys...)
+	defer s.seen.left(c.UID) // «сүүлд идэвхтэй» — профайлын онлайн төлөвт
 
 	ctx := conn.CloseRead(context.Background()) // клиент хаахад ctx цуцлагдана
 	ping := time.NewTicker(25 * time.Second)

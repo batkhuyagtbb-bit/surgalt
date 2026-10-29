@@ -217,6 +217,19 @@ button,input,textarea,select{font:inherit;color:inherit}
 .pf-verified{display:inline-grid;place-items:center;width:22px;height:22px;margin-left:10px;vertical-align:.12em;border-radius:50%;background:var(--brand);color:#fff}
 .pf-verified svg{stroke-width:3}
 .pf-headline{margin:4px 0 0;color:var(--text-2);font-weight:600}
+/* Онлайн төлөв: аватар дээр ногоон цэг, нэрийн доор «● Онлайн · одоо сайтад байна» */
+.pf-presence{position:absolute;right:14px;bottom:14px;width:28px;height:28px;border-radius:50%;background:#22c55e;border:4px solid var(--surface);box-shadow:0 2px 8px rgba(15,23,42,.18)}
+.pf-presence::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid rgba(34,197,94,.55);animation:pres-ring 2.2s ease-out infinite}
+.pf-avatar-btn:not([hidden])~.pf-presence{bottom:auto;top:14px}
+.pf-live{display:inline-flex;align-items:center;gap:6px;margin:8px 0 2px;padding:4px 12px 4px 10px;border-radius:999px;background:var(--ink-2);color:var(--muted);font-size:.82rem;font-weight:600;animation:fade-in .3s ease backwards}
+.pf-live i{flex:none;width:8px;height:8px;border-radius:50%;background:#94a3b8}
+.pf-live b{font-weight:800}
+.pf-live.on{background:rgba(34,197,94,.13);color:#16a34a}
+.pf-live.on i{background:#22c55e;animation:live-ping 1.8s ease-out infinite}
+@keyframes pres-ring{0%{transform:scale(.9);opacity:1}100%{transform:scale(1.5);opacity:0}}
+@keyframes live-ping{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}80%,100%{box-shadow:0 0 0 7px rgba(34,197,94,0)}}
+@media (prefers-reduced-motion:reduce){.pf-presence::after,.pf-live.on i{animation:none}}
+@media (max-width:560px){.pf-presence{width:22px;height:22px;right:10px;bottom:10px;border-width:3px}}
 .pf-counts{margin:6px 0 0;color:var(--muted);font-weight:600;font-size:.94rem}
 .pf-counts b{color:var(--text)}
 .pf-actions{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;padding-top:18px;align-self:flex-end}
@@ -1978,7 +1991,7 @@ html.reader-open{overflow:hidden}
 .rail .rail-close:hover{background:var(--ink-2);color:var(--brand)}
 .rail-search{border:1px solid var(--line);background:var(--surface);border-radius:12px;transition:border-color .15s,box-shadow .15s}
 .rail-search:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-glow,rgba(31,60,143,.12))}
-.rail-list{gap:1px;padding:0 2px 8px}
+.rail-list{gap:1px;padding:0 2px 8px;grid-auto-rows:max-content} /* мөр агуулгынхаа өндрөөс доош хэзээ ч шахагдахгүй */
 .rail-sec{margin:10px 8px 6px;font-size:.66rem}
 .rail-item{padding:9px 10px;border-radius:12px;align-items:center;gap:11px}
 .rail-item:hover{background:var(--ink-2)}
@@ -2799,6 +2812,13 @@ html.dv-locked,html.dv-locked body{overflow:hidden}
 .jr-t .jr-name{position:sticky;left:0;z-index:1;min-width:190px;max-width:240px;background:#fff;text-align:left;cursor:pointer;box-shadow:1px 0 0 #e3e7ef}
 .jr-t thead .jr-name,.jr-t tfoot .jr-name{z-index:3;background:#f3f5fa;cursor:default}
 .jr-name .jr-who{display:block;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+/* Идэвхтэй (сүүлийн 7 хоног) суралцагч — журнал, тэмдэглэлд дээрээ, ногоон цэгтэй */
+.jr-live{display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.18);vertical-align:1px}
+.jr-live-n{display:inline-flex;align-items:center;font-weight:700;color:#15803d}
+.ns-card h3 .jr-live-n{margin-left:8px;font-size:.78rem}
+.jr-head>.jr-sort{flex:none;min-width:0;display:inline-flex;align-items:center;padding:3px;border-radius:12px;background:var(--ink-2);gap:2px}
+.jr-sort button{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border:0;border-radius:9px;background:none;font:inherit;font-size:.8rem;font-weight:700;color:var(--muted);cursor:pointer;transition:background .15s,color .15s,box-shadow .15s}
+.jr-sort button[aria-pressed="true"]{background:var(--surface);color:var(--brand);box-shadow:0 1px 3px rgba(15,23,42,.12)}
 .jr-name small{display:block;color:var(--muted);font-size:.72rem;font-weight:500}
 .jr-t tbody .jr-name:hover .jr-who{color:var(--brand);text-decoration:underline}
 .jr-l{min-width:46px}
@@ -4514,3 +4534,72 @@ ol.thread .msg-day{letter-spacing:.03em}
 .wl-calc dd{margin:0;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
 .wl-calc .sum{padding-top:4px;border-top:1px dashed var(--line-2)}
 .wl-calc .sum dd{color:var(--brand)}
+/* ===== Профайлын таб солих: хуучин хэсэг зөөлөн бүдгэрч, шинэ хэсэг доороос шатлан гарч ирнэ =====
+   backwards — дууссаны дараа transform/opacity үлдэхгүй (stacking context үүсэхгүй, sticky/fixed эвдэхгүй). */
+.pf-panel.pf-out{animation:pf-out .14s cubic-bezier(.4,0,1,1) forwards;pointer-events:none}
+.pf-in{animation:pf-in .36s ease-out backwards}
+.pf-in>:not(.loader,.course-grid,.book-grid,.meet-list),
+.pf-in>:is(.course-grid,.book-grid,.meet-list)>*{animation:pf-rise .52s var(--ease) backwards;animation-delay:40ms}
+.pf-in>:nth-child(2),.pf-in>:is(.course-grid,.book-grid,.meet-list)>:nth-child(2){animation-delay:85ms}
+.pf-in>:nth-child(3),.pf-in>:is(.course-grid,.book-grid,.meet-list)>:nth-child(3){animation-delay:130ms}
+.pf-in>:nth-child(4),.pf-in>:is(.course-grid,.book-grid,.meet-list)>:nth-child(4){animation-delay:175ms}
+.pf-in>:nth-child(5),.pf-in>:is(.course-grid,.book-grid,.meet-list)>:nth-child(5){animation-delay:220ms}
+.pf-in>:nth-child(n+6),.pf-in>:is(.course-grid,.book-grid,.meet-list)>:nth-child(n+6){animation-delay:265ms}
+@keyframes pf-out{to{opacity:0;transform:translateY(-6px)}}
+@keyframes pf-in{from{opacity:0}}
+@keyframes pf-rise{from{opacity:0;transform:translateY(14px)}}
+@media (prefers-reduced-motion:reduce){.pf-panel.pf-out,.pf-in,.pf-in>*,.pf-in>*>*{animation:none}}
+/* Чатын мөр: hover хийхэд баруун талд дугуй «⋯» товч — «Чат устгах» цэс */
+.rail-row{position:relative}
+.rail-row:hover .rail-item,.rail-row:has(.rail-more[aria-expanded="true"]) .rail-item{background:var(--ink-2)}
+.rail-row:hover .rail-item.active,.rail-row .rail-item.active{background:var(--brand-soft)}
+.rail-more{position:absolute;top:50%;right:10px;width:32px;height:32px;margin-top:-16px;display:grid;place-items:center;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--text-2);box-shadow:0 2px 10px rgba(15,23,42,.14);cursor:pointer;opacity:0;transform:scale(.8);pointer-events:none;transition:opacity .16s,transform .16s var(--ease),background .15s,color .15s}
+.rail-row:hover .rail-more,.rail-more:focus-visible,.rail-more[aria-expanded="true"]{opacity:1;transform:none;pointer-events:auto}
+.rail-more:hover,.rail-more[aria-expanded="true"]{background:var(--ink-2);color:var(--brand)}
+.rail-row:hover .rail-time,.rail-row:hover .rail-unread,.rail-row:has(.rail-more[aria-expanded="true"]) .rail-time,.rail-row:has(.rail-more[aria-expanded="true"]) .rail-unread{visibility:hidden}
+.rail-row:hover .rail-item small{padding-right:30px}
+@media (hover:none){
+  .rail-more{opacity:1;transform:none;pointer-events:auto;border:0;box-shadow:none;background:transparent;color:var(--muted)}
+  .rail-row .rail-item{padding-right:46px}
+}
+.rail-menu{position:fixed;z-index:90;width:max-content;min-width:200px;max-width:min(300px,calc(100vw - 16px));padding:6px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:0 18px 44px -12px rgba(15,23,42,.35);animation:rail-menu-in .16s var(--ease)}
+.rail-menu button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;border-radius:10px;background:none;font:inherit;font-size:.9rem;font-weight:700;color:var(--text);cursor:pointer;text-align:left}
+.rail-menu button:hover{background:var(--ink-2)}
+.rail-menu .danger{color:#dc2626}
+.rail-menu .danger:hover{background:rgba(220,38,38,.09)}
+.rail-menu p{margin:6px 8px 10px;font-size:.82rem;line-height:1.45;color:var(--muted)}
+.rail-menu p b{display:block;margin-bottom:3px;font-size:.9rem;color:var(--text)}
+.rail-menu .rm-acts{display:flex;gap:6px;padding:0 2px 2px}
+.rail-menu .rm-acts button{justify-content:center;background:var(--ink-2)}
+.rail-menu .rm-acts .rm-del{background:#dc2626;color:#fff}
+.rail-menu .rm-acts .rm-del:hover{background:#b91c1c}
+.rail-menu button:disabled{opacity:.6;cursor:wait}
+@keyframes rail-menu-in{from{opacity:0;transform:translateY(-4px) scale(.97)}}
+@media (prefers-reduced-motion:reduce){.rail-menu{animation:none}}
+/* Нэрийг шууд (inline) засах: hover-д тодорч ✎ гарна, засах үед хүрээтэй талбар болж, хадгалахад ногоон гялбана */
+.inl-name{display:inline;padding:0 6px;margin:0 -6px;border-radius:10px;outline:none;cursor:text;transition:background .15s,box-shadow .15s;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.inl-name:hover{background:var(--ink-2)}
+.inl-name:focus-visible{box-shadow:0 0 0 2px var(--brand-glow,rgba(31,60,143,.25))}
+.inl-name.editing{background:var(--surface);box-shadow:0 0 0 2px var(--brand),0 8px 22px -10px rgba(31,60,143,.45);cursor:text;caret-color:var(--brand)}
+.inl-name.saving{opacity:.55;cursor:progress}
+.inl-name.saved{animation:inl-saved 1.4s ease}
+@keyframes inl-saved{0%,30%{background:rgba(34,197,94,.22);box-shadow:0 0 0 2px rgba(34,197,94,.45)}100%{background:transparent;box-shadow:none}}
+.inl-pen{display:inline-grid;place-items:center;width:32px;height:32px;margin-left:8px;padding:0;vertical-align:.1em;border:0;border-radius:50%;background:var(--ink-2);color:var(--muted);cursor:pointer;opacity:0;transform:scale(.85);transition:opacity .15s,transform .15s var(--ease),background .15s,color .15s}
+:is(h1,h2):hover>.inl-pen,.inl-pen:focus-visible{opacity:1;transform:none}
+.inl-pen:hover{background:var(--brand-soft);color:var(--brand)}
+:is(h1,h2):has(.inl-name.editing)>.inl-pen{opacity:0;pointer-events:none}
+.inl-hint{display:block;margin:8px 0 0;font:600 .76rem var(--sans);letter-spacing:0;color:var(--muted);animation:fade-in .2s ease backwards}
+.inl-hint kbd{padding:1px 6px;border-radius:6px;border:1px solid var(--line);border-bottom-width:2px;background:var(--surface);font:700 .7rem var(--sans);color:var(--text-2)}
+@media (hover:none){.inl-pen{opacity:1;transform:none;width:28px;height:28px}}
+@media (prefers-reduced-motion:reduce){.inl-name.saved{animation:none}}
+/* Профайл: зөвхөн эзэмшигчид (зочны нүдээр харах үед ердийн текст) */
+.pf:not(.is-owner) .inl-pen{display:none}
+.pf:not(.is-owner) .inl-name{cursor:inherit;background:none;box-shadow:none}
+/* «Сурах» хуудасны хар хөх мэндчилгээн дээр: цагаан өнгөний хувилбар */
+.dash-head .inl-name:hover{background:rgba(255,255,255,.14)}
+.dash-head .inl-name:focus-visible{box-shadow:0 0 0 2px rgba(255,255,255,.55)}
+.dash-head .inl-name.editing{background:rgba(255,255,255,.1);box-shadow:0 0 0 2px rgba(255,255,255,.8),0 8px 22px -10px rgba(0,0,0,.45);caret-color:#fff}
+.dash-head .inl-pen{background:rgba(255,255,255,.16);color:#fff}
+.dash-head .inl-pen:hover{background:rgba(255,255,255,.28);color:#fff}
+.dash-head .inl-hint{color:rgba(255,255,255,.78)}
+.dash-head .inl-hint kbd{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.35);color:#fff}

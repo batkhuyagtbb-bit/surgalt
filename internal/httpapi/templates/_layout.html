@@ -6,6 +6,8 @@
 <title>{{.Title}}</title>
 <meta name="description" content="{{.Desc}}">
 <meta name="terms-version" content="{{terms}}">
+{{if .NoIndex}}<meta name="robots" content="noindex, nofollow">{{else}}<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">{{end}}
+{{with gsv}}<meta name="google-site-verification" content="{{.}}">{{end}}{{with bsv}}<meta name="msvalidate.01" content="{{.}}">{{end}}
 <meta property="og:site_name" content="surgalt.mn">
 <meta property="og:locale" content="mn_MN">
 <meta property="og:type" content="{{or .Type "website"}}">

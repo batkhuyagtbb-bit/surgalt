@@ -256,6 +256,10 @@ func run(log *slog.Logger) error {
 		AdminPath:     adminPath,
 		AdminLogin:    adminLogin,
 		AdminPassHash: adminHash,
+
+		// Google Search Console / Bing Webmaster-ийн «HTML tag» баталгаажуулалтын content утга.
+		GoogleSiteVerification: strings.TrimSpace(os.Getenv("GOOGLE_SITE_VERIFICATION")),
+		BingSiteVerification:   strings.TrimSpace(os.Getenv("BING_SITE_VERIFICATION")),
 	}, st, tokens, hub, fstore, log)
 
 	base := env("PUBLIC_URL", "http://localhost"+env("ADDR", ":8080"))

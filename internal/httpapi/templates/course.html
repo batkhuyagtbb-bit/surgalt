@@ -1,5 +1,6 @@
 {{$c := .D.Course}}{{$t := .D.Teacher}}{{$paid := sub $c.LessonCount $c.FreeLessonCount}}
-{{template "head" (dict "Title" (printf "%s — %s" $c.Title $t.DisplayName) "Desc" $c.Description "Image" $t.AvatarURL "Page" "course")}}
+{{template "head" (dict "Title" (pageTitle $c.Title $t.DisplayName) "Desc" (courseDesc .D) "Image" (printf "%s/t/%s/og.jpg" .PublicURL $t.Username) "ImageW" 1200 "ImageH" 630 "ImageAlt" (printf "%s — %s" $c.Title $t.DisplayName) "URL" (printf "%s/c/%s" .PublicURL $c.ID) "Page" "course")}}
+<script type="application/ld+json">{{ldCourse .D .PublicURL}}</script>
 <main class="course-page" data-course="{{$c.ID}}" data-locked="{{if $c.Locked}}1{{end}}" data-price="{{$c.Price}}" data-drip="{{if $c.Drip}}1{{else}}0{{end}}" data-mode="{{if $c.Price}}bundle{{else if gt $paid 0}}lessons{{else}}free{{end}}">
   <section class="lp" id="lessonStage" hidden aria-label="Хичээл үзэх">
     <header class="lp-top">

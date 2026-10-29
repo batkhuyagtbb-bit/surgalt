@@ -91,6 +91,14 @@ func (h *Hub) Unsubscribe(c *Client, keys ...string) {
 
 func (h *Hub) Connections() int64 { return h.conns.Load() }
 
+// Online — тухайн сувагт дор хаяж нэг нээлттэй холболт байгаа эсэх (багшийн онлайн төлөв).
+func (h *Hub) Online(key string) bool {
+	s := h.shard(key)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.subs[key]) > 0
+}
+
 func (h *Hub) publish(key string, payload []byte) {
 	s := h.shard(key)
 	s.mu.RLock()
