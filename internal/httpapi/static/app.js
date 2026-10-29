@@ -468,6 +468,7 @@ function chatRail() {
   // show=false: самбарын нээлттэй/хумьсан төлөвийг өөрчлөхгүй (refresh-ийн дараа сэргээх, дахин холбогдох).
   const open = async (id, show = true) => {
     const same = cur === id && !thread.hidden;
+    if (meetConv && meetConv !== id) meetOff(); // өөр яриа нээвэл Meet-ийн холбоос хүлээхээ болино
     cur = id; unread.delete(id); badge(); if (show) setRail(true); draw();
     ss.set("sg_rail_conv", id);
     home.hidden = true; thread.hidden = false;
@@ -484,7 +485,7 @@ function chatRail() {
       $("#railWho").innerHTML = `<span class="form-error" style="margin:0">${esc(e.message)}</span>`;
     }
   };
-  $("#railBack").onclick = () => { cur = null; ss.set("sg_rail_conv", null); thread.hidden = true; home.hidden = false; draw(); };
+  $("#railBack").onclick = () => { meetOff(); cur = null; ss.set("sg_rail_conv", null); thread.hidden = true; home.hidden = false; draw(); };
   $("#railSearch").addEventListener("input", draw);
   $("#railList").addEventListener("click", (e) => { const mo = e.target.closest("[data-more]"); if (mo) return moreMenu(mo); const lv = e.target.closest("[data-live]"); if (lv) return lv.dataset.conv ? open(lv.dataset.conv) : startWith(lv.dataset.live); const p = e.target.closest("[data-person]"); if (p) return startWith(p.dataset.person); const it = e.target.closest(".rail-item"); if (it) open(it.dataset.id); });
   $("#railList").addEventListener("scroll", () => closeMenu(), { passive: true });
@@ -515,11 +516,56 @@ function chatRail() {
     setTimeout(() => { document.addEventListener("pointerdown", away); document.addEventListener("keydown", esc_); addEventListener("resize", closeMenu); }, 0);
     m._off = () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", esc_); removeEventListener("resize", closeMenu); };
   }
+  // 📹 Google Meet: Google-ээ холбосон багшид холбоос серверт автоматаар үүсэж шууд илгээгдэнэ. Холбоогүй бол
+  // meet.google.com/new шинэ табд нээгдэж уулзалт үүснэ → багш тэндээс холбоосыг хуулаад буцаж ирэхэд энд гарч ирнэ →
+  // «Илгээх». (meet.google.com/new-ийг өөрийг нь илгээвэл дарсан хүн бүр тусдаа шинэ уулзалтад орно — жинхэнэ
+  // уулзалтын холбоосыг илгээнэ.)
+  const MEET_RE = /https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}/i;
+  let meetConv = null, meetUrl = "";
+  const meetOff = () => { meetConv = null; meetUrl = ""; removeEventListener("focus", meetGrab); document.removeEventListener("visibilitychange", meetGrab); form.querySelector(".meet-bar")?.remove(); };
+  const meetBar = (state) => {
+    let bar = form.querySelector(".meet-bar");
+    if (!bar) { bar = document.createElement("div"); bar.className = "meet-bar"; bar.setAttribute("role", "status"); form.prepend(bar); }
+    const x = `<button type="button" class="mb-x" data-mb="x" aria-label="Болих" title="Болих">✕</button>`;
+    bar.classList.toggle("got", state === "got");
+    bar.innerHTML = state === "got"
+      ? `<span class="mb-ico">${I.live}</span><span class="mb-txt"><b>Холбоос бэлэн</b><small class="mb-url">${esc(meetUrl.replace("https://", ""))}</small></span><button type="button" class="mb-send" data-mb="send">Илгээх</button>${x}`
+      : state === "new"
+        ? `<span class="mb-ico">${I.live}</span><span class="mb-txt"><b>Meet холболт салсан</b><small>Шинэ уулзалт нээж холбоосыг илгээнэ</small></span><button type="button" class="mb-send" data-mb="new">Meet нээх</button>${x}`
+        : `<span class="mb-ico">${I.live}</span><span class="mb-txt"><b>Meet шинэ табд нээгдлээ</b><small>Холбоосыг хуулаад (⧉) буцаж ирээрэй</small></span><button type="button" class="mb-paste" data-mb="paste">Тавих</button>${x}`;
+  };
+  const meetFrom = (text) => { const m = (text || "").match(MEET_RE); if (!m || !meetConv) return false; meetUrl = m[0]; meetBar("got"); return true; };
+  async function meetGrab() {
+    if (!meetConv || meetUrl || document.visibilityState !== "visible") return;
+    try { meetFrom(await navigator.clipboard.readText()); } catch {} // санах ойг унших зөвшөөрөлгүй бол «Тавих»
+  }
+  const meetNew = () => {
+    window.open("https://meet.google.com/new", "_blank", "noopener");
+    meetConv = cur; meetUrl = ""; meetBar("wait");
+    addEventListener("focus", meetGrab); document.addEventListener("visibilitychange", meetGrab);
+  };
   form.addEventListener("click", async (e) => {
+    const mb = e.target.closest("[data-mb]")?.dataset.mb;
+    if (mb === "x") return meetOff();
+    if (mb === "new") return meetNew();
+    if (mb === "paste") {
+      try { if (meetFrom(await navigator.clipboard.readText())) return; } catch {}
+      toast("Хуулсан Meet холбоос олдсонгүй — meet.google.com/… холбоосыг хуулаад дахин «Тавих» дарна уу", true); return;
+    }
+    if (mb === "send") {
+      const conv = meetConv, url = meetUrl; if (!conv || !url) return;
+      e.target.closest("[data-mb]").disabled = true;
+      try { const m = await api(`/api/chat/${conv}/messages`, { method: "POST", body: { body: "📹 Google Meet уулзалт бэлэн боллоо, нэгдээрэй: " + url } }); meetOff(); if (conv === cur) append(m); toast("📹 Meet холбоос илгээгдлээ"); }
+      catch (x) { e.target.closest("[data-mb]").disabled = false; toast(x.message, true); }
+      return;
+    }
     if (!e.target.closest("#railMeet") || !cur) return;
-    try { const d = await api(`/api/chat/${cur}/meet`, { method: "POST" }); append(d.message); toast("Meet холбоос илгээгдлээ"); }
-    catch (x) { toast(x.message, true); }
+    if (!u.meet_connected) return meetNew();
+    try { const d = await api(`/api/chat/${cur}/meet`, { method: "POST" }); append(d.message); toast("📹 Meet холбоос илгээгдлээ"); }
+    catch (x) { if (x.status === 428 || x.status === 503) { meetConv = cur; meetUrl = ""; meetBar("new"); } else toast(x.message, true); }
   });
+  // Багш Meet-ийн холбоосыг бичих талбарт шууд буулгавал ч мөн «Илгээх» бэлэн болно.
+  form.addEventListener("paste", (e) => { if (meetConv && !meetUrl && meetFrom(e.clipboardData?.getData("text"))) e.preventDefault(); });
   // Онлайн төлөв: жагсаалтын хүмүүсээс хэн одоо сайтад байгааг 30 секунд тутам асууна (таб нуугдсан үед асуухгүй).
   // Сервер зөвхөн жагсаалтад тань харагдсан хүмүүсийнхийг өгдөг тул жагсаалт ачаалсны дараа асууна.
   let presT = 0;
