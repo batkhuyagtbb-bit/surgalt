@@ -111,7 +111,7 @@ func (s *Server) handleRevealPhone(w http.ResponseWriter, r *http.Request) {
 			if err := s.store.SaveVisit(r.Context(), v); err != nil {
 				s.log.Warn("утас харсныг бүртгэх", "err", err)
 			}
-			s.notify(r.Context(), &store.Notification{UserID: t.ID, Type: NotifPhoneView, Title: "📞 " + who + " утасны дугаарыг тань харлаа",
+			s.notify(r.Context(), &store.Notification{UserID: t.ID, Type: NotifPhoneView, ActorID: uid, Title: "📞 " + who + " утасны дугаарыг тань харлаа",
 				Body: "Удахгүй тантай холбогдож магадгүй.", Link: "/t/" + t.Username})
 		}
 	}

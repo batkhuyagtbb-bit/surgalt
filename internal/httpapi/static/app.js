@@ -613,63 +613,133 @@ async function consentGate() {
 function bell() {
   const links = $(".nav-links");
   if (!links || $("#bell")) return;
+  const dots = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`;
+  // Facebook маягийн самбар: гарчиг + «⋯» цэс, «Бүгд / Уншаагүй» таб, «Шинэ / Өмнөх» хэсэг, аватар дээр төрлийн тэмдэг, цэнхэр цэг.
   links.insertAdjacentHTML("afterbegin", `
-    <div class="bell-wrap"><button class="icon-btn bell" id="bell" aria-label="Мэдэгдэл"><svg data-ico="bell" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg><span class="bell-badge" hidden></span></button>
-    <div class="bell-panel glass" id="bellPanel" hidden><div class="bell-head"><strong>Мэдэгдэл</strong><button class="btn btn-ghost btn-sm" id="bellPerm" hidden>🔔 Браузерт мэдэгдэх</button></div><ol class="bell-list" id="bellList"><li class="muted small">Ачаалж байна…</li></ol></div></div>`);
-  const badge = $(".bell-badge"), panel = $("#bellPanel"), list = $("#bellList");
-  let unread = 0;
-  const setBadge = (n) => { unread = n; badge.hidden = !n; badge.textContent = n > 99 ? "99+" : n; };
-  // Мэдэгдэл бүрийн дүрс (хөдөлгөөнт дүрсээр солигдоно): гарчгийн эхний emoji-оос, эс бөгөөс төрлөөс.
-  const N_EMOJI = { "💬": "chat", "📅": "cal", "🏦": "money", "💰": "money", "✅": "check", "⚠️": "alert", "⚠": "alert", "🚩": "alert", "🔓": "lock", "🔒": "lock", "📹": "live", "📣": "bell", "📞": "phone", "📎": "clip", "💾": "files", "🎓": "courses", "👀": "eye", "👁": "eye", "📝": "exam", "🏆": "medal", "🛒": "card", "💳": "card" };
-  const N_TYPE = { message: "chat", booking: "cal", payout: "money", purchase: "card", enroll: "courses", profile_view: "eye", course_view: "eye", lesson_view: "play", phone_view: "phone", storage: "files", report: "alert", account: "shield", blocked: "lock" };
-  const nIcon = (n) => {
-    const t = (n.title || "").trim(), m = /^(\p{Extended_Pictographic}️?)\s*/u.exec(t);
+    <div class="bell-wrap"><button class="icon-btn bell" id="bell" aria-label="Мэдэгдэл" aria-haspopup="dialog" aria-expanded="false" aria-controls="bellPanel">${icon("bell", 21)}<span class="bell-badge" hidden></span></button>
+    <section class="np" id="bellPanel" role="dialog" aria-labelledby="npTitle" hidden>
+      <header class="np-head"><h2 id="npTitle">Мэдэгдэл</h2><button type="button" class="np-more" id="npMore" aria-label="Мэдэгдлийн тохиргоо" aria-haspopup="menu" aria-expanded="false">${dots}</button>
+        <div class="np-menu" id="npMenu" role="menu" hidden><button type="button" role="menuitem" data-np="readall">${icon("check", 18)}<span>Бүгдийг уншсан болгох</span></button><button type="button" role="menuitem" data-np="perm" hidden>${icon("bell", 18)}<span>Браузерт мэдэгдэх</span></button></div></header>
+      <div class="np-tabs" role="tablist"><button type="button" role="tab" class="on" aria-selected="true" data-np-tab="all">Бүгд</button><button type="button" role="tab" aria-selected="false" data-np-tab="unread">Уншаагүй</button></div>
+      <div class="np-body" id="bellList"><div class="np-skel" aria-hidden="true"><i></i><i></i><i></i></div></div>
+    </section></div>`);
+  const btn = $("#bell"), badge = $(".bell-badge", btn), panel = $("#bellPanel"), list = $("#bellList"), menu = $("#npMenu"), more = $("#npMore");
+  // «Харсан» хил: самбарыг сүүлд нээх үеийн хамгийн шинэ мэдэгдлийн ID (энэ төхөөрөмж дээр). Тэмдэг (badge) зөвхөн
+  // түүнээс хойших уншаагүйг тоолно; цэнхэр цэг нь тухайн мэдэгдэл дээр дартал (эсвэл «Бүгдийг уншсан») үлдэнэ.
+  const SEEN = "sg_notif_seen";
+  const getSeen = () => { try { return localStorage.getItem(SEEN) || ""; } catch { return ""; } };
+  const setSeen = (id) => { try { localStorage.setItem(SEEN, id); } catch {} };
+  let items = [], tab = "all", limit = 12, floor = getSeen(), loaded = false;
+  // Мэдэгдэл бүрийн дүрс: гарчгийн эхний emoji-оос, эс бөгөөс төрлөөс; өнгө нь төрлөөр (чат — цэнхэр, мөнгө — ногоон г.м.).
+  const N_EMOJI = { "💬": "chat", "↩": "chat", "👥": "users", "📅": "cal", "❌": "cal", "🏦": "money", "💰": "money", "✅": "check", "⚠️": "alert", "⚠": "alert", "🚩": "alert", "⛔": "lock", "🔓": "lock", "🔒": "lock", "🔑": "lock", "📹": "live", "📣": "bell", "📞": "phone", "📎": "clip", "💾": "files", "🎓": "courses", "📚": "book", "👀": "eye", "👁": "eye", "📝": "exam", "🏆": "medal", "🎖": "medal", "🛒": "card", "💳": "card" };
+  const N_TYPE = { message: "chat", comment: "chat", reply: "chat", booking: "cal", payout: "money", purchase: "card", enroll: "courses", profile_view: "eye", course_view: "eye", lesson_view: "play", phone_view: "phone", storage: "files", report: "alert", violation: "alert", account: "shield", blocked: "lock", unblock: "lock", assignment: "clip", grade: "check", exam: "exam", remind: "bell", rank: "medal" };
+  const TONE = { chat: "blue", users: "blue", money: "green", card: "green", check: "green", phone: "green", courses: "violet", medal: "violet", exam: "violet", book: "violet", cal: "orange", bell: "orange", alert: "red", lock: "red", live: "red", clip: "teal", files: "teal", play: "teal", eye: "gray", shield: "gray" };
+  const kind = (n) => {
+    const t = (n.title || "").trim(), m = /^(\p{Extended_Pictographic}️?|↩)\s*/u.exec(t);
     const name = (m && N_EMOJI[m[1]]) || N_TYPE[n.type] || "bell";
-    return { ico: `<span class="bell-ico">${icon(name, 18)}</span>`, title: m && N_EMOJI[m[1]] ? t.slice(m[0].length) : t };
+    return { name, tone: TONE[name] || "blue", title: m ? t.slice(m[0].length) : t };
+  };
+  const ago = (t) => {
+    const m = (Date.now() - new Date(t)) / 60000;
+    return m < 1 ? "Саяхан" : m < 60 ? Math.floor(m) + " мин" : m < 1440 ? Math.floor(m / 60) + " цаг" : m < 10080 ? Math.floor(m / 1440) + " өдөр" : m < 50400 ? Math.floor(m / 10080) + " 7 хоног" : fmtDay(t, new Date(t).getFullYear() !== new Date().getFullYear());
   };
   const item = (n) => {
-    const { ico, title } = nIcon(n);
+    const k = kind(n), unread = !n.read;
     const ub = n.type === "blocked" && /^unblock:([^:]+):(.+)$/.exec(n.link || "");
-    if (ub) return `<li class="bell-item bell-blocked ${n.read ? "" : "unread"}"><div class="bell-row">${ico}<div><strong>${esc(title)}</strong>${n.body ? `<span>${esc(n.body)}</span>` : ""}<time>${fmtDate(n.created_at)}</time>
-      <button type="button" class="btn btn-sm bell-unblock" data-unblock-user="${esc(ub[1])}" data-unblock-lesson="${esc(ub[2])}">⛔ Хаагдсан — 🔓 Дахин нээх</button></div></div></li>`;
-    return `<li class="bell-item ${n.read ? "" : "unread"}"><a class="bell-row" href="${esc(n.Link || n.link || "#")}">${ico}<div><strong>${esc(title)}</strong>${n.body ? `<span>${esc(n.body)}</span>` : ""}<time>${fmtDate(n.created_at)}</time></div></a></li>`;
+    const av = n.actor ? `${avatarHTML(n.actor, "np-avatar")}<i class="np-badge t-${k.tone}">${icon(k.name, 13)}</i>` : `<span class="np-sys t-${k.tone}">${icon(k.name, 26)}</span>`;
+    const acts = ub ? `<span class="np-acts"><button type="button" class="np-btn" data-unblock-user="${esc(ub[1])}" data-unblock-lesson="${esc(ub[2])}">Дахин нээх</button></span>` : "";
+    const inner = `<span class="np-av">${av}</span><span class="np-txt"><span class="np-t">${esc(k.title)}</span>${n.body ? `<span class="np-b">${esc(n.body)}</span>` : ""}<time datetime="${esc(n.created_at)}" title="${esc(fmtDate(n.created_at))}">${ago(n.created_at)}</time>${acts}</span>${unread ? `<i class="np-dot" aria-label="Уншаагүй"></i>` : ""}`;
+    const cls = "np-item" + (unread ? " unread" : "");
+    return ub || !n.link ? `<div class="${cls}" data-nid="${esc(n.id)}">${inner}</div>` : `<a class="${cls}" href="${esc(n.link)}" data-nid="${esc(n.id)}">${inner}</a>`;
   };
-  list.addEventListener("click", async (e) => {
-    const b = e.target.closest("[data-unblock-user]"); if (!b) return;
-    e.preventDefault(); e.stopPropagation(); b.disabled = true;
-    try {
-      const r = await api(`/api/me/students/${b.dataset.unblockUser}/unblock`, { method: "POST", body: { lesson_id: b.dataset.unblockLesson } });
-      b.className = "btn btn-sm bell-unblock done"; b.textContent = r.exam ? "✓ Шалгалт дахин нээгдлээ (+1 оролдлого)" : r.unblocked ? "✓ Дахин нээгдлээ — суралцагчид мэдэгдлээ" : "✓ Аль хэдийн нээлттэй";
-    } catch (x) { toast(x.message, true); b.disabled = false; }
-  });
+  // «Шинэ» = самбарыг энэ удаа нээхээс өмнө хараагүй нь (анх энэ төхөөрөмж дээр бол — уншаагүй нь).
+  const isNew = (n) => (floor ? n.id > floor : !n.read);
+  const sec = (title, extra = "") => `<div class="np-sec"><h3>${title}</h3>${extra}</div>`;
+  const draw = () => {
+    if (!loaded) return;
+    const xs = tab === "unread" ? items.filter((n) => !n.read) : items;
+    if (!xs.length) {
+      list.innerHTML = `<div class="np-empty"><span>${icon("bell", 30)}</span><b>${tab === "unread" ? "Уншаагүй мэдэгдэл алга" : "Одоогоор мэдэгдэл алга"}</b><small>${tab === "unread" ? "Бүгдийг нь уншсан байна." : "Шинэ зүйл болоход энд харагдана."}</small></div>`;
+      return;
+    }
+    const vis = xs.slice(0, limit), fresh = vis.filter(isNew), old = vis.filter((n) => !isNew(n));
+    const all = items.some((n) => !n.read) ? `<button type="button" class="np-link" data-np="readall">Бүгдийг уншсан</button>` : "";
+    list.innerHTML = (fresh.length ? sec("Шинэ", all) + fresh.map(item).join("") : "") + (old.length ? sec("Өмнөх", fresh.length ? "" : all) + old.map(item).join("") : "") +
+      (xs.length > limit ? `<button type="button" class="np-prev" data-np="prev">Өмнөх мэдэгдлүүдийг харах</button>` : "");
+  };
+  const newest = () => items.reduce((a, n) => (n.id > a ? n.id : a), "");
+  const setBadge = () => { const s = getSeen(), k = items.filter((n) => !n.read && n.id > s).length; badge.hidden = !k; badge.textContent = k > 99 ? "99+" : k; };
   const load = async () => {
     try {
-      const d = await api("/api/me/notifications");
-      list.innerHTML = d.items.length ? d.items.map(item).join("") : `<li class="muted small">Одоогоор мэдэгдэл алга</li>`;
-      setBadge(d.unread);
-    } catch {}
+      const d = await api("/api/me/notifications"), mine = new Set(items.filter((n) => n.read).map((n) => n.id));
+      items = (d.items || []).map((n) => (mine.has(n.id) ? { ...n, read: true } : n)); // саяхан дарсныг сервер хараахан бичээгүй байж болно
+      loaded = true; setBadge(); if (!panel.hidden) draw();
+    } catch { if (!loaded && !panel.hidden) list.innerHTML = `<div class="np-empty"><b>Ачаалж чадсангүй</b><small>Дахин оролдоно уу.</small></div>`; }
+  };
+  // Дээр нь дарсан мэдэгдлийг уншсан болгоно (keepalive — хуудас шилжсэн ч хүсэлт хүрнэ).
+  const markOne = (id) => fetch("/api/me/notifications/read", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json", Authorization: "Bearer " + Auth.token }, body: JSON.stringify({ id }) }).catch(() => {});
+  const closeMenu = () => { menu.hidden = true; more.setAttribute("aria-expanded", "false"); };
+  const open = (show) => {
+    panel.hidden = !show; btn.setAttribute("aria-expanded", String(show)); closeMenu();
+    if (!show) return;
+    floor = getSeen(); limit = 12; draw();
+    const top = newest(); if (top) setSeen(top);
+    setBadge(); load();
   };
   load();
-  const perm = $("#bellPerm");
-  if ("Notification" in window && Notification.permission === "default") perm.hidden = false;
-  perm.addEventListener("click", async () => { await Notification.requestPermission(); perm.hidden = true; });
-  $("#bell").addEventListener("click", async (e) => {
+  btn.addEventListener("click", (e) => { e.stopPropagation(); open(panel.hidden); });
+  document.addEventListener("click", (e) => { if (!panel.hidden && !e.target.closest(".bell-wrap")) open(false); });
+  addEventListener("keydown", (e) => { if (e.key === "Escape" && !panel.hidden) { if (!menu.hidden) return closeMenu(); open(false); btn.focus(); } });
+  more.addEventListener("click", (e) => {
     e.stopPropagation();
-    panel.hidden = !panel.hidden;
-    if (!panel.hidden && unread) { setBadge(0); api("/api/me/notifications/read", { method: "POST" }).catch(() => {}); }
+    const show = menu.hidden; menu.hidden = !show; more.setAttribute("aria-expanded", String(show));
+    $("[data-np=perm]", menu).hidden = !("Notification" in window && Notification.permission === "default");
+    $("[data-np=readall]", menu).disabled = !items.some((n) => !n.read);
   });
-  document.addEventListener("click", (e) => { if (!e.target.closest(".bell-wrap")) panel.hidden = true; });
+  panel.addEventListener("click", async (e) => {
+    if (!e.target.closest("#npMenu, #npMore")) closeMenu();
+    const tb = e.target.closest("[data-np-tab]");
+    if (tb) {
+      tab = tb.dataset.npTab; limit = 12;
+      $$("[data-np-tab]", panel).forEach((b) => { const on = b === tb; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); });
+      return draw();
+    }
+    const act = e.target.closest("[data-np]")?.dataset.np;
+    if (act === "prev") { limit += 15; return draw(); }
+    if (act === "readall") {
+      closeMenu(); items = items.map((n) => ({ ...n, read: true })); setBadge(); draw();
+      api("/api/me/notifications/read", { method: "POST" }).catch(() => {});
+      return toast("✓ Бүх мэдэгдлийг уншсан болголоо");
+    }
+    if (act === "perm") { closeMenu(); await Notification.requestPermission(); return; }
+    const it = e.target.closest(".np-item"); if (!it) return;
+    const n = items.find((x) => x.id === it.dataset.nid);
+    if (n && !n.read) { n.read = true; markOne(n.id); it.classList.remove("unread"); it.querySelector(".np-dot")?.remove(); setBadge(); }
+    const b = e.target.closest("[data-unblock-user]");
+    if (b) {
+      e.preventDefault(); b.disabled = true;
+      try {
+        const r = await api(`/api/me/students/${b.dataset.unblockUser}/unblock`, { method: "POST", body: { lesson_id: b.dataset.unblockLesson } });
+        b.classList.add("done"); b.textContent = r.exam ? "✓ Шалгалт дахин нээгдлээ (+1 оролдлого)" : r.unblocked ? "✓ Дахин нээгдлээ — суралцагчид мэдэгдлээ" : "✓ Аль хэдийн нээлттэй";
+      } catch (x) { toast(x.message, true); b.disabled = false; }
+      return;
+    }
+    if (it.tagName === "A") open(false);
+  });
+  let refetch = 0;
   Live.on((d) => {
     if (d.type !== "notification") return;
-    const n = d.notification;
-    list.querySelector(".muted")?.remove();
-    list.insertAdjacentHTML("afterbegin", item(n));
-    setBadge(unread + 1);
-    $("#bell").animate([{ transform: "rotate(0)" }, { transform: "rotate(18deg)" }, { transform: "rotate(-14deg)" }, { transform: "rotate(0)" }], { duration: 600 });
+    const n = { ...d.notification, read: false };
+    if (items.some((x) => x.id === n.id)) return;
+    items.unshift(n); loaded = true;
+    if (!panel.hidden) { setSeen(n.id); draw(); } // нээлттэй үед тэмдэг нэмэгдэхгүй — шууд «Шинэ» хэсэгт
+    setBadge();
+    if (n.actor_id) { clearTimeout(refetch); refetch = setTimeout(load, 700); } // үүсгэсэн хүний зураг, нэрийг серверээс
+    btn.animate([{ transform: "rotate(0)" }, { transform: "rotate(18deg)" }, { transform: "rotate(-14deg)" }, { transform: "rotate(0)" }], { duration: 600 });
     toast(n.title);
     if (document.hidden && "Notification" in window && Notification.permission === "granted") {
       const bn = new Notification(n.title, { body: n.body || "", tag: n.id });
-      bn.onclick = () => { focus(); if (n.link && !n.link.startsWith("unblock:")) location.href = n.link; else panel.hidden = false; };
+      bn.onclick = () => { focus(); if (n.link && !n.link.startsWith("unblock:")) { markOne(n.id); location.href = n.link; } else open(true); };
     }
   });
   Live.connect(Auth.token);

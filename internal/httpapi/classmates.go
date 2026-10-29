@@ -205,7 +205,7 @@ func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	name := s.displayName(r.Context(), c.UID, c.Name)
 	for _, m := range in.Members {
-		s.notify(r.Context(), &store.Notification{UserID: m, Type: NotifMessage, Count: 1, Title: "👥 " + name + " таныг «" + in.Title + "» бүлэгт нэмлээ", Link: "/me#chat=" + conv.ID})
+		s.notify(r.Context(), &store.Notification{UserID: m, Type: NotifMessage, Count: 1, ActorID: c.UID, Title: "👥 " + name + " таныг «" + in.Title + "» бүлэгт нэмлээ", Link: "/me#chat=" + conv.ID})
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"conversation": conv})
 }

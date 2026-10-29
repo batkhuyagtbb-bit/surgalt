@@ -213,6 +213,7 @@ var chMigrations = []string{
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version String DEFAULT ''",
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_at Nullable(" + tsType + ")",
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS tokens_after Nullable(" + tsType + ")",
+	"ALTER TABLE notifications ADD COLUMN IF NOT EXISTS actor_id String DEFAULT ''",
 	// Эцэг эхийн зөвшөөрлийн боломжийг хассан: хадгалсан нас, эцэг эхийн нэр, утсыг устгана.
 	"ALTER TABLE users DROP COLUMN IF EXISTS age_group",
 	"ALTER TABLE users DROP COLUMN IF EXISTS guardian_name",
@@ -254,11 +255,14 @@ var chTables = []chTable{
 		previews Int64, reads Int64, interest Int64)
 	ENGINE = SummingMergeTree ORDER BY (entity, id)`},
 	{"notifications", `(id String, user_id String, type String, title String, body String, link String,
-		count Int64, created_at ` + tsType + `)
+		count Int64, created_at ` + tsType + `, actor_id String DEFAULT '')
 	ENGINE = MergeTree ORDER BY (user_id, id) TTL toDateTime(created_at) + INTERVAL 90 DAY`},
 	// Уншсан тэмдэглэгээ: user_id -> уншсан хамгийн сүүлийн мэдэгдлийн id (ID цаг хугацаагаар өсдөг).
 	{"notification_reads", `(user_id String, upto String, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY user_id`},
+	// Дээр нь дарж уншсан мэдэгдлүүд (upto-оос хойших; мэдэгдэлтэйгээ адил 90 хоног хадгална).
+	{"notification_opens", `(user_id String, id String, at ` + tsType + `)
+	ENGINE = ReplacingMergeTree ORDER BY (user_id, id) TTL toDateTime(at) + INTERVAL 90 DAY`},
 	// Цаг захиалга: багшийн сул цаг ба захиалга нэг мөрөнд (slots.go).
 	{"slots", `(id String, teacher_id String, starts_at ` + tsType + `, duration_min Int32, mode String, price Int64,
 		location String, student_id String, student_name String, note String, hold_by String,
@@ -810,13 +814,13 @@ func (c *ClickHouse) AddNotifications(ctx context.Context, ns []*Notification) e
 	if len(ns) == 0 {
 		return nil
 	}
-	b, err := c.conn.PrepareBatch(ctx, "INSERT INTO notifications (id, user_id, type, title, body, link, count, created_at)")
+	b, err := c.conn.PrepareBatch(ctx, "INSERT INTO notifications (id, user_id, type, title, body, link, count, created_at, actor_id)")
 	if err != nil {
 		return err
 	}
 	for _, n := range ns {
 		n.ID, n.CreatedAt = NewID(), time.Now()
-		if err := b.Append(n.ID, n.UserID, n.Type, n.Title, n.Body, n.Link, n.Count, n.CreatedAt.UTC()); err != nil {
+		if err := b.Append(n.ID, n.UserID, n.Type, n.Title, n.Body, n.Link, n.Count, n.CreatedAt.UTC(), n.ActorID); err != nil {
 			return err
 		}
 	}
@@ -836,20 +840,32 @@ func (c *ClickHouse) Notifications(ctx context.Context, userID string, limit int
 		return nil, 0, err
 	}
 	out := []Notification{}
-	err = c.query(ctx, `SELECT id, user_id, type, title, body, link, count, created_at FROM notifications
-		WHERE user_id = ? ORDER BY id DESC LIMIT ?`, []any{userID, limit}, func(r driver.Rows) error {
-		var n Notification
-		if err := r.Scan(&n.ID, &n.UserID, &n.Type, &n.Title, &n.Body, &n.Link, &n.Count, &n.CreatedAt); err != nil {
+	opened := map[string]bool{}
+	if err := c.query(ctx, "SELECT id FROM notification_opens WHERE user_id = ? AND id > ?", []any{userID, upto}, func(r driver.Rows) error {
+		var id string
+		if err := r.Scan(&id); err != nil {
 			return err
 		}
-		n.Read = n.ID <= upto
+		opened[id] = true
+		return nil
+	}); err != nil {
+		return nil, 0, err
+	}
+	err = c.query(ctx, `SELECT id, user_id, type, title, body, link, count, created_at, actor_id FROM notifications
+		WHERE user_id = ? ORDER BY id DESC LIMIT ?`, []any{userID, limit}, func(r driver.Rows) error {
+		var n Notification
+		if err := r.Scan(&n.ID, &n.UserID, &n.Type, &n.Title, &n.Body, &n.Link, &n.Count, &n.CreatedAt, &n.ActorID); err != nil {
+			return err
+		}
+		n.Read = n.ID <= upto || opened[n.ID]
 		out = append(out, n)
 		return nil
 	})
 	if err != nil {
 		return nil, 0, err
 	}
-	unread, err := c.count(ctx, "SELECT count() FROM notifications WHERE user_id = ? AND id > ?", userID, upto)
+	unread, err := c.count(ctx, `SELECT count() FROM notifications WHERE user_id = ? AND id > ?
+		AND id NOT IN (SELECT id FROM notification_opens WHERE user_id = ?)`, userID, upto, userID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -866,6 +882,10 @@ func (c *ClickHouse) MarkNotificationsRead(ctx context.Context, userID string) e
 		return nil
 	}
 	return c.insert(ctx, "notification_reads", []string{"user_id", "upto", "ver"}, userID, maxID, ver())
+}
+
+func (c *ClickHouse) MarkNotificationRead(ctx context.Context, userID, id string) error {
+	return c.insert(ctx, "notification_opens", []string{"user_id", "id", "at"}, userID, id, time.Now().UTC())
 }
 
 // ---- уулзалт ----

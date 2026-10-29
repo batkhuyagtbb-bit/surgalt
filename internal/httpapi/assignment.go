@@ -415,7 +415,7 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.store.MarkLessonCompleted(r.Context(), c.UID, course.ID, l.ID)
-	s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: "assignment", Title: "📎 Даалгаврын хариу ирлээ",
+	s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: "assignment", ActorID: c.UID, Title: "📎 Даалгаврын хариу ирлээ",
 		Body: sub.UserName + " — «" + l.Title + "»" + map[bool]string{true: " (хоцорсон)", false: ""}[sub.Late], Link: "/t/" + c.Name + "#course=" + course.ID})
 	s.courses.Delete(course.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"submission": s.subView(sub), "due": ds})
@@ -496,7 +496,7 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.GradeSubmission(r.Context(), l.ID, uid, in.Score, strings.TrimSpace(in.Feedback), picks); s.storeErr(w, r, err) {
 		return
 	}
-	s.notify(r.Context(), &store.Notification{UserID: uid, Type: "grade", Title: fmt.Sprintf("✅ Даалгавар дүгнэгдлээ: %d/%d", in.Score, maxScore),
+	s.notify(r.Context(), &store.Notification{UserID: uid, Type: "grade", ActorID: course.TeacherID, Title: fmt.Sprintf("✅ Даалгавар дүгнэгдлээ: %d/%d", in.Score, maxScore),
 		Body: "«" + l.Title + "»" + map[bool]string{true: " — " + in.Feedback, false: ""}[in.Feedback != ""], Link: "/c/" + course.ID + "#l=" + l.ID})
 	sub, err := s.store.SubmissionFor(r.Context(), uid, l.ID)
 	if s.storeErr(w, r, err) {

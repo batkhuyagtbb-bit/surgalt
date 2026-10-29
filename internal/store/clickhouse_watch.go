@@ -40,10 +40,10 @@ func (c *ClickHouse) WatchNotifications(ctx context.Context, every time.Duration
 		return err
 	}
 	go c.poll(ctx, every, log, func(ctx context.Context) error {
-		return c.query(ctx, `SELECT id, user_id, type, title, body, link, count, created_at
+		return c.query(ctx, `SELECT id, user_id, type, title, body, link, count, created_at, actor_id
 			FROM notifications WHERE id > ? ORDER BY id LIMIT 500`, []any{last}, func(r driver.Rows) error {
 			var n Notification
-			if err := r.Scan(&n.ID, &n.UserID, &n.Type, &n.Title, &n.Body, &n.Link, &n.Count, &n.CreatedAt); err != nil {
+			if err := r.Scan(&n.ID, &n.UserID, &n.Type, &n.Title, &n.Body, &n.Link, &n.Count, &n.CreatedAt, &n.ActorID); err != nil {
 				return err
 			}
 			last = n.ID

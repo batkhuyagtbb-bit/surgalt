@@ -309,7 +309,7 @@ func (s *Server) cancelSlots(ctx context.Context, teacherID, teacherUser string,
 			if l.paid {
 				body = "Төлсөн мөнгийг багш буцаан олгоно — чатаар холбогдоорой."
 			}
-			nt := &store.Notification{UserID: uid, Type: NotifBooking, Count: 1, Link: "/t/" + teacherUser, Body: body,
+			nt := &store.Notification{UserID: uid, Type: NotifBooking, Count: 1, ActorID: teacherID, Link: "/t/" + teacherUser, Body: body,
 				Title: "❌ " + teacher + " уулзалтыг цуцаллаа · " + l.when[0]}
 			if len(l.when) > 1 {
 				nt.Title = fmt.Sprintf("❌ %s %d уулзалтыг цуцаллаа", teacher, len(l.when))
@@ -418,7 +418,7 @@ func (s *Server) handleSlotMeet(w http.ResponseWriter, r *http.Request) {
 			s.log.Warn("уулзалтын холбоос", "err", err)
 		}
 	}
-	s.notify(r.Context(), &store.Notification{UserID: sl.StudentID, Type: NotifBooking, Count: 1,
+	s.notify(r.Context(), &store.Notification{UserID: sl.StudentID, Type: NotifBooking, Count: 1, ActorID: c.UID,
 		Title: "📹 Уулзалтын холбоос ирлээ · " + slotWhen(sl.StartsAt), Body: s.displayName(r.Context(), c.UID, c.Name) + ": " + link, Link: "/#my-live"})
 	writeJSON(w, http.StatusOK, sl)
 }
@@ -546,9 +546,9 @@ func (s *Server) slotPaid(ctx context.Context, o *store.Order) {
 	if err != nil { // төлбөр орсон ч цаг цуцлагдсан/өөр хүнд очсон (маш ховор) — багш мөнгийг буцаана
 		s.log.Warn("төлсөн цаг баталгаажсангүй", "order", o.ID, "err", err)
 		s.notify(ctx,
-			&store.Notification{UserID: o.TeacherID, Type: NotifBooking, Count: 1, Title: "⚠️ " + name + " төлбөр төлсөн боловч цаг баталгаажсангүй",
+			&store.Notification{UserID: o.TeacherID, Type: NotifBooking, Count: 1, ActorID: o.UserID, Title: "⚠️ " + name + " төлбөр төлсөн боловч цаг баталгаажсангүй",
 				Body: o.Title + " — мөнгийг буцаах эсвэл өөр цаг санал болгоно уу.", Link: "/me#live"},
-			&store.Notification{UserID: o.UserID, Type: NotifBooking, Count: 1, Title: "⚠️ Таны төлсөн цаг өөр хүнд очсон байна",
+			&store.Notification{UserID: o.UserID, Type: NotifBooking, Count: 1, ActorID: o.TeacherID, Title: "⚠️ Таны төлсөн цаг өөр хүнд очсон байна",
 				Body: o.Title + " — багш тантай холбогдож буцаан олгоно.", Link: "/"})
 		return
 	}
@@ -603,6 +603,6 @@ func (s *Server) slotConfirmed(ctx context.Context, sl *store.Slot) {
 		sb += ": " + sl.MeetURL
 	}
 	s.notify(ctx,
-		&store.Notification{UserID: sl.TeacherID, Type: NotifBooking, Count: 1, Title: "📅 " + sl.StudentName + " цаг захиаллаа · " + when, Body: tb, Link: "/me#live"},
-		&store.Notification{UserID: sl.StudentID, Type: NotifBooking, Count: 1, Title: "✅ Цаг баталгаажлаа · " + teacher + " · " + when, Body: sb, Link: "/#my-live"})
+		&store.Notification{UserID: sl.TeacherID, Type: NotifBooking, Count: 1, ActorID: sl.StudentID, Title: "📅 " + sl.StudentName + " цаг захиаллаа · " + when, Body: tb, Link: "/me#live"},
+		&store.Notification{UserID: sl.StudentID, Type: NotifBooking, Count: 1, ActorID: sl.TeacherID, Title: "✅ Цаг баталгаажлаа · " + teacher + " · " + when, Body: sb, Link: "/#my-live"})
 }

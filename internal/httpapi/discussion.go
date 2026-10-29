@@ -156,10 +156,10 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
 	}
 	link := "/c/" + course.ID + "#l=" + l.ID
 	if c.UID != course.TeacherID { // багшид: шинэ сэтгэгдэл/асуулт
-		s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: "comment", Title: "💬 " + cm.UserName + ": «" + l.Title + "»", Body: short(in.Body), Link: link})
+		s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: "comment", ActorID: c.UID, Title: "💬 " + cm.UserName + ": «" + l.Title + "»", Body: short(in.Body), Link: link})
 	}
 	if parent != nil && parent.UserID != c.UID && parent.UserID != course.TeacherID { // хариу авсан суралцагчид
-		s.notify(r.Context(), &store.Notification{UserID: parent.UserID, Type: "reply", Title: "↩ " + cm.UserName + " танд хариуллаа", Body: short(in.Body), Link: link})
+		s.notify(r.Context(), &store.Notification{UserID: parent.UserID, Type: "reply", ActorID: c.UID, Title: "↩ " + cm.UserName + " танд хариуллаа", Body: short(in.Body), Link: link})
 	}
 	s.courses.Delete(course.ID)
 	writeJSON(w, http.StatusCreated, cm)

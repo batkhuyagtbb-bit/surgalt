@@ -817,6 +817,17 @@ func (m *Memory) MarkNotificationsRead(_ context.Context, userID string) error {
 	return nil
 }
 
+func (m *Memory) MarkNotificationRead(_ context.Context, userID, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, n := range m.notifs[userID] {
+		if n.ID == id {
+			n.Read = true
+		}
+	}
+	return nil
+}
+
 func (m *Memory) UpdateLesson(_ context.Context, l *Lesson) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

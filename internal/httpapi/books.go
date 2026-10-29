@@ -421,7 +421,7 @@ func (s *Server) handleBookPage(w http.ResponseWriter, r *http.Request) {
 	if uid != b.TeacherID && !bookLim.allow(who+"|"+b.ID) {
 		s.logBook(r, b, uid, name, "limit", "Минутад 40-өөс олон хуудас татах гэсэн", 10*time.Minute)
 		if uid != "" && bookLim.once("notify-limit|"+uid+"|"+b.ID, 30*time.Minute) {
-			s.notify(r.Context(), &store.Notification{UserID: b.TeacherID, Type: "violation", Title: "⚠️ " + s.displayName(r.Context(), uid, name) + ": номыг хэт хурдан татах гэсэн", Body: short(b.Title), Link: "/me#books"})
+			s.notify(r.Context(), &store.Notification{UserID: b.TeacherID, Type: "violation", ActorID: uid, Title: "⚠️ " + s.displayName(r.Context(), uid, name) + ": номыг хэт хурдан татах гэсэн", Body: short(b.Title), Link: "/me#books"})
 		}
 		writeErr(w, http.StatusTooManyRequests, "Хэт хурдан эргүүлж байна — түр хүлээгээд үргэлжлүүлнэ үү")
 		return

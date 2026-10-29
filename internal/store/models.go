@@ -81,6 +81,9 @@ type Notification struct {
 	Count     int64     `json:"count"`
 	Read      bool      `json:"read"`
 	CreatedAt time.Time `json:"created_at"`
+
+	// ActorID — мэдэгдлийг үүсгэсэн хүн (бичсэн, элссэн, худалдаж авсан…); жагсаалтад аватар нь харагдана. Системийнх бол хоосон.
+	ActorID string `json:"actor_id,omitempty"`
 }
 
 // Meeting нь Google Meet-ээр явагдах шууд хичээл/уулзалт.
@@ -604,6 +607,8 @@ type Store interface {
 	AddNotifications(ctx context.Context, ns []*Notification) error
 	Notifications(ctx context.Context, userID string, limit int) ([]Notification, int64, error)
 	MarkNotificationsRead(ctx context.Context, userID string) error
+	// MarkNotificationRead — нэг мэдэгдлийг уншсан болгоно (дээр нь дарсан).
+	MarkNotificationRead(ctx context.Context, userID, id string) error
 	CreateMeeting(ctx context.Context, m *Meeting) error
 	MeetingByID(ctx context.Context, id string) (*Meeting, error)
 	// SetMeetingPrice — шууд хичээлийн үнэ, элссэн хүнд үнэгүй эсэхийг өөрчилнө.

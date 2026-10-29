@@ -14,7 +14,7 @@ var eraseByUser = []struct{ table, col string }{
 	{"activity_events", "user_id"}, {"study_sessions", "user_id"}, {"quiz_logs", "user_id"}, {"reflections", "user_id"},
 	{"video_watches", "user_id"}, {"book_events", "user_id"}, {"lesson_progress", "user_id"}, {"exam_attempts", "user_id"},
 	{"submissions", "user_id"}, {"comments", "user_id"}, {"likes", "user_id"}, {"rank_points", "user_id"}, {"rank_levels", "user_id"},
-	{"notifications", "user_id"}, {"notification_reads", "user_id"}, {"enrollments", "user_id"}, {"lesson_access", "user_id"},
+	{"notifications", "user_id"}, {"notification_reads", "user_id"}, {"notification_opens", "user_id"}, {"enrollments", "user_id"}, {"lesson_access", "user_id"},
 	{"book_access", "user_id"}, {"meeting_access", "user_id"}, {"identities", "user_id"}, {"conversation_members", "user_id"},
 	{"page_visits", "visitor_id"}, {"highlights", "user_id"}, {"cloud_answers", "user_id"}, {"course_unlocks", "user_id"}, {"chat_hides", "user_id"},
 	{"payout_accounts", "teacher_id"}, // дансны мэдээлэл (татах хүсэлтүүд санхүүгийн баримт тул үлдэнэ)

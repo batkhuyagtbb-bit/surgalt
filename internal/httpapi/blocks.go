@@ -192,7 +192,7 @@ func (s *Server) handleUnblockStudent(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.AddActivityEvents(r.Context(), evs); s.storeErr(w, r, err) {
 		return
 	}
-	n := &store.Notification{UserID: uid, Type: "unblock", Title: "🔓 Багш хичээлийг тань дахин нээлээ", Body: "Анхааралтай, бусад цонхоо хаагаад үзээрэй.", Link: link}
+	n := &store.Notification{UserID: uid, Type: "unblock", ActorID: c.UID, Title: "🔓 Багш хичээлийг тань дахин нээлээ", Body: "Анхааралтай, бусад цонхоо хаагаад үзээрэй.", Link: link}
 	if exam != "" {
 		n.Title, n.Body = "🔓 Багш шалгалтыг тань дахин нээлээ", "«"+exam+"» — дахин өгөх боломжтой (нэмэлт оролдлого). Бусад цонхоо хаагаад, анхааралтай өгөөрэй."
 	}

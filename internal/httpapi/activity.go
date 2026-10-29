@@ -77,7 +77,7 @@ func (s *Server) logEvents(ctx context.Context, evs []store.ActivityEvent) {
 			continue
 		}
 		n.msgLast[k] = time.Now()
-		ns = append(ns, &store.Notification{UserID: e.TeacherID, Type: "violation", Title: "⚠️ " + e.UserName + ": " + m.Label, Body: short(e.Detail), Link: "/me#students"})
+		ns = append(ns, &store.Notification{UserID: e.TeacherID, Type: "violation", ActorID: e.UserID, Title: "⚠️ " + e.UserName + ": " + m.Label, Body: short(e.Detail), Link: "/me#students"})
 	}
 	n.mu.Unlock()
 	for _, e := range blocked {
@@ -100,7 +100,7 @@ func (s *Server) logEvents(ctx context.Context, evs []store.ActivityEvent) {
 				body = fmt.Sprintf("Энэ сургалтад %d дахь удаагаа хаагдлаа · %s", n, body)
 			}
 		}
-		ns = append(ns, &store.Notification{UserID: e.TeacherID, Type: "blocked", Title: "⛔ " + e.UserName + ": «" + title + "» " + what + " хаагдсан",
+		ns = append(ns, &store.Notification{UserID: e.TeacherID, Type: "blocked", ActorID: e.UserID, Title: "⛔ " + e.UserName + ": «" + title + "» " + what + " хаагдсан",
 			Body: body, Link: "unblock:" + e.UserID + ":" + e.LessonID})
 	}
 	s.notify(ctx, ns...)
@@ -190,7 +190,7 @@ func (s *Server) handleRemindStudent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	teacher := s.displayName(r.Context(), c.UID, c.Name)
-	s.notify(r.Context(), &store.Notification{UserID: uid, Type: "remind", Title: "📣 " + teacher + " багшаас сануулга", Body: short(in.Message), Link: "/c/" + course.ID})
+	s.notify(r.Context(), &store.Notification{UserID: uid, Type: "remind", ActorID: c.UID, Title: "📣 " + teacher + " багшаас сануулга", Body: short(in.Message), Link: "/c/" + course.ID})
 	s.logEvents(r.Context(), []store.ActivityEvent{{UserID: uid, UserName: s.displayName(r.Context(), uid, ""), CourseID: course.ID, TeacherID: c.UID, Type: "teacher_remind", Detail: in.Message}})
 	writeJSON(w, http.StatusOK, map[string]any{"sent": true})
 }

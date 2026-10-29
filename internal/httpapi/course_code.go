@@ -91,7 +91,7 @@ func (s *Server) handleUnlockCourse(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	s.notify(ctx, &store.Notification{UserID: course.TeacherID, Type: NotifEnroll, Count: 1,
+	s.notify(ctx, &store.Notification{UserID: course.TeacherID, Type: NotifEnroll, Count: 1, ActorID: c.UID,
 		Title: "🔑 Нууц үгээр элслээ", Body: s.displayName(ctx, c.UID, c.Name) + " — " + course.Title, Link: "/c/" + course.ID})
 	writeJSON(w, http.StatusCreated, map[string]any{"enrolled": true})
 }

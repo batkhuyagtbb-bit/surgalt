@@ -853,7 +853,7 @@ func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		if err := s.store.Enroll(r.Context(), c.UID, course); s.storeErr(w, r, err) {
 			return
 		}
-		s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: NotifEnroll, Count: 1,
+		s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: NotifEnroll, Count: 1, ActorID: c.UID,
 			Title: "🎓 Шинэ суралцагч элслээ", Body: c.Name + " — " + course.Title, Link: "/c/" + course.ID})
 		writeJSON(w, http.StatusCreated, map[string]any{"enrolled": true})
 		return

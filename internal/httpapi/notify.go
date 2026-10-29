@@ -2,7 +2,10 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -187,7 +190,7 @@ func (s *Server) notifyMessage(ctx context.Context, conv *store.Conversation, m 
 		}
 		title = "💬 " + who + " · " + conv.VisitorName + " бүлэгт бичлээ"
 	}
-	s.notify(ctx, &store.Notification{UserID: conv.TeacherID, Type: NotifMessage, Count: 1,
+	s.notify(ctx, &store.Notification{UserID: conv.TeacherID, Type: NotifMessage, Count: 1, ActorID: m.SenderID,
 		Title: title, Body: short(m.Body), Link: "/me#chat=" + conv.ID})
 }
 
@@ -220,7 +223,7 @@ func (s *Server) notifyPeers(ctx context.Context, conv *store.Conversation, m *s
 		title = "💬 " + who + " · " + conv.VisitorName + " бүлэгт бичлээ"
 	}
 	for _, u := range to {
-		s.notify(ctx, &store.Notification{UserID: u, Type: NotifMessage, Count: 1, Title: title, Body: short(m.Body), Link: "/me#chat=" + conv.ID})
+		s.notify(ctx, &store.Notification{UserID: u, Type: NotifMessage, Count: 1, ActorID: m.SenderID, Title: title, Body: short(m.Body), Link: "/me#chat=" + conv.ID})
 	}
 }
 
@@ -254,8 +257,8 @@ func (s *Server) notifyPaid(ctx context.Context, o *store.Order) {
 		defer cancel()
 		_ = s.store.AddBookEvent(cctx, store.BookEvent{BookID: o.BookID, TeacherID: o.TeacherID, UserID: o.UserID, UserName: buyer, Type: "purchase", Detail: money(o.Amount) + what})
 		s.notify(ctx,
-			&store.Notification{UserID: o.TeacherID, Type: NotifPurchase, Count: 1, Title: fmt.Sprintf("📚 Ном зарагдлаа%s · %s", what, money(o.Amount)), Body: buyer + " — " + o.Title, Link: "/me#books"},
-			&store.Notification{UserID: o.UserID, Type: NotifPurchase, Count: 1, Title: done, Body: o.Title, Link: "/b/" + o.BookID})
+			&store.Notification{UserID: o.TeacherID, Type: NotifPurchase, Count: 1, ActorID: o.UserID, Title: fmt.Sprintf("📚 Ном зарагдлаа%s · %s", what, money(o.Amount)), Body: buyer + " — " + o.Title, Link: "/me#books"},
+			&store.Notification{UserID: o.UserID, Type: NotifPurchase, Count: 1, ActorID: o.TeacherID, Title: done, Body: o.Title, Link: "/b/" + o.BookID})
 		return
 	}
 	if o.Kind == store.OrderKindMeeting {
@@ -268,8 +271,8 @@ func (s *Server) notifyPaid(ctx context.Context, o *store.Order) {
 			when = " · " + m.StartsAt.In(mnLoc).Format("01/02 15:04")
 		}
 		s.notify(ctx,
-			&store.Notification{UserID: o.TeacherID, Type: NotifPurchase, Count: 1, Title: fmt.Sprintf("📹 Шууд хичээл зарагдлаа · %s", money(o.Amount)), Body: buyer + " — " + o.Title, Link: "/me#live"},
-			&store.Notification{UserID: o.UserID, Type: NotifPurchase, Count: 1, Title: "✅ Шууд хичээлд бүртгэгдлээ — эхлэх цагт «Нэгдэх» дарна уу", Body: o.Title + when, Link: "/c/" + o.CourseID + "#meet=" + o.MeetingID})
+			&store.Notification{UserID: o.TeacherID, Type: NotifPurchase, Count: 1, ActorID: o.UserID, Title: fmt.Sprintf("📹 Шууд хичээл зарагдлаа · %s", money(o.Amount)), Body: buyer + " — " + o.Title, Link: "/me#live"},
+			&store.Notification{UserID: o.UserID, Type: NotifPurchase, Count: 1, ActorID: o.TeacherID, Title: "✅ Шууд хичээлд бүртгэгдлээ — эхлэх цагт «Нэгдэх» дарна уу", Body: o.Title + when, Link: "/c/" + o.CourseID + "#meet=" + o.MeetingID})
 		return
 	}
 	title := o.Title
@@ -283,11 +286,17 @@ func (s *Server) notifyPaid(ctx context.Context, o *store.Order) {
 		buyer = u.DisplayName
 	}
 	s.notify(ctx,
-		&store.Notification{UserID: o.TeacherID, Type: NotifPurchase, Count: 1,
+		&store.Notification{UserID: o.TeacherID, Type: NotifPurchase, Count: 1, ActorID: o.UserID,
 			Title: fmt.Sprintf("💰 Шинэ борлуулалт · %s", money(o.Amount)), Body: buyer + " — " + title, Link: "/me#overview"},
-		&store.Notification{UserID: o.UserID, Type: NotifPurchase, Count: 1,
+		&store.Notification{UserID: o.UserID, Type: NotifPurchase, Count: 1, ActorID: o.TeacherID,
 			Title: "✅ Худалдан авалт амжилттай — нээгдлээ", Body: title, Link: "/c/" + o.CourseID},
 	)
+}
+
+// notifOut — мэдэгдэл + түүнийг үүсгэсэн хүний нэр, зураг (жагсаалтад аватар, дээр нь төрлийн жижиг тэмдэг).
+type notifOut struct {
+	store.Notification
+	Actor *TeacherBrief `json:"actor,omitempty"`
 }
 
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
@@ -299,15 +308,55 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items, "unread": unread})
+	var ids []string
+	want := map[string]bool{}
+	for _, n := range items {
+		if n.ActorID != "" && !want[n.ActorID] {
+			want[n.ActorID] = true
+			ids = append(ids, n.ActorID)
+		}
+	}
+	actors := map[string]*TeacherBrief{}
+	if len(ids) > 0 {
+		if us, err := s.store.UsersByIDs(r.Context(), ids); err == nil {
+			for _, u := range us {
+				actors[u.ID] = &TeacherBrief{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, AvatarURL: u.AvatarURL}
+			}
+		}
+	}
+	out := make([]notifOut, len(items))
+	for i, n := range items {
+		out[i] = notifOut{Notification: n, Actor: actors[n.ActorID]}
+	}
+	w.Header().Set("Cache-Control", "private, no-store")
+	writeJSON(w, http.StatusOK, map[string]any{"items": out, "unread": unread})
 }
 
+// handleNotificationsRead: POST /api/me/notifications/read — {"id": "…"} бол тэр нэг мэдэгдлийг (дээр нь дарсан),
+// хоосон бол бүгдийг уншсан болгоно («Бүгдийг уншсан болгох»).
 func (s *Server) handleNotificationsRead(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireUser(w, r)
 	if !ok {
 		return
 	}
-	if err := s.store.MarkNotificationsRead(r.Context(), c.UID); s.storeErr(w, r, err) {
+	var in struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1024)).Decode(&in); err != nil && !errors.Is(err, io.EOF) {
+		writeErr(w, http.StatusBadRequest, "буруу хүсэлт")
+		return
+	}
+	var err error
+	switch {
+	case in.ID == "":
+		err = s.store.MarkNotificationsRead(r.Context(), c.UID)
+	case len(in.ID) > 64:
+		writeErr(w, http.StatusBadRequest, "буруу мэдэгдэл")
+		return
+	default:
+		err = s.store.MarkNotificationRead(r.Context(), c.UID, in.ID)
+	}
+	if s.storeErr(w, r, err) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

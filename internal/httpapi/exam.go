@@ -256,7 +256,7 @@ func (s *Server) finishAttempt(r *http.Request, a *store.ExamAttempt, l *store.L
 	}
 	s.logEvents(r.Context(), evs)
 	if a.UserID != course.TeacherID && status != store.AttemptTerminated {
-		s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: "exam", Title: title, Body: short(l.Title + " · " + reason), Link: "/me#students"})
+		s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: "exam", ActorID: a.UserID, Title: title, Body: short(l.Title + " · " + reason), Link: "/me#students"})
 	}
 	if a.Passed {
 		_ = s.store.MarkLessonCompleted(r.Context(), a.UserID, a.CourseID, a.LessonID)
