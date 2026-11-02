@@ -239,3 +239,12 @@ html.adm-noscroll{overflow:hidden}
 .dr-plan{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 16px;padding:10px 14px;border:1px dashed var(--line);border-radius:14px;background:#fff}
 .dr-plan span{font-size:.82rem;font-weight:700;color:var(--muted)}
 .dr-plan select{width:auto;flex:1 1 200px;max-width:320px;min-width:170px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;font:inherit}
+.ad-bank{display:grid;gap:10px}
+.ad-bank header{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.ad-bank .ad-acct{grid-template-columns:repeat(4,minmax(0,1fr))}
+.ad-bank dd small{display:block;color:var(--muted);font-size:.78rem}
+.ad-bank.off{color:var(--muted)} .ad-bank.off small{display:block;margin-top:4px}
+.ad-bank .bad,.ad-holder.bad{color:var(--coral)} .ad-holder.ok{color:var(--teal)}
+.ad-holder{display:block;margin-top:4px;font-size:.82rem;font-weight:600}
+.ad-warn{margin:0;padding:8px 12px;border-radius:10px;background:var(--amber-soft,#fff3d6);color:var(--amber,#b45309);font-size:.86rem}
+@media (max-width:760px){.ad-bank .ad-acct{grid-template-columns:repeat(2,minmax(0,1fr))}}

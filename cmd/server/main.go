@@ -23,6 +23,7 @@ import (
 	"surgalt/internal/chat"
 	"surgalt/internal/files"
 	"surgalt/internal/httpapi"
+	"surgalt/internal/khanbank"
 	"surgalt/internal/mail"
 	"surgalt/internal/meet"
 	"surgalt/internal/oauth"
@@ -251,6 +252,8 @@ func run(log *slog.Logger) error {
 		AdminEmails:   emailList(os.Getenv("ADMIN_EMAILS")),
 		Mail:          mailer,
 		PayoutMin:     envInt("PAYOUT_MIN", 1000),
+		Bank: httpapi.BankConfig{FromAccount: os.Getenv("KHAN_CGW_FROM_ACCOUNT"), Login: os.Getenv("KHAN_CGW_LOGIN"),
+			TranPassword: os.Getenv("KHAN_CGW_TRAN_PASSWORD"), Auto: envBool("KHAN_CGW_AUTO"), AutoMax: envInt("KHAN_CGW_AUTO_MAX", 1000000)},
 		ServiceFeePct: envFloat("SERVICE_FEE_PERCENT", 1),
 		PixabayKey:    os.Getenv("PIXABAY_KEY"),
 		AdminPath:     adminPath,
@@ -276,6 +279,11 @@ func run(log *slog.Logger) error {
 		log.Info("QPay төлбөр идэвхтэй", "url", srv.QPay.BaseURL, "callback", strings.TrimRight(base, "/")+"/api/payments/qpay")
 	} else if envBool("DEV_PAYMENTS") {
 		log.Info("QPay тохируулаагүй — демо QR төлбөр (DEV_PAYMENTS)")
+	}
+	// Хаан банк Corporate Gateway: багшийн татах хүсэлтийг банкаар шилжүүлэх (тест: KHAN_CGW_URL=https://doob.world:6442/v1).
+	if k, sec := os.Getenv("KHAN_CGW_CONSUMER_KEY"), os.Getenv("KHAN_CGW_SECRET_KEY"); k != "" && sec != "" {
+		srv.Khan = khanbank.New(env("KHAN_CGW_URL", khanbank.TestURL), k, sec)
+		log.Info("Хаан банк CGW идэвхтэй", "test", srv.Khan.Test(), "tran_password", os.Getenv("KHAN_CGW_TRAN_PASSWORD") != "", "auto", envBool("KHAN_CGW_AUTO"))
 	}
 	active := map[string]bool{}
 	for _, p := range srv.OAuth.List() {

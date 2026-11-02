@@ -693,7 +693,7 @@ func (s *Server) teacherRows(sn *adminSnap) map[string]*teacherRow {
 			switch p.Status {
 			case store.PayoutPaid:
 				t.PaidOut += p.Amount
-			case store.PayoutPending:
+			case store.PayoutPending, store.PayoutSending, store.PayoutReview:
 				t.Pending += p.Amount
 			}
 		}
@@ -1155,7 +1155,7 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, p := range sn.payouts {
 		switch p.Status {
-		case store.PayoutPending:
+		case store.PayoutPending, store.PayoutSending, store.PayoutReview:
 			all.Pending += p.Amount
 		case store.PayoutPaid:
 			all.Payouts += p.Amount

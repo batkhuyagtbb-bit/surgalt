@@ -20,9 +20,16 @@ const (
 	PayoutQuarterly = "quarterly" // улиралд нэг удаа
 
 	PayoutPending  = "pending"  // шилжүүлэхийг хүлээж буй
+	PayoutSending  = "sending"  // банкаар шилжүүлж байна (давхар илгээхгүй)
+	PayoutReview   = "review"   // банкны хариу тодорхойгүй — хянагч хуулгаас шалгаж шийднэ
 	PayoutPaid     = "paid"     // данс руу шилжүүлсэн
 	PayoutRejected = "rejected" // татгалзсан (дүн үлдэгдэлд буцна)
 )
+
+// PayoutOpen — шийдвэрлэгдээгүй (үлдэгдлээс хасагдсан, шилжээгүй) хүсэлт.
+func PayoutOpen(status string) bool {
+	return status == PayoutPending || status == PayoutSending || status == PayoutReview
+}
 
 // PayoutAccount — багшийн орлого хүлээн авах данс ба автомат татах хуваарь.
 type PayoutAccount struct {
@@ -50,6 +57,9 @@ type Payout struct {
 	CreatedAt   time.Time  `json:"created_at"`
 	ProcessedAt *time.Time `json:"processed_at,omitempty"`
 	ProcessedBy string     `json:"processed_by,omitempty"`
+	// Банкаар (Хаан банк CGW) шилжүүлсэн бол: манай гүйлгээний дугаар (transferid), банкны журналын дугаар.
+	BankRef string `json:"bank_ref,omitempty"`
+	Journal string `json:"journal,omitempty"`
 }
 
 // teacherCommission — багшийн борлуулалтаас платформын авах шимтгэл (%). main.go эхлэхэд тохируулна (анхдагч 0).
@@ -114,7 +124,7 @@ func balanceOf(orders []Order, payouts []Payout) *Balance {
 		switch p.Status {
 		case PayoutPaid:
 			b.Paid += p.Amount
-		case PayoutPending:
+		case PayoutPending, PayoutSending, PayoutReview:
 			b.Pending += p.Amount
 		}
 	}

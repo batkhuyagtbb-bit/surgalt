@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -181,6 +182,7 @@ func (s *Server) handleWithdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.payoutRequested(ctx, p)
+	s.autoBank(p)
 	writeJSON(w, http.StatusCreated, p)
 }
 
@@ -248,6 +250,7 @@ func (s *Server) autoPayout(ctx context.Context, a *store.PayoutAccount, now tim
 		return
 	}
 	s.payoutRequested(ctx, p)
+	s.autoBank(p)
 	s.notify(ctx, &store.Notification{UserID: a.TeacherID, Type: NotifPayout, Link: "/me#wallet",
 		Title: "🏦 Орлогоо татах хүсэлт илгээгдлээ · " + money(p.Amount), Body: bankName(p.Bank) + " " + p.AccountNo + " руу удахгүй шилжинэ"})
 }
@@ -496,13 +499,13 @@ func (s *Server) handleAdminPayouts(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAdmin(w, r); !ok {
 		return
 	}
-	status := r.URL.Query().Get("status")
+	status, open := r.URL.Query().Get("status"), false
 	switch status {
-	case "":
-		status = store.PayoutPending
+	case "": // шийдвэрлэгдээгүй бүгд: хүлээгдэж буй, банкаар илгээж буй, шалгах
+		status, open = "", true
 	case "all":
 		status = ""
-	case store.PayoutPending, store.PayoutPaid, store.PayoutRejected:
+	case store.PayoutPending, store.PayoutSending, store.PayoutReview, store.PayoutPaid, store.PayoutRejected:
 	default:
 		writeErr(w, http.StatusBadRequest, "төлөв буруу")
 		return
@@ -512,9 +515,19 @@ func (s *Server) handleAdminPayouts(w http.ResponseWriter, r *http.Request) {
 		limit = 200
 	}
 	ctx := r.Context()
-	ps, err := s.store.Payouts(ctx, "", status, limit)
+	fetch := limit
+	if open {
+		fetch = 2000
+	}
+	ps, err := s.store.Payouts(ctx, "", status, fetch)
 	if s.storeErr(w, r, err) {
 		return
+	}
+	if open {
+		ps = slices.DeleteFunc(ps, func(p store.Payout) bool { return !store.PayoutOpen(p.Status) })
+		if len(ps) > limit {
+			ps = ps[:limit]
+		}
 	}
 	ids := make([]string, len(ps))
 	for i := range ps {
@@ -559,7 +572,7 @@ func (s *Server) handleAdminPayout(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Note = strings.TrimSpace(in.Note)
 	switch {
-	case in.Status != store.PayoutPaid && in.Status != store.PayoutRejected:
+	case in.Status != store.PayoutPaid && in.Status != store.PayoutRejected && in.Status != store.PayoutPending:
 		writeErr(w, http.StatusBadRequest, "төлөв буруу")
 		return
 	case utf8.RuneCountInString(in.Note) > 300:
@@ -571,9 +584,18 @@ func (s *Server) handleAdminPayout(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, now := r.Context(), time.Now()
 	errDone := errors.New("done")
+	// Хүлээгдэж буйг: шилжүүлсэн/татгалзсан. Банкны хариу тодорхойгүй (review) бол хуулгаас шалгаад:
+	// шилжсэн → «шилжүүлсэн», шилжээгүй → «хүлээгдэж буй» (дахин илгээж болно) эсвэл «татгалзсан».
 	p, err := s.store.UpdatePayout(ctx, r.PathValue("id"), func(p *store.Payout) error {
-		if p.Status != store.PayoutPending {
+		switch {
+		case p.Status == store.PayoutPending && in.Status != store.PayoutPending:
+		case p.Status == store.PayoutReview:
+		default:
 			return errDone
+		}
+		if in.Status == store.PayoutPending {
+			p.Status, p.Note = store.PayoutPending, strings.TrimSpace("Хуулгаар шилжээгүй нь батлагдсан. "+in.Note)
+			return nil
 		}
 		p.Status, p.Note, p.ProcessedAt, p.ProcessedBy = in.Status, in.Note, &now, admin.DisplayName
 		return nil
@@ -586,6 +608,10 @@ func (s *Server) handleAdminPayout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.adminInvalidate()
+	if p.Status == store.PayoutPending { // шалгаад буцаасан: багшид мэдэгдэхгүй, хянагч дахин илгээнэ
+		writeJSON(w, http.StatusOK, p)
+		return
+	}
 	n := &store.Notification{UserID: p.TeacherID, Type: NotifPayout, Link: "/me#wallet"}
 	if p.Status == store.PayoutPaid {
 		n.Title = "✅ Орлого данс руу шилжлээ · " + money(p.Amount)

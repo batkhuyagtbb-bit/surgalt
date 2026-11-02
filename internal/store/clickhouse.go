@@ -217,6 +217,8 @@ var chMigrations = []string{
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS plan String DEFAULT ''",              // системийн эрх (plans.go)
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS plan String DEFAULT ''",             // багцын захиалга
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS commission_pct Float64 DEFAULT 0", // төлөгдөх үеийн шимтгэл (0 = хуучин)
+	"ALTER TABLE payouts ADD COLUMN IF NOT EXISTS bank_ref String DEFAULT ''",      // Хаан банкаар шилжүүлсэн: transferid
+	"ALTER TABLE payouts ADD COLUMN IF NOT EXISTS journal String DEFAULT ''",       // банкны журналын дугаар
 	// Эцэг эхийн зөвшөөрлийн боломжийг хассан: хадгалсан нас, эцэг эхийн нэр, утсыг устгана.
 	"ALTER TABLE users DROP COLUMN IF EXISTS age_group",
 	"ALTER TABLE users DROP COLUMN IF EXISTS guardian_name",
@@ -398,7 +400,7 @@ var chTables = []chTable{
 	ENGINE = ReplacingMergeTree(ver) ORDER BY teacher_id`},
 	{"payouts", `(id String, teacher_id String, amount Int64, bank String, account_no String, account_name String,
 		status String, auto Bool, note String, created_at ` + tsType + `, processed_at Nullable(` + tsType + `),
-		processed_by String, ver UInt64,
+		processed_by String, bank_ref String DEFAULT '', journal String DEFAULT '', ver UInt64,
 		INDEX ix_teacher teacher_id TYPE bloom_filter GRANULARITY 1)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
 	// Суралцагчийн маркераар тодруулсан хэсгүүд (highlights.go) — зөвхөн өөрт нь харагдана.

@@ -10,12 +10,14 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"surgalt/internal/auth"
 	"surgalt/internal/cache"
 	"surgalt/internal/chat"
 	"surgalt/internal/files"
+	"surgalt/internal/khanbank"
 	"surgalt/internal/mail"
 	"surgalt/internal/meet"
 	"surgalt/internal/oauth"
@@ -38,6 +40,7 @@ type Config struct {
 	AdminEmails   []string      // чатын мэдүүлэг шийдвэрлэх хянагчид (жижиг үсгээр; moderation.go)
 	Mail          mail.Sender   // нууц үг сэргээх имэйл (nil бол илгээхгүй; демо горимд холбоосыг логт гаргана)
 	PayoutMin     int64         // багшийн орлого татах доод дүн (₮; 0 бол 1000)
+	Bank          BankConfig    // Хаан банкаар (CGW) татах хүсэлтийг шилжүүлэх (bank.go)
 	// ServiceFeePct — төлбөр бүрийн үнэ дээр нэмж авах үйлчилгээний хураамж (%, жишээ нь 1). Багшийн орлогод орохгүй.
 	ServiceFeePct float64
 	// PixabayKey — цагаан самбарын зураг хайлтад Pixabay (SafeSearch) ашиглах түлхүүр (хоосон бол Openverse + Wikimedia).
@@ -91,6 +94,12 @@ type Server struct {
 	Meet *meet.Client
 	// QPay нь QR төлбөр (nil бол идэвхгүй; DEV_PAYMENTS үед демо QR).
 	QPay *qpay.Client
+	// Khan нь Хаан банкны Corporate Gateway — багшийн орлогыг данс руу шилжүүлэх (nil бол гараар).
+	Khan *khanbank.Client
+	khanFrom struct {
+		sync.Mutex
+		acct string
+	}
 
 	// Publish нь шинэ мессежийг бусад серверүүдэд хүргэнэ.
 	// nil бол зөвхөн локал hub (ClickHouse store нэг сервер хуулбартай ажилладаг).
@@ -284,6 +293,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/earnings", s.handleMyEarnings)
 	mux.HandleFunc("GET /api/admin/payouts", s.handleAdminPayouts)
 	mux.HandleFunc("POST /api/admin/payouts/{id}", s.handleAdminPayout)
+	mux.HandleFunc("POST /api/admin/payouts/{id}/send", s.handleAdminPayoutSend)
+	mux.HandleFunc("GET /api/admin/payouts/{id}/holder", s.handleAdminPayoutHolder)
+	mux.HandleFunc("GET /api/admin/bank", s.handleAdminBank)
 
 	// Багшийн файлын сан (багш бүр тусдаа хавтастай)
 	mux.HandleFunc("POST /api/me/files", s.handleUpload)

@@ -2833,7 +2833,7 @@ async function students() {
 }
 
 /* ---------- Данс: банкны данс холбох, орлого татах (гараар / хуваариар), орлогын статистик ---------- */
-const PAY_ST = { pending: ["Хүлээгдэж буй", "chip-amber"], paid: ["Шилжүүлсэн", "chip-teal"], rejected: ["Татгалзсан", "chip-coral"] };
+const PAY_ST = { pending: ["Хүлээгдэж буй", "chip-amber"], sending: ["Шилжүүлж байна", "chip-amber"], review: ["Шалгаж байна", "chip-amber"], paid: ["Шилжүүлсэн", "chip-teal"], rejected: ["Татгалзсан", "chip-coral"] };
 const SCH_HELP = {
   manual: "Та доорх «Татах» товчоор хүссэн үедээ татна.",
   instant: "Борлуулалт бүрийн дараа үлдэгдлийг автоматаар татах хүсэлт илгээнэ.",
@@ -2894,7 +2894,7 @@ async function wallet() {
     <section class="anx-card"><div class="anx-card-head"><h3>${ico("list", 18)}Татсан түүх</h3>${pay.payouts.length ? `<span class="muted small">${pay.payouts.length} хүсэлт</span>` : ""}</div>
       ${pay.payouts.length ? `<div class="an-table-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Дүн</th><th>Данс</th><th>Төрөл</th><th>Төлөв</th></tr></thead><tbody>
         ${pay.payouts.map((p) => `<tr><td class="muted">${fmtDate(p.created_at)}</td><td><strong>${money(p.amount)}</strong></td><td>${esc(bankOf(p.bank))} · ${esc(p.account_no)}</td><td>${p.auto ? "Хуваариар" : "Гараар"}</td>
-          <td><span class="chip ${PAY_ST[p.status]?.[1] || ""}">${PAY_ST[p.status]?.[0] || esc(p.status)}</span>${p.note ? `<div class="muted small">${esc(p.note)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div>`
+          <td><span class="chip ${PAY_ST[p.status]?.[1] || ""}">${PAY_ST[p.status]?.[0] || esc(p.status)}</span>${p.note && p.status !== "review" && p.status !== "sending" ? `<div class="muted small">${esc(p.note)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div>`
         : `<div class="anx-empty">${ico("money", 28)}<p>Одоогоор орлого татаагүй байна.</p></div>`}</section>
   </div>`;
 

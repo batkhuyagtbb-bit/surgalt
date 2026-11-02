@@ -56,13 +56,13 @@ func (c *ClickHouse) TeacherPaidOrders(ctx context.Context, teacherID string) ([
 	return out, nil
 }
 
-const payoutCols = "id, teacher_id, amount, bank, account_no, account_name, status, auto, note, created_at, processed_at, processed_by"
+const payoutCols = "id, teacher_id, amount, bank, account_no, account_name, status, auto, note, created_at, processed_at, processed_by, bank_ref, journal"
 
 func (c *ClickHouse) writePayout(ctx context.Context, p *Payout) error {
 	return c.insert(ctx, "payouts", []string{"id", "teacher_id", "amount", "bank", "account_no", "account_name", "status", "auto", "note",
-		"created_at", "processed_at", "processed_by", "ver"},
+		"created_at", "processed_at", "processed_by", "bank_ref", "journal", "ver"},
 		p.ID, p.TeacherID, p.Amount, p.Bank, p.AccountNo, p.AccountName, p.Status, p.Auto, p.Note,
-		p.CreatedAt.UTC(), nullTime(p.ProcessedAt), p.ProcessedBy, ver())
+		p.CreatedAt.UTC(), nullTime(p.ProcessedAt), p.ProcessedBy, p.BankRef, p.Journal, ver())
 }
 
 func (c *ClickHouse) payoutsWhere(ctx context.Context, where string, args ...any) ([]Payout, error) {
@@ -70,7 +70,7 @@ func (c *ClickHouse) payoutsWhere(ctx context.Context, where string, args ...any
 	err := c.query(ctx, "SELECT "+payoutCols+" FROM payouts FINAL WHERE "+where, args, func(r driver.Rows) error {
 		var p Payout
 		if err := r.Scan(&p.ID, &p.TeacherID, &p.Amount, &p.Bank, &p.AccountNo, &p.AccountName, &p.Status, &p.Auto, &p.Note,
-			&p.CreatedAt, &p.ProcessedAt, &p.ProcessedBy); err != nil {
+			&p.CreatedAt, &p.ProcessedAt, &p.ProcessedBy, &p.BankRef, &p.Journal); err != nil {
 			return err
 		}
 		out = append(out, p)

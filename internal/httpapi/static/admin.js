@@ -142,7 +142,7 @@ async function start() {
 
 async function badges() {
   try {
-    const [ps, rs] = await Promise.all([api("/api/admin/payouts?status=pending"), api("/api/admin/reports?status=open")]);
+    const [ps, rs] = await Promise.all([api("/api/admin/payouts"), api("/api/admin/reports?status=open")]);
     const set = (el, n) => { el.hidden = !n; el.textContent = n; };
     set($("#bPay"), ps.length); set($("#bRep"), rs.length);
   } catch {}
@@ -281,7 +281,7 @@ async function openTeacher(id) {
     ["courses", `Сургалт (${d.courses.length})`], ["books", `Ном (${d.books.length})`], ["files", `Файл (${d.files.length})`],
     ["sales", `Борлуулалт (${d.sales.length})`], ["payouts", `Татсан (${d.payouts.length})`], ["students", `Суралцагч (${d.students.length})`],
   ];
-  const PST = { pending: "Хүлээгдэж буй", paid: "Шилжүүлсэн", rejected: "Татгалзсан" };
+  const PST = { pending: "Хүлээгдэж буй", sending: "Банкаар илгээж буй", review: "Шалгах шаардлагатай", paid: "Шилжүүлсэн", rejected: "Татгалзсан" };
   const panes = {
     courses: d.courses.length ? `<div class="adm-table-wrap"><table class="adm-table mini"><thead><tr><th>Сургалт</th><th>Үнэ</th><th>Хичээл</th><th>Суралцагч</th><th>Үзэлт</th><th>Борлуулалт</th></tr></thead><tbody>${d.courses.map((c) =>
       `<tr><td><a class="link" href="/c/${esc(c.id)}" target="_blank" rel="noopener">${esc(c.title)}</a><small>${c.published ? "Нийтэлсэн" : "Ноорог"} · ${dd(c.created_at)}</small></td><td class="n">${c.price ? tg(c.price) : "Үнэгүй"}</td><td class="n">${num(c.lessons)}</td><td class="n">${num(c.students)}</td><td class="n">${num(c.views)}</td><td class="n"><b>${tg(c.revenue)}</b><small>${num(c.sales)} удаа</small></td></tr>`).join("")}</tbody></table></div>` : empty("Сургалт алга"),
@@ -499,34 +499,68 @@ VIEWS.finance = {
 };
 
 /* ---------- Татах хүсэлт ---------- */
-const PST = { pending: ["Хүлээгдэж буй", "chip-amber"], paid: ["Шилжүүлсэн", "chip-teal"], rejected: ["Татгалзсан", "chip-coral"] };
-const payCard = (p) => `<article class="ad-card" data-pid="${esc(p.id)}">
+const PST = { pending: ["Хүлээгдэж буй", "chip-amber"], sending: ["Банкаар илгээж буй", "chip-amber"], review: ["Шалгах шаардлагатай", "chip-coral"], paid: ["Шилжүүлсэн", "chip-teal"], rejected: ["Татгалзсан", "chip-coral"] };
+// Хаан банк (Corporate Gateway): үлдэгдэл, шилжүүлэх данс — зөвхөн хянагчид.
+let BANK = null;
+const bankCard = (b) => !b?.configured
+  ? `<section class="adm-card ad-bank off"><b>🏦 Хаан банк холбоогүй</b><small>KHAN_CGW_CONSUMER_KEY, KHAN_CGW_SECRET_KEY тохируулбал хүсэлтийг эндээс шууд шилжүүлнэ.</small></section>`
+  : `<section class="adm-card ad-bank"><header><b>🏦 Хаан банк</b>${b.test ? `<span class="chip chip-amber">ТЕСТ орчин — бодит мөнгө хөдлөхгүй</span>` : `<span class="chip chip-teal">Бодит орчин</span>`}</header>
+    <dl class="ad-acct"><div><dt>Шилжүүлэх данс</dt><dd><code>${esc(b.from_account || "—")}</code>${b.account_name ? `<small>${esc(b.account_name)}</small>` : ""}</dd></div>
+      <div><dt>Боломжит үлдэгдэл</dt><dd><b>${b.available != null ? tg(b.available) : "—"}</b></dd></div>
+      <div><dt>Гүйлгээний нууц үг</dt><dd>${b.tran_password ? "✓ тохируулсан" : `<span class="bad">✗ KHAN_CGW_TRAN_PASSWORD</span>`}</dd></div>
+      <div><dt>Автомат шилжүүлэг</dt><dd>${b.auto ? `Асаалттай · ${tg(b.auto_max)} хүртэл` : "Унтраалттай — хянагч батална"}</dd></div></dl>
+    ${b.error ? `<p class="ad-warn">${esc(b.error)}</p>` : ""}</section>`;
+const payCard = (p) => `<article class="ad-card" data-pid="${esc(p.id)}" data-amount="${p.amount}" data-acct="${esc(p.bank_name + " " + p.account_no)}">
   <header><span class="chip ${PST[p.status]?.[1] || ""}">${PST[p.status]?.[0] || esc(p.status)}</span><small class="muted">${p.auto ? "Хуваариар" : "Гараар"}</small><time>${dt(p.created_at)}</time></header>
   <p class="ad-pay"><b>${tg(p.amount)}</b><span><a class="link" href="/t/${esc(p.teacher_username)}" target="_blank" rel="noopener">${esc(p.teacher_name || p.teacher_username)}</a> · ${esc(p.teacher_email || "")}</span></p>
-  <dl class="ad-acct"><div><dt>Банк</dt><dd>${esc(p.bank_name)}</dd></div><div><dt>Данс</dt><dd><code>${esc(p.account_no)}</code> <button type="button" class="btn btn-ghost btn-sm" data-copy="${esc(p.account_no)}">Хуулах</button></dd></div><div><dt>Эзэмшигч</dt><dd>${esc(p.account_name)}</dd></div></dl>
-  ${p.status === "pending" ? `<form class="ad-act ad-payact"><input name="note" maxlength="300" placeholder="Гүйлгээний дугаар эсвэл татгалзсан шалтгаан" aria-label="Тайлбар"><button class="btn btn-gold btn-sm" value="paid">✓ Шилжүүлсэн</button><button class="btn btn-danger btn-sm" value="rejected">Татгалзах</button></form>`
+  <dl class="ad-acct"><div><dt>Банк</dt><dd>${esc(p.bank_name)}</dd></div><div><dt>Данс</dt><dd><code>${esc(p.account_no)}</code> <button type="button" class="btn btn-ghost btn-sm" data-copy="${esc(p.account_no)}">Хуулах</button></dd></div><div><dt>Эзэмшигч</dt><dd>${esc(p.account_name)}${BANK?.configured && p.status !== "paid" && p.status !== "rejected" ? ` <button type="button" class="btn btn-ghost btn-sm" data-holder>ДНС-ээс шалгах</button><small class="ad-holder"></small>` : ""}</dd></div></dl>
+  ${p.status === "pending" ? `${p.note ? `<p class="ad-warn">${esc(p.note)}</p>` : ""}<form class="ad-act ad-payact">${BANK?.configured ? `<button type="button" class="btn btn-gold btn-sm" data-send ${BANK.tran_password ? "" : `disabled title="Гүйлгээний нууц үг тохируулаагүй"`}>🏦 Хаанаар шилжүүлэх</button>` : ""}<input name="note" maxlength="300" placeholder="Гүйлгээний дугаар эсвэл татгалзсан шалтгаан" aria-label="Тайлбар"><button class="btn ${BANK?.configured ? "btn-ghost" : "btn-gold"} btn-sm" value="paid">✓ Гараар шилжүүлсэн</button><button class="btn btn-danger btn-sm" value="rejected">Татгалзах</button></form>`
+    : p.status === "review" ? `<p class="ad-warn">${esc(p.note || "")}</p><form class="ad-act ad-payact"><input name="note" maxlength="300" placeholder="Хуулгын тэмдэглэл" aria-label="Тайлбар"><button class="btn btn-gold btn-sm" value="paid">✓ Хуулгад шилжсэн байна</button><button class="btn btn-ghost btn-sm" value="pending">Шилжээгүй — дахин илгээх</button><button class="btn btn-danger btn-sm" value="rejected">Татгалзах</button></form>`
+    : p.status === "sending" ? `<p class="ad-done">⏳ Хаан банкаар илгээж байна… ${esc(p.bank_ref || "")}</p>`
     : `<p class="ad-done">${esc(p.processed_by || "")}${p.processed_at ? " · " + dt(p.processed_at) : ""}${p.note ? ` — ${esc(p.note)}` : ""}</p>`}
 </article>`;
 VIEWS.payouts = {
-  title: "Орлого татах хүсэлт", sub: "Багшийн данс руу банкаар шилжүүлээд «Шилжүүлсэн» гэж тэмдэглэнэ. Татгалзвал дүн багшийн үлдэгдэлд буцна. Аль ч тохиолдолд багшид мэдэгдэнэ.",
+  title: "Орлого татах хүсэлт", sub: "«Хаанаар шилжүүлэх» дарахад платформын данснаас багшийн данс руу шууд шилжинэ (эсвэл гараар шилжүүлээд тэмдэглэнэ). Татгалзвал дүн багшийн үлдэгдэлд буцна. Аль ч тохиолдолд багшид мэдэгдэнэ.",
   st: "pending",
   async render(tools, el, live) {
     const self = VIEWS.payouts;
-    tools.innerHTML = seg("pst", [["pending", "Хүлээгдэж буй"], ["done", "Шийдвэрлэсэн"]], self.st);
+    tools.innerHTML = seg("pst", [["pending", "Шийдвэрлээгүй"], ["done", "Шийдвэрлэсэн"]], self.st);
     tools.onclick = (e) => { const b = e.target.closest("[data-seg=pst] button"); if (b) { self.st = b.dataset.val; route(); } };
-    const ps = await api("/api/admin/payouts?status=" + (self.st === "pending" ? "pending" : "all"));
+    const [ps, bank] = await Promise.all([api("/api/admin/payouts" + (self.st === "pending" ? "" : "?status=all")), api("/api/admin/bank").catch(() => null)]);
     if (!live()) return;
-    const shown = self.st === "pending" ? ps : ps.filter((p) => p.status !== "pending");
+    BANK = bank;
+    const shown = self.st === "pending" ? ps : ps.filter((p) => p.status === "paid" || p.status === "rejected");
     const sum = shown.reduce((n, p) => n + (p.status === "rejected" ? 0 : p.amount), 0);
-    el.innerHTML = `<div class="ad-list">${shown.length ? `<p class="muted small">${shown.length} хүсэлт · нийт ${tg(sum)}</p>` + shown.map(payCard).join("") : empty(self.st === "pending" ? "Хүлээгдэж буй хүсэлт алга 🎉" : "Шийдвэрлэсэн хүсэлт алга")}</div>`;
+    el.innerHTML = bankCard(bank) + `<div class="ad-list">${shown.length ? `<p class="muted small">${shown.length} хүсэлт · нийт ${tg(sum)}</p>` + shown.map(payCard).join("") : empty(self.st === "pending" ? "Шийдвэрлээгүй хүсэлт алга 🎉" : "Шийдвэрлэсэн хүсэлт алга")}</div>`;
+    el.onclick = async (e) => {
+      const card = e.target.closest(".ad-card"); if (!card) return;
+      const id = encodeURIComponent(card.dataset.pid);
+      if (e.target.closest("[data-holder]")) {
+        const out = $(".ad-holder", card), b = e.target.closest("[data-holder]"); b.disabled = true;
+        try { const h = await api(`/api/admin/payouts/${id}/holder`); out.textContent = `ДНС: ${h.name}${h.iban ? " · " + h.iban : ""}`; out.className = "ad-holder ok"; }
+        catch (x) { out.textContent = x.message; out.className = "ad-holder bad"; }
+        b.disabled = false;
+      }
+      if (e.target.closest("[data-send]")) {
+        if (!confirm(`${tg(+card.dataset.amount)}-ийг ${card.dataset.acct} руу Хаан банкаар шилжүүлэх үү?${BANK?.test ? "\n(ТЕСТ орчин — бодит мөнгө хөдлөхгүй)" : ""}`)) return;
+        $$("button", card).forEach((b) => (b.disabled = true));
+        try {
+          const p = await api(`/api/admin/payouts/${id}/send`, { method: "POST" });
+          if (p.status === "paid") toast(`✓ Шилжлээ${p.journal ? " · журнал " + p.journal : ""}`);
+          else toast(p.note || "Шилжүүлэг амжилтгүй", true);
+        } catch (x) { toast(x.message, true); }
+        badges(); route();
+      }
+    };
     el.onsubmit = async (e) => {
       const pf = e.target.closest(".ad-payact"); if (!pf) return;
       e.preventDefault();
       const status = e.submitter?.value || "paid", card = pf.closest(".ad-card");
       if (status === "rejected" && !pf.note.value.trim()) { toast("Татгалзсан шалтгаанаа бичнэ үү", true); pf.note.focus(); return; }
-      if (status === "paid" && !confirm("Энэ дүнг багшийн данс руу шилжүүлсэн үү?")) return;
+      if (status === "paid" && !confirm("Энэ дүн багшийн данс руу шилжсэн үү?")) return;
+      if (status === "pending" && !confirm("Банкны хуулгаас шилжээгүйг шалгасан уу? Дараа нь дахин илгээж болно.")) return;
       $$("button", pf).forEach((b) => (b.disabled = true));
-      try { await api(`/api/admin/payouts/${encodeURIComponent(card.dataset.pid)}`, { method: "POST", body: { status, note: pf.note.value } }); toast(status === "paid" ? "Шилжүүлсэн гэж тэмдэглэлээ ✓" : "Татгалзлаа"); badges(); route(); }
+      try { await api(`/api/admin/payouts/${encodeURIComponent(card.dataset.pid)}`, { method: "POST", body: { status, note: pf.note.value } }); toast(status === "paid" ? "Шилжүүлсэн гэж тэмдэглэлээ ✓" : status === "pending" ? "Дахин илгээх боломжтой боллоо" : "Татгалзлаа"); badges(); route(); }
       catch (x) { toast(x.message, true); $$("button", pf).forEach((b) => (b.disabled = false)); }
     };
   },
