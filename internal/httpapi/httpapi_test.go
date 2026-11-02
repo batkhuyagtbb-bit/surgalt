@@ -2550,10 +2550,14 @@ func TestWarningLimitBlock(t *testing.T) {
 	if code, _ := call(t, srv, "POST", "/api/me/students/"+uid+"/unblock", s1, `{"lesson_id":"`+lid+`"}`); code != 403 {
 		t.Fatalf("суралцагч нээхгүй: %d", code)
 	}
-	// Багш дахин нээнэ → орно, суралцагчид мэдэгдэл.
+	// Багш дахин нээнэ → орно, суралцагчид мэдэгдэл; нээлттэй хуудас нь WebSocket-оор шууд шинэчлэгдэнэ.
+	ws1 := wsWait(t, srv, s1)
 	code, r := call(t, srv, "POST", "/api/me/students/"+uid+"/unblock", tt, `{"lesson_id":"`+lid+`"}`)
 	if code != 200 || r["unblocked"].(float64) != 1 {
 		t.Fatalf("багш нээх: %d %v", code, r)
+	}
+	if ev := ws1("lesson_unblocked"); !strings.Contains(fmt.Sprint(ev["lessons"]), lid) || !strings.Contains(fmt.Sprint(ev["lessons"]), cid) {
+		t.Fatalf("суралцагчийн хуудас шууд нээгдэх үйл явдал: %v", ev)
 	}
 	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid, s1, ""); code != 200 {
 		t.Fatal("нээсний дараа орно")

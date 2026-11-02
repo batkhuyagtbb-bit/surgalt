@@ -129,13 +129,15 @@ type boardSnap struct {
 // ---- ангийн төлөв ----
 
 type boardState struct {
-	Mode   string            `json:"mode"`   // teach | solo | team
-	Teams  int               `json:"teams"`  // багийн тоо
-	Assign map[string]int    `json:"assign"` // суралцагч → баг (0..Teams-1)
-	Names  map[string]string `json:"names"`  // самбарт орж байсан суралцагчид → нэр
-	Copy   bool              `json:"copy"`   // шинэ самбар багшийн самбараас (ажлын хуудас) эхэлнэ
-	Lock   bool              `json:"lock"`   // суралцагчдыг түр зогсоох («Анхаараарай!»)
-	Spot   string            `json:"spot"`   // бүх ангид харуулж буй өрөө
+	Mode   string            `json:"mode"`            // teach | solo | team
+	Teams  int               `json:"teams"`           // багийн тоо
+	Assign map[string]int    `json:"assign"`          // суралцагч → баг (0..Teams-1)
+	Names  map[string]string `json:"names"`           // самбарт орж байсан суралцагчид → нэр
+	Copy   bool              `json:"copy"`            // шинэ самбар багшийн самбараас (ажлын хуудас) эхэлнэ
+	Lock   bool              `json:"lock"`            // суралцагчдыг түр зогсоох («Анхаараарай!»)
+	Spot   string            `json:"spot"`            // бүх ангид харуулж буй өрөө
+	Stage  []string          `json:"stage,omitempty"` // дуут өрөө: бүх ангид ярих эрхтэй суралцагчид
+	Hands  []string          `json:"hands,omitempty"` // дуут өрөө: гар өргөсөн суралцагчид
 	V      int64             `json:"v"`
 }
 
@@ -144,6 +146,7 @@ type boardPeer struct {
 	Name    string `json:"name"`
 	Room    string `json:"room"`
 	Teacher bool   `json:"teacher,omitempty"`
+	Mic     bool   `json:"mic,omitempty"` // дуут өрөөнд микрофон асаалттай
 	at      time.Time
 }
 
@@ -159,14 +162,19 @@ type boardSess struct {
 	peers      map[string]*boardPeer
 	used       time.Time
 	saved      time.Time
-	gone       bool // санах ойгоос буулгасан — дахин ачаална
+	gone       bool                  // санах ойгоос буулгасан — дахин ачаална
+	chats      map[string]*boardChat // багийн чат (board_chat.go)
+	met        boardMetrics          // оролцооны хэмжүүр (board_chat.go)
+	metDirty   bool
+	act        map[string]time.Time // суралцагчийн сүүлийн идэвх (засвар, чат)
+	talk       map[string]time.Time // дуут өрөө: ярьсан хугацааны сүүлийн мэдээлэл
 }
 
 type boardGrant struct {
-	lessonID, bid, teacherID, title string
-	teacher                         bool
-	teams                           int
-	exp                             time.Time
+	lessonID, bid, teacherID, title, name string // name — харагдах нэр (токенд зөвхөн username)
+	teacher                               bool
+	teams                                 int
+	exp                                   time.Time
 }
 
 type boardHub struct {
@@ -305,6 +313,9 @@ func (bs *boardSess) touchPeer(c auth.Claims, teacher bool, room string, now tim
 		bs.peers[c.UID] = &boardPeer{UID: c.UID, Name: c.Name, Room: room, Teacher: teacher, at: now}
 		return true
 	}
+	if !teacher && !bs.state.Lock && bs.ownRoom(c.UID) != "" { // өөрийн/багийн самбартай байсан хугацаа (багш тайлбарлаж байхыг тооцохгүй)
+		bs.metric(c.UID, c.Name, now)[0] += int(now.Sub(p.at).Seconds() + 0.5)
+	}
 	p.at = now
 	if p.Room != room {
 		p.Room = room
@@ -352,6 +363,10 @@ type boardEvent struct {
 	State *boardState `json:"state,omitempty"`
 	Peers []boardPeer `json:"peers,omitempty"`
 	Rooms []string    `json:"rooms,omitempty"`
+	Msg   *boardMsg   `json:"msg,omitempty"` // ev = chat
+	Del   string      `json:"del,omitempty"` // ev = chat: устгасан мессеж
+	Voice *boardVoice `json:"voice,omitempty"`
+	Rtc   *boardRTC   `json:"rtc,omitempty"`
 }
 
 func (s *Server) boardSend(bs *boardSess, ids []string, ev boardEvent) {
@@ -388,13 +403,17 @@ func (s *Server) boardSession(ctx context.Context, g boardGrant) (*boardSess, er
 		return nil, err
 	}
 	bs := &boardSess{key: key, lessonID: g.lessonID, bid: g.bid, teacherID: g.teacherID,
-		state: boardState{Mode: "teach", Copy: true}, rooms: map[string]*boardRoom{}, peers: map[string]*boardPeer{}, used: time.Now()}
+		state: boardState{Mode: "teach", Copy: true}, rooms: map[string]*boardRoom{}, peers: map[string]*boardPeer{}, used: time.Now(),
+		chats: map[string]*boardChat{}, act: map[string]time.Time{}, talk: map[string]time.Time{}}
 	for room, data := range raw {
 		if room == "_s" {
 			var st boardState
 			if json.Unmarshal(data, &st) == nil {
 				bs.state = st
 			}
+			continue
+		}
+		if bs.loadExtra(room, data) {
 			continue
 		}
 		var snap boardSnap
@@ -455,6 +474,8 @@ func (s *Server) flushBoards(ctx context.Context, final bool) {
 		bs    *boardSess
 		rooms []string
 		state bool
+		chats []string
+		met   bool
 	}
 	var marks []mark
 	for _, bs := range sessions {
@@ -480,7 +501,23 @@ func (s *Server) flushBoards(ctx context.Context, final bool) {
 					m.rooms = append(m.rooms, name)
 				}
 			}
-			if m.state || len(m.rooms) > 0 {
+			for ch, c := range bs.chats {
+				if !c.dirty {
+					continue
+				}
+				if data, err := json.Marshal(c); err == nil {
+					rows = append(rows, store.BoardRoomData{LessonID: bs.lessonID, BlockID: bs.bid, Room: boardChatPrefix + ch, Data: data})
+					c.dirty = false
+					m.chats = append(m.chats, ch)
+				}
+			}
+			if bs.metDirty {
+				if data, err := json.Marshal(bs.met); err == nil {
+					rows = append(rows, store.BoardRoomData{LessonID: bs.lessonID, BlockID: bs.bid, Room: boardMetricsRoom, Data: data})
+					bs.metDirty, m.met = false, true
+				}
+			}
+			if m.state || len(m.rooms) > 0 || len(m.chats) > 0 || m.met {
 				bs.saved = now
 				marks = append(marks, m)
 			}
@@ -498,6 +535,12 @@ func (s *Server) flushBoards(ctx context.Context, final bool) {
 						r.dirty = true
 					}
 				}
+				for _, ch := range m.chats {
+					if c := m.bs.chats[ch]; c != nil {
+						c.dirty = true
+					}
+				}
+				m.bs.metDirty = m.bs.metDirty || m.met
 				m.bs.mu.Unlock()
 			}
 			return
@@ -506,9 +549,12 @@ func (s *Server) flushBoards(ctx context.Context, final bool) {
 	h.mu.Lock()
 	for k, bs := range h.m {
 		bs.mu.Lock()
-		idle := !bs.stateDirty && len(bs.peers) == 0 && now.Sub(bs.used) > boardIdle
+		idle := !bs.stateDirty && !bs.metDirty && len(bs.peers) == 0 && now.Sub(bs.used) > boardIdle
 		for _, r := range bs.rooms {
 			idle = idle && !r.dirty
+		}
+		for _, c := range bs.chats {
+			idle = idle && !c.dirty
 		}
 		if idle {
 			bs.gone = true
@@ -557,7 +603,7 @@ func (s *Server) boardOpen(w http.ResponseWriter, r *http.Request, fresh bool) (
 			return nil, false
 		}
 		g = boardGrant{lessonID: l.ID, bid: b.ID, teacherID: course.TeacherID, title: b.Text,
-			teacher: course.TeacherID == c.UID, teams: b.Max, exp: time.Now().Add(boardGrantTTL)}
+			teacher: course.TeacherID == c.UID, teams: b.Max, exp: time.Now().Add(boardGrantTTL), name: s.displayName(r.Context(), c.UID, c.Name)}
 		h.mu.Lock()
 		if h.grants == nil {
 			h.grants = map[string]boardGrant{}
@@ -576,6 +622,9 @@ func (s *Server) boardOpen(w http.ResponseWriter, r *http.Request, fresh bool) (
 			continue
 		}
 		bs.used = time.Now()
+		if g.name != "" {
+			c.Name = g.name // самбар, чат, дуут өрөөнд жинхэнэ нэр
+		}
 		return &boardReq{s: bs, c: c, g: g, teacher: g.teacher}, true
 	}
 }
@@ -762,6 +811,9 @@ func (s *Server) handleBoardOps(w http.ResponseWriter, r *http.Request) {
 		rm.v++
 		rm.dirty = true
 	}
+	if !br.teacher && (len(applied) > 0 || len(fx) > 0) {
+		bs.active(uid, br.c.Name, now)[2] += len(applied)
+	}
 	if bs.touchPeer(br.c, br.teacher, in.Room, now) {
 		s.boardSendPeers(bs, now)
 	}
@@ -876,14 +928,16 @@ func (s *Server) handleBoardPresence(w http.ResponseWriter, r *http.Request) {
 // POST .../board/{bid}/state — багш: горим, багууд, түр зогсоох, бүх ангид харуулах, ажлын хуудас тараах.
 func (s *Server) handleBoardState(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Mode       *string        `json:"mode"`
-		Teams      *int           `json:"teams"`
-		Assign     map[string]int `json:"assign"` // хэсэгчилсэн: -1 бол багаас гаргана
-		Copy       *bool          `json:"copy"`
-		Lock       *bool          `json:"lock"`
-		Spot       *string        `json:"spot"`
-		Shuffle    bool           `json:"shuffle"`    // одоо байгаа суралцагчдыг санамсаргүй хуваах
-		Distribute bool           `json:"distribute"` // багшийн самбарыг бүх самбарт хуулах (дарж бичнэ)
+		Mode       *string         `json:"mode"`
+		Teams      *int            `json:"teams"`
+		Assign     map[string]int  `json:"assign"` // хэсэгчилсэн: -1 бол багаас гаргана
+		Copy       *bool           `json:"copy"`
+		Lock       *bool           `json:"lock"`
+		Spot       *string         `json:"spot"`
+		Shuffle    bool            `json:"shuffle"`    // одоо байгаа суралцагчдыг санамсаргүй хуваах
+		Distribute bool            `json:"distribute"` // багшийн самбарыг бүх самбарт хуулах (дарж бичнэ)
+		Stage      map[string]bool `json:"stage"`      // дуут өрөө: суралцагчид бүх ангид ярих эрх өгөх/авах
+		Hands      *bool           `json:"hands"`      // false: бүх өргөсөн гарыг буулгах
 	}
 	if !decode(w, r, &in) {
 		return
@@ -940,6 +994,24 @@ func (s *Server) handleBoardState(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		st.Spot = *in.Spot
+	}
+	for id, on := range in.Stage {
+		if !boardUIDRe.MatchString(id) {
+			errLocked(w, bs, http.StatusBadRequest, "суралцагч буруу")
+			return
+		}
+		i := slices.Index(st.Stage, id)
+		if on && i < 0 && len(st.Stage) < 50 {
+			st.Stage = append(st.Stage, id)
+		} else if !on && i >= 0 {
+			st.Stage = slices.Delete(st.Stage, i, i+1)
+		}
+		if h := slices.Index(st.Hands, id); h >= 0 {
+			st.Hands = slices.Delete(st.Hands, h, h+1)
+		}
+	}
+	if in.Hands != nil && !*in.Hands {
+		st.Hands = nil
 	}
 	if in.Shuffle {
 		var ids []string

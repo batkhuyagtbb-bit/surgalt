@@ -64,6 +64,32 @@ type StudentStat struct {
 	ActiveDays  int          `json:"active_days"`            // энэ хугацаанд суралцсан өдрийн тоо
 	StreakDays  int          `json:"streak_days"`            // дараалсан өдрийн тоо (өнөөдөр/өчигдрөөс)
 	LearnScore  int          `json:"learn_score"`            // идэвхтэй суралцсан нэгдсэн оноо 0-100
+	// Багаар ажилласан нь (цагаан самбар: засвар, багийн чат, дуут өрөө — board_chat.go).
+	BoardDays      int `json:"board_days"`       // самбар дээр ажилласан (самбар × өдөр)
+	BoardSec       int `json:"board_sec"`        // өөрийн/багийн самбартай байсан хугацаа
+	BoardActiveSec int `json:"board_active_sec"` // зурж, бичиж, чатлаж, ярьж байсан хугацаа
+	BoardOps       int `json:"board_ops"`        // самбарт хийсэн засвар
+	BoardMsgs      int `json:"board_msgs"`       // багийн чатад бичсэн мессеж
+	BoardVoiceSec  int `json:"board_voice_sec"`  // дуут өрөөнд ярьсан хугацаа
+	BoardTeam      int `json:"board_team"`       // сүүлд байсан баг (-1 = алга)
+	CollabScore    int `json:"collab_score"`     // багаар ажилласан оноо 0-100
+}
+
+// collabScore — «Багаар ажилласан оноо» 0-100: самбар дээр идэвхтэй байсан хувь (40%), самбарт хийсэн
+// засвар (30%), багтайгаа харилцсан нь — чат, дуу (30%). Самбарын өдөр бүрт 20 засвар, 5 мессеж
+// (эсвэл 1 минут ярих) хийвэл тэр хэсэг дүүрэн.
+func (st *StudentStat) collabScore() int {
+	if st.BoardDays == 0 {
+		return 0
+	}
+	n := float64(st.BoardDays)
+	act := 0.0
+	if st.BoardSec > 0 {
+		act = math.Min(1, float64(st.BoardActiveSec)/float64(st.BoardSec))
+	}
+	ops := math.Min(1, float64(st.BoardOps)/(20*n))
+	talk := math.Min(1, (float64(st.BoardMsgs)+float64(st.BoardVoiceSec)/12)/(5*n))
+	return int(math.Round(100 * (0.4*act + 0.3*ops + 0.3*talk)))
 }
 
 func (st *StudentStat) add(x *store.StudySession) {
@@ -142,6 +168,7 @@ func (st *StudentStat) finish(focusSum float64, focusN int) {
 		st.ReflectionWords /= st.Reflections
 	}
 	st.LearnScore = st.learnScore()
+	st.CollabScore = st.collabScore()
 	switch {
 	case st.TotalSec == 0:
 		st.Risk = "ok"
@@ -198,9 +225,12 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 	get := func(uid, name string) *StudentStat {
 		st := by[uid]
 		if st == nil {
-			st = &StudentStat{UserID: uid, Name: name, Counts: map[string]int{}, ExamBest: -1}
+			st = &StudentStat{UserID: uid, Name: name, Counts: map[string]int{}, ExamBest: -1, BoardTeam: -1}
 			by[uid] = st
 			lessons[uid] = map[string]bool{}
+		}
+		if st.Name == "" {
+			st.Name = name
 		}
 		return st
 	}
@@ -260,6 +290,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 	}
 	// Асуулттай хичээл бүрт: эхэлсэн үү, бүх асуултад зөв хариулж дуусгасан уу (явцаас).
 	scope := s.scopeCourses(ctx, teacherID, courseID)
+	s.addBoardStats(ctx, scope, teacherID, userID, since, get)
 	for _, m := range quizMasteryFromScope(scope, userID) {
 		if m.UserID == teacherID {
 			continue
@@ -402,9 +433,18 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 	}
 	total := tot.ActiveSec + tot.IdleSec + tot.AwaySec
 	activePct, attention, learn, reflections, qLessons, qMastered, cheated := 0, 0, 0, 0, 0, 0, 0
+	boardN, collab, boardOps, boardMsgs, boardVoice, boardActive := 0, 0, 0, 0, 0, 0
 	rankDist := map[string]int{}
 	topRank := RankInfo{}
 	for _, st := range out.Students {
+		if st.BoardDays > 0 {
+			boardN++
+			collab += st.CollabScore
+			boardOps += st.BoardOps
+			boardMsgs += st.BoardMsgs
+			boardVoice += st.BoardVoiceSec
+			boardActive += st.BoardActiveSec
+		}
 		if st.Rank.Name == "" {
 			st.Rank = RankFor(0)
 		}
@@ -428,7 +468,9 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 	}
 	out.Totals = map[string]any{"students": len(out.Students), "live": live, "active_sec": tot.ActiveSec, "total_sec": total, "active_pct": activePct,
 		"attention": attention, "violations": tot.Violations, "exams": len(atts), "learn_score": learn, "reflections": reflections,
-		"quiz_lessons": qLessons, "quiz_mastered": qMastered, "rank_dist": rankDist, "top_rank": topRank, "cheated_lessons": cheated}
+		"quiz_lessons": qLessons, "quiz_mastered": qMastered, "rank_dist": rankDist, "top_rank": topRank, "cheated_lessons": cheated,
+		"board_students": boardN, "collab_score": collab / max(boardN, 1), "board_ops": boardOps, "board_msgs": boardMsgs,
+		"board_voice_sec": boardVoice, "board_active_sec": boardActive}
 	return out, ss, atts, nil
 }
 
@@ -749,7 +791,8 @@ func (s *Server) handleAnalyticsExport(w http.ResponseWriter, r *http.Request) {
 	_ = cw.Write([]string{"Суралцагч", "Нийт хугацаа (мин)", "Идэвхтэй (мин)", "Идэвхгүй (мин)", "Өөр цонхонд (мин)", "Идэвхтэй хувь %", "Анхаарлын индекс %",
 		"Зөрчил", "Таб шилжсэн", "Хуулах", "Автоматаар зогссон", "Хичээл", "Шалгалтын шилдэг %", "Хаагдсан шалгалт",
 		"Асуултад зөв хариулсан %", "Дундаж хариулах хугацаа (сек)", "Таамагласан хариулт", "Асуулга дуусгасан хичээл", "Асуулттай хичээл", "Анх удаад зөв %", "Дүгнэлт бичсэн тоо", "Видео үзэлтийн бүрэн байдал %",
-		"Тогтмол ирсэн өдөр", "Суралцсан оноо", "Цэргийн цол", "Цолын оноо", "Цолгүй хичээл", "Эрсдэл", "Сүүлд"})
+		"Тогтмол ирсэн өдөр", "Суралцсан оноо", "Цэргийн цол", "Цолын оноо", "Цолгүй хичээл", "Эрсдэл", "Сүүлд",
+		"Самбар дээр (мин)", "Самбарт идэвхтэй (мин)", "Самбарын засвар", "Багийн чат", "Ярьсан (мин)", "Багаар ажилласан оноо"})
 	risk := map[string]string{"ok": "Хэвийн", "watch": "Анхаарах", "risk": "Эрсдэлтэй"}
 	for _, st := range data.Students {
 		best := ""
@@ -764,7 +807,8 @@ func (s *Server) handleAnalyticsExport(w http.ResponseWriter, r *http.Request) {
 			strconv.Itoa(st.ActivePct), strconv.Itoa(st.Attention), strconv.Itoa(st.Violations), strconv.Itoa(st.Counts["tab_switch"]), strconv.Itoa(st.Counts["copy"]),
 			strconv.Itoa(st.Counts["auto_block"]), strconv.Itoa(st.Lessons), best, strconv.Itoa(st.Terminated),
 			accuracy, strconv.Itoa(st.QuizAvgMs / 1000), strconv.Itoa(st.QuizGuesses), strconv.Itoa(st.QuizMastered), strconv.Itoa(st.QuizLessons), strconv.Itoa(st.QuizFirstTry), strconv.Itoa(st.Reflections), strconv.Itoa(st.VideoCoverage),
-			strconv.Itoa(st.StreakDays), strconv.Itoa(st.LearnScore), st.Rank.Name, strconv.Itoa(st.Rank.Points), strconv.Itoa(st.Rank.Cheated), risk[st.Risk], st.LastAt.Local().Format("2006-01-02 15:04")})
+			strconv.Itoa(st.StreakDays), strconv.Itoa(st.LearnScore), st.Rank.Name, strconv.Itoa(st.Rank.Points), strconv.Itoa(st.Rank.Cheated), risk[st.Risk], st.LastAt.Local().Format("2006-01-02 15:04"),
+			strconv.Itoa(st.BoardSec / 60), strconv.Itoa(st.BoardActiveSec / 60), strconv.Itoa(st.BoardOps), strconv.Itoa(st.BoardMsgs), strconv.Itoa(st.BoardVoiceSec / 60), strconv.Itoa(st.CollabScore)})
 	}
 	if q.Get("student") != "" { // суралцагчийн дэлгэрэнгүй: сесс, шалгалт, лог
 		_ = cw.Write(nil)

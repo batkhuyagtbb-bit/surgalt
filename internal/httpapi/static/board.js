@@ -9,6 +9,72 @@ const { esc, api, toast, Auth, Live } = SG;
 const BI = /* Lucide (ISC) */ {"select":"<path d=\"M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z\"/>","hand":"<path d=\"M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2\"/><path d=\"M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2\"/><path d=\"M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8\"/><path d=\"M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15\"/>","pen":"<path d=\"M13 21h8\"/><path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"/>","marker":"<path d=\"m9 11-6 6v3h9l3-3\"/><path d=\"m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4\"/>","eraser":"<path d=\"M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21\"/><path d=\"m5.082 11.09 8.828 8.828\"/>","shapes":"<path d=\"M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><circle cx=\"17.5\" cy=\"17.5\" r=\"3.5\"/>","arrow":"<path d=\"M13 5H19V11\"/><path d=\"M19 5L5 19\"/>","text":"<path d=\"M12 4v16\"/><path d=\"M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2\"/><path d=\"M9 20h6\"/>","sticky":"<path d=\"M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z\"/><path d=\"M15 3v5a1 1 0 0 0 1 1h5\"/>","image":"<path d=\"M16 5h6\"/><path d=\"M19 2v6\"/><path d=\"M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5\"/><path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\"/><circle cx=\"9\" cy=\"9\" r=\"2\"/>","icons":"<path d=\"M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z\"/><path d=\"M15 3v5a1 1 0 0 0 1 1h5\"/><path d=\"M8 13h.01\"/><path d=\"M16 13h.01\"/><path d=\"M10 16s.8 1 2 1c1.3 0 2-1 2-1\"/>","emoji":"<path d=\"M15 10V9\"/><path d=\"M7.084 14.302a5.12 5.12 0 009.833 0 .24.24 0 00-.235-.302H7.32a.24.24 0 00-.235.302\"/><path d=\"M9 10V9\"/><circle cx=\"12\" cy=\"12\" r=\"10\"/>","laser":"<path d=\"m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72\"/><path d=\"m14 7 3 3\"/><path d=\"M5 6v4\"/><path d=\"M19 14v4\"/><path d=\"M10 2v2\"/><path d=\"M7 8H3\"/><path d=\"M21 16h-4\"/><path d=\"M11 3H9\"/>","undo":"<path d=\"M9 14 4 9l5-5\"/><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\"/>","redo":"<path d=\"m15 14 5-5-5-5\"/><path d=\"M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13\"/>","zin":"<circle cx=\"11\" cy=\"11\" r=\"8\"/><line x1=\"21\" x2=\"16.65\" y1=\"21\" y2=\"16.65\"/><line x1=\"11\" x2=\"11\" y1=\"8\" y2=\"14\"/><line x1=\"8\" x2=\"14\" y1=\"11\" y2=\"11\"/>","zout":"<circle cx=\"11\" cy=\"11\" r=\"8\"/><line x1=\"21\" x2=\"16.65\" y1=\"21\" y2=\"16.65\"/><line x1=\"8\" x2=\"14\" y1=\"11\" y2=\"11\"/>","fit":"<path d=\"M3 7V5a2 2 0 0 1 2-2h2\"/><path d=\"M17 3h2a2 2 0 0 1 2 2v2\"/><path d=\"M21 17v2a2 2 0 0 1-2 2h-2\"/><path d=\"M7 21H5a2 2 0 0 1-2-2v-2\"/>","download":"<path d=\"M12 15V3\"/><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><path d=\"m7 10 5 5 5-5\"/>","lock":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/>","unlock":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 9.9-1\"/>","copy":"<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"/><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/>","front":"<rect x=\"8\" y=\"8\" width=\"8\" height=\"8\" rx=\"2\"/><path d=\"M4 10a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2\"/><path d=\"M14 20a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2\"/>","back":"<rect x=\"14\" y=\"14\" width=\"8\" height=\"8\" rx=\"2\"/><rect x=\"2\" y=\"2\" width=\"8\" height=\"8\" rx=\"2\"/><path d=\"M7 14v1a2 2 0 0 0 2 2h1\"/><path d=\"M14 7h1a2 2 0 0 1 2 2v1\"/>","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><path d=\"M16 3.128a4 4 0 0 1 0 7.744\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/>","grid":"<rect width=\"7\" height=\"7\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"7\" x=\"14\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"7\" x=\"14\" y=\"14\" rx=\"1\"/><rect width=\"7\" height=\"7\" x=\"3\" y=\"14\" rx=\"1\"/>","x":"<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>","more":"<circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"19\" cy=\"12\" r=\"1\"/><circle cx=\"5\" cy=\"12\" r=\"1\"/>","crop":"<path d=\"M6 2v14a2 2 0 0 0 2 2h14\"/><path d=\"M18 22V8a2 2 0 0 0-2-2H2\"/>","wand":"<path d=\"M15 4V2\"/><path d=\"M15 16v-2\"/><path d=\"M8 9h2\"/><path d=\"M20 9h2\"/><path d=\"M17.8 11.8 19 13\"/><path d=\"M15 9h.01\"/><path d=\"M17.8 6.2 19 5\"/><path d=\"m3 21 9-9\"/><path d=\"M12.2 6.2 11 5\"/>","lasso":"<path d=\"M3.704 14.467a10 8 0 1 1 3.115 2.375\"/><path d=\"M7 22a5 5 0 0 1-2-3.994\"/><circle cx=\"5\" cy=\"16\" r=\"2\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","pause":"<rect x=\"14\" y=\"3\" width=\"5\" height=\"18\" rx=\"1\"/><rect x=\"5\" y=\"3\" width=\"5\" height=\"18\" rx=\"1\"/>","play":"<path d=\"M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z\"/>","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","spot":"<path d=\"M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z\"/><path d=\"M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14\"/><path d=\"M8 6v8\"/>","shuffle":"<path d=\"m18 14 4 4-4 4\"/><path d=\"m18 2 4 4-4 4\"/><path d=\"M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22\"/><path d=\"M2 6h1.972a4 4 0 0 1 3.6 2.2\"/><path d=\"M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45\"/>","distribute":"<line x1=\"15\" x2=\"15\" y1=\"12\" y2=\"18\"/><line x1=\"12\" x2=\"18\" y1=\"15\" y2=\"15\"/><rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"/><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/>","plus":"<path d=\"M5 12h14\"/><path d=\"M12 5v14\"/>","minus":"<path d=\"M5 12h14\"/>","upload":"<path d=\"M12 3v12\"/><path d=\"m17 8-5-5-5 5\"/><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/>","link":"<path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\"/><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\"/>","search":"<path d=\"m21 21-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/>","bold":"<path d=\"M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8\"/>","fill":"<path d=\"M11 7 6 2\"/><path d=\"M18.992 12H2.041\"/><path d=\"M21.145 18.38A3.34 3.34 0 0 1 20 16.5a3.3 3.3 0 0 1-1.145 1.88c-.575.46-.855 1.02-.855 1.595A2 2 0 0 0 20 22a2 2 0 0 0 2-2.025c0-.58-.285-1.13-.855-1.595\"/><path d=\"m8.5 4.5 2.148-2.148a1.205 1.205 0 0 1 1.704 0l7.296 7.296a1.205 1.205 0 0 1 0 1.704l-7.592 7.592a3.615 3.615 0 0 1-5.112 0l-3.888-3.888a3.615 3.615 0 0 1 0-5.112L5.67 7.33\"/>","line":"<path d=\"M5 12h14\"/>","out":"<path d=\"m16 17 5-5-5-5\"/><path d=\"M21 12H9\"/><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\"/>","board":"<path d=\"M2 3h20\"/><path d=\"M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3\"/><path d=\"m7 21 5-5 5 5\"/>","restore":"<path d=\"m11 10 3 3\"/><path d=\"M6.5 21A3.5 3.5 0 1 0 3 17.5a2.62 2.62 0 0 1-.708 1.792A1 1 0 0 0 3 21z\"/><path d=\"M9.969 17.031 21.378 5.624a1 1 0 0 0-3.002-3.002L6.967 14.031\"/>","target":"<line x1=\"2\" x2=\"5\" y1=\"12\" y2=\"12\"/><line x1=\"19\" x2=\"22\" y1=\"12\" y2=\"12\"/><line x1=\"12\" x2=\"12\" y1=\"2\" y2=\"5\"/><line x1=\"12\" x2=\"12\" y1=\"19\" y2=\"22\"/><circle cx=\"12\" cy=\"12\" r=\"7\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","dash":"<circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"19\" cy=\"12\" r=\"1\"/><circle cx=\"5\" cy=\"12\" r=\"1\"/>","user":"<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/>","globe":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\"/><path d=\"M2 12h20\"/>","chev":"<path d=\"m6 9 6 6 6-6\"/>","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\"/><path d=\"m21.854 2.147-10.94 10.939\"/>","trash":"<path d=\"M10 11v6\"/><path d=\"M14 11v6\"/><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\"/><path d=\"M3 6h18\"/><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/>"};
 const bi = (n, s = 20) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${BI[n] || ""}</svg>`;
 const V = document.querySelector('script[src*="/static/app.js"]')?.src.split("v=")[1] || "";
+Object.assign(BI, /* Lucide (ISC) */ {
+  mic: '<path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/>',
+  micoff: '<path d="M12 19v3"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M16.95 16.95A7 7 0 0 1 5 12v-2"/><path d="M18.89 13.23A7 7 0 0 0 19 12v-2"/><path d="m2 2 20 20"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/>',
+  chat: '<path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/>',
+  vol: '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/>',
+  volx: '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/>',
+});
+
+/* ---------- дуу: 16кГц IMA ADPCM (зөвхөн WebRTC холбогдож чадаагүй сонсогчид серверээр) ---------- */
+const VSR = 16000, VCH = 3200; // 200 мс-ийн хэсэг
+const AD_STEP = [7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73, 80, 88, 97, 107, 118, 130, 143, 157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494, 544, 598, 658, 724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272, 2499, 2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358, 5894, 6484, 7132, 7845, 8630, 9493, 10442, 11487, 12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767];
+const AD_IDX = [-1, -1, -1, -1, 2, 4, 6, 8, -1, -1, -1, -1, 2, 4, 6, 8];
+// Хэсэг бүр бие даан тайлагдана: [таамаг lo, hi, алхмын индекс] + 4 бит/дээж (алдагдсан хэсэг дараагийнхыг эвдэхгүй).
+function adEnc(pcm, idx0) {
+  const out = new Uint8Array(3 + (pcm.length >> 1));
+  let pred = pcm[0], idx = idx0;
+  out[0] = pred & 255; out[1] = (pred >> 8) & 255; out[2] = idx;
+  for (let i = 0; i < pcm.length; i++) {
+    const step = AD_STEP[idx]; let diff = pcm[i] - pred, code = 0, delta = step >> 3;
+    if (diff < 0) { code = 8; diff = -diff; }
+    if (diff >= step) { code |= 4; diff -= step; delta += step; }
+    if (diff >= step >> 1) { code |= 2; diff -= step >> 1; delta += step >> 1; }
+    if (diff >= step >> 2) { code |= 1; delta += step >> 2; }
+    pred = Math.max(-32768, Math.min(32767, pred + (code & 8 ? -delta : delta)));
+    idx = Math.max(0, Math.min(88, idx + AD_IDX[code]));
+    if (i & 1) out[3 + (i >> 1)] |= code << 4; else out[3 + (i >> 1)] = code;
+  }
+  return { data: out, idx };
+}
+function adDec(b) {
+  let pred = ((b[0] | (b[1] << 8)) << 16) >> 16, idx = Math.min(88, b[2]);
+  const n = (b.length - 3) * 2, out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const byte = b[3 + (i >> 1)], code = i & 1 ? byte >> 4 : byte & 15, step = AD_STEP[idx];
+    let delta = step >> 3;
+    if (code & 4) delta += step;
+    if (code & 2) delta += step >> 1;
+    if (code & 1) delta += step >> 2;
+    pred = Math.max(-32768, Math.min(32767, pred + (code & 8 ? -delta : delta)));
+    idx = Math.max(0, Math.min(88, idx + AD_IDX[code]));
+    out[i] = pred / 32768;
+  }
+  return out;
+}
+const b64 = (u8) => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const unb64 = (s) => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+const f32cat = (a, b) => { if (!a.length) return b; const o = new Float32Array(a.length + b.length); o.set(a); o.set(b, a.length); return o; };
+// resampler — хөтчийн давтамжаас (48/44.1кГц) 16кГц: цонхны дунджаар (энгийн доод шүүлтүүр).
+function resampler(rate) {
+  const step = rate / VSR; let pos = 0, carry = new Float32Array(0);
+  return (input) => {
+    const data = f32cat(carry, input), out = [];
+    while (pos + step <= data.length) {
+      const a = Math.floor(pos), b = Math.max(a + 1, Math.floor(pos + step)); let s = 0;
+      for (let i = a; i < b; i++) s += data[i];
+      out.push(s / (b - a)); pos += step;
+    }
+    const keep = Math.floor(pos); carry = data.slice(keep); pos -= keep;
+    return Float32Array.from(out);
+  };
+}
+const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }, { urls: "stun:stun.cloudflare.com:3478" }];
+const iceDone = (pc) => pc.iceGatheringState === "complete" ? Promise.resolve() : new Promise((res) => {
+  const t = setTimeout(res, 2500);
+  pc.addEventListener("icegatheringstatechange", () => { if (pc.iceGatheringState === "complete") { clearTimeout(t); res(); } });
+});
 
 /* ---------- тогтмол ---------- */
 const COLORS = ["#121829", "#e11d48", "#f97316", "#eab308", "#16a34a", "#06b6d4", "#1f3c8f", "#7c3aed", "#db2777", "#92400e", "#64748b", "#ffffff"];
@@ -155,6 +221,10 @@ function shellHTML(title) {
     <div class="bd-grp bd-hist"><button type="button" class="bd-ib" data-a="undo" title="Буцаах (Ctrl+Z)" disabled>${bi("undo")}</button><button type="button" class="bd-ib" data-a="redo" title="Дахих (Ctrl+Y)" disabled>${bi("redo")}</button></div>
     <div class="bd-grp bd-zoom"><button type="button" class="bd-ib" data-a="zout" title="Жижигрүүлэх (−)">${bi("zout")}</button><button type="button" class="bd-zv" data-a="fit" title="Бүгдийг харах (0)">100%</button><button type="button" class="bd-ib" data-a="zin" title="Томруулах (+)">${bi("zin")}</button></div>
     <button type="button" class="bd-pill bd-lockbtn" data-a="lock" hidden>${bi("pause", 17)}<span>Түр зогсоох</span></button>
+    <select class="bd-vto" aria-label="Хэнд ярих" title="Микрофоноор хэнд ярих" hidden></select>
+    <button type="button" class="bd-pill bd-micbtn" data-a="mic" hidden></button>
+    <button type="button" class="bd-pill bd-handbtn" data-a="hand" hidden></button>
+    <button type="button" class="bd-pill bd-chatbtn" data-a="chat" hidden>${bi("chat", 17)}<span>Чат</span><i class="bd-badge" hidden></i></button>
     <button type="button" class="bd-pill bd-panelbtn" data-a="panel" hidden>${bi("grid", 17)}<span>Анги</span><i class="bd-badge" hidden></i></button>
     <button type="button" class="bd-ib" data-a="more" data-pop="more" title="Бусад">${bi("more")}</button>
   </header>
@@ -187,6 +257,16 @@ function shellHTML(title) {
     <div class="bd-lockov" hidden><div><b>⏸</b><h3>Багш самбарыг түр зогсоолоо</h3><p>Багш руугаа анхаарлаа хандуулаарай 👀</p></div></div>
     <div class="bd-loading"><span class="bd-spin"></span>Самбар ачаалж байна…</div>
     <aside class="bd-panel" hidden aria-label="Анги"></aside>
+    <div class="bd-voice" hidden aria-live="polite"></div>
+    <aside class="bd-chat" hidden aria-label="Багийн чат">
+      <header class="bd-ph"><div><b>${bi("chat", 18)} Багийн чат</b><small class="bd-ch-sub"></small></div><button type="button" class="bd-ib" data-a="chat" title="Хаах">${bi("x", 18)}</button></header>
+      <div class="bd-ch-teams" hidden></div>
+      <div class="bd-ch-tabs" role="tablist"></div>
+      <div class="bd-ch-members"></div>
+      <div class="bd-ch-list" role="log" aria-live="polite"></div>
+      <form class="bd-ch-f"><label class="bd-ch-all" hidden><input type="checkbox"> 📢 Бүх багт нэг дор илгээх</label>
+        <textarea rows="1" maxlength="1000" placeholder="Бичих…" aria-label="Мессеж"></textarea><button type="submit" class="bd-ch-send" title="Илгээх (Enter)">${bi("send", 18)}</button></form>
+    </aside>
     <input type="file" class="bd-file" accept="image/*" multiple hidden>
   </div>`;
 }
@@ -294,12 +374,15 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
   }
   const onLive = (d) => {
     if (dead) return;
-    if (d.type === "reconnected") { resync(); return; }
+    if (d.type === "reconnected") { resync(); loadChat(); return; }
     if (d.type !== "board" || d.lid !== lid || d.bid !== bid) return;
     if (d.ev === "ops") { if (syncing) buffered.push(d); else onOps(d); }
     else if (d.ev === "fx") { if (d.room === room && d.cid !== cid) onFx(d.ops || []); }
     else if (d.ev === "state") onState(d.state);
-    else if (d.ev === "peers") { peers = d.peers || []; renderPeers(); renderPanel(); }
+    else if (d.ev === "chat") onChat(d);
+    else if (d.ev === "voice") onVoice(d.voice);
+    else if (d.ev === "rtc") onRtc(d.rtc);
+    else if (d.ev === "peers") { peers = d.peers || []; renderPeers(); renderPanel(); peersVoice(); renderChat(); }
     else if (d.ev === "reload") { if (d.rooms?.includes(room)) resync(); (d.rooms || []).forEach(markThumb); }
     else if (d.ev === "touch") markThumb(d.room);
   };
@@ -424,6 +507,8 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     const was = canEdit; canEdit = canWriteRoom(room);
     if (was !== canEdit) { cv.getObjects().forEach(prepare); setTool(canEdit ? (["hand", "laser"].includes(tool) ? "pen" : tool) : "hand"); }
     renderChrome();
+    chatState(prev, quiet);
+    voiceState(prev, quiet);
   }
   function modeToast(prev) {
     if (st.spot && st.spot !== prev.spot) return toast(`📢 Багш «${roomLabel(st.spot)}» самбарыг бүх ангид харуулж байна`);
@@ -436,6 +521,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     await flushAll();
     if (dead) return;
     room = r; undoS.length = 0; redoS.length = 0; syncUndo();
+    if (me.teacher && r.startsWith("t:")) chatTeam = +r.slice(2); // багш багийн самбарыг нээвэл чат нь ч тэр баг
     canEdit = canWriteRoom(room);
     lasers.forEach((l) => l.el.remove()); lasers.clear();
     await resync(true);
@@ -886,6 +972,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
     if (e.key === "Escape") {
       if (cv.getActiveObject()?.isEditing) return;
+      if (chatOn && chatBox.contains(document.activeElement)) { if (innerWidth < 820) toggleChat(false); else document.activeElement.blur(); return; }
       if (closePops()) { e.preventDefault(); return; }
       if (!panel.hidden && me.teacher && innerWidth < 900) { togglePanel(false); return; }
       if (cv.getActiveObject()) { cv.discardActiveObject(); cv.requestRenderAll(); renderStyle(); return; }
@@ -1102,7 +1189,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
   });
 
   /* ---------- дээд мөр, мэдэгдэл, анги ---------- */
-  function renderChrome() { renderTop(); renderPeers(); renderBanner(); renderStyle(); renderPanel(); syncUndo(); }
+  function renderChrome() { renderTop(); renderPeers(); renderBanner(); renderStyle(); renderPanel(); syncUndo(); renderChat(); renderVoice(); }
   function renderTop() {
     q(".bd-room").textContent = roomLabel(room);
     q(".bd-tools").hidden = !canEdit && !me.teacher;
@@ -1114,6 +1201,17 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     q(".bd-lockbtn").classList.toggle("on", !!st.lock);
     q(".bd-lockbtn").innerHTML = `${bi(st.lock ? "play" : "pause", 17)}<span>${st.lock ? "Үргэлжлүүлэх" : "Түр зогсоох"}</span>`;
     q(".bd-panelbtn").hidden = !me.teacher;
+    // Дуут өрөө: микрофон (ярих эрхтэй үед), гар өргөх (суралцагч), багш хэнд ярихаа сонгоно.
+    const tgt = micTarget(), mb = q(".bd-micbtn"), up = (st.hands || []).includes(me.uid), hb = q(".bd-handbtn"), vs = q(".bd-vto");
+    mb.hidden = !mic && !tgt; mb.classList.toggle("on", !!mic);
+    mb.innerHTML = `${bi(mic ? "mic" : "micoff", 17)}<span>${mic ? (tgt === "all" ? "Ярьж байна" : "Багтаа ярьж байна") : tgt === "all" ? "Ярих" : "Багтаа ярих"}</span><i class="bd-lv" aria-hidden="true"></i>`;
+    mb.title = mic ? "Микрофон унтраах" : tgt === "all" ? "Микрофон асааж бүх ангид ярих" : "Микрофон асааж багийнхантайгаа ярих";
+    mb.setAttribute("aria-pressed", String(!!mic));
+    hb.hidden = me.teacher || onStage(); hb.classList.toggle("on", up);
+    hb.innerHTML = `<span class="bd-hand" aria-hidden="true">✋</span><span>${up ? "Гараа буулгах" : "Гар өргөх"}</span>`;
+    hb.title = up ? "Гараа буулгах" : "Гар өргөж бүх ангид ярих эрх хүсэх";
+    vs.hidden = !me.teacher || st.mode !== "team";
+    if (!vs.hidden) { vs.innerHTML = `<option value="all">📢 Бүх анги</option>` + Array.from({ length: st.teams }, (_, i) => `<option value="t:${i}">${teamOf(i)[0]} ${esc(teamOf(i)[1])}</option>`).join(""); vs.value = tgt || "all"; }
     const rooms = q(".bd-rooms"), own = ownRoom();
     if (!me.teacher && own && !st.spot) {
       rooms.hidden = false;
@@ -1147,6 +1245,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
   }
   function togglePanel(on) {
     panel.hidden = on === undefined ? !panel.hidden : !on;
+    if (!panel.hidden && chatOn) { chatOn = false; chatBox.hidden = true; root.classList.remove("chat-on"); renderChat(); }
     q(".bd-panelbtn").classList.toggle("on", !panel.hidden);
     root.classList.toggle("panel-on", !panel.hidden);
     renderPanel();
@@ -1213,8 +1312,9 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
       h += `<div class="bd-teamctl"><span>Баг</span><button type="button" class="bd-ib bd-sm" data-teams="-1" ${st.teams <= 2 ? "disabled" : ""}>${bi("minus", 16)}</button><b>${st.teams}</b><button type="button" class="bd-ib bd-sm" data-teams="1" ${st.teams >= 12 ? "disabled" : ""}>${bi("plus", 16)}</button>
         <button type="button" class="btn btn-glass btn-sm" data-a="shuffle">${bi("shuffle", 16)}Санамсаргүй хуваах</button></div>
         <p class="muted small">Хүүхдийн нэрийг чирж өөр багт шилжүүлнэ.</p>`;
-      const chip = (u) => `<span class="bd-chip" draggable="true" data-uid="${esc(u)}"><i class="bd-dot ${online.has(u) ? "on" : ""}"></i>${esc(names[u])}</span>`;
-      h += `<div class="bd-cards">${teams.map((m, i) => { const t = teamOf(i); return cardHTML("t:" + i, `<span style="color:${t[2]}">${t[0]} ${esc(t[1])}</span>`, `<div class="bd-members" data-team="${i}">${m.map(chip).join("") || `<small class="muted">Хүүхэд чирч оруулна</small>`}</div>`, m.some((u) => online.has(u))); }).join("")}</div>`;
+      const chip = (u) => `<span class="bd-chip" draggable="true" data-uid="${esc(u)}"><i class="bd-dot ${online.has(u) ? "on" : ""}"></i>${esc(names[u])}${online.get(u)?.mic ? `<i class="bd-mic-i" title="Микрофон асаалттай">${bi("mic", 11)}</i>` : ""}</span>`;
+      const chatBtn = (i) => { const n = unreadOf("b:" + i) + unreadOf("t:" + i); return `<button type="button" class="bd-mini bd-chatmini" data-chteam="${i}" title="Багийн чат, самбар">${bi("chat", 13)}Чат<b ${n ? "" : "hidden"}>${n || ""}</b></button>`; };
+      h += `<div class="bd-cards">${teams.map((m, i) => { const t = teamOf(i); return cardHTML("t:" + i, `<span style="color:${t[2]}">${t[0]} ${esc(t[1])}</span>`, `<div class="bd-members" data-team="${i}">${m.map(chip).join("") || `<small class="muted">Хүүхэд чирч оруулна</small>`}</div><div class="bd-card-f">${chatBtn(i)}</div>`, m.some((u) => online.has(u))); }).join("")}</div>`;
       if (free.length) h += `<div class="bd-free"><b>Багт ороогүй</b><div class="bd-members" data-team="-1">${free.map(chip).join("")}</div></div>`;
     }
     h += `</div><footer class="bd-pf">${st.mode !== "teach" ? `<button type="button" class="btn btn-glass btn-sm" data-a="distribute">${bi("distribute", 16)}Миний самбарыг бүгдэд тараах</button>` : ""}
@@ -1234,6 +1334,376 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     setState({ assign: { [uid]: n } });
   });
 
+  /* ---------- багийн чат (баруун талд): «t:N» — баг хоорондоо, «b:N» — баг ↔ багш ---------- */
+  const chats = new Map(), chatBox = q(".bd-chat"), chatList = q(".bd-ch-list"), chatTa = q(".bd-ch-f textarea");
+  let chatOn = false, chatTab = "t", chatTeam = 0, chatShut = false;
+  const SEEN = `sg_bdchat:${lid}:${bid}`;
+  let seen = {};
+  try { seen = JSON.parse(localStorage.getItem(SEEN) || "{}") || {}; } catch {}
+  const myTeamOf = (s) => { const n = s.assign?.[me.uid]; return n != null && n < s.teams ? n : -1; };
+  const myTeam = () => myTeamOf(st);
+  const chatAvail = () => st.mode === "team" && (me.teacher || myTeam() >= 0);
+  const chatTeamNow = () => (me.teacher ? chatTeam : myTeam());
+  const chatCh = (k = chatTab) => `${k}:${chatTeamNow()}`;
+  const unreadOf = (ch) => { const s = seen[ch] || ""; let n = 0; for (const m of chats.get(ch) || []) if (m.uid !== me.uid && m.id > s) n++; return n; };
+  const hhmm = (ms) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+  const linkify = (s) => s.replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`);
+  async function loadChat() {
+    if (!chatAvail()) return;
+    try {
+      const d = await api(base + "/chat"); if (dead) return;
+      chats.clear(); for (const [k, v] of Object.entries(d.chats || {})) chats.set(k, v);
+      renderChat();
+    } catch {}
+  }
+  function onChat(d) {
+    const list = chats.get(d.room) || []; chats.set(d.room, list);
+    if (d.del) { const i = list.findIndex((m) => m.id === d.del); if (i >= 0) list.splice(i, 1); renderChat(); return; }
+    const m = d.msg; if (!m || list.some((x) => x.id === m.id)) return;
+    list.push(m); if (list.length > 300) list.shift();
+    const viewing = chatOn && d.room === chatCh() && !document.hidden;
+    if (m.uid !== me.uid && !viewing && (me.teacher ? d.room.startsWith("b:") : m.t)) toast(`💬 ${m.name}: ${m.body.length > 90 ? m.body.slice(0, 90) + "…" : m.body}`);
+    renderChat();
+  }
+  function toggleChat(on) {
+    chatOn = on === undefined ? !chatOn : !!on;
+    if (chatOn && !panel.hidden) togglePanel(false);
+    chatBox.hidden = !chatOn; root.classList.toggle("chat-on", chatOn);
+    renderChat();
+    if (chatOn && innerWidth > 720) setTimeout(() => !chatTa.disabled && chatTa.focus({ preventScroll: true }), 60);
+  }
+  // Нэр дээр дарахад тэр хүний самбар шууд харагдана: багш → багшийн самбар, суралцагч → багийнх нь самбар.
+  function boardOf(uid, isTeacher) {
+    if (isTeacher) return "main";
+    const n = st.assign?.[uid];
+    if (n == null || n >= st.teams) return "";
+    return me.teacher || n === myTeam() ? "t:" + n : "";
+  }
+  function showBoard(r, keepChat) {
+    if (!r) return;
+    if (r !== room) switchRoom(r);
+    if (!keepChat && innerWidth < 820 && chatOn) toggleChat(false);
+  }
+  function openTeam(n) { chatTeam = n; if (!chatOn) toggleChat(true); else renderChat(); showBoard("t:" + n, true); }
+  function msgHTML(m, prev) {
+    const mine = m.uid === me.uid, cont = prev && prev.uid === m.uid && m.at - prev.at < 180000;
+    const head = cont ? "" : `<div class="bd-msg-h">${mine ? "" : `<button type="button" class="bd-ch-who" data-who="${esc(m.uid)}" data-wt="${m.t ? 1 : ""}" title="${m.t ? "Багшийн самбарыг харах" : "Самбарыг нь харах"}">${m.t ? "👩‍🏫 " : ""}${esc(m.name)}</button>`}<time>${hhmm(m.at)}</time></div>`;
+    return `<div class="bd-msg${mine ? " me" : ""}${m.t ? " tch" : ""}${cont ? " cont" : ""}">${head}<p>${linkify(esc(m.body))}</p>${me.teacher ? `<button type="button" class="bd-msg-del" data-del="${esc(m.id)}" title="Устгах" aria-label="Устгах">${bi("x", 13)}</button>` : ""}</div>`;
+  }
+  function renderChat() {
+    const avail = chatAvail(), team = chatTeamNow();
+    document.documentElement.classList.toggle("bd-chatting", chatOn && avail);
+    if (!avail && chatOn) { chatOn = false; chatBox.hidden = true; root.classList.remove("chat-on"); }
+    if (me.teacher && chatTeam >= st.teams) chatTeam = 0;
+    const ch = chatCh(), list = chats.get(ch) || [];
+    if (chatOn && !document.hidden && list.length && seen[ch] !== list[list.length - 1].id) { // харж буй сувгийг уншсан гэж тэмдэглэнэ
+      seen[ch] = list[list.length - 1].id;
+      try { localStorage.setItem(SEEN, JSON.stringify(seen)); } catch {}
+    }
+    let total = 0;
+    if (me.teacher) for (let i = 0; i < st.teams; i++) total += unreadOf("b:" + i);
+    else if (team >= 0) total = unreadOf("t:" + team) + unreadOf("b:" + team);
+    const btn = q(".bd-chatbtn"), bg = btn.querySelector(".bd-badge");
+    btn.hidden = !avail; btn.classList.toggle("on", chatOn); bg.hidden = !total; bg.textContent = total > 99 ? "99+" : total;
+    panel.querySelectorAll(".bd-chatmini[data-chteam]").forEach((b) => { const i = b.dataset.chteam, n = unreadOf("b:" + i) + unreadOf("t:" + i), x = b.querySelector("b"); x.textContent = n || ""; x.hidden = !n; });
+    if (!chatOn) return;
+    const t = teamOf(Math.max(team, 0));
+    q(".bd-ch-sub").textContent = me.teacher ? "Нэр дээр дарж самбарыг нь шууд харна" : `${t[0]} ${t[1]} · нэр дээр дарж самбарыг харна`;
+    const chips = q(".bd-ch-teams"); chips.hidden = !me.teacher;
+    // Өөрчлөгдсөн хэсгийг л дахин зурна (хүн нэгдэх г.м. үйл явдлаар товч солигдож даралт алдагдахгүй).
+    const setHTML = (el, h) => { if (el._h !== h) { el._h = h; el.innerHTML = h; return true; } return false; };
+    if (me.teacher) setHTML(chips, Array.from({ length: st.teams }, (_, i) => {
+      const tt = teamOf(i), b = unreadOf("b:" + i), u = unreadOf("t:" + i);
+      return `<button type="button" class="bd-ch-team ${i === chatTeam ? "on" : ""}" data-chteam="${i}" style="--tc:${tt[2]}" title="${esc(tt[1])} — чат ба самбарыг нь харах">${tt[0]} ${esc(tt[1])}${b ? `<i class="bd-tb">${b}</i>` : u ? `<i class="bd-tdot"></i>` : ""}</button>`;
+    }).join(""));
+    setHTML(q(".bd-ch-tabs"), [["t", me.teacher ? "👥 Багийн доторх" : `👥 ${t[1]}`], ["b", me.teacher ? "🙋 Багштай" : "👩‍🏫 Багштай"]].map(([k, label]) => {
+      const n = unreadOf(`${k}:${team}`);
+      return `<button type="button" role="tab" data-chtab="${k}" class="${k === chatTab ? "on" : ""}" aria-selected="${k === chatTab}">${label}${n ? `<i class="bd-tb">${n}</i>` : ""}</button>`;
+    }).join(""));
+    const on = new Map(peers.map((p) => [p.uid, p])), tp = peers.find((p) => p.teacher);
+    const mem = (uid, name, isT) => {
+      const p = on.get(uid);
+      return `<button type="button" class="bd-ch-mem ${p ? "on" : ""}" data-who="${esc(uid)}" data-wt="${isT ? 1 : ""}" title="${isT ? "Багшийн самбарыг харах" : "Багийн самбарыг харах"}"><span class="bd-vav" data-vuid="${esc(uid)}">${avatar({ uid, name })}<i class="bd-vring"></i></span><span>${isT ? "👩‍🏫 " : ""}${esc(name)}</span>${p?.mic ? `<i class="bd-mic-i" title="Микрофон асаалттай">${bi("mic", 12)}</i>` : ""}</button>`;
+    };
+    const ids = Object.keys(st.names || {}).filter((u) => st.assign?.[u] === team).sort((a, b) => (st.names[a] || "").localeCompare(st.names[b] || ""));
+    setHTML(q(".bd-ch-members"), (tp ? mem(tp.uid, tp.name, true) : "") + ids.map((u) => mem(u, st.names[u], false)).join(""));
+    const atBottom = chatList.dataset.ch !== ch || chatList.scrollHeight - chatList.scrollTop - chatList.clientHeight < 90;
+    chatList.dataset.ch = ch;
+    const changed = setHTML(chatList, list.length ? list.map((m, i) => msgHTML(m, list[i - 1])).join("")
+      : `<p class="bd-ch-empty">${chatTab === "t" ? (me.teacher ? "Энэ баг хоорондоо одоогоор бичээгүй байна." : "Багийнхантайгаа энд ярилцаарай 👋<br><small>Багш харах боломжтой.</small>")
+        : (me.teacher ? "Энэ багаас асуулт ирээгүй байна.<br><small>Та бичвэл багийн бүх гишүүнд очно.</small>" : "Багаараа багшдаа асуулт, санал бичээрэй 🙋<br><small>Багийн бүх гишүүн харна.</small>")}</p>`);
+    if (changed && atBottom) chatList.scrollTop = chatList.scrollHeight;
+    const lockMe = !me.teacher && (st.lock || st.mode !== "team");
+    chatTa.disabled = lockMe; q(".bd-ch-send").disabled = lockMe;
+    chatTa.placeholder = lockMe ? "Багш самбарыг түр зогсоосон" : chatTab === "t" ? (me.teacher ? "Багт бичих…" : "Багийнхандаа бичих…") : me.teacher ? "Багт хариулах…" : "Багшдаа бичих…";
+    q(".bd-ch-all").hidden = !(me.teacher && chatTab === "b");
+  }
+  const autoGrow = () => { chatTa.style.height = "auto"; chatTa.style.height = Math.min(120, chatTa.scrollHeight) + "px"; };
+  async function sendChat() {
+    const body = chatTa.value.trim(); if (!body || chatTa.disabled) return;
+    const ch = me.teacher && chatTab === "b" && q(".bd-ch-all input").checked ? "all" : chatCh();
+    chatTa.disabled = true;
+    try {
+      const r = await post("/chat", { ch, body });
+      chatTa.value = ""; autoGrow();
+      if (ch !== "all") for (const m of r?.msgs || []) onChat({ room: ch, msg: m });
+    } catch (e) { toast(e.message, true); }
+    finally { chatTa.disabled = false; renderChat(); if (!chatTa.disabled) chatTa.focus({ preventScroll: true }); }
+  }
+  async function delMsg(id) {
+    if (!confirm("Энэ мессежийг устгах уу?")) return;
+    try { await post("/chat", { ch: chatCh(), del: id }); } catch (e) { toast(e.message, true); }
+  }
+  q(".bd-ch-f").addEventListener("submit", (e) => { e.preventDefault(); sendChat(); });
+  chatTa.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendChat(); } });
+  chatTa.addEventListener("input", autoGrow);
+  function chatState(prev, quiet) {
+    if (myTeamOf(prev) !== myTeam() || (prev.mode !== "team" && st.mode === "team")) loadChat();
+    if (!quiet && !me.teacher && st.mode === "team" && prev.mode !== "team" && myTeam() >= 0 && innerWidth >= 1100 && !chatShut) toggleChat(true);
+  }
+
+  /* ---------- дуут өрөө (Clubhouse маягийн): багш ба суралцагчид дуугаар ----------
+     Дуу WebRTC-ээр шууд (P2P) явна — сервер зөвхөн холболтын дохиог дамжуулна. Шууд холбогдож чадаагүй
+     (симметр NAT) сонсогчид л 16кГц ADPCM хэсгийг серверээр илгээнэ. Ярьж буй хүнийг цагираг, эквалайзераар харуулна. */
+  const vbox = q(".bd-voice");
+  const forceRelay = (() => { try { return localStorage.getItem("sg_voice_relay") === "1"; } catch { return false; } })();
+  let mic = null, vTo = "all", vMuted = false, needTap = false, octx = null, gAll = null, gTeam = null, lastHeard = 0, vTicks = 0;
+  const outLinks = new Map(), inLinks = new Map(), relayPlay = new Map(), talking = new Map();
+  const onStage = (uid = me.uid) => (st.stage || []).includes(uid);
+  const prio = (uid) => peers.some((p) => p.uid === uid && p.teacher) || onStage(uid); // багш, тайзан дээрх хүн ярихад багийн яриа намсна
+  function micTarget() {
+    if (me.teacher) { const n = vTo.startsWith("t:") ? +vTo.slice(2) : -1; return n >= 0 && (st.mode !== "team" || n >= st.teams) ? "all" : vTo; }
+    if (onStage()) return "all";
+    const n = myTeam();
+    return st.mode === "team" && !st.lock && n >= 0 ? "t:" + n : "";
+  }
+  function listenersFor(to) {
+    if (!to) return [];
+    const n = to.startsWith("t:") ? +to.slice(2) : -1;
+    return peers.filter((p) => p.uid !== me.uid && (to === "all" || (p.teacher ? p.room === to : st.assign?.[p.uid] === n))).map((p) => p.uid);
+  }
+  function audioOut() {
+    if (!octx) {
+      const AC = window.AudioContext || window.webkitAudioContext; octx = new AC();
+      gAll = octx.createGain(); gTeam = octx.createGain(); gAll.connect(octx.destination); gTeam.connect(octx.destination);
+    }
+    return octx;
+  }
+  function unlockAudio() {
+    audioOut().resume().catch(() => {});
+    for (const L of inLinks.values()) L.audio.play().catch(() => {});
+    if (needTap) { needTap = false; renderVoice(); }
+  }
+  root.addEventListener("pointerdown", () => { if (needTap || octx?.state === "suspended") unlockAudio(); }, true);
+  async function micOn() {
+    if (mic) return;
+    if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) return toast("Энэ хөтөч микрофон дэмжихгүй байна — Chrome эсвэл Edge ашиглана уу", true);
+    if (!micTarget()) return toast("Одоо ярих боломжгүй — ✋ гараа өргөөд багшийн зөвшөөрлийг хүлээнэ үү", true);
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } }); }
+    catch { return toast("Микрофон ашиглах зөвшөөрөл өгнө үү (хаягийн мөрөн дэх 🔒 дүрс → Микрофон)", true); }
+    if (dead || mic) { stream.getTracks().forEach((t) => t.stop()); return; }
+    const ctx = audioOut(); ctx.resume().catch(() => {});
+    const src = ctx.createMediaStreamSource(stream), an = ctx.createAnalyser(); an.fftSize = 1024; src.connect(an);
+    mic = { stream, track: stream.getAudioTracks()[0], src, an, buf: new Float32Array(an.fftSize), level: 0, talkMs: 0, lastRep: Date.now(),
+      to: "", proc: null, sink: null, rs: null, pend: new Float32Array(0), idx: 0, hang: 0, seq: 0, q: [], busy: false };
+    mic.track.onended = () => micOff();
+    post("/voice", { mic: true }).catch(() => {});
+    syncLinks(); renderTop(); renderVoice();
+    toast(micTarget() === "all" ? "🎙 Микрофон асаалттай — бүх анги таныг сонсож байна" : "🎙 Микрофон асаалттай — багийнхан тань сонсож байна");
+  }
+  function micOff(quiet) {
+    if (!mic) return;
+    const m = mic; mic = null;
+    if (!quiet) post("/voice", { mic: false, talk: Math.round(m.talkMs) }).catch(() => {});
+    m.stream.getTracks().forEach((t) => t.stop());
+    try { m.src.disconnect(); m.proc?.disconnect(); m.sink?.disconnect(); } catch {}
+    for (const uid of [...outLinks.keys()]) dropOut(uid, true);
+    talking.delete(me.uid);
+    q(".bd-micbtn")?.style.setProperty("--lv", "0");
+    renderTop(); renderVoice();
+  }
+  // syncLinks — микрофон асаалттай үед сонсогч бүртэй нэг WebRTC холболт (зөвхөн илгээх).
+  function syncLinks() {
+    const to = mic ? micTarget() : "";
+    if (mic && !to) { micOff(); toast("Микрофон унтарлаа — одоо ярих боломжгүй", true); return; }
+    if (mic) mic.to = to;
+    const want = new Set(listenersFor(to));
+    for (const uid of [...outLinks.keys()]) if (!want.has(uid)) dropOut(uid);
+    for (const uid of want) if (!outLinks.has(uid)) connectOut(uid);
+    relayCheck();
+  }
+  async function connectOut(uid) {
+    const L = { pc: null, id: rid(10), ok: false, relay: forceRelay, t: 0 }; outLinks.set(uid, L);
+    if (forceRelay) { relayCheck(); return; }
+    const pc = L.pc = new RTCPeerConnection({ iceServers: ICE });
+    pc.addTransceiver(mic.track, { direction: "sendonly", streams: [mic.stream] });
+    const fail = () => { if (outLinks.get(uid) === L && !L.ok) { L.relay = true; relayCheck(); renderVoice(); } };
+    pc.onconnectionstatechange = () => {
+      const s = pc.connectionState;
+      if (s === "connected") { L.ok = true; L.relay = false; clearTimeout(L.t); relayCheck(); renderVoice(); }
+      else if (s === "failed") { L.ok = false; fail(); }
+      else if (s === "disconnected") { clearTimeout(L.t); L.t = setTimeout(() => { if (pc.connectionState !== "connected") { L.ok = false; fail(); } }, 4000); }
+    };
+    L.t = setTimeout(fail, 9000);
+    try {
+      await pc.setLocalDescription(await pc.createOffer());
+      await iceDone(pc);
+      if (outLinks.get(uid) !== L) return;
+      await post("/voice", { sig: { to: uid, t: "offer", id: L.id, sdp: pc.localDescription.sdp } });
+    } catch { fail(); }
+  }
+  function dropOut(uid, silent) {
+    const L = outLinks.get(uid); if (!L) return;
+    outLinks.delete(uid); clearTimeout(L.t);
+    try { L.pc?.close(); } catch {}
+    if (!silent && L.pc) post("/voice", { sig: { to: uid, t: "bye", id: L.id } }).catch(() => {});
+    relayCheck();
+  }
+  async function onRtc(r) {
+    if (!r) return;
+    if (r.t === "answer") { const L = outLinks.get(r.from); if (L?.pc && L.id === r.id) L.pc.setRemoteDescription({ type: "answer", sdp: r.sdp }).catch(() => { L.relay = true; relayCheck(); }); return; }
+    if (r.t === "bye") { if (inLinks.get(r.from)?.id === r.id) dropIn(r.from); return; }
+    dropIn(r.from); // offer: ярьж буй хүнээс шинэ холболт
+    const pc = new RTCPeerConnection({ iceServers: ICE }), audio = new Audio();
+    audio.autoplay = true; audio.muted = vMuted;
+    const L = { pc, id: r.id, audio }; inLinks.set(r.from, L);
+    pc.ontrack = (e) => { audio.srcObject = e.streams[0] || new MediaStream([e.track]); audio.play().catch(() => { needTap = true; renderVoice(); }); };
+    try {
+      await pc.setRemoteDescription({ type: "offer", sdp: r.sdp });
+      await pc.setLocalDescription(await pc.createAnswer());
+      await iceDone(pc);
+      if (inLinks.get(r.from) !== L) return;
+      await post("/voice", { sig: { to: r.from, t: "answer", id: r.id, sdp: pc.localDescription.sdp } });
+    } catch {}
+  }
+  function dropIn(uid) { const L = inLinks.get(uid); if (!L) return; inLinks.delete(uid); try { L.pc.close(); } catch {} L.audio.srcObject = null; }
+  // Нөөц зам: WebRTC холбогдоогүй сонсогч байвал л микрофоныг 16кГц ADPCM болгож серверээр (зөвхөн тэдэнд).
+  function relayCheck() {
+    const need = !!mic && [...outLinks.values()].some((L) => L.relay);
+    if (need && !mic.proc) {
+      const ctx = audioOut(), proc = ctx.createScriptProcessor(4096, 1, 1), sink = ctx.createGain(); sink.gain.value = 0;
+      mic.rs = resampler(ctx.sampleRate); mic.proc = proc; mic.sink = sink;
+      proc.onaudioprocess = (e) => relayData(e.inputBuffer.getChannelData(0));
+      mic.src.connect(proc); proc.connect(sink); sink.connect(ctx.destination);
+    } else if (!need && mic?.proc) {
+      try { mic.src.disconnect(mic.proc); mic.proc.disconnect(); mic.sink.disconnect(); } catch {}
+      mic.proc = mic.sink = null; mic.pend = new Float32Array(0);
+    }
+  }
+  function relayData(input) {
+    if (!mic || !mic.rs || !mic.track.enabled) return;
+    mic.pend = f32cat(mic.pend, mic.rs(input));
+    while (mic && mic.pend.length >= VCH) {
+      const c = mic.pend.subarray(0, VCH); mic.pend = mic.pend.slice(VCH);
+      let s = 0; for (const v of c) s += v * v;
+      const rms = Math.sqrt(s / VCH), echo = performance.now() - lastHeard < 300; // бусдын дуу гарч байхад цуурайг шүүнэ
+      if (rms > (echo ? 0.05 : 0.01)) mic.hang = 4; else if (mic.hang > 0) mic.hang--; else continue; // чимээгүй үед илгээхгүй
+      const only = [...outLinks].filter(([, L]) => L.relay).map(([u]) => u); if (!only.length) return;
+      const pcm = new Int16Array(VCH); for (let i = 0; i < VCH; i++) pcm[i] = Math.max(-1, Math.min(1, c[i])) * 32767;
+      const enc = adEnc(pcm, mic.idx); mic.idx = enc.idx;
+      mic.q.push({ to: mic.to, seq: ++mic.seq, d: b64(enc.data), only }); if (mic.q.length > 5) mic.q.shift();
+      pump();
+    }
+  }
+  async function pump() {
+    if (!mic || mic.busy) return;
+    const m = mic; m.busy = true;
+    try {
+      while (mic === m && m.q.length) {
+        try { await post("/voice", m.q.shift()); }
+        catch (e) { if (e.status === 403) { micOff(); toast(e.message, true); return; } }
+      }
+    } finally { m.busy = false; }
+  }
+  function onVoice(v) {
+    if (!v?.d || v.uid === me.uid) return;
+    talking.set(v.uid, performance.now()); lastHeard = performance.now();
+    if (vMuted) return;
+    const ctx = audioOut();
+    if (ctx.state !== "running") { ctx.resume().catch(() => {}); if (!needTap) { needTap = true; renderVoice(); } return; }
+    const p = relayPlay.get(v.uid) || { next: 0, seq: 0 }; relayPlay.set(v.uid, p);
+    if (v.seq <= p.seq && p.seq - v.seq < 50) return; // хоцорсон хэсэг
+    p.seq = v.seq;
+    const pcm = adDec(unb64(v.d)), buf = ctx.createBuffer(1, pcm.length, VSR); buf.getChannelData(0).set(pcm);
+    const now = ctx.currentTime; if (p.next < now || p.next > now + 1.2) p.next = now + 0.22; // життер буфер
+    const s = ctx.createBufferSource(); s.buffer = buf; s.connect(prio(v.uid) ? gAll : gTeam); s.start(p.next); p.next += buf.duration;
+  }
+  async function toggleHand() {
+    const up = !(st.hands || []).includes(me.uid);
+    try { await post("/voice", { hand: up }); toast(up ? "✋ Гараа өргөлөө — багш ярих эрх өгөхийг хүлээнэ үү" : "Гараа буулгалаа"); } catch (e) { toast(e.message, true); }
+  }
+  // 100мс тутам: өөрийн микрофоны түвшин, бусдын ярьж буй эсэх (RTP audioLevel), ярихад намсгах.
+  function vTick() {
+    const now = performance.now();
+    if (mic) {
+      mic.an.getFloatTimeDomainData(mic.buf); let s = 0; for (const v of mic.buf) s += v * v;
+      const rms = Math.sqrt(s / mic.buf.length);
+      mic.level = mic.level * 0.55 + Math.min(1, rms * 7) * 0.45;
+      if (rms > 0.02) { mic.talkMs += 100; talking.set(me.uid, now); }
+      if (Date.now() - mic.lastRep > 10000) { const ms = Math.round(mic.talkMs); mic.talkMs = 0; mic.lastRep = Date.now(); if (ms) post("/voice", { talk: ms }).catch(() => {}); }
+      q(".bd-micbtn")?.style.setProperty("--lv", mic.level.toFixed(2));
+    }
+    for (const [uid, L] of inLinks) for (const r of L.pc.getReceivers()) { const x = r.getSynchronizationSources?.()[0]; if (x && x.audioLevel > 0.02) { talking.set(uid, now); lastHeard = now; } }
+    if (++vTicks % 3 === 0) for (const [uid, L] of inLinks) { // 300мс-ийн дундаж энерги: богино авиа ч алдагдахгүй
+      L.pc.getStats().then((rep) => rep.forEach((x) => {
+        if (x.type !== "inbound-rtp" || x.kind !== "audio" || x.totalSamplesDuration == null) return;
+        if (L.d != null && x.totalSamplesDuration > L.d && Math.sqrt((x.totalAudioEnergy - L.e) / (x.totalSamplesDuration - L.d)) > 0.015) { talking.set(uid, performance.now()); lastHeard = performance.now(); }
+        L.e = x.totalAudioEnergy; L.d = x.totalSamplesDuration;
+      })).catch(() => {});
+    }
+    let prioTalk = false; const who = [];
+    for (const [uid, t] of talking) { if (now - t > 450) { talking.delete(uid); continue; } if (uid !== me.uid) { who.push(uid); if (prio(uid)) prioTalk = true; } }
+    root.querySelectorAll("[data-vuid]").forEach((el) => el.classList.toggle("talk", talking.has(el.dataset.vuid)));
+    const vol = prioTalk ? 0.3 : 1;
+    for (const [uid, L] of inLinks) L.audio.volume = prio(uid) ? 1 : vol;
+    if (gTeam) gTeam.gain.value = vol;
+    vbox.classList.toggle("talking", who.length > 0 || talking.has(me.uid));
+    const now2 = q(".bd-vnow");
+    if (now2) {
+      const names = who.map((u) => { const p = peers.find((x) => x.uid === u); return p ? (p.teacher ? "👩‍🏫 Багш" : p.name) : st.names?.[u] || "Хэн нэгэн"; });
+      const txt = names.length ? `${names.slice(0, 2).join(", ")}${names.length > 2 ? ` +${names.length - 2}` : ""} ярьж байна` : talking.has(me.uid) ? "Та ярьж байна" : "";
+      if (now2.textContent !== txt) now2.textContent = txt;
+      now2.hidden = !txt;
+    }
+  }
+  const vTimer = setInterval(vTick, 100);
+  function renderVoice() {
+    const nameOf = (uid) => peers.find((p) => p.uid === uid)?.name || st.names?.[uid] || "Суралцагч";
+    const n = myTeam();
+    const rel = peers.filter((p) => p.mic && p.uid !== me.uid && (me.teacher || p.teacher || onStage(p.uid) || (st.mode === "team" && n >= 0 && st.assign?.[p.uid] === n)));
+    const queue = me.teacher && ((st.hands || []).length || (st.stage || []).length);
+    const show = !!mic || rel.length > 0 || queue || needTap;
+    vbox.hidden = !show;
+    if (!show) return;
+    const av = (p) => `<span class="bd-vav" data-vuid="${esc(p.uid)}" title="${esc(p.teacher ? "Багш · " + p.name : p.name)}">${avatar(p)}<i class="bd-vring"></i>${p.teacher ? `<i class="bd-vbadge">👩‍🏫</i>` : ""}</span>`;
+    const relayN = [...outLinks.values()].filter((L) => L.relay).length;
+    let h = `<div class="bd-vroom"><span class="bd-vlive"><i></i>LIVE</span><b>Дуут өрөө</b>
+      <span class="bd-vavs">${mic ? av({ uid: me.uid, name: me.name, teacher: me.teacher }) : ""}${rel.slice(0, 7).map(av).join("")}${rel.length > 7 ? `<span class="bd-av bd-more">+${rel.length - 7}</span>` : ""}</span>
+      <span class="bd-eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+      <button type="button" class="bd-ib bd-sm" data-a="vmute" title="${vMuted ? "Дууг нээх" : "Дууг хаах (бусдыг сонсохгүй)"}">${bi(vMuted ? "volx" : "vol", 16)}</button></div>
+      <div class="bd-vnow" hidden></div>`;
+    if (mic && relayN) h += `<div class="bd-vinfo" title="Эдгээр сонсогчийн сүлжээ шууд холболт зөвшөөрөөгүй тул дуу серверээр дамжиж байна">↪ ${relayN} сонсогчид серверээр</div>`;
+    if (needTap) h += `<div class="bd-vtap"><button type="button" data-a="vtap">🔊 Дуу сонсохын тулд энд дарна уу</button></div>`;
+    if (queue) h += `<div class="bd-vq">${(st.hands || []).map((u) => `<span class="bd-vh">✋ ${esc(nameOf(u))}<button type="button" data-grant="${esc(u)}">🎤 Ярих эрх</button><button type="button" class="bd-vx" data-revoke="${esc(u)}" title="Гарыг буулгах">${bi("x", 12)}</button></span>`).join("")}${(st.stage || []).map((u) => `<span class="bd-vh on">🎤 ${esc(nameOf(u))} · бүх ангид<button type="button" class="bd-vx" data-revoke="${esc(u)}" title="Ярих эрхийг авах">${bi("x", 12)}</button></span>`).join("")}</div>`;
+    if (vbox._h !== h) { vbox._h = h; vbox.innerHTML = h; }
+    vTick();
+  }
+  function voiceState(prev, quiet) {
+    if (!quiet) {
+      if (me.teacher) { const nw = (st.hands || []).filter((u) => !(prev.hands || []).includes(u)); if (nw.length) toast(`✋ ${nw.map((u) => st.names?.[u] || "Суралцагч").join(", ")} гар өргөлөө — «Дуут өрөө»-нөөс ярих эрх өгнө үү`); }
+      else if (onStage() && !(prev.stage || []).includes(me.uid)) toast("🎤 Багш танд бүх ангид ярих эрх өглөө — «Ярих» дарж микрофоноо асаагаарай");
+      else if (!onStage() && (prev.stage || []).includes(me.uid)) toast("Ярих эрх дууслаа — баярлалаа 🙏");
+    }
+    if (mic) syncLinks();
+  }
+  function peersVoice() {
+    for (const uid of [...inLinks.keys()]) if (!peers.some((p) => p.uid === uid && p.mic)) dropIn(uid);
+    if (mic) syncLinks();
+    renderVoice();
+  }
+  q(".bd-vto").addEventListener("change", (e) => { vTo = e.target.value; if (mic) syncLinks(); renderTop(); renderVoice(); });
+
   /* ---------- товшилтууд ---------- */
   root.addEventListener("click", async (e) => {
     const b = e.target.closest("button, [data-a]"); if (!b || !root.contains(b)) return;
@@ -1248,7 +1718,18 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     if (b.dataset.open) { if (b.dataset.open !== room) switchRoom(b.dataset.open); if (innerWidth < 900) togglePanel(false); return; }
     if (b.dataset.spot) { setState({ spot: st.spot === b.dataset.spot ? "" : b.dataset.spot }); return; }
     if (b.dataset.teams) { setState({ teams: clamp(st.teams + +b.dataset.teams, 2, 12) }); return; }
+    if (b.dataset.chteam != null) { openTeam(+b.dataset.chteam); return; }
+    if (b.dataset.chtab) { chatTab = b.dataset.chtab; renderChat(); if (!chatTa.disabled && innerWidth > 720) chatTa.focus({ preventScroll: true }); return; }
+    if (b.dataset.who) { showBoard(boardOf(b.dataset.who, !!b.dataset.wt)); return; }
+    if (b.dataset.del) { delMsg(b.dataset.del); return; }
+    if (b.dataset.grant) { setState({ stage: { [b.dataset.grant]: true } }); return; }
+    if (b.dataset.revoke) { setState({ stage: { [b.dataset.revoke]: false } }); return; }
     const a = b.dataset.a;
+    if (a === "chat") { if (chatOn) chatShut = true; return toggleChat(); }
+    if (a === "mic") return mic ? micOff() : micOn();
+    if (a === "hand") return toggleHand();
+    if (a === "vmute") { vMuted = !vMuted; for (const L of inLinks.values()) L.audio.muted = vMuted; toast(vMuted ? "🔇 Дуут өрөөний дууг хаалаа" : "🔊 Дуут өрөөний дуу нээгдлээ"); renderVoice(); return; }
+    if (a === "vtap") return unlockAudio();
     if (a === "close") return close();
     if (a === "undo") return undo();
     if (a === "redo") return redo();
@@ -1350,13 +1831,15 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
   function destroy() {
     if (dead) return; dead = true;
     if (queue.length) flush();
+    micOff(true); for (const uid of [...inLinks.keys()]) dropIn(uid);
+    clearInterval(vTimer); try { octx?.close(); } catch {}
     fetch(base + "/presence", { method: "POST", keepalive: true, headers: { Authorization: "Bearer " + Auth.token, "Content-Type": "application/json" }, body: JSON.stringify({ leave: true }) }).catch(() => {});
     clearInterval(hb); ro.disconnect(); Live.handlers.delete(onLive);
     document.removeEventListener("keydown", onKey); document.removeEventListener("keyup", onKeyUp);
     document.removeEventListener("copy", onCopy); document.removeEventListener("paste", onPaste);
     removeEventListener("popstate", onPop);
     try { cv.dispose(); } catch {}
-    root.remove(); document.documentElement.classList.remove("bd-on");
+    root.remove(); document.documentElement.classList.remove("bd-on", "bd-chatting");
     if (cur?.destroy === destroy) cur = null;
   }
 
@@ -1377,13 +1860,20 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
       renderChrome();
       q(".bd-loading")?.remove();
       if (me.teacher && st.mode !== "teach" && innerWidth >= 1100) togglePanel(true);
+      if (chatAvail()) { loadChat(); if (!me.teacher && innerWidth >= 1100) toggleChat(true); }
     } catch (e) {
       const l = q(".bd-loading");
       if (l) l.innerHTML = `<p>${esc(e.message || "Самбар нээгдсэнгүй")}</p><button type="button" class="btn btn-glass btn-sm" data-a="close">Хаах</button>`;
     }
   })();
 
-  return { destroy, cv, get room() { return room; }, get state() { return st; } };
+  return { destroy, cv, get room() { return room; }, get state() { return st; },
+    // Дуут өрөөний оношилгоо (SGBoard.current.voice): холболт бүрийн төлөв, нөөц зам.
+    get voice() {
+      const lvl = (pc) => pc?.getReceivers().map((r) => r.getSynchronizationSources?.()[0]?.audioLevel ?? null)[0] ?? null;
+      return { mic: !!mic, to: mic?.to || "", out: [...outLinks].map(([u, L]) => ({ u, state: L.pc?.connectionState || "relay", relay: L.relay })),
+        in: [...inLinks].map(([u, L]) => ({ u, state: L.pc.connectionState, level: lvl(L.pc), playing: !L.audio.paused })) };
+    } };
 }
 
 /* ================= зураг засагч: тайрах, лассо, дэвсгэр арилгах ================= */

@@ -17,4 +17,6 @@ type BoardStore interface {
 	SaveBoardRooms(ctx context.Context, rows []BoardRoomData) error
 	// BoardRooms — тухайн хэсгийн бүх өрөө: өрөө → JSON.
 	BoardRooms(ctx context.Context, lessonID, blockID string) (map[string][]byte, error)
+	// BoardRoomsNamed — өгөгдсөн хичээлүүдийн бүх самбарын тухайн нэртэй өрөө (жишээ нь "_m" — оролцооны хэмжүүр).
+	BoardRoomsNamed(ctx context.Context, lessonIDs []string, room string) ([]BoardRoomData, error)
 }

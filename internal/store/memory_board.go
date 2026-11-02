@@ -31,3 +31,15 @@ func (m *Memory) BoardRooms(_ context.Context, lessonID, blockID string) (map[st
 	}
 	return out, nil
 }
+
+func (m *Memory) BoardRoomsNamed(_ context.Context, lessonIDs []string, room string) ([]BoardRoomData, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var out []BoardRoomData
+	for k, d := range m.boards {
+		if k[2] == room && slices.Contains(lessonIDs, k[0]) {
+			out = append(out, BoardRoomData{LessonID: k[0], BlockID: k[1], Room: room, Data: slices.Clone(d)})
+		}
+	}
+	return out, nil
+}

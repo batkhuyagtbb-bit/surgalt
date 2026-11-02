@@ -38,3 +38,21 @@ func (c *ClickHouse) BoardRooms(ctx context.Context, lessonID, blockID string) (
 	})
 	return out, err
 }
+
+func (c *ClickHouse) BoardRoomsNamed(ctx context.Context, lessonIDs []string, room string) ([]BoardRoomData, error) {
+	if len(lessonIDs) == 0 {
+		return nil, nil
+	}
+	var out []BoardRoomData
+	err := c.query(ctx, "SELECT lesson_id, block_id, data FROM board_rooms FINAL WHERE room = ? AND has(?, lesson_id)", []any{room, lessonIDs}, func(r driver.Rows) error {
+		var d BoardRoomData
+		var data string
+		if err := r.Scan(&d.LessonID, &d.BlockID, &data); err != nil {
+			return err
+		}
+		d.Room, d.Data = room, []byte(data)
+		out = append(out, d)
+		return nil
+	})
+	return out, err
+}

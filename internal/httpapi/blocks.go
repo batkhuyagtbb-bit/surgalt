@@ -197,5 +197,11 @@ func (s *Server) handleUnblockStudent(w http.ResponseWriter, r *http.Request) {
 		n.Title, n.Body = "🔓 Багш шалгалтыг тань дахин нээлээ", "«"+exam+"» — дахин өгөх боломжтой (нэмэлт оролдлого). Бусад цонхоо хаагаад, анхааралтай өгөөрэй."
 	}
 	s.notify(r.Context(), n)
+	// Суралцагчийн нээлттэй хуудас (хичээлийн жагсаалт, хаагдсан цонх) шинэчлэхгүйгээр шууд нээгдэнэ.
+	opened := make([]map[string]string, 0, len(targets))
+	for lid := range targets {
+		opened = append(opened, map[string]string{"course_id": courseOf[lid], "lesson_id": lid})
+	}
+	s.hub.SendUsers([]string{uid}, map[string]any{"type": "lesson_unblocked", "lessons": opened})
 	writeJSON(w, http.StatusOK, map[string]any{"unblocked": len(evs), "exam": exam != ""})
 }

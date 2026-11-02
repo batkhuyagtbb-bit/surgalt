@@ -2546,7 +2546,27 @@ async function students() {
     if (x.video_clips) p.push(`▶ ${x.video_coverage}%`);
     if (x.reflections) p.push(`✍️ ${x.reflections}`);
     if (x.streak_days > 1) p.push(`🔥 ${x.streak_days} өдөр`);
+    if (x.board_days) p.push(`🧩 багаар ${x.collab_score}%`);
     return p.join(" · ") || "Мэдээлэл алга";
+  };
+  // «Багаар ажилласан нь»: цагаан самбар дээрх оролцоо (засвар, багийн чат, дуут өрөө) — шинэ хэмжүүр.
+  const TEAMS = [["🦊", "Үнэгнүүд"], ["🐼", "Пандагууд"], ["🦁", "Арслангууд"], ["🐸", "Мэлхийнүүд"], ["🐳", "Халимууд"], ["🦋", "Эрвээхэйнүүд"],
+    ["🐯", "Барууд"], ["🐧", "Оцон шувууд"], ["🐰", "Туулайнууд"], ["🦅", "Бүргэдүүд"], ["🐬", "Далайн гахайнууд"], ["🐝", "Зөгийнүүд"]];
+  const teamName = (n) => (n >= 0 ? TEAMS[n % TEAMS.length].join(" ") : "—");
+  const collabSection = (list, t) => {
+    const rows = list.filter((x) => x.board_days).sort((a, b) => b.collab_score - a.collab_score);
+    const pctAct = (x) => (x.board_sec ? Math.min(100, Math.round(x.board_active_sec / x.board_sec * 100)) : 0);
+    const stat = (label, value) => `<div class="anx-stat"><small>${label}</small><b>${value}</b></div>`;
+    return `<section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Багаар ажилласан нь <span class="chip">${rows.length}</span></h3><span class="muted small">цагаан самбар · багийн чат · дуут өрөө</span></div>
+      ${rows.length ? `<div class="anx-stats anx-collab">${stat("Багаар ажилласан оноо", t.collab_score + "%")}${stat("Самбарт идэвхтэй", dur(t.board_active_sec || 0))}${stat("Самбарын засвар", t.board_ops || 0)}${stat("Багийн чат", t.board_msgs || 0)}${stat("Ярьсан", dur(t.board_voice_sec || 0))}</div>` : ""}
+      <p class="muted small anx-hint">Оноо = самбар дээр идэвхтэй байсан хувь (40%) + зурж, бичсэн засвар (30%) + багтайгаа чатаар, дуугаар харилцсан (30%). Багш тайлбарлаж байх үе, түр зогсоосон хугацааг тооцохгүй.</p>
+      <div class="an-table-wrap"><table class="tbl an-table anx-table"><thead><tr><th>Суралцагч</th><th>Баг</th><th>Самбар дээр</th><th>Идэвхтэй</th><th>Засвар</th><th>Чат</th><th>Ярьсан</th><th>Багаар ажилласан</th></tr></thead><tbody>
+      ${rows.map((x) => `<tr class="an-row" data-uid="${esc(x.user_id)}"><td><div class="anx-who"><span class="anx-av" style="--h:${hueOfName(x.name)}">${esc((x.name || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase())}</span><div><b>${esc(x.name)}</b><small class="muted">${x.board_days} самбарын өдөр</small></div></div></td>
+        <td data-label="Баг">${esc(teamName(x.board_team))}</td><td data-label="Самбар дээр">${dur(x.board_sec)}</td>
+        <td data-label="Идэвхтэй"><b>${dur(x.board_active_sec)}</b><small class="muted">${pctAct(x)}%</small></td>
+        <td data-label="Засвар">${x.board_ops}</td><td data-label="Чат">${x.board_msgs}</td><td data-label="Ярьсан">${x.board_voice_sec ? dur(x.board_voice_sec) : `<span class="muted">—</span>`}</td>
+        <td data-label="Багаар ажилласан">${bar(x.collab_score)}</td></tr>`).join("") || `<tr><td colspan="8"><div class="anx-empty">${ico("users", 26)}<p>Энэ хугацаанд багаар ажилласан бүртгэл алга. Хичээлдээ «Цагаан самбар» хэсэг нэмж, «Багаар» горимд ажиллуулбал энд гарна.</p></div></td></tr>`}
+      </tbody></table></div></section>`;
   };
   // Видеоны үзэлтийн heatmap: хэсэг бүрийг хэдэн удаа үзсэнээр өнгөөр ялгана (саарал = огт үзээгүй).
   const heatmap = (w) => {
@@ -2599,6 +2619,7 @@ async function students() {
       <div class="anx-stats">
         ${stat("Идэвхтэй хувь", t.active_pct + "%")}${stat("Зөрчил", t.violations, t.violations ? "bad" : "")}${stat("Шалгалт", t.exams)}
         ${stat("Асуулга дуусгасан", `${t.quiz_mastered}<em>/${t.quiz_lessons}</em>`)}${stat("Бичсэн дүгнэлт", t.reflections)}${stat("Дээд цол", t.top_rank?.lessons ? esc(t.top_rank.name) : "—")}
+        ${stat("Багаар ажилласан оноо", t.board_students ? `${t.collab_score}%<em> · ${t.board_students} хүн</em>` : "—")}
       </div>
       <div class="anx-grid">
         <section class="anx-card anx-wide"><div class="anx-card-head"><h3>${ico("pulse", 18)}Өдөр бүрийн идэвх</h3><div class="an-legend"><span><i style="background:var(--brand)"></i>Идэвхтэй</span><span><i style="background:var(--accent)"></i>Идэвхгүй, өөр цонхонд</span></div></div>${chart2(data.daily || [])}</section>
@@ -2620,6 +2641,7 @@ async function students() {
           <td data-label="Төлөв"><span class="an-risk ${RISK[x.risk][1]}">${RISK[x.risk][0]}</span></td>
           <td class="anx-acts"><div><button class="icon-btn" data-detail title="Дэлгэрэнгүй" aria-label="Дэлгэрэнгүй">${ico("eye", 17)}</button><button class="icon-btn" data-remind title="Сануулга илгээх" aria-label="Сануулга илгээх">${ico("chat", 17)}</button></div></td></tr>`).join("") || `<tr><td colspan="8"><div class="anx-empty">${ico("users", 26)}<p>Энэ хугацаанд хичээл үзсэн суралцагч алга.</p></div></td></tr>`}
         </tbody></table></div></section>
+      ${collabSection(list, t)}
       <div class="anx-grid">
         <section class="anx-card anx-wide"><div class="anx-card-head"><h3>${ico("clock", 18)}Сүүлийн үйл явдал</h3><span class="muted small">зөрчил, сануулга, шалгалт</span></div><div id="anFeed"></div></section>
         <section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Бүх суралцагчид <span class="chip">${rows.length}</span></h3></div>
@@ -2670,7 +2692,8 @@ async function students() {
         <div class="an-tile ${x.quiz_guesses > 2 ? "warn" : ""}"><small>Хэт хурдан хариулсан</small><b>${x.quiz_guesses}</b><span class="muted small">1.5 сек-ээс богино (таамаг)</span></div>
         <div class="an-tile"><small>Асуулга дуусгасан</small><b>${x.quiz_lessons ? `${x.quiz_mastered}/${x.quiz_lessons}` : "—"}</b><span class="muted small">хичээл · анх удаад зөв ${x.quiz_questions ? x.quiz_first_try + "%" : "—"} · ${x.quiz_questions ? (x.quiz_attempts / 10).toFixed(1) + " оролдлого/асуулт" : ""}</span></div>
         <div class="an-tile"><small>▶ Видео үзэлт</small><b>${x.video_clips ? x.video_coverage + "%" : "—"}</b><span class="muted small">${x.video_clips} видео</span></div>
-        <div class="an-tile"><small>Дүгнэлт бичсэн</small><b>${x.reflections}</b><span class="muted small">${x.reflections ? `дундаж ${x.reflection_words} үг` : "одоогоор алга"}</span></div></div>
+        <div class="an-tile"><small>Дүгнэлт бичсэн</small><b>${x.reflections}</b><span class="muted small">${x.reflections ? `дундаж ${x.reflection_words} үг` : "одоогоор алга"}</span></div>
+        <div class="an-tile ${x.board_days ? "learn" : ""}"><small>🧩 Багаар ажилласан</small><b>${x.board_days ? x.collab_score + "%" : "—"}</b><span class="muted small">${x.board_days ? `${esc(teamName(x.board_team))} · идэвхтэй ${dur(x.board_active_sec)} · ${x.board_ops} засвар · ${x.board_msgs} чат${x.board_voice_sec ? ` · ${dur(x.board_voice_sec)} ярьсан` : ""}` : "самбар дээр ажиллаагүй"}</span></div></div>
       ${d.watches?.length ? `<h4>Видеоны үзэлтийн зураглал</h4><p class="muted small" style="margin:0 0 8px">Бараан хэсэг = давтаж үзсэн, цайвар саарал = алгассан хэсэг.</p><div class="vh">${d.watches.map(heatmap).join("")}</div>` : ""}
       ${d.reflections?.length ? `<h4>Бичсэн дүгнэлтүүд</h4><div class="refl-list">${d.reflections.map((r) => `<div class="refl-item"><b>${esc(r.lesson)}</b><small class="muted">${fmtDate(r.at)}</small><p>${esc(r.text)}</p></div>`).join("")}</div>` : ""}
       ${d.quiz_lessons?.length ? `<h4>Асуулгын үнэлгээ — хичээл бүрээр</h4><p class="muted small" style="margin:0 0 8px">Хичээл доторх өөрийгөө сорих асуултууд. Бүгдэд нь зөв хариулсан хичээлийн дараагийнх нээгдэнэ.</p>

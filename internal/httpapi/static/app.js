@@ -4425,6 +4425,19 @@ async function coursePage() {
     if (locked && a.need_code && location.hash === "#unlock") askCode(); // картан дээрх 🔒-оос ирсэн
     drawStage();
   }) : Promise.resolve();
+  // Багш хоригийг цуцлахад (WebSocket) хуудас шинэчлэхгүйгээр шууд нээгдэнэ; хаагдсан цонх/хичээл дээр байсан бол шууд үргэлжилнэ.
+  if (Auth.token) Live.on(async (d) => {
+    if (d.type !== "lesson_unblocked") return;
+    const mine = (d.lessons || []).filter((x) => x.course_id === id).map((x) => x.lesson_id);
+    if (!mine.length) return;
+    const was = mine.filter((lid) => access?.blocks?.[lid]), pop = $(".drip-pop");
+    await refreshAccess();
+    const lid = was.find((x) => !access?.blocks?.[x]) || mine.find((x) => !access?.blocks?.[x]), li = lid && rowById(lid);
+    if (!li) return;
+    toast("🔓 Багш хичээлийг тань дахин нээлээ — үргэлжлүүлэн үзээрэй");
+    if (pop) pop.remove();
+    if (pop || !stageOn() || stageLid === lid) expandRow(li, true); // өөр хичээл үзэж байвал зөвхөн мэдэгдэнэ
+  });
   if (!Auth.token && locked && location.hash === "#unlock") setTimeout(() => askCode(), 300); // нэвтрэх рүү хөтөлнө
   if (!Auth.token) $$(".lesson.is-free [data-play]").forEach((b) => (b.textContent = "▶ Нэвтэрч үзэх")); // үнэгүй хичээлийг ч нэвтэрч үзнэ
   if (!Auth.token && drip) $$(".lesson:not(.is-free)").forEach((li) => { const lbl = $(".lesson-state", li); if (lbl && +li.dataset.unlock && li.dataset.always !== "1") { lbl.hidden = false; lbl.textContent = `⏱ Өмнөхийг үзснээс ${humanHours(li.dataset.unlock)}-ийн дараа`; } });
