@@ -81,20 +81,102 @@ let cleanup = null;
 
 const views = { overview, courses, books, course: (id) => courseEditor(id), files, live, chat: (id) => chat(id), learning, students, wallet };
 
-/* Профайл хуудаснаас дуудагдана: тухайн хэсгийг өгсөн контейнерт рендерлэнэ. */
+/* Профайл хуудаснаас дуудагдана: тухайн хэсгийг өгсөн контейнерт рендерлэнэ.
+   Системийн эрх дууссан бол «Данс»-аас бусад хэсэгт багц сунгах дэлгэц гарна. */
+let mounted = null;
 window.Studio = {
   me: () => me,
   teacher,
   async mount(container, view, arg) {
     cleanup?.(); cleanup = null;
-    main = container;
+    main = container; mounted = [container, view, arg];
     main.innerHTML = `<div class="loader"></div>`;
-    try { await (views[view] || views.overview)(arg); }
+    const ps = await loadPlan();
+    try {
+      if (ps && !ps.active && view !== "wallet") planLock(ps);
+      else { await (views[view] || views.overview)(arg); planBanner(ps, view); }
+    }
     catch (e) { main.innerHTML = panel(`<p class="form-error">${esc(e.message)}</p>`); }
     if (window.SG?.panelIn) window.SG.panelIn(main); // хэсэг солигдоход зөөлөн, шатлан гарч ирнэ
     else { main.classList.remove("fade-in"); void main.offsetWidth; main.classList.add("fade-in"); }
   },
 };
+
+/* ---------- Системийн эрх (багц): «Данс»-аас QPay-ээр сунгана; дууссан бол студи хаагдана ---------- */
+let planSt = null;
+async function loadPlan(force) {
+  if (!teacher) return null;
+  if (!planSt || force) planSt = await api("/api/me/plan").catch(() => planSt);
+  return planSt;
+}
+const planTerm = (m) => (m % 12 ? `${m} сар` : `${m / 12} жил`);
+const planDate = (s) => { const d = new Date(s); return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`; };
+const goWallet = () => { const t = document.querySelector('.pf-tab[data-tab="wallet"]'); if (t) t.click(); else location.hash = "wallet"; };
+function planNowHTML(ps) {
+  const what = ps.plan === "trial" ? "Үнэгүй хугацаа" : ps.active ? `«${esc(ps.name)}» багц` : "Системийн эрх дууссан";
+  const when = ps.active ? `${planDate(ps.until)} хүртэл · <b>${ps.days_left}</b> хоног үлдсэн · шимтгэл ${ps.commission_pct}%` : `${planDate(ps.until)}-нд дууссан`;
+  const next = ps.upcoming.length ? `<small>Дараа нь: ${ps.upcoming.map((u) => `${esc(u.name)} (${planDate(u.from)} – ${planDate(u.until)})`).join(", ")}</small>` : "";
+  return `<div class="sp-now${!ps.active ? " off" : ps.days_left <= 7 ? " warn" : ""}"><span class="sp-ic">${ico(ps.active ? "clock" : "lock", 20)}</span><div><b>${what}</b><small>${when}</small>${next}</div></div>`;
+}
+function planCardsHTML(ps) {
+  return `<div class="sp-grid">${ps.plans.map((p) => {
+    const cur = ps.active && ps.plan === p.id;
+    return `<article class="sp-card${cur ? " cur" : ""}">${cur ? `<span class="sp-tag">Одоогийн</span>` : ""}
+      <h4>${esc(p.name)}</h4><span class="sp-term">${planTerm(p.months)}</span>
+      <p class="sp-price"><b>${money(p.price)}</b><small>сард ≈ ${money(Math.round(p.price / p.months))}</small></p>
+      <p class="sp-pct"><b>${p.commission_pct}%</b><small>борлуулалтын шимтгэл</small></p>
+      <button type="button" class="btn ${cur ? "btn-ghost" : "btn-gold"} btn-block" data-plan-buy="${esc(p.id)}">${cur ? "Сунгах" : "Авах"}</button></article>`;
+  }).join("")}</div>`;
+}
+const planRulesHTML = (ps) => `<ul class="sp-rules">
+  <li>Шинэ багшид эхний ${ps.trial_months} сар үнэгүй, энэ хугацаанд борлуулалтын шимтгэл ${ps.trial_pct}%.</li>
+  <li>Сунгавал хугацаа нэмэгдэнэ. Шимтгэл багатай багц авбал шууд эхэлж, одоогийн багцын үлдсэн хоног араас нь үргэлжилнэ.</li>
+  <li>Эрх дуусвал сургалт удирдах, шинээр борлуулах боломж хаагдана. Худалдаж авсан суралцагчдын эрх, таны орлого хэвээр — «Данс»-аас татна.</li></ul>`;
+function bindPlanBuy(root, after) {
+  root.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-plan-buy]"); if (!b) return;
+    const p = planSt?.plans.find((x) => x.id === b.dataset.planBuy); if (!p) return;
+    b.disabled = true;
+    try {
+      const d = await api("/api/me/plan/purchase", { method: "POST", body: { plan: p.id } });
+      window.SG.pay(d.order, d.payment, `Системийн эрх · ${p.name} · ${planTerm(p.months)}`, async () => {
+        toast("✅ Системийн эрх сунгагдлаа"); celebrate(); await loadPlan(true); after?.();
+      }, { name: "Системийн эрх" });
+    } catch (x) { toast(x.message, true); }
+    finally { b.disabled = false; }
+  });
+}
+// Эрх дууссан: «Данс»-аас бусад хэсэгт энэ дэлгэц (багц сонгоод төлмөгц шууд нээгдэнэ).
+function planLock(ps) {
+  main.innerHTML = `<div class="sp-lock">
+    <section class="anx-card sp-lock-card"><span class="sp-lock-ic">${ico("lock", 30)}</span>
+      <h2>Системийн эрх дууссан</h2>
+      <p>${planDate(ps.until)}-нд дууссан тул сургалт удирдах, шинээр борлуулах боломж түр хаагдлаа. Доорх багцаас сонгож QPay-ээр төлмөгц шууд нээгдэнэ.</p>
+      <p class="muted small">Худалдаж авсан суралцагчдын эрх хэвээр. Орлогоо <button type="button" class="linkish" data-go-wallet>«Данс»</button> хэсгээс татна.</p></section>
+    ${planCardsHTML(ps)}${planRulesHTML(ps)}</div>`;
+  $("[data-go-wallet]", main).onclick = goWallet;
+  bindPlanBuy(main, () => mounted && window.Studio.mount(...mounted));
+}
+// Дуусахад 7 хоног үлдсэн бол бүх хэсэгт, үнэгүй хугацаанд тойм дээр сануулга.
+function planBanner(ps, view) {
+  if (!ps?.active || !main || view === "wallet") return;
+  const soon = ps.days_left <= 7, trial = ps.plan === "trial";
+  if (!soon && !(trial && (!view || view === "overview"))) return;
+  const el = document.createElement("div");
+  el.className = "sp-banner" + (soon ? " warn" : "");
+  el.innerHTML = `${ico(soon ? "clock" : "money", 18)}<span>${trial ? `Үнэгүй хугацаа — <b>${ps.days_left}</b> хоног үлдсэн (${planDate(ps.until)} хүртэл) · шимтгэл ${ps.commission_pct}%. Багц авбал шимтгэл 8–20% болно.`
+    : `«${esc(ps.name)}» багц <b>${ps.days_left}</b> хоногийн дараа дуусна (${planDate(ps.until)}).`}</span><button type="button" class="btn btn-gold btn-sm">${trial ? "Багц сонгох" : "Сунгах"}</button>`;
+  $("button", el).onclick = goWallet;
+  main.prepend(el);
+}
+// Сунгасан / дууссан (WebSocket): хаалттай дэлгэцийг шууд нээнэ; засварлаж байхад хаахгүй (хадгалахад сануулга гарна).
+if (teacher) Live.on(async (d) => {
+  if (d.type !== "plan_changed") return;
+  const was = planSt?.active, ps = await loadPlan(true);
+  if (!ps || !mounted) return;
+  if (mounted[1] === "wallet" || (ps.active && was === false)) window.Studio.mount(...mounted);
+  else if (!ps.active) toast("Системийн эрх дууссан — «Данс» хэсгээс багц авч сунгана уу", true);
+});
 
 /* ---------- Нүүр (тойм) ---------- */
 async function overview() {
@@ -2763,7 +2845,7 @@ const SCH_HELP = {
 const PERIODS = [["day", "Өдрөөр"], ["week", "7 хоногоор"], ["month", "Сараар"], ["quarter", "Улирлаар"]];
 const wst = { period: "month" };
 async function wallet() {
-  const pay = await api("/api/me/payout");
+  const [pay, ps] = await Promise.all([api("/api/me/payout"), loadPlan(true)]);
   const b = pay.balance, a = pay.account, min = pay.min;
   const short = (n) => (n >= 1e9 ? +(n / 1e9).toFixed(2) + " тэрбум₮" : n >= 1e6 ? +(n / 1e6).toFixed(2) + " сая₮" : n ? money(n) : "0₮");
   const bankOf = (k) => pay.banks.find((x) => x.key === k)?.name || k;
@@ -2772,6 +2854,8 @@ async function wallet() {
   const tg0 = (n) => (n ? money(n) : "0₮");
   const canDraw = a && b.available >= min;
   main.innerHTML = `<div class="wl">
+    ${ps ? `<section class="anx-card sp-box" id="spBox"><div class="anx-card-head"><h3>${ico("gear", 18)}Системийн эрх</h3>${ps.active ? `<span class="chip ${ps.days_left <= 7 ? "chip-amber" : "chip-teal"}">Идэвхтэй</span>` : `<span class="chip chip-coral">Дууссан</span>`}</div>
+      ${planNowHTML(ps)}${planCardsHTML(ps)}${planRulesHTML(ps)}</section>` : ""}
     <div class="anx-kpis">
       ${kpi("money", "Татах боломжтой", b.available, `${b.commission ? "шимтгэл хассан · " : ""}доод дүн ${money(min)}`, "wl-avail")}
       ${kpi("chart", "Нийт борлуулалт", b.earned, b.commission ? `платформын шимтгэл ${b.commission_pct}% · −${tg0(b.commission)}` : "бүх төлөгдсөн борлуулалт")}
@@ -2814,6 +2898,7 @@ async function wallet() {
         : `<div class="anx-empty">${ico("money", 28)}<p>Одоогоор орлого татаагүй байна.</p></div>`}</section>
   </div>`;
 
+  if (ps) bindPlanBuy($("#spBox", main), () => wallet());
   // Хуваарь сонгох
   let pick = sch;
   $$("[data-sch]", main).forEach((btn) => btn.addEventListener("click", () => {

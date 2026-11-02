@@ -3,6 +3,7 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"surgalt/internal/store"
 )
@@ -23,6 +24,10 @@ func (s *Server) handleAdminMakeTeacher(w http.ResponseWriter, r *http.Request) 
 			return errAlreadyTeacher
 		}
 		x.Role = store.RoleTeacher
+		if x.Plan.TrialFrom == nil { // үнэгүй 3 сар багш болсон өдрөөс
+			now := time.Now()
+			x.Plan.TrialFrom = &now
+		}
 		return nil
 	})
 	if errors.Is(err, errAlreadyTeacher) {

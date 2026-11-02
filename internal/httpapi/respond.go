@@ -87,7 +87,17 @@ func (s *Server) requireUser(w http.ResponseWriter, r *http.Request) (auth.Claim
 	return c, true
 }
 
+// requireTeacher — багш, системийн эрх нь хүчинтэй (дууссан бол 402: «Данс» хэсгээс сунгана).
 func (s *Server) requireTeacher(w http.ResponseWriter, r *http.Request) (auth.Claims, bool) {
+	c, ok := s.requireTeacherAny(w, r)
+	if !ok || !s.planOpen(w, r, c.UID) {
+		return c, false
+	}
+	return c, true
+}
+
+// requireTeacherAny — багш (системийн эрх дууссан ч): данс, орлого татах, багц сунгах.
+func (s *Server) requireTeacherAny(w http.ResponseWriter, r *http.Request) (auth.Claims, bool) {
 	c, ok := s.requireUser(w, r)
 	if !ok {
 		return c, false

@@ -404,6 +404,19 @@ func (m *Memory) CreateStorageOrder(_ context.Context, userID string, mb int64, 
 	return &oc, nil
 }
 
+func (m *Memory) CreatePlanOrder(_ context.Context, userID string, p Plan) (*Order, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.users[userID]; !ok {
+		return nil, ErrNotFound
+	}
+	o := &Order{ID: m.next(), Kind: OrderKindPlan, Plan: p.ID, Months: p.Months, UserID: userID, Amount: p.Price,
+		Title: "Системийн эрх · " + p.Name + " · " + PlanTerm(p.Months), Status: OrderPending, CreatedAt: time.Now()}
+	m.orders[o.ID] = o
+	oc := *o
+	return &oc, nil
+}
+
 func (m *Memory) OrderByID(_ context.Context, id string) (*Order, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -428,8 +441,18 @@ func (m *Memory) MarkOrderPaid(_ context.Context, orderID string, amount, fee in
 		}
 		now := time.Now()
 		o.Status, o.PaidAt, o.Fee = OrderPaid, &now, max(fee, 0)
+		if o.TeacherID != "" && !o.Platform() {
+			o.CommissionPct = saleCommissionPct(m.users[o.TeacherID], now)
+		}
 	}
 	switch o.Kind {
+	case OrderKindPlan:
+		if !m.applied[o.ID] {
+			m.applied[o.ID] = true
+			if u := m.users[o.UserID]; u != nil {
+				applyPlanOrder(u, o, time.Now())
+			}
+		}
 	case OrderKindLesson:
 		delete(m.pendingL, [2]string{o.UserID, o.LessonID})
 		m.lessonAcc[[2]string{o.UserID, o.LessonID}] = o.CourseID
@@ -935,7 +958,7 @@ func (m *Memory) UserOrders(_ context.Context, userID string, limit int) ([]Orde
 	defer m.mu.RUnlock()
 	out := []Order{}
 	for _, o := range m.orders {
-		if o.UserID == userID && o.Kind != OrderKindStorage {
+		if o.UserID == userID && !o.Platform() {
 			out = append(out, *o)
 		}
 	}

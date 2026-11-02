@@ -48,6 +48,8 @@ type User struct {
 	// Худалдан авсан нэмэлт багтаамж (байт) ба дуусах хугацаа.
 	StorageExtraBytes int64      `json:"storage_extra_bytes"`
 	StorageExpiresAt  *time.Time `json:"storage_expires_at,omitempty"`
+	// Plan — багшийн системийн эрх: үнэгүй хугацаа, худалдаж авсан багцууд (plans.go).
+	Plan PlanState `json:"-"`
 	// Google Meet: шифрлэгдсэн refresh token (JSON-д гарахгүй).
 	GoogleToken   string `json:"-"`
 	MeetConnected bool   `json:"meet_connected"`
@@ -408,6 +410,7 @@ const (
 	OrderKindLate    = "late"    // хугацаа хоцорсон шалгалт/даалгаврын төлбөр (late_pass + fee_pass)
 	OrderKindFee     = "fee"     // шалгалт/даалгаврын оролцооны төлбөр (fee_pass)
 	OrderKindMeeting = "meeting" // төлбөртэй шууд хичээл (Google Meet)
+	OrderKindPlan    = "plan"    // багшийн системийн эрх (plans.go)
 )
 
 // StorageMonth — багтаамжийн нэг сарын үргэлжлэх хугацаа.
@@ -427,6 +430,10 @@ type Order struct {
 	TeacherID string      `json:"teacher_id,omitempty"`
 	Title     string      `json:"title,omitempty"`
 	Amount    int64       `json:"amount"`
+	// Plan — системийн эрхийн захиалгын багц (kind = plan).
+	Plan string `json:"plan,omitempty"`
+	// CommissionPct — төлөгдөх үеийн багшийн шимтгэлийн хувь (0 бол хуучин захиалга — TEACHER_COMMISSION_PERCENT).
+	CommissionPct float64 `json:"-"`
 	// Fee — үнэ дээр нэмж авсан үйлчилгээний хураамж (платформын орлого; багшийн орлогод орохгүй). Төлөгдөх үед бүртгэгдэнэ.
 	Fee       int64       `json:"fee,omitempty"`
 	Status    OrderStatus `json:"status"`
@@ -704,6 +711,8 @@ type Store interface {
 	PurchasedLessons(ctx context.Context, userID, courseID string) ([]string, error)
 	// CreateStorageOrder нь багтаамж худалдан авах захиалга.
 	CreateStorageOrder(ctx context.Context, userID string, mb int64, months int, amount int64) (*Order, error)
+	// CreatePlanOrder — багшийн системийн эрх (багц) худалдан авах захиалга.
+	CreatePlanOrder(ctx context.Context, userID string, p Plan) (*Order, error)
 	OrderByID(ctx context.Context, id string) (*Order, error)
 	// MarkOrderPaid нь идемпотент: дахин дуудахад алдаагүй, элсэлт/багтаамж давхардахгүй.
 	MarkOrderPaid(ctx context.Context, orderID string, amount, fee int64) (*Order, error)

@@ -615,7 +615,7 @@ func (c *ClickHouse) CourseStudents(ctx context.Context, courseID string) ([]Cou
 // ---- захиалга ----
 
 const orderCols = `id, kind, storage_mb, months, user_id, course_id, lesson_id, book_id, meeting_id, slot_id, teacher_id, title, amount, status,
-	created_at, paid_at, applied, fee`
+	created_at, paid_at, applied, fee, plan, commission_pct`
 
 type orderRow struct {
 	Order
@@ -628,16 +628,16 @@ func scanOrder(r driver.Rows) (orderRow, error) {
 	var status string
 	var paid *time.Time
 	err := r.Scan(&o.ID, &o.Kind, &o.StorageMB, &months, &o.UserID, &o.CourseID, &o.LessonID, &o.BookID, &o.MeetingID, &o.SlotID, &o.TeacherID,
-		&o.Title, &o.Amount, &status, &o.CreatedAt, &paid, &o.applied, &o.Fee)
+		&o.Title, &o.Amount, &status, &o.CreatedAt, &paid, &o.applied, &o.Fee, &o.Plan, &o.CommissionPct)
 	o.Months, o.Status, o.PaidAt = int(months), OrderStatus(status), paid
 	return o, err
 }
 
 func (c *ClickHouse) writeOrder(ctx context.Context, o *Order, applied bool) error {
 	return c.insert(ctx, "orders", []string{"id", "kind", "storage_mb", "months", "user_id", "course_id", "lesson_id", "book_id",
-		"meeting_id", "slot_id", "teacher_id", "title", "amount", "status", "created_at", "paid_at", "applied", "fee", "ver"},
+		"meeting_id", "slot_id", "teacher_id", "title", "amount", "status", "created_at", "paid_at", "applied", "fee", "plan", "commission_pct", "ver"},
 		o.ID, o.Kind, o.StorageMB, int32(o.Months), o.UserID, o.CourseID, o.LessonID, o.BookID, o.MeetingID, o.SlotID, o.TeacherID, o.Title, o.Amount,
-		string(o.Status), o.CreatedAt.UTC(), nullTime(o.PaidAt), applied, o.Fee, ver())
+		string(o.Status), o.CreatedAt.UTC(), nullTime(o.PaidAt), applied, o.Fee, o.Plan, o.CommissionPct, ver())
 }
 
 func (c *ClickHouse) ordersWhere(ctx context.Context, where, order string, args ...any) ([]orderRow, error) {
@@ -721,6 +721,12 @@ func (c *ClickHouse) CreateStorageOrder(ctx context.Context, userID string, mb i
 	return o, c.writeOrder(ctx, o, false)
 }
 
+func (c *ClickHouse) CreatePlanOrder(ctx context.Context, userID string, p Plan) (*Order, error) {
+	o := &Order{ID: NewID(), Kind: OrderKindPlan, Plan: p.ID, Months: p.Months, UserID: userID, Amount: p.Price, Status: OrderPending, CreatedAt: time.Now(),
+		Title: "Системийн эрх · " + p.Name + " · " + PlanTerm(p.Months)}
+	return o, c.writeOrder(ctx, o, false)
+}
+
 // MarkOrderPaid: процесс доторх түгжээ + applied тэмдэг → давтан дуудахад (webhook давхардсан ч)
 // элсэлт, багтаамж, номын эрх нэг л удаа хэрэгжинэ.
 func (c *ClickHouse) MarkOrderPaid(ctx context.Context, orderID string, amount, fee int64) (*Order, error) {
@@ -740,6 +746,10 @@ func (c *ClickHouse) MarkOrderPaid(ctx context.Context, orderID string, amount, 
 		}
 		now := time.Now()
 		o.Status, o.PaidAt, o.Fee = OrderPaid, &now, max(fee, 0)
+		if o.TeacherID != "" && !o.Platform() { // багшийн тухайн үеийн багцын шимтгэлийг хадгална
+			t, _ := c.UserByID(ctx, o.TeacherID)
+			o.CommissionPct = saleCommissionPct(t, now)
+		}
 		if err := c.writeOrder(ctx, &o, row.applied); err != nil {
 			return nil, err
 		}
@@ -766,6 +776,10 @@ func (c *ClickHouse) MarkOrderPaid(ctx context.Context, orderID string, amount, 
 		}
 	case OrderKindStorage:
 		if err := c.applyStorage(ctx, &o); err != nil {
+			return nil, err
+		}
+	case OrderKindPlan:
+		if _, err := c.UpdateUser(ctx, o.UserID, func(u *User) error { applyPlanOrder(u, &o, time.Now()); return nil }); err != nil {
 			return nil, err
 		}
 	case OrderKindBook, OrderKindBookDL:
@@ -808,7 +822,7 @@ func (c *ClickHouse) applyStorage(ctx context.Context, o *Order) error {
 }
 
 func (c *ClickHouse) UserOrders(ctx context.Context, userID string, limit int) ([]Order, error) {
-	rows, err := c.ordersWhere(ctx, "user_id = ? AND kind != ?", "ORDER BY created_at DESC LIMIT ?", userID, OrderKindStorage, limit)
+	rows, err := c.ordersWhere(ctx, "user_id = ? AND kind NOT IN (?, ?)", "ORDER BY created_at DESC LIMIT ?", userID, OrderKindStorage, OrderKindPlan, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -820,8 +834,8 @@ func (c *ClickHouse) UserOrders(ctx context.Context, userID string, limit int) (
 }
 
 func (c *ClickHouse) TeacherSales(ctx context.Context, teacherID string, limit int) (*SalesSummary, error) {
-	rows, err := c.ordersWhere(ctx, "teacher_id = ? AND status = ? AND kind != ?", "ORDER BY paid_at DESC",
-		teacherID, string(OrderPaid), OrderKindStorage)
+	rows, err := c.ordersWhere(ctx, "teacher_id = ? AND status = ? AND kind NOT IN (?, ?)", "ORDER BY paid_at DESC",
+		teacherID, string(OrderPaid), OrderKindStorage, OrderKindPlan)
 	if err != nil {
 		return nil, err
 	}

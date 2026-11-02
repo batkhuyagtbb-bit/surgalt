@@ -68,7 +68,7 @@ func (s *Server) payoutMin() int64 {
 
 // handleMyPayout: GET /api/me/payout — данс, үлдэгдэл, сүүлийн татах хүсэлтүүд.
 func (s *Server) handleMyPayout(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r) // эрх дууссан ч орлогоо татна
 	if !ok {
 		return
 	}
@@ -93,7 +93,7 @@ func (s *Server) handleMyPayout(w http.ResponseWriter, r *http.Request) {
 
 // handleSetPayoutAccount: PUT /api/me/payout/account {bank, account_no, account_name, schedule}
 func (s *Server) handleSetPayoutAccount(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r) // эрх дууссан ч орлогоо татна
 	if !ok {
 		return
 	}
@@ -142,7 +142,7 @@ func (s *Server) handleSetPayoutAccount(w http.ResponseWriter, r *http.Request) 
 
 // handleWithdraw: POST /api/me/payout/withdraw {amount} — одоо татах (amount 0 бол бүх үлдэгдэл).
 func (s *Server) handleWithdraw(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r) // эрх дууссан ч орлогоо татна
 	if !ok {
 		return
 	}
@@ -377,7 +377,7 @@ func bucketLabel(period string, t time.Time) string {
 // handleMyEarnings: GET /api/me/earnings?period=day|week|month|quarter — орлогын график ба задаргаа
 // (эх сурвалж, хамгийн их орлоготой сургалт/ном, хичээл, бүлэг) сонгосон цонхонд.
 func (s *Server) handleMyEarnings(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r) // эрх дууссан ч орлогоо татна
 	if !ok {
 		return
 	}

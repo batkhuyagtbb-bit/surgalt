@@ -79,6 +79,7 @@ type Server struct {
 	qrs       *cache.Cache[[]byte]
 	ogs       *cache.Cache[[]byte] // профайлыг хуваалцах зураг (og.go)
 	alive     *cache.Cache[int64]  // хэрэглэгч бүрийн «энэ цагаас өмнөх токен хүчингүй» (миллисекунд; account.go)
+	planEnds  *cache.Cache[time.Time] // багшийн системийн эрх дуусах хугацаа (plans.go)
 	seen      presence             // багшийн онлайн төлөв, сүүлд идэвхтэй байсан мөч (presence.go)
 	smap      sitemapCache         // /sitemap.xml (seo.go)
 	notif     *notifier
@@ -118,6 +119,7 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 		qrs:       cache.New[[]byte](time.Hour, 5*time.Second, isNF),
 		ogs:       cache.New[[]byte](time.Hour, 5*time.Second, isNF),
 		alive:     cache.New[int64](5*time.Minute, 5*time.Minute, isNF),
+		planEnds:  cache.New[time.Time](time.Minute, 5*time.Second, isNF),
 	}
 	s.notif = newNotifier()
 	s.started = time.Now()
@@ -132,6 +134,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.courses.Janitor(ctx, time.Minute)
 	go s.qrs.Janitor(ctx, 10*time.Minute)
 	go s.alive.Janitor(ctx, 10*time.Minute)
+	go s.planEnds.Janitor(ctx, 10*time.Minute)
 	go s.limiter.Janitor(ctx)
 	go s.authLim.Janitor(ctx)
 	go s.codeLim.Janitor(ctx)
@@ -145,6 +148,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.hitLoop(ctx)
 	go s.notifyLoop(ctx)
 	go s.payoutLoop(ctx)
+	go s.planLoop(ctx)
 }
 
 func (s *Server) Handler() http.Handler {
@@ -291,6 +295,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/storage/plans", s.handleStoragePlans)
 	mux.HandleFunc("GET /api/me/storage", s.handleMyStorage)
 	mux.HandleFunc("POST /api/me/storage/purchase", s.handleBuyStorage)
+	mux.HandleFunc("GET /api/plans", s.handlePlans)
+	mux.HandleFunc("GET /api/me/plan", s.handleMyPlan)
+	mux.HandleFunc("POST /api/me/plan/purchase", s.handleBuyPlan)
 
 	// Google Meet
 	mux.HandleFunc("POST /api/me/meet/connect", s.handleMeetConnect)
@@ -346,6 +353,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/admin/overview", s.handleAdminOverview)
 	mux.HandleFunc("GET /api/admin/teachers", s.handleAdminTeachers)
 	mux.HandleFunc("GET /api/admin/teachers/{id}", s.handleAdminTeacher)
+	mux.HandleFunc("POST /api/admin/teachers/{id}/plan", s.handleAdminGrantPlan)
 	mux.HandleFunc("GET /api/admin/students", s.handleAdminStudents)
 	mux.HandleFunc("GET /api/admin/students/{id}", s.handleAdminStudent)
 	mux.HandleFunc("POST /api/admin/students/{id}/make-teacher", s.handleAdminMakeTeacher)

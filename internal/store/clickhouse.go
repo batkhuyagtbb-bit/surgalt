@@ -214,6 +214,9 @@ var chMigrations = []string{
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_at Nullable(" + tsType + ")",
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS tokens_after Nullable(" + tsType + ")",
 	"ALTER TABLE notifications ADD COLUMN IF NOT EXISTS actor_id String DEFAULT ''",
+	"ALTER TABLE users ADD COLUMN IF NOT EXISTS plan String DEFAULT ''",              // системийн эрх (plans.go)
+	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS plan String DEFAULT ''",             // багцын захиалга
+	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS commission_pct Float64 DEFAULT 0", // төлөгдөх үеийн шимтгэл (0 = хуучин)
 	// Эцэг эхийн зөвшөөрлийн боломжийг хассан: хадгалсан нас, эцэг эхийн нэр, утсыг устгана.
 	"ALTER TABLE users DROP COLUMN IF EXISTS age_group",
 	"ALTER TABLE users DROP COLUMN IF EXISTS guardian_name",
@@ -243,7 +246,7 @@ var chTables = []chTable{
 		subjects Array(String), location String, links Map(String, String),
 		created_at ` + tsType + `, storage_extra_bytes Int64, storage_expires_at Nullable(` + tsType + `),
 		google_token String, phone String DEFAULT '', consent_version String DEFAULT '', consent_at Nullable(` + tsType + `),
-		tokens_after Nullable(` + tsType + `),
+		tokens_after Nullable(` + tsType + `), plan String DEFAULT '',
 		ver UInt64, deleted Bool DEFAULT false,
 		INDEX ix_email email TYPE bloom_filter GRANULARITY 1,
 		INDEX ix_username username TYPE bloom_filter GRANULARITY 1
@@ -311,7 +314,8 @@ var chTables = []chTable{
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, lesson_id)`},
 	{"orders", `(id String, kind String, storage_mb Int64, months Int32, user_id String, course_id String,
 		lesson_id String, book_id String, meeting_id String DEFAULT '', slot_id String DEFAULT '', teacher_id String, title String, amount Int64, status String,
-		created_at ` + tsType + `, paid_at Nullable(` + tsType + `), applied Bool DEFAULT false, fee Int64 DEFAULT 0, ver UInt64,
+		created_at ` + tsType + `, paid_at Nullable(` + tsType + `), applied Bool DEFAULT false, fee Int64 DEFAULT 0,
+		plan String DEFAULT '', commission_pct Float64 DEFAULT 0, ver UInt64,
 		INDEX ix_user user_id TYPE bloom_filter GRANULARITY 1,
 		INDEX ix_teacher teacher_id TYPE bloom_filter GRANULARITY 1)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
@@ -558,19 +562,21 @@ func (c *ClickHouse) counters(ctx context.Context, entity string, ids []string) 
 // ---- хэрэглэгч ----
 
 const userCols = `id, username, email, password_hash, role, display_name, headline, bio, avatar_url, cover_url,
-	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, consent_version, consent_at, tokens_after, deleted`
+	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, consent_version, consent_at, tokens_after, deleted, plan`
 
 func scanUser(r driver.Rows) (*User, bool, error) {
 	var u User
 	var role string
 	var deleted bool
 	var exp *time.Time
+	var plan string
 	if err := r.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &role, &u.DisplayName, &u.Headline, &u.Bio,
 		&u.AvatarURL, &u.CoverURL, &u.Subjects, &u.Location, &u.Links, &u.CreatedAt, &u.StorageExtraBytes, &exp,
-		&u.GoogleToken, &u.Phone, &u.ConsentVersion, &u.ConsentAt, &u.TokensAfter, &deleted); err != nil {
+		&u.GoogleToken, &u.Phone, &u.ConsentVersion, &u.ConsentAt, &u.TokensAfter, &deleted, &plan); err != nil {
 		return nil, false, err
 	}
 	u.Role = Role(role)
+	u.Plan = decodePlan(plan)
 	u.StorageExpiresAt = exp
 	u.MeetConnected = u.GoogleToken != ""
 	if u.Subjects == nil {
@@ -585,10 +591,10 @@ func scanUser(r driver.Rows) (*User, bool, error) {
 func (c *ClickHouse) writeUser(ctx context.Context, u *User, deleted bool) error {
 	return c.insert(ctx, "users", []string{"id", "username", "email", "password_hash", "role", "display_name", "headline", "bio",
 		"avatar_url", "cover_url", "subjects", "location", "links", "created_at", "storage_extra_bytes", "storage_expires_at",
-		"google_token", "phone", "consent_version", "consent_at", "tokens_after", "ver", "deleted"},
+		"google_token", "phone", "consent_version", "consent_at", "tokens_after", "plan", "ver", "deleted"},
 		u.ID, u.Username, u.Email, u.PasswordHash, string(u.Role), u.DisplayName, u.Headline, u.Bio,
 		u.AvatarURL, u.CoverURL, nzStrings(u.Subjects), u.Location, nzLinks(u.Links), u.CreatedAt.UTC(), u.StorageExtraBytes,
-		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, u.ConsentVersion, nullTime(u.ConsentAt), nullTime(u.TokensAfter), ver(), deleted)
+		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, u.ConsentVersion, nullTime(u.ConsentAt), nullTime(u.TokensAfter), u.Plan.encode(), ver(), deleted)
 }
 
 func (c *ClickHouse) userWhere(ctx context.Context, where string, args ...any) (*User, error) {

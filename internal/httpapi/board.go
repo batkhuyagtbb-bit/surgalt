@@ -602,6 +602,9 @@ func (s *Server) boardOpen(w http.ResponseWriter, r *http.Request, fresh bool) (
 			writeErr(w, http.StatusNotFound, "цагаан самбар олдсонгүй")
 			return nil, false
 		}
+		if course.TeacherID == c.UID && !s.planOpen(w, r, c.UID) { // эрх дууссан багш самбараа удирдахгүй
+			return nil, false
+		}
 		g = boardGrant{lessonID: l.ID, bid: b.ID, teacherID: course.TeacherID, title: b.Text,
 			teacher: course.TeacherID == c.UID, teams: b.Max, exp: time.Now().Add(boardGrantTTL), name: s.displayName(r.Context(), c.UID, c.Name)}
 		h.mu.Lock()

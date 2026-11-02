@@ -44,8 +44,8 @@ func (c *ClickHouse) PayoutAccounts(ctx context.Context) ([]PayoutAccount, error
 }
 
 func (c *ClickHouse) TeacherPaidOrders(ctx context.Context, teacherID string) ([]Order, error) {
-	rows, err := c.ordersWhere(ctx, "teacher_id = ? AND status = ? AND kind != ?", "ORDER BY paid_at DESC",
-		teacherID, string(OrderPaid), OrderKindStorage)
+	rows, err := c.ordersWhere(ctx, "teacher_id = ? AND status = ? AND kind NOT IN (?, ?)", "ORDER BY paid_at DESC",
+		teacherID, string(OrderPaid), OrderKindStorage, OrderKindPlan)
 	if err != nil {
 		return nil, err
 	}

@@ -245,14 +245,16 @@ VIEWS.teachers = {
       ${kpi("Нийт борлуулалт", tg(sum("revenue")), `${num(sum("sales"))} гүйлгээ`, "good")}
       ${kpi("Татсан (шилжүүлсэн)", tg(sum("paid_out")), `хүлээгдэж буй ${tg(sum("pending"))}`)}
       ${kpi("Багшийн үлдэгдэл", tg(sum("available")), `шимтгэл ${tg(sum("commission"))} хассан, татах боломжтой`)}
+      ${kpi("Системийн эрх", num(all.filter((t) => t.plan_active && t.plan !== "trial").length) + " <small>багцтай</small>", `${num(all.filter((t) => t.plan === "trial").length)} үнэгүй хугацаанд · ${num(all.filter((t) => !t.plan_active).length)} дууссан`, all.some((t) => !t.plan_active) ? "warn" : "")}
     </section>
     <div class="adm-table-wrap"><table class="adm-table" id="tTable"><thead><tr>
-      <th data-sort="name" data-type="text">Багш</th><th data-sort="courses">Сургалт</th><th data-sort="lessons">Хичээл</th><th data-sort="books">Ном</th>
+      <th data-sort="name" data-type="text">Багш</th><th data-sort="plan_until" data-type="text">Багц</th><th data-sort="courses">Сургалт</th><th data-sort="lessons">Хичээл</th><th data-sort="books">Ном</th>
       <th data-sort="file_bytes">Файл</th><th data-sort="students">Суралцагч</th><th data-sort="revenue">Борлуулалт</th><th data-sort="paid_out">Татсан</th>
       <th data-sort="pending">Хүлээгдэж буй</th><th data-sort="available">Үлдэгдэл</th><th data-sort="profile_views">Үзэлт</th><th data-sort="created_at" data-type="text">Бүртгүүлсэн</th>
     </tr></thead><tbody></tbody></table></div>`;
     const row = (t) => `<tr data-teacher="${esc(t.id)}" tabindex="0">
       <td><span class="adm-person" title="${esc(t.email || "")}">${avatar(t.name, t.avatar_url)}<span><b>${esc(t.name || t.username)}</b><small>@${esc(t.username)}</small></span></span></td>
+      <td>${planChip(t)}<small>${dd(t.plan_until)}${t.plan_active ? " хүртэл · " + t.plan_pct + "%" : ""}</small></td>
       <td class="n">${num(t.courses)}${t.courses ? `<small>${num(t.courses_published)} нийтэлсэн</small>` : ""}</td><td class="n">${num(t.lessons)}</td><td class="n">${num(t.books)}</td>
       <td class="n">${num(t.files)}<small>${bytes(t.file_bytes)}</small></td><td class="n">${num(t.students)}</td>
       <td class="n"><b>${tg(t.revenue)}</b><small>${num(t.sales)} удаа</small></td><td class="n">${tg(t.paid_out)}</td>
@@ -265,6 +267,10 @@ VIEWS.teachers = {
     });
   },
 };
+
+// Системийн эрх (plans.go): шошго ба олгох сонголт.
+const PLAN_OPTS = [["start", "Эхлэл · 3 сар"], ["standard", "Standart · 6 сар"], ["major", "Major · 1 жил"], ["pro", "Pro · 1 жил"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+const planChip = (t) => `<span class="chip ${!t.plan_active ? "chip-coral" : t.plan === "trial" ? "chip-amber" : "chip-teal"}">${t.plan_active ? esc(t.plan_name) : "Дууссан"}</span>`;
 
 async function openTeacher(id) {
   const body = drawer("Багш", `<div class="adm-loading"><i></i><i></i><i></i></div>`);
@@ -297,6 +303,7 @@ async function openTeacher(id) {
       ${kpi("Борлуулалт", tg(t.revenue), `${num(t.sales)} удаа`, "good")}
       ${kpi("Татсан", tg(t.paid_out), "данс руу шилжүүлсэн")}
       ${kpi("Хүлээгдэж буй", tg(t.pending), "татах хүсэлт", t.pending ? "warn" : "")}
+      ${kpi("Системийн эрх", planChip(t), t.plan_active ? `${dd(t.plan_until)} хүртэл · шимтгэл ${t.plan_pct}%` : `${dd(t.plan_until)}-нд дууссан`, t.plan_active ? "" : "warn")}
       ${kpi("Платформын шимтгэл", tg(t.commission), "борлуулалтаас")}
       ${kpi("Үлдэгдэл", tg(t.available), "шимтгэл хассан, татаж болох")}
       ${kpi("Суралцагч", num(t.students), `${num(t.profile_views)} профайл үзэлт`)}
@@ -304,8 +311,16 @@ async function openTeacher(id) {
     </section>
     <dl class="dr-acct">${d.account ? `<div><dt>Банк</dt><dd>${esc(d.account.bank)}</dd></div><div><dt>Данс</dt><dd><code>${esc(d.account.account_no)}</code></dd></div><div><dt>Эзэмшигч</dt><dd>${esc(d.account.account_name)}</dd></div><div><dt>Татах хуваарь</dt><dd>${esc({ manual: "Гараар", instant: "Шууд", daily: "Өдөр бүр", weekly: "7 хоног бүр", monthly: "Сар бүр", quarterly: "Улирал бүр" }[d.account.schedule] || d.account.schedule)}</dd></div>` : `<div><dt>Данс</dt><dd class="muted">Холбоогүй</dd></div>`}
       ${p.storage_extra_bytes ? `<div><dt>Нэмэлт багтаамж</dt><dd>${bytes(p.storage_extra_bytes)}${p.storage_expires_at ? " · " + dd(p.storage_expires_at) + " хүртэл" : ""}</dd></div>` : ""}</dl>
+    <form class="dr-plan" id="drPlan"><span>Багц олгох (үнэгүй)</span><select name="plan" aria-label="Багц">${PLAN_OPTS}</select><button class="btn btn-gold btn-sm">Олгох</button></form>
     <nav class="dr-tabs">${tabs.map(([k, l], i) => `<button type="button" data-tab="${k}" class="${i ? "" : "on"}">${esc(l)}</button>`).join("")}</nav>
     <div class="dr-pane">${panes.courses}</div>`;
+  $("#drPlan", body).addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const sel = e.target.plan, label = sel.selectedOptions[0].textContent;
+    if (!confirm(`${t.name || t.username}-д «${label}» багцыг үнэгүй олгох уу?`)) return;
+    try { const r = await api(`/api/admin/teachers/${encodeURIComponent(id)}/plan`, { method: "POST", body: { plan: sel.value } }); toast(`Олголоо · ${dd(r.until)} хүртэл`); openTeacher(id); }
+    catch (x) { toast(x.message, true); }
+  });
   $(".dr-tabs", body).addEventListener("click", (e) => {
     const b = e.target.closest("[data-tab]"); if (!b) return;
     $$(".dr-tabs button", body).forEach((x) => x.classList.toggle("on", x === b));
@@ -441,18 +456,18 @@ VIEWS.finance = {
     const R = d.range, A = d.all;
     el.innerHTML = `
     <section class="kp-grid">
-      ${kpi("Орлого", tg(R.income), `борлуулалт ${tg(R.sales)} · багтаамж ${tg(R.storage)} · хураамж ${tg(R.fees)}`, "good")}
+      ${kpi("Орлого", tg(R.income), `борлуулалт ${tg(R.sales)} · багтаамж ${tg(R.storage)} · багц ${tg(R.plans)} · хураамж ${tg(R.fees)}`, "good")}
       ${kpi("Зарлага", tg(R.outgo), `багшид ${tg(R.payouts)} · зардал ${tg(R.expenses)}`, "bad")}
       ${kpi("Цэвэр", tg(R.net), `сүүлийн ${state.months} сард`, R.net < 0 ? "bad" : "")}
       ${kpi("Багшид өгөх үлдэгдэл", tg(A.owed), `шимтгэл ${d.commission_pct}% хассан · хүсэлт гаргасан ${tg(A.pending)}`, A.pending ? "warn" : "")}
-      ${kpi("Платформын ашиг", tg(A.profit), `шимтгэл ${tg(A.commission)} + хураамж ${tg(A.fees)} + багтаамж − зардал`)}
+      ${kpi("Платформын ашиг", tg(A.profit), `шимтгэл ${tg(A.commission)} + хураамж ${tg(A.fees)} + багтаамж + багц − зардал`)}
       ${kpi("Данс дахь мөнгө", tg(A.cash), "нийт орлого − шилжүүлсэн − зардал")}
     </section>
     <section class="adm-card"><header><h3>Сар бүрийн орлого ба зарлага</h3><span class="lg"><i class="brand"></i>Орлого <i class="coral"></i>Зарлага</span></header>
       ${chart2(d.months, { a: "income", b: "outgo", label: (m) => MONTHS[+m.month.slice(5) - 1].replace("-р сар", "") })}</section>
-    <div class="adm-table-wrap"><table class="adm-table"><thead><tr><th>Сар</th><th>Борлуулалт</th><th>Шимтгэл</th><th>Багтаамж</th><th>Хураамж</th><th>Нийт орлого</th><th>Багшид шилжүүлсэн</th><th>Зардал</th><th>Нийт зарлага</th><th>Цэвэр</th></tr></thead><tbody>
-      ${[...d.months].reverse().map((m) => `<tr><td>${monthName(m.month)}<small>${num(m.orders)} гүйлгээ</small></td><td class="n">${tg(m.sales)}</td><td class="n">${tg(m.commission)}</td><td class="n">${tg(m.storage)}</td><td class="n">${tg(m.fees)}</td><td class="n"><b>${tg(m.income)}</b></td><td class="n">${tg(m.payouts)}</td><td class="n">${tg(m.expenses)}</td><td class="n">${tg(m.outgo)}</td><td class="n ${m.net < 0 ? "bad" : "good"}"><b>${tg(m.net)}</b></td></tr>`).join("")}
-      <tr class="tot"><td>Нийт</td><td class="n">${tg(R.sales)}</td><td class="n">${tg(R.commission)}</td><td class="n">${tg(R.storage)}</td><td class="n">${tg(R.fees)}</td><td class="n">${tg(R.income)}</td><td class="n">${tg(R.payouts)}</td><td class="n">${tg(R.expenses)}</td><td class="n">${tg(R.outgo)}</td><td class="n">${tg(R.net)}</td></tr>
+    <div class="adm-table-wrap"><table class="adm-table"><thead><tr><th>Сар</th><th>Борлуулалт</th><th>Шимтгэл</th><th>Багтаамж</th><th>Багц</th><th>Хураамж</th><th>Нийт орлого</th><th>Багшид шилжүүлсэн</th><th>Зардал</th><th>Нийт зарлага</th><th>Цэвэр</th></tr></thead><tbody>
+      ${[...d.months].reverse().map((m) => `<tr><td>${monthName(m.month)}<small>${num(m.orders)} гүйлгээ</small></td><td class="n">${tg(m.sales)}</td><td class="n">${tg(m.commission)}</td><td class="n">${tg(m.storage)}</td><td class="n">${tg(m.plans)}</td><td class="n">${tg(m.fees)}</td><td class="n"><b>${tg(m.income)}</b></td><td class="n">${tg(m.payouts)}</td><td class="n">${tg(m.expenses)}</td><td class="n">${tg(m.outgo)}</td><td class="n ${m.net < 0 ? "bad" : "good"}"><b>${tg(m.net)}</b></td></tr>`).join("")}
+      <tr class="tot"><td>Нийт</td><td class="n">${tg(R.sales)}</td><td class="n">${tg(R.commission)}</td><td class="n">${tg(R.storage)}</td><td class="n">${tg(R.plans)}</td><td class="n">${tg(R.fees)}</td><td class="n">${tg(R.income)}</td><td class="n">${tg(R.payouts)}</td><td class="n">${tg(R.expenses)}</td><td class="n">${tg(R.outgo)}</td><td class="n">${tg(R.net)}</td></tr>
     </tbody></table></div>
     <div class="adm-grid2 fin">
       <section class="adm-card"><header><h3>Зардал бүртгэх</h3></header>

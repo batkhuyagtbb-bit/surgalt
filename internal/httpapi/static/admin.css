@@ -236,3 +236,6 @@ html.adm-noscroll{overflow:hidden}
 .use i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#2f56d6,#14a38b)}
 .kp.warn .use i{background:linear-gradient(90deg,#eaa02e,#e11d48)}
 .adm-table code{font-size:.82rem;color:var(--text)}
+.dr-plan{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 16px;padding:10px 14px;border:1px dashed var(--line);border-radius:14px;background:#fff}
+.dr-plan span{font-size:.82rem;font-weight:700;color:var(--muted)}
+.dr-plan select{width:auto;flex:1 1 200px;max-width:320px;min-width:170px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;font:inherit}

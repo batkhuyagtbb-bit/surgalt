@@ -87,6 +87,9 @@ func (s *Server) handleUnlockCourse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !enrolled {
+		if !s.sellerOpen(w, r, course.TeacherID) {
+			return
+		}
 		if err := s.store.Enroll(ctx, c.UID, course); s.storeErr(w, r, err) {
 			return
 		}

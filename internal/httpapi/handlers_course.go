@@ -152,6 +152,9 @@ func (s *Server) ownCourse(w http.ResponseWriter, r *http.Request, uid string) (
 		writeErr(w, http.StatusNotFound, "олдсонгүй")
 		return nil, false
 	}
+	if !s.planOpen(w, r, uid) {
+		return nil, false
+	}
 	return course, true
 }
 
@@ -584,6 +587,9 @@ func (s *Server) handleBuyLesson(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "энэ хичээл зөвхөн сургалтын багцаар нээгдэнэ")
 		return
 	}
+	if !s.sellerOpen(w, r, course.TeacherID) {
+		return
+	}
 	o, err := s.store.CreateOrGetPendingLessonOrder(r.Context(), c.UID, course, l)
 	if s.storeErr(w, r, err) {
 		return
@@ -849,6 +855,9 @@ func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"enrolled": true})
 		return
 	}
+	if !s.sellerOpen(w, r, course.TeacherID) {
+		return
+	}
 	if course.Price == 0 {
 		if err := s.store.Enroll(r.Context(), c.UID, course); s.storeErr(w, r, err) {
 			return
@@ -913,7 +922,7 @@ func (s *Server) handleDevPay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wasPaid := o.Status == store.OrderPaid
-	o, err = s.store.MarkOrderPaid(r.Context(), o.ID, o.Amount, s.serviceFee(o.Amount))
+	o, err = s.store.MarkOrderPaid(r.Context(), o.ID, o.Amount, s.orderFee(o))
 	if s.storeErr(w, r, err) {
 		return
 	}

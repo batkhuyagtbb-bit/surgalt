@@ -329,6 +329,9 @@ func (s *Server) handleBuyMeeting(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusGone, "шууд хичээл дууссан байна")
 		return
 	}
+	if !s.sellerOpen(w, r, m.TeacherID) {
+		return
+	}
 	o, err := s.store.CreateOrGetPendingMeetingOrder(r.Context(), c.UID, m, "Шууд хичээл: "+m.Title+" ("+course.Title+")")
 	if s.storeErr(w, r, err) {
 		return

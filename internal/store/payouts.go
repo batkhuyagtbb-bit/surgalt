@@ -101,13 +101,14 @@ type PayoutStore interface {
 
 // earning — багшийн орлогод тооцогдох захиалга эсэх (файлын сангийн багтаамжийг багш өөрөө худалдаж авдаг).
 func earning(o *Order, teacherID string) bool {
-	return o.TeacherID == teacherID && o.Status == OrderPaid && o.Kind != OrderKindStorage
+	return o.TeacherID == teacherID && o.Status == OrderPaid && !o.Platform()
 }
 
 func balanceOf(orders []Order, payouts []Payout) *Balance {
 	b := &Balance{}
-	for _, o := range orders {
-		b.Earned += o.Amount
+	for i := range orders {
+		b.Earned += orders[i].Amount
+		b.Commission += OrderCommission(&orders[i]) // борлуулалт бүр төлөгдөх үеийн багцын хувиар
 	}
 	for _, p := range payouts {
 		switch p.Status {
@@ -117,7 +118,10 @@ func balanceOf(orders []Order, payouts []Payout) *Balance {
 			b.Pending += p.Amount
 		}
 	}
-	b.Commission, b.CommissionPct = Commission(b.Earned), teacherCommission
+	b.CommissionPct = teacherCommission
+	if b.Earned > 0 { // дундаж хувь (багц солигдсон бол холимог)
+		b.CommissionPct = math.Round(float64(b.Commission)/float64(b.Earned)*1000) / 10
+	}
 	b.Net = b.Earned - b.Commission
 	b.Available = max(0, b.Net-b.Paid-b.Pending) // шимтгэлийг хасаад л татна
 	return b

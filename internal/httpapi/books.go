@@ -157,6 +157,9 @@ func (s *Server) ownBook(w http.ResponseWriter, r *http.Request, teacherID strin
 		writeErr(w, http.StatusNotFound, "ном олдсонгүй")
 		return nil, false
 	}
+	if !s.planOpen(w, r, teacherID) {
+		return nil, false
+	}
 	return b, true
 }
 
@@ -510,6 +513,9 @@ func (s *Server) handleBuyBook(w http.ResponseWriter, r *http.Request) {
 		amount = s.bookDownloadPrice(r, b, c.UID)
 	} else if s.bookFull(r, b, c.UID) {
 		writeJSON(w, http.StatusOK, map[string]any{"unlocked": true})
+		return
+	}
+	if !s.sellerOpen(w, r, b.TeacherID) {
 		return
 	}
 	o, err := s.store.CreateOrGetPendingBookOrder(r.Context(), c.UID, b, download, amount)

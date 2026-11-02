@@ -369,7 +369,7 @@ func (s *Server) adminSnapshot(ctx context.Context) (*adminSnap, error) {
 // ---- туслах ----
 
 var orderKindLabel = map[string]string{
-	store.OrderKindCourse: "Сургалт", store.OrderKindLesson: "Хичээл", store.OrderKindStorage: "Файлын багтаамж",
+	store.OrderKindCourse: "Сургалт", store.OrderKindLesson: "Хичээл", store.OrderKindStorage: "Файлын багтаамж", store.OrderKindPlan: "Системийн эрх (багц)",
 	store.OrderKindLate: "Хоцролтын төлбөр", store.OrderKindFee: "Оролцооны төлбөр", store.OrderKindMeeting: "Шууд хичээл",
 	store.OrderKindBook: "Ном", store.OrderKindBookDL: "Ном (татах эрх)", store.OrderKindSlot: "Уулзалтын цаг",
 }
@@ -488,7 +488,7 @@ func (s *Server) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 		Total int64 `json:"total"`
 		Count int   `json:"count"`
 	}
-	inc := map[string]*money{"today": {}, "week": {}, "month": {}, "period": {}, "all": {}, "sales": {}, "storage": {}, "fees": {}, "pending": {}}
+	inc := map[string]*money{"today": {}, "week": {}, "month": {}, "period": {}, "all": {}, "sales": {}, "storage": {}, "plans": {}, "fees": {}, "pending": {}}
 	add := func(k string, v int64) { inc[k].Total += v; inc[k].Count++ }
 	for i := range sn.orders {
 		o := &sn.orders[i]
@@ -498,9 +498,12 @@ func (s *Server) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 		}
 		t, got := paidAt(o), o.Amount+o.Fee // хүлээн авсан мөнгө: үнэ + үйлчилгээний хураамж
 		add("all", got)
-		if o.Kind == store.OrderKindStorage {
+		switch o.Kind {
+		case store.OrderKindStorage:
 			add("storage", o.Amount)
-		} else {
+		case store.OrderKindPlan:
+			add("plans", o.Amount)
+		default:
 			add("sales", o.Amount)
 		}
 		if o.Fee > 0 {
@@ -561,7 +564,7 @@ func (s *Server) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 	// Шилдэг багш (нийт борлуулалтаар) ба сүүлийн гүйлгээ, бүртгэл.
 	rev := map[string]int64{}
 	for i := range sn.orders {
-		if o := &sn.orders[i]; o.Status == store.OrderPaid && o.Kind != store.OrderKindStorage {
+		if o := &sn.orders[i]; o.Status == store.OrderPaid && !o.Platform() {
 			rev[o.TeacherID] += o.Amount
 		}
 	}
@@ -624,15 +627,25 @@ type teacherRow struct {
 	ProfileViews int64      `json:"profile_views"`
 	CourseViews  int64      `json:"course_views"`
 	LastSaleAt   *time.Time `json:"last_sale_at,omitempty"`
+	// Системийн эрх (plans.go): багц эсвэл «Үнэгүй хугацаа», дуусах огноо, одоогийн шимтгэл.
+	Plan       string    `json:"plan"`
+	PlanName   string    `json:"plan_name"`
+	PlanUntil  time.Time `json:"plan_until"`
+	PlanActive bool      `json:"plan_active"`
+	PlanPct    float64   `json:"plan_pct"`
 }
 
 func (s *Server) teacherRows(sn *adminSnap) map[string]*teacherRow {
 	rows := map[string]*teacherRow{}
-	for _, u := range sn.users {
+	now := time.Now()
+	for i := range sn.users {
+		u := &sn.users[i]
 		if u.Role == store.RoleTeacher {
 			f := sn.files[u.ID]
+			plan, pct, active := u.PlanAt(now)
 			rows[u.ID] = &teacherRow{ID: u.ID, Name: u.DisplayName, Username: u.Username, Email: u.Email, AvatarURL: u.AvatarURL,
-				CreatedAt: u.CreatedAt, ProfileViews: u.ProfileViews, Files: f.Count, FileBytes: f.Bytes}
+				CreatedAt: u.CreatedAt, ProfileViews: u.ProfileViews, Files: f.Count, FileBytes: f.Bytes,
+				Plan: plan, PlanName: planName(plan), PlanUntil: u.PlanUntil(), PlanActive: active, PlanPct: pct}
 		}
 	}
 	for _, c := range sn.courses {
@@ -665,11 +678,12 @@ func (s *Server) teacherRows(sn *adminSnap) map[string]*teacherRow {
 	for i := range sn.orders {
 		o := &sn.orders[i]
 		t := rows[o.TeacherID]
-		if t == nil || o.Status != store.OrderPaid || o.Kind == store.OrderKindStorage {
+		if t == nil || o.Status != store.OrderPaid || o.Platform() {
 			continue
 		}
 		t.Sales++
 		t.Revenue += o.Amount
+		t.Commission += store.OrderCommission(o)
 		if pa := paidAt(o); t.LastSaleAt == nil || pa.After(*t.LastSaleAt) {
 			t.LastSaleAt = &pa
 		}
@@ -685,7 +699,6 @@ func (s *Server) teacherRows(sn *adminSnap) map[string]*teacherRow {
 		}
 	}
 	for _, t := range rows {
-		t.Commission = store.Commission(t.Revenue)
 		t.Available = max(0, t.Revenue-t.Commission-t.PaidOut-t.Pending)
 	}
 	return rows
@@ -764,7 +777,7 @@ func (s *Server) handleAdminTeacher(w http.ResponseWriter, r *http.Request) {
 	sales := []map[string]any{}
 	for i := range sn.orders {
 		o := &sn.orders[i]
-		if o.TeacherID != id || o.Status != store.OrderPaid || o.Kind == store.OrderKindStorage {
+		if o.TeacherID != id || o.Status != store.OrderPaid || o.Platform() {
 			continue
 		}
 		csales[o.CourseID]++
@@ -1061,7 +1074,7 @@ func (s *Server) handleAdminTransactions(w http.ResponseWriter, r *http.Request)
 	sort.Slice(kinds, func(i, j int) bool { return kinds[i]["total"].(int64) > kinds[j]["total"].(int64) })
 	labels := []map[string]string{}
 	for _, k := range []string{store.OrderKindCourse, store.OrderKindLesson, store.OrderKindBook, store.OrderKindBookDL, store.OrderKindMeeting, store.OrderKindSlot,
-		store.OrderKindFee, store.OrderKindLate, store.OrderKindStorage} {
+		store.OrderKindFee, store.OrderKindLate, store.OrderKindStorage, store.OrderKindPlan} {
 		labels = append(labels, map[string]string{"key": k, "label": kindLabel(k)})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"rows": rows, "matched": len(list), "totals": tot, "by_kind": kinds, "kinds": labels})
@@ -1093,6 +1106,7 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 		Month      string `json:"month"`
 		Sales      int64  `json:"sales"`
 		Storage    int64  `json:"storage"`
+		Plans      int64  `json:"plans"` // багшийн системийн эрх (багц)
 		Fees       int64  `json:"fees"`
 		Commission int64  `json:"commission"`
 		Income     int64  `json:"income"`
@@ -1109,7 +1123,7 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 		rows[i].Month, idx[k] = k, i
 	}
 	type totals struct {
-		Sales, Storage, Fees, Commission, Income, Payouts, Pending, Expenses, Outgo, Net int64
+		Sales, Storage, Plans, Fees, Commission, Income, Payouts, Pending, Expenses, Outgo, Net int64
 	}
 	var all, rng totals
 	for i := range sn.orders {
@@ -1117,27 +1131,26 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 		if o.Status != store.OrderPaid {
 			continue
 		}
-		in := func(t *totals) {
-			t.Income += o.Amount + o.Fee
-			t.Fees += o.Fee
-			if o.Kind == store.OrderKindStorage {
-				t.Storage += o.Amount
-			} else {
-				t.Sales += o.Amount
+		// Шимтгэл — борлуулалт бүрийн төлөгдөх үеийн багцын хувиар (plans.go).
+		in := func(income, fees, sales, storage, plans, commission *int64) {
+			*income += o.Amount + o.Fee
+			*fees += o.Fee
+			switch o.Kind {
+			case store.OrderKindStorage:
+				*storage += o.Amount
+			case store.OrderKindPlan:
+				*plans += o.Amount
+			default:
+				*sales += o.Amount
+				*commission += store.OrderCommission(o)
 			}
 		}
-		in(&all)
+		in(&all.Income, &all.Fees, &all.Sales, &all.Storage, &all.Plans, &all.Commission)
 		if j, ok := idx[localMonth(paidAt(o))]; ok {
-			in(&rng)
+			in(&rng.Income, &rng.Fees, &rng.Sales, &rng.Storage, &rng.Plans, &rng.Commission)
 			m := &rows[j]
-			m.Income += o.Amount + o.Fee
-			m.Fees += o.Fee
 			m.Orders++
-			if o.Kind == store.OrderKindStorage {
-				m.Storage += o.Amount
-			} else {
-				m.Sales += o.Amount
-			}
+			in(&m.Income, &m.Fees, &m.Sales, &m.Storage, &m.Plans, &m.Commission)
 		}
 	}
 	for _, p := range sn.payouts {
@@ -1169,22 +1182,20 @@ func (s *Server) handleAdminFinance(w http.ResponseWriter, r *http.Request) {
 	}
 	for i := range rows {
 		m := &rows[i]
-		m.Commission = store.Commission(m.Sales)
 		m.Outgo = m.Payouts + m.Expenses
 		m.Net = m.Income - m.Outgo
 	}
 	for _, t := range []*totals{&all, &rng} {
-		t.Commission = store.Commission(t.Sales)
 		t.Outgo = t.Payouts + t.Expenses
 		t.Net = t.Income - t.Outgo
 	}
 	j := func(t totals) map[string]int64 {
-		return map[string]int64{"sales": t.Sales, "storage": t.Storage, "fees": t.Fees, "commission": t.Commission, "income": t.Income, "payouts": t.Payouts, "pending": t.Pending,
+		return map[string]int64{"sales": t.Sales, "storage": t.Storage, "plans": t.Plans, "fees": t.Fees, "commission": t.Commission, "income": t.Income, "payouts": t.Payouts, "pending": t.Pending,
 			"expenses": t.Expenses, "outgo": t.Outgo, "net": t.Net}
 	}
 	allJ := j(all)
-	allJ["owed"] = max(0, all.Sales-all.Commission-all.Payouts)             // багшид шилжүүлээгүй үлдэгдэл (хүлээгдэж буй хүсэлт орно)
-	allJ["profit"] = all.Storage + all.Fees + all.Commission - all.Expenses // платформын ашиг: багтаамж + хураамж + шимтгэл − зардал
+	allJ["owed"] = max(0, all.Sales-all.Commission-all.Payouts)                       // багшид шилжүүлээгүй үлдэгдэл (хүлээгдэж буй хүсэлт орно)
+	allJ["profit"] = all.Storage + all.Plans + all.Fees + all.Commission - all.Expenses // платформын ашиг: багтаамж + багц + хураамж + шимтгэл − зардал
 	allJ["cash"] = all.Income - all.Payouts - all.Expenses                  // данс дахь мөнгө (онолын)
 	cats := []map[string]any{}
 	for k, v := range byCat {

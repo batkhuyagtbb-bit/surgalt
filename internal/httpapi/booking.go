@@ -522,6 +522,9 @@ func (s *Server) handleBookSlot(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"booked": true, "slot": sl})
 		return
 	}
+	if !s.sellerOpen(w, r, sl.TeacherID) {
+		return
+	}
 	teacher := s.displayName(ctx, sl.TeacherID, "Багш")
 	o, err := s.store.CreateOrGetPendingSlotOrder(ctx, c.UID, sl, "Уулзах цаг: "+teacher+" · "+slotWhen(sl.StartsAt))
 	if s.storeErr(w, r, err) {

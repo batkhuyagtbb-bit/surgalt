@@ -31,11 +31,19 @@ func (s *Server) serviceFee(amount int64) int64 {
 	return int64(math.Ceil(float64(amount) * s.cfg.ServiceFeePct / 100))
 }
 
+// orderFee — захиалгын үйлчилгээний хураамж; багшийн системийн эрх (багц) жагсаасан үнээрээ, хураамжгүй.
+func (s *Server) orderFee(o *store.Order) int64 {
+	if o.Kind == store.OrderKindPlan {
+		return 0
+	}
+	return s.serviceFee(o.Amount)
+}
+
 // paymentInfo — бүх худалдан авалтын хариунд ижил хэлбэртэй төлбөрийн мэдээлэл. amount — төлөх нийт дүн (үнэ + хураамж),
 // base — үнэ, fee — үйлчилгээний хураамж.
 // provider: "qpay" (жинхэнэ QR), "demo" (DEV_PAYMENTS — QR нь демо төлбөрийн хуудас руу), "" (тохируулаагүй).
 func (s *Server) paymentInfo(r *http.Request, o *store.Order) map[string]any {
-	fee := s.serviceFee(o.Amount)
+	fee := s.orderFee(o)
 	p := map[string]any{"amount": o.Amount + fee, "base": o.Amount, "fee": fee, "fee_pct": s.cfg.ServiceFeePct, "currency": "MNT", "dev_pay": s.cfg.DevPayments, "provider": ""}
 	if o.Status == store.OrderPaid {
 		return p
@@ -127,7 +135,7 @@ func (s *Server) qpayInvoice(r *http.Request, o *store.Order) (*store.PaymentInv
 	mu := payLock(o.ID)
 	mu.Lock()
 	defer mu.Unlock()
-	total := o.Amount + s.serviceFee(o.Amount)
+	total := o.Amount + s.orderFee(o)
 	sender := o.ID
 	old, err := s.store.InvoiceByOrder(r.Context(), o.ID)
 	switch {
