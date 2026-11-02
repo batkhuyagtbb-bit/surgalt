@@ -605,7 +605,8 @@ type Store interface {
 	IncViews(ctx context.Context, profile map[string]int64, course map[string]int64) error
 	// Мэдэгдэл
 	AddNotifications(ctx context.Context, ns []*Notification) error
-	Notifications(ctx context.Context, userID string, limit int) ([]Notification, int64, error)
+	// Notifications — хамгийн шинэ нь эхэндээ; before хоосон биш бол түүнээс өмнөх (хуучин) мэдэгдлүүд.
+	Notifications(ctx context.Context, userID, before string, limit int) ([]Notification, int64, error)
 	MarkNotificationsRead(ctx context.Context, userID string) error
 	// MarkNotificationRead — нэг мэдэгдлийг уншсан болгоно (дээр нь дарсан).
 	MarkNotificationRead(ctx context.Context, userID, id string) error

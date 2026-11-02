@@ -2522,6 +2522,10 @@ func TestWarningLimitBlock(t *testing.T) {
 	if code, _ := call(t, srv, "POST", "/api/activity/start", s1, `{"course_id":"`+cid+`","lesson_id":"`+lid+`","kind":"lesson"}`); code != http.StatusLocked {
 		t.Fatalf("хаагдсан хичээлд сесс нээхгүй: %d", code)
 	}
+	// Хаагдсан ч үзсэн хичээлийнхээ дүгнэлтийг бичиж болно (хяналт зогсоосны дараа дүгнэлтийн цонх гардаг).
+	if code, r := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lid+"/reflect", s1, `{"text":"Хяналтын горимын тухай ойлголоо"}`); code != 200 {
+		t.Fatalf("хаагдсан хичээлд дүгнэлт хадгалагдах ёстой: %d %v", code, r)
+	}
 	_, acc = call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
 	if b := acc["blocks"].(map[string]any)[lid]; b == nil || b.(map[string]any)["until"] != nil {
 		t.Fatalf("access.blocks (багш нээтэл): %v", acc["blocks"])

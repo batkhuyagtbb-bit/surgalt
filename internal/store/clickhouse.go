@@ -834,7 +834,7 @@ func (c *ClickHouse) readUpto(ctx context.Context, userID string) (string, error
 	return upto, err
 }
 
-func (c *ClickHouse) Notifications(ctx context.Context, userID string, limit int) ([]Notification, int64, error) {
+func (c *ClickHouse) Notifications(ctx context.Context, userID, before string, limit int) ([]Notification, int64, error) {
 	upto, err := c.readUpto(ctx, userID)
 	if err != nil {
 		return nil, 0, err
@@ -851,8 +851,13 @@ func (c *ClickHouse) Notifications(ctx context.Context, userID string, limit int
 	}); err != nil {
 		return nil, 0, err
 	}
-	err = c.query(ctx, `SELECT id, user_id, type, title, body, link, count, created_at, actor_id FROM notifications
-		WHERE user_id = ? ORDER BY id DESC LIMIT ?`, []any{userID, limit}, func(r driver.Rows) error {
+	q, args := `SELECT id, user_id, type, title, body, link, count, created_at, actor_id FROM notifications
+		WHERE user_id = ?`, []any{userID}
+	if before != "" {
+		q += " AND id < ?"
+		args = append(args, before)
+	}
+	err = c.query(ctx, q+" ORDER BY id DESC LIMIT ?", append(args, limit), func(r driver.Rows) error {
 		var n Notification
 		if err := r.Scan(&n.ID, &n.UserID, &n.Type, &n.Title, &n.Body, &n.Link, &n.Count, &n.CreatedAt, &n.ActorID); err != nil {
 			return err

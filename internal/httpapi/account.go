@@ -116,7 +116,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	add("video_watches", watches, err)
 	bookings, err := s.store.StudentSlots(ctx, c.UID, time.Time{})
 	add("bookings", bookings, err)
-	notifs, _, err := s.store.Notifications(ctx, c.UID, 500)
+	notifs, _, err := s.store.Notifications(ctx, c.UID, "", 500)
 	add("notifications", notifs, err)
 	if u.Role == store.RoleTeacher {
 		own, err := s.store.CoursesByTeacher(ctx, c.UID, false)

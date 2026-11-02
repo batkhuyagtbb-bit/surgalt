@@ -44,6 +44,12 @@ func (s *Server) apiErr(w http.ResponseWriter, r *http.Request, err error) bool 
 // LessonFor нь хэрэглэгч (эсвэл багш) хичээлийг үзэх эрхтэй эсэхийг бүрэн шалгана:
 // нийтлэгдсэн, төлбөр, дараалсан нээлт. Эрхгүй бол *APIError.
 func (s *Server) LessonFor(ctx context.Context, uid, cid, lid string) (*store.Course, *store.Lesson, error) {
+	return s.lessonFor(ctx, uid, cid, lid, false)
+}
+
+// lessonFor — ignoreBlock бол анхаарлын хяналтын хоригийг (сануулга хэтэрсэн) тооцохгүй: хориг нь агуулгыг
+// үзэхийг хаана, харин үзэж дууссан хичээлийн дүгнэлтийг хаахгүй.
+func (s *Server) lessonFor(ctx context.Context, uid, cid, lid string, ignoreBlock bool) (*store.Course, *store.Lesson, error) {
 	course, err := s.store.CourseByID(ctx, cid)
 	if err != nil {
 		return nil, nil, err
@@ -65,9 +71,11 @@ func (s *Server) LessonFor(ctx context.Context, uid, cid, lid string) (*store.Co
 	if !has {
 		return nil, nil, apiError(http.StatusPaymentRequired, "энэ хичээл төлбөртэй", map[string]any{"lesson_price": l.Price, "course_price": course.Price})
 	}
-	if b := s.lessonBlocked(ctx, uid, course, l.ID); b != nil {
-		b.Title = l.Title
-		return nil, nil, blockedErr(b)
+	if !ignoreBlock {
+		if b := s.lessonBlocked(ctx, uid, course, l.ID); b != nil {
+			b.Title = l.Title
+			return nil, nil, blockedErr(b)
+		}
 	}
 	if course.Drip && !l.AlwaysOpen && course.TeacherID != uid {
 		lessons, err := s.store.LessonsByCourse(ctx, course.ID)

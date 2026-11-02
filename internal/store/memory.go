@@ -791,7 +791,7 @@ func (m *Memory) AddNotifications(_ context.Context, ns []*Notification) error {
 	return nil
 }
 
-func (m *Memory) Notifications(_ context.Context, userID string, limit int) ([]Notification, int64, error) {
+func (m *Memory) Notifications(_ context.Context, userID, before string, limit int) ([]Notification, int64, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	all := m.notifs[userID]
@@ -803,6 +803,9 @@ func (m *Memory) Notifications(_ context.Context, userID string, limit int) ([]N
 	}
 	out := []Notification{}
 	for i := len(all) - 1; i >= 0 && len(out) < limit; i-- {
+		if before != "" && all[i].ID >= before {
+			continue
+		}
 		out = append(out, *all[i])
 	}
 	return out, unread, nil

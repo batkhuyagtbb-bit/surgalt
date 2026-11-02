@@ -304,9 +304,20 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	items, unread, err := s.store.Notifications(r.Context(), c.UID, 50)
+	// ?before=<id> — «Өмнөх мэдэгдлүүдийг харах»: тэр мэдэгдлээс хуучныг дараагийн хуудсаар.
+	const page = 50
+	before := r.URL.Query().Get("before")
+	if before != "" && !lessonIDRe.MatchString(before) {
+		writeErr(w, http.StatusBadRequest, "буруу мэдэгдэл")
+		return
+	}
+	items, unread, err := s.store.Notifications(r.Context(), c.UID, before, page+1)
 	if s.storeErr(w, r, err) {
 		return
+	}
+	more := len(items) > page
+	if more {
+		items = items[:page]
 	}
 	var ids []string
 	want := map[string]bool{}
@@ -329,7 +340,7 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 		out[i] = notifOut{Notification: n, Actor: actors[n.ActorID]}
 	}
 	w.Header().Set("Cache-Control", "private, no-store")
-	writeJSON(w, http.StatusOK, map[string]any{"items": out, "unread": unread})
+	writeJSON(w, http.StatusOK, map[string]any{"items": out, "unread": unread, "more": more})
 }
 
 // handleNotificationsRead: POST /api/me/notifications/read — {"id": "…"} бол тэр нэг мэдэгдлийг (дээр нь дарсан),

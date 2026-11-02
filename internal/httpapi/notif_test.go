@@ -1,6 +1,12 @@
 package httpapi
 
-import "testing"
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"surgalt/internal/store"
+)
 
 // Мэдэгдэл: үүсгэсэн хүний нэр, зураг (actor) ирнэ; дээр нь дарсныг нэг бүрчлэн уншсан болгоно;
 // хоосон хүсэлт бүгдийг уншсан болгоно.
@@ -59,5 +65,39 @@ func TestNotificationActorAndRead(t *testing.T) {
 	}
 	if code, _ := call(t, srv, "POST", "/api/me/notifications/read", "", `{"id":"x"}`); code != 401 {
 		t.Fatalf("нэвтрээгүй: %d", code)
+	}
+}
+
+// «Өмнөх мэдэгдлүүдийг харах»: эхний хуудас 50 + more, ?before=<хамгийн хуучин id> дараагийн хуудсыг өгнө.
+func TestNotificationPages(t *testing.T) {
+	srv, mem := newTestServer(t)
+	defer srv.Close()
+	tt, tid := register(t, srv, "pgteach", "teacher")
+	var ns []*store.Notification
+	for i := range 57 {
+		ns = append(ns, &store.Notification{UserID: tid, Type: "remind", Title: fmt.Sprintf("Мэдэгдэл %d", i)})
+	}
+	if err := mem.AddNotifications(context.Background(), ns); err != nil {
+		t.Fatal(err)
+	}
+	page := func(q string) ([]any, bool) {
+		code, d := call(t, srv, "GET", "/api/me/notifications"+q, tt, "")
+		if code != 200 {
+			t.Fatalf("%s: %d %v", q, code, d)
+		}
+		items, _ := d["items"].([]any)
+		return items, d["more"] == true
+	}
+	first, more := page("")
+	if len(first) != 50 || !more || first[0].(map[string]any)["title"] != "Мэдэгдэл 56" {
+		t.Fatalf("эхний хуудас: %d %v", len(first), more)
+	}
+	last := first[49].(map[string]any)["id"].(string)
+	rest, more := page("?before=" + last)
+	if len(rest) != 7 || more || rest[0].(map[string]any)["title"] != "Мэдэгдэл 6" || rest[6].(map[string]any)["title"] != "Мэдэгдэл 0" {
+		t.Fatalf("дараагийн хуудас: %d %v %v", len(rest), more, rest)
+	}
+	if code, _ := call(t, srv, "GET", "/api/me/notifications?before=x'--", tt, ""); code != 400 {
+		t.Fatalf("буруу before: %d", code)
 	}
 }

@@ -20,8 +20,9 @@ func (s *Server) handleSaveReflection(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	course, l, ok := s.lessonForUser(w, r, c.UID, r.PathValue("id"), r.PathValue("lid"))
-	if !ok {
+	// Хяналт хичээлийг хаасны дараа ч (идэвхийн шалгалтад хариулаагүй г.м.) дүгнэлтээ бичиж болно.
+	course, l, err := s.lessonFor(r.Context(), c.UID, r.PathValue("id"), r.PathValue("lid"), true)
+	if s.apiErr(w, r, err) {
 		return
 	}
 	if course.TeacherID == c.UID {

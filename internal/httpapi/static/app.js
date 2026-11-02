@@ -675,7 +675,7 @@ function bell() {
   const SEEN = "sg_notif_seen";
   const getSeen = () => { try { return localStorage.getItem(SEEN) || ""; } catch { return ""; } };
   const setSeen = (id) => { try { localStorage.setItem(SEEN, id); } catch {} };
-  let items = [], tab = "all", limit = 12, floor = getSeen(), loaded = false;
+  let items = [], tab = "all", limit = 12, floor = getSeen(), loaded = false, hasOlder = false, busy = false;
   // Мэдэгдэл бүрийн дүрс: гарчгийн эхний emoji-оос, эс бөгөөс төрлөөс; өнгө нь төрлөөр (чат — цэнхэр, мөнгө — ногоон г.м.).
   const N_EMOJI = { "💬": "chat", "↩": "chat", "👥": "users", "📅": "cal", "❌": "cal", "🏦": "money", "💰": "money", "✅": "check", "⚠️": "alert", "⚠": "alert", "🚩": "alert", "⛔": "lock", "🔓": "lock", "🔒": "lock", "🔑": "lock", "📹": "live", "📣": "bell", "📞": "phone", "📎": "clip", "💾": "files", "🎓": "courses", "📚": "book", "👀": "eye", "👁": "eye", "📝": "exam", "🏆": "medal", "🎖": "medal", "🛒": "card", "💳": "card" };
   const N_TYPE = { message: "chat", comment: "chat", reply: "chat", booking: "cal", payout: "money", purchase: "card", enroll: "courses", profile_view: "eye", course_view: "eye", lesson_view: "play", phone_view: "phone", storage: "files", report: "alert", violation: "alert", account: "shield", blocked: "lock", unblock: "lock", assignment: "clip", grade: "check", exam: "exam", remind: "bell", rank: "medal" };
@@ -701,9 +701,10 @@ function bell() {
   // «Шинэ» = самбарыг энэ удаа нээхээс өмнө хараагүй нь (анх энэ төхөөрөмж дээр бол — уншаагүй нь).
   const isNew = (n) => (floor ? n.id > floor : !n.read);
   const sec = (title, extra = "") => `<div class="np-sec"><h3>${title}</h3>${extra}</div>`;
+  const view = () => (tab === "unread" ? items.filter((n) => !n.read) : items);
   const draw = () => {
     if (!loaded) return;
-    const xs = tab === "unread" ? items.filter((n) => !n.read) : items;
+    const xs = view();
     if (!xs.length) {
       list.innerHTML = `<div class="np-empty"><span>${icon("bell", 30)}</span><b>${tab === "unread" ? "Уншаагүй мэдэгдэл алга" : "Одоогоор мэдэгдэл алга"}</b><small>${tab === "unread" ? "Бүгдийг нь уншсан байна." : "Шинэ зүйл болоход энд харагдана."}</small></div>`;
       return;
@@ -711,16 +712,27 @@ function bell() {
     const vis = xs.slice(0, limit), fresh = vis.filter(isNew), old = vis.filter((n) => !isNew(n));
     const all = items.some((n) => !n.read) ? `<button type="button" class="np-link" data-np="readall">Бүгдийг уншсан</button>` : "";
     list.innerHTML = (fresh.length ? sec("Шинэ", all) + fresh.map(item).join("") : "") + (old.length ? sec("Өмнөх", fresh.length ? "" : all) + old.map(item).join("") : "") +
-      (xs.length > limit ? `<button type="button" class="np-prev" data-np="prev">Өмнөх мэдэгдлүүдийг харах</button>` : "");
+      (xs.length > limit || hasOlder ? `<button type="button" class="np-prev" data-np="prev"${busy ? " disabled" : ""}>${busy ? "Ачаалж байна…" : "Өмнөх мэдэгдлүүдийг харах"}</button>` : "");
   };
   const newest = () => items.reduce((a, n) => (n.id > a ? n.id : a), "");
   const setBadge = () => { const s = getSeen(), k = items.filter((n) => !n.read && n.id > s).length; badge.hidden = !k; badge.textContent = k > 99 ? "99+" : k; };
   const load = async () => {
     try {
       const d = await api("/api/me/notifications"), mine = new Set(items.filter((n) => n.read).map((n) => n.id));
-      items = (d.items || []).map((n) => (mine.has(n.id) ? { ...n, read: true } : n)); // саяхан дарсныг сервер хараахан бичээгүй байж болно
+      const page = (d.items || []).map((n) => (mine.has(n.id) ? { ...n, read: true } : n)); // саяхан дарсныг сервер хараахан бичээгүй байж болно
+      const lo = page.length ? page[page.length - 1].id : "", tail = lo ? items.filter((n) => n.id < lo) : []; // «Өмнөх»-өөр ачаалсныг хадгална
+      items = page.concat(tail); if (!tail.length) hasOlder = !!d.more;
       loaded = true; setBadge(); if (!panel.hidden) draw();
     } catch { if (!loaded && !panel.hidden) list.innerHTML = `<div class="np-empty"><b>Ачаалж чадсангүй</b><small>Дахин оролдоно уу.</small></div>`; }
+  };
+  // Ачаалсан мэдэгдэл дуусвал хамгийн хуучны өмнөхийг серверээс дараагийн хуудсаар татна.
+  const older = async () => {
+    if (busy || !hasOlder || !items.length) return;
+    busy = true; draw();
+    try {
+      const d = await api("/api/me/notifications?before=" + encodeURIComponent(items[items.length - 1].id)), have = new Set(items.map((n) => n.id));
+      items = items.concat((d.items || []).filter((n) => !have.has(n.id))); hasOlder = !!d.more;
+    } catch (x) { toast(x.message, true); } finally { busy = false; }
   };
   // Дээр нь дарсан мэдэгдлийг уншсан болгоно (keepalive — хуудас шилжсэн ч хүсэлт хүрнэ).
   const markOne = (id) => fetch("/api/me/notifications/read", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json", Authorization: "Bearer " + Auth.token }, body: JSON.stringify({ id }) }).catch(() => {});
@@ -734,7 +746,9 @@ function bell() {
   };
   load();
   btn.addEventListener("click", (e) => { e.stopPropagation(); open(panel.hidden); });
-  document.addEventListener("click", (e) => { if (!panel.hidden && !e.target.closest(".bell-wrap")) open(false); });
+  // composedPath: дарсан товч draw()-аар DOM-оос салсан ч (жишээ нь «Өмнөх…») самбар дотор дарсанд тооцогдоно.
+  const wrap = btn.closest(".bell-wrap");
+  document.addEventListener("click", (e) => { if (!panel.hidden && !e.composedPath().includes(wrap)) open(false); });
   addEventListener("keydown", (e) => { if (e.key === "Escape" && !panel.hidden) { if (!menu.hidden) return closeMenu(); open(false); btn.focus(); } });
   more.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -751,7 +765,11 @@ function bell() {
       return draw();
     }
     const act = e.target.closest("[data-np]")?.dataset.np;
-    if (act === "prev") { limit += 15; return draw(); }
+    if (act === "prev") {
+      limit += 15;
+      for (let i = 0; i < 3 && hasOlder && view().length < limit; i++) { const n = items.length; await older(); if (items.length === n) break; } // уншаагүй табад хуучин хуудсанд цөөн байж болно
+      return draw();
+    }
     if (act === "readall") {
       closeMenu(); items = items.map((n) => ({ ...n, read: true })); setBadge(); draw();
       api("/api/me/notifications/read", { method: "POST" }).catch(() => {});
@@ -1720,12 +1738,20 @@ function lessonMarker(body, base, ctx = {}) {
 /* ---------- Хичээл үзэх үеийн анхаарал: өөр таб, цонх руу шилжвэл сануулга, 3 дахь удаад зогсоно ---------- */
 const WATCH_MAX_WARN = 3;
 // tone: "danger" (таб солих — улаан, сэгсрэлт, дохио), "stop" (хичээл зогссон), "info" (идэвхийн шалгалт).
+// Бүтэн дэлгэцтэй үед (PDF, ном) body-д нэмсэн цонх харагдахгүй тул бүтэн дэлгэцийн элемент дотор нэмнэ;
+// видео, iframe бүтэн дэлгэц хүүхэд элемент харуулдаггүй тул бүтэн дэлгэцээс гаргана.
+function overlayHost(exit) {
+  const fs = document.fullscreenElement || document.webkitFullscreenElement;
+  if (!fs) return document.body;
+  if (exit || fs.tagName === "IFRAME" || fs.tagName === "VIDEO") { (document.exitFullscreen || document.webkitExitFullscreen)?.call(document); return document.body; }
+  return fs;
+}
 function watchAlert(html, btn, onClose, tone = "info") {
   $(".watch-alert")?.remove();
   const el = document.createElement("div");
   el.className = `watch-alert wa-${tone}`; el.setAttribute("role", "alertdialog"); el.setAttribute("aria-modal", "true");
   el.innerHTML = `<div class="watch-card">${html}<button class="btn ${tone === "info" ? "btn-gold" : "wa-btn"} btn-block">${btn}</button></div>`;
-  document.body.append(el);
+  overlayHost(tone === "stop").append(el); // зогсоход хичээлийн цонх хаагдсан тул бүтэн дэлгэцээс гарна
   if (tone !== "info") alarm(tone);
   const b = $("button", el); b.focus();
   b.onclick = () => { el.remove(); onClose?.(); };
@@ -1739,7 +1765,7 @@ function alarm(kind) {
     alarmCtx ||= new (window.AudioContext || window.webkitAudioContext)();
     const ctx = alarmCtx, t0 = ctx.currentTime + 0.02;
     ctx.resume?.();
-    const notes = kind === "stop" ? [[523, 0], [392, 0.2], [262, 0.4]] : [[988, 0], [740, 0.16], [988, 0.32]];
+    const notes = kind === "stop" ? [[523, 0], [392, 0.2], [262, 0.4]] : kind === "ping" ? [[660, 0], [880, 0.18]] : [[988, 0], [740, 0.16], [988, 0.32]];
     for (const [f, dt] of notes) {
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.type = "triangle"; o.frequency.value = f;
@@ -1783,11 +1809,13 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
   paint(); card.prepend(badge); badge.after(why);
   const wm = document.createElement("div"); wm.className = "wm"; wm.setAttribute("aria-hidden", "true");
   const playing = () => $$("video, audio", modal).some((v) => !v.paused && !v.ended) || !!modal._ytPlaying;
+  // Хичээлийн embed (iframe) дотор ажиллаж байхад хулгана, товчлуурын үйлдэл энэ хуудсанд ирэхгүй — идэвхгүйд тооцохгүй.
+  const inFrame = () => { const a = document.activeElement; return a?.tagName === "IFRAME" && modal.contains(a); };
   const tick = () => {
     const now = Date.now(), dt = Math.round((now - last) / 1000); last = now;
     if (dt <= 0) return;
     if (away) acc.away += dt;
-    else if (now - lastInput > WATCH_IDLE_MS && !playing()) { acc.idle += dt; if (!idleLogged) { idleLogged = true; events.push({ type: "idle", detail: "2 минутаас дээш хөдөлгөөнгүй" }); } }
+    else if (now - lastInput > WATCH_IDLE_MS && !playing() && !inFrame()) { acc.idle += dt; if (!idleLogged) { idleLogged = true; events.push({ type: "idle", detail: "2 минутаас дээш хөдөлгөөнгүй" }); } }
     else acc.active += dt;
   };
   const send = (end) => {
@@ -1815,7 +1843,7 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
   const pauseMedia = () => { $$("video, audio", modal).forEach((v) => v.pause()); modal._ytPause?.(); };
   // Өөр таб руу гарсан үед хуудасны гарчиг анивчина: «⚠️ Хичээл рүүгээ буцна уу!»
   const title0 = document.title; let flashT = 0;
-  const flashOn = () => { if (owner || flashT) return; let f = false; flashT = setInterval(() => { document.title = (f = !f) ? "⚠️ Хичээл рүүгээ буцна уу!" : title0; }, 900); };
+  const flashOn = (msg = "⚠️ Хичээл рүүгээ буцна уу!") => { if (owner || flashT) return; let f = false; flashT = setInterval(() => { document.title = (f = !f) ? msg : title0; }, 900); };
   const flashOff = () => { clearInterval(flashT); flashT = 0; document.title = title0; };
   const leave = () => { if (away || stopped) return; tick(); away = true; awayAt = Date.now(); pauseMedia(); flashOn(); };
   const back = () => {
@@ -1856,11 +1884,12 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
     pauseMedia();
     let left = WATCH_PING_ANSWER, answered = false;
     watchAlert(`<span class="watch-ico">🙋</span><h3>Та хичээлээ үргэлжлүүлэн үзэж байна уу?</h3>
-      <p>Идэвхийн шалгалт. <b class="ping-left">${left}</b> секундэд хариулахгүй бол хичээл зогсоно.</p>`, "Тийм, үзэж байна", () => { answered = true; lastInput = Date.now(); });
+      <p>Идэвхийн шалгалт. <b class="ping-left">${left}</b> секундэд хариулахгүй бол хичээл зогсоно.</p>`, "Тийм, үзэж байна", () => { answered = true; lastInput = Date.now(); flashOff(); });
+    alarm("ping"); flashOn("🙋 Та хичээлээ үзэж байна уу?"); // өөр зүйл рүү харж байсан ч анзаарна
     const t = setInterval(() => {
       if (answered || stopped) { clearInterval(t); return; }
       left--; const el = $(".watch-alert .ping-left"); if (el) el.textContent = left;
-      if (left <= 0) { clearInterval(t); $(".watch-alert")?.remove(); events.push({ type: "ping_missed", detail: "30 секундэд хариулаагүй" }); stop("Идэвхийн шалгалтад хариулаагүй", "Та идэвхийн шалгалтад 30 секундэд хариулаагүй тул хичээл зогслоо."); }
+      if (left <= 0) { clearInterval(t); $(".watch-alert")?.remove(); flashOff(); events.push({ type: "ping_missed", detail: "30 секундэд хариулаагүй" }); stop("Идэвхийн шалгалтад хариулаагүй", "Та идэвхийн шалгалтад 30 секундэд хариулаагүй тул хичээл зогслоо."); }
     }, 1000);
   };
   pingTimer = setInterval(() => { if (!away && Date.now() >= pingAt) { pingAt = Date.now() + WATCH_PING_SEC * 1000; ping(); } }, 1000);
@@ -4515,13 +4544,17 @@ async function coursePage() {
     const key = "sg_reflect_at_" + lid;
     let last = 0; try { last = +localStorage.getItem(key) || 0; } catch {}
     if (Date.now() - last < 3600e3) return; // цагт нэг удаа л зовоохгүй
+    // Хяналт хичээлийг зогсоосон бол эхлээд тэр сануулгыг уншиж хаасны дараа асууна (дээр нь давхарлахгүй;
+    // дараагийн сануулга watchAlert бичиж буй дүгнэлтийг устгахгүйн тулд).
+    const busy = $(".watch-alert");
+    if (busy) { new MutationObserver((_, mo) => { if (!busy.isConnected) { mo.disconnect(); askReflection(cid, lid, title); } }).observe(document.documentElement, { childList: true, subtree: true }); return; }
     const el = document.createElement("div"); el.className = "watch-alert"; el.innerHTML = `<div class="watch-card refl-card">
       <span class="watch-ico">✍️</span><h3>«${esc(title)}» хичээлээс юу сурсан бэ?</h3>
       <p class="muted small">2-3 өгүүлбэрээр бичихэд хангалттай. Энэ нь идэвхтэй суралцсаны тэмдэглэгээ болно.</p>
       <textarea rows="3" maxlength="2000" placeholder="Жишээ нь: Энэ хичээлээр … гэдгийг ойлголоо…"></textarea>
       <p class="form-error" role="alert"></p>
       <div class="refl-acts"><button class="btn btn-ghost btn-sm" data-skip>Алгасах</button><button class="btn btn-gold" data-send>Илгээх</button></div></div>`;
-    document.body.append(el);
+    overlayHost(true).append(el); $("textarea", el).focus();
     try { localStorage.setItem(key, Date.now()); } catch {}
     const close = () => el.remove();
     $(".refl-card [data-skip]", el).onclick = close;
