@@ -281,7 +281,7 @@ func (s *Server) handleBoardChatPost(w http.ResponseWriter, r *http.Request) {
 		s.boardSend(bs, bs.chatViewers(ch, now), boardEvent{Ev: "chat", Room: ch, Msg: &m})
 		sent = append(sent, m)
 	}
-	if bs.touchPeer(br.c, br.teacher, bs.defaultRoom(br.c.UID, br.teacher), now) {
+	if bs.touchPeer(br.c, br.teacher, bs.peerRoom(br.c.UID, br.teacher, now), now) {
 		s.boardSendPeers(bs, now)
 	}
 	writeLocked(w, bs, map[string]any{"msgs": sent})
@@ -412,7 +412,7 @@ func (s *Server) handleBoardVoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	bs, uid, now := br.s, br.c.UID, time.Now()
-	if bs.touchPeer(br.c, br.teacher, bs.defaultRoom(uid, br.teacher), now) {
+	if bs.touchPeer(br.c, br.teacher, bs.peerRoom(uid, br.teacher, now), now) {
 		s.boardSendPeers(bs, now)
 	}
 	p := bs.peers[uid]

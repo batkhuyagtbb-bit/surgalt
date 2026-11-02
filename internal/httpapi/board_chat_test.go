@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -277,5 +278,66 @@ func wsWait(t *testing.T, srv *httptest.Server, token string) func(typ string) m
 				return m
 			}
 		}
+	}
+}
+
+// Дуу, чатын хүсэлт харж буй самбарыг солихгүй: багийн самбар (t:0) дээр ярьж/бичиж буй багш
+// «main» руу шилжиж, бүх хүнд оролцогчдын жагсаалт дахин очиж, тэр багийн сонсогчдоос гарах ёсгүй.
+func TestBoardVoiceKeepsRoom(t *testing.T) {
+	st := newTestStore(t)
+	fs, err := files.New(t.TempDir(), []byte("k"), 10<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hub := chat.NewHub()
+	s := New(Config{TrustProxy: true}, st, auth.NewSigner("test", time.Hour), hub, fs, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+	tt, tid := register(t, srv, "krteach", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Баг","price":0,"published":true}`)
+	cid := c["id"].(string)
+	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true,"blocks":[{"id":"brd1","type":"board","text":""}]}`)
+	base := "/api/courses/" + cid + "/lessons/" + l["id"].(string) + "/board/brd1"
+	s1, u1 := register(t, srv, "krstud1", "student")
+	for _, tok := range []string{tt, s1} {
+		call(t, srv, "GET", base, tok, "")
+	}
+	call(t, srv, "POST", base+"/state", tt, `{"mode":"team","teams":2,"assign":{"`+u1+`":0}}`)
+	call(t, srv, "POST", base+"/presence", tt, `{"room":"t:0"}`)
+	ws := chat.NewClient()
+	hub.Subscribe(ws, chat.UserKey(u1))
+	defer hub.Unsubscribe(ws, chat.UserKey(u1))
+	peersEv := func() (n int) {
+		for {
+			select {
+			case b := <-ws.Send:
+				var e boardEvent
+				if json.Unmarshal(b, &e) == nil && e.Ev == "peers" {
+					n++
+				}
+			default:
+				return
+			}
+		}
+	}
+	peersEv()
+	call(t, srv, "POST", base+"/voice", tt, `{"mic":true}`)
+	for seq := 1; seq <= 5; seq++ {
+		call(t, srv, "POST", base+"/voice", tt, `{"to":"t:0","seq":`+strconv.Itoa(seq)+`,"d":"`+voiceChunk()+`"}`)
+	}
+	call(t, srv, "POST", base+"/voice", tt, `{"talk":800}`)
+	call(t, srv, "POST", base+"/chat", tt, `{"ch":"b:0","body":"сайн уу"}`)
+	if n := peersEv(); n != 1 { // зөвхөн микрофон асаасан нь (Mic тэмдэг)
+		t.Fatalf("өрөө солигдож оролцогчдын жагсаалт давтан илгээгдэв: %d", n)
+	}
+	s.boards.mu.Lock()
+	bs := s.boards.m[l["id"].(string)+"/brd1"]
+	s.boards.mu.Unlock()
+	bs.mu.Lock()
+	room := bs.peers[tid].Room
+	ls := bs.voiceListeners(u1, "t:0", time.Now())
+	bs.mu.Unlock()
+	if room != "t:0" || !slices.Contains(ls, tid) {
+		t.Fatalf("багш багийн самбар дээрээ үлдэж, багийн дууг сонсох ёстой: %q %v", room, ls)
 	}
 }

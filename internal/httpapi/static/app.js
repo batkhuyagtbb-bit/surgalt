@@ -1790,10 +1790,12 @@ function cursorAlert(n) {
 // Өөр таб/цонх руу шилжвэл сануулга (3 дахь удаад зогсоно), 5 минут тутам "Та үзэж байна уу?" (30 сек),
 // хөдөлгөөнт усан тэмдэг (нэр, ID, IP), идэвхтэй хугацааны тоолуур.
 const WATCH_PING_SEC = 300, WATCH_PING_ANSWER = 30, WATCH_IDLE_MS = 120000;
-function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
+// lazy — хичээл суралцагчийн оролцоогүйгээр (багш хоригийг цуцлахад) нээгдсэн: суралцагч анх хөдлөх хүртэл
+// идэвхгүй, гадуур, идэвхийн шалгалтыг тоолохгүй (компьютерийн дэргэд байхгүй үед дахин хаагдахаас сэргийлнэ).
+function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn, lazy }) {
   const WATCH_MAX_WARN = Math.max(1, +maxWarn || 3); // багш сургалтын тохиргоонд тоогоор оруулна
   if (!Auth.token) return () => {};
-  let sid = null, owner = false, warns = 0, stopped = false, away = false, awayAt = 0, last = Date.now(), lastInput = Date.now(), idleLogged = false;
+  let sid = null, owner = false, warns = 0, stopped = false, away = false, awayAt = 0, last = Date.now(), lastInput = Date.now(), idleLogged = false, armed = !lazy;
   let acc = { active: 0, idle: 0, away: 0 }, events = [], pingAt = Date.now() + WATCH_PING_SEC * 1000, pingTimer = null, wmTimer = null;
   // Идэвхийн оноо E = идэвхтэй / нийт (сүүлийн 5 минут). 3+ минут хэмжээд E < 0.1 бол хичээл зогсоно.
   const win = [];
@@ -1813,7 +1815,7 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
   const inFrame = () => { const a = document.activeElement; return a?.tagName === "IFRAME" && modal.contains(a); };
   const tick = () => {
     const now = Date.now(), dt = Math.round((now - last) / 1000); last = now;
-    if (dt <= 0) return;
+    if (dt <= 0 || !armed) return;
     if (away) acc.away += dt;
     else if (now - lastInput > WATCH_IDLE_MS && !playing() && !inFrame()) { acc.idle += dt; if (!idleLogged) { idleLogged = true; events.push({ type: "idle", detail: "2 минутаас дээш хөдөлгөөнгүй" }); } }
     else acc.active += dt;
@@ -1845,7 +1847,7 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
   const title0 = document.title; let flashT = 0;
   const flashOn = (msg = "⚠️ Хичээл рүүгээ буцна уу!") => { if (owner || flashT) return; let f = false; flashT = setInterval(() => { document.title = (f = !f) ? msg : title0; }, 900); };
   const flashOff = () => { clearInterval(flashT); flashT = 0; document.title = title0; };
-  const leave = () => { if (away || stopped) return; tick(); away = true; awayAt = Date.now(); pauseMedia(); flashOn(); };
+  const leave = () => { if (away || stopped || !armed) return; tick(); away = true; awayAt = Date.now(); pauseMedia(); flashOn(); };
   const back = () => {
     if (!away || stopped) return;
     tick(); away = false; flashOff();
@@ -1892,25 +1894,29 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn }) {
       if (left <= 0) { clearInterval(t); $(".watch-alert")?.remove(); flashOff(); events.push({ type: "ping_missed", detail: "30 секундэд хариулаагүй" }); stop("Идэвхийн шалгалтад хариулаагүй", "Та идэвхийн шалгалтад 30 секундэд хариулаагүй тул хичээл зогслоо."); }
     }, 1000);
   };
-  pingTimer = setInterval(() => { if (!away && Date.now() >= pingAt) { pingAt = Date.now() + WATCH_PING_SEC * 1000; ping(); } }, 1000);
+  pingTimer = setInterval(() => { if (armed && !away && Date.now() >= pingAt) { pingAt = Date.now() + WATCH_PING_SEC * 1000; ping(); } }, 1000);
   // Таб нуугдах: найдвартай. Цонхны blur: видео тоглуулагч (iframe) дээр дарахад ч гардаг тул шалгана.
   const onVis = () => (document.hidden ? leave() : back());
   const onBlur = () => setTimeout(() => { if (document.activeElement?.tagName !== "IFRAME" && !document.hasFocus()) leave(); }, 0);
   const onFocus = () => { if (!document.hidden) back(); };
-  const onInput = () => { lastInput = Date.now(); idleLogged = false; };
+  const onInput = () => {
+    lastInput = Date.now(); idleLogged = false;
+    if (!armed) { armed = true; last = Date.now(); pingAt = Date.now() + WATCH_PING_SEC * 1000; } // одооноос тоолно
+  };
   const inputs = ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"];
   // Курсор хичээлийн цонхноос 2.5 сек+ гарвал тусдаа (шар) сануулга; буцаж ороход алга болж, хугацааг нь тэмдэглэнэ.
   const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;
   let outT = 0, outAt = 0, outs = 0, ca = null;
   const area = modal.closest("#lessonStage") || card; // хичээл үзэх горимд хөтөлбөрийн самбар ч хичээлийн цонхонд тооцогдоно
-  const overlayOpen = () => $(".watch-alert") || $(".dv-full") || $$(".modal.open").some((m) => m !== modal);
+  // Цагаан самбар (бүтэн дэлгэцээр нээгддэг) — хичээлийн нэг хэсэг тул курсор «гадуур» гэж тооцохгүй.
+  const overlayOpen = () => $(".watch-alert") || $(".dv-full") || document.documentElement.classList.contains("bd-on") || $$(".modal.open").some((m) => m !== modal);
   const cursorBack = () => {
     clearTimeout(outT); if (!ca) return;
     events.push({ type: "cursor_out", detail: `${Math.max(1, Math.round((Date.now() - outAt) / 1000))} сек курсор хичээлийн цонхноос гадуур (${outs} дахь удаа)` });
     const el = ca; ca = null; el.classList.add("out"); setTimeout(() => el.remove(), 250); card.classList.remove("cursor-out");
   };
   const onLeaveCard = (e) => {
-    if (!fine || owner || stopped || e.pointerType === "touch" || (e.relatedTarget && area.contains(e.relatedTarget))) return;
+    if (!fine || owner || stopped || !armed || e.pointerType === "touch" || (e.relatedTarget && (area.contains(e.relatedTarget) || e.relatedTarget.closest?.(".bd")))) return;
     clearTimeout(outT); outAt = Date.now();
     outT = setTimeout(() => { if (stopped || away || owner || ca || overlayOpen() || area.matches(":hover")) return; outs++; ca = cursorAlert(outs); card.classList.add("cursor-out"); }, 2500);
   };
@@ -4426,6 +4432,7 @@ async function coursePage() {
     drawStage();
   }) : Promise.resolve();
   // Багш хоригийг цуцлахад (WebSocket) хуудас шинэчлэхгүйгээр шууд нээгдэнэ; хаагдсан цонх/хичээл дээр байсан бол шууд үргэлжилнэ.
+  let lazyWatch = false; // дараагийн нээх хичээлийн хяналт суралцагч хөдөлтөл хүлээнэ (play-д нэг удаа)
   if (Auth.token) Live.on(async (d) => {
     if (d.type !== "lesson_unblocked") return;
     const mine = (d.lessons || []).filter((x) => x.course_id === id).map((x) => x.lesson_id);
@@ -4436,7 +4443,11 @@ async function coursePage() {
     if (!li) return;
     toast("🔓 Багш хичээлийг тань дахин нээлээ — үргэлжлүүлэн үзээрэй");
     if (pop) pop.remove();
-    if (pop || !stageOn() || stageLid === lid) expandRow(li, true); // өөр хичээл үзэж байвал зөвхөн мэдэгдэнэ
+    if (pop || !stageOn() || stageLid === lid) { // өөр хичээл үзэж байвал зөвхөн мэдэгдэнэ
+      lazyWatch = true; // суралцагч дэргэд байхгүй байж болно: хөдөлтөл хяналт тоолохгүй
+      await expandRow(li, true);
+      lazyWatch = false;
+    }
   });
   if (!Auth.token && locked && location.hash === "#unlock") setTimeout(() => askCode(), 300); // нэвтрэх рүү хөтөлнө
   if (!Auth.token) $$(".lesson.is-free [data-play]").forEach((b) => (b.textContent = "▶ Нэвтэрч үзэх")); // үнэгүй хичээлийг ч нэвтэрч үзнэ
@@ -4817,7 +4828,8 @@ async function coursePage() {
       if (sec < need) cb.textContent = `🕒 ${l.active_min} мин идэвхтэй үзсний дараа дуусгана`; else { cb.textContent = "✓ Энэ хичээлийг дууслаа"; finishByTime(); }
     };
     stopWatch?.();
-    stopWatch = l.exam ? null : watchLesson({ courseId: id, lessonId: lid, modal, onStop: () => { closeModal(modal); refreshAccess(); }, onActive, maxWarn: access?.max_warnings });
+    const lazy = lazyWatch; lazyWatch = false;
+    stopWatch = l.exam ? null : watchLesson({ courseId: id, lessonId: lid, modal, onStop: () => { closeModal(modal); refreshAccess(); }, onActive, maxWarn: access?.max_warnings, lazy });
     reflectDone = !!(Auth.token && access?.progress?.[lid]?.completed_at) || isOwner || !Auth.token || !!l.exam;
     curLesson = reflectDone ? null : { id, lid, title: l.title };
     openModal(modal);

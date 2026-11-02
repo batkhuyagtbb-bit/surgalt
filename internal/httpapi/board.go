@@ -240,6 +240,16 @@ func (bs *boardSess) canWrite(uid string, teacher bool, room string) bool {
 	return !bs.state.Lock && room != "main" && room == bs.ownRoom(uid)
 }
 
+// peerRoom — хэрэглэгчийн одоо харж буй самбар (дуу, чатын хүсэлт үүнийг солихгүй; шинэ бол анхдагч).
+// Өмнө нь анхдагч руу буцаадаг байсан тул багийн самбар дээр ярьж буй багш 200 мс тутам «main» руу шилжиж,
+// бүх хүнд оролцогчдын жагсаалт дахин очиж, тэр багийн дуу тасалддаг байв.
+func (bs *boardSess) peerRoom(uid string, teacher bool, now time.Time) string {
+	if p := bs.peers[uid]; p != nil && now.Sub(p.at) <= boardPeerTTL && p.Room != "" {
+		return p.Room
+	}
+	return bs.defaultRoom(uid, teacher)
+}
+
 func (bs *boardSess) defaultRoom(uid string, teacher bool) string {
 	if teacher {
 		return "main"

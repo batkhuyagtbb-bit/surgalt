@@ -1,6 +1,7 @@
 /* surgalt.mn — «Цагаан самбар: багаар ажиллах». app.css-ийн өнгө, фонт (--brand, --accent, Manrope)-той нэг хэв маяг. */
 html.bd-on,html.bd-on body{overflow:hidden!important}
 html.bd-on #toasts{z-index:2600;left:auto!important;right:18px;bottom:18px;transform:none;justify-items:end}
+html.bd-on .watch-alert{z-index:2500} /* идэвхийн шалгалт, сануулга самбараас дээр */
 .toast.bd-busy{display:flex;align-items:center;gap:10px}
 .bd{position:fixed;inset:0;z-index:2000;display:grid;grid-template-rows:auto 1fr;background:var(--ink);color:var(--text);font:500 15px/1.45 var(--sans);
   -webkit-user-select:none;user-select:none;animation:bd-in .28s var(--ease) both}
