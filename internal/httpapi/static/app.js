@@ -5493,7 +5493,7 @@ document.addEventListener("pointerup", (e) => {
   else lbxTap = { im, t: now };
 });
 
-/* ---------- Хүртээмж: хичээл унших хэсэгт харааны бэрхшээлтэй хүмүүст зориулсан байнга дагадаг цэс ---------- */
+/* ---------- Хүртээмж: харааны бэрхшээлтэй хүмүүст зориулсан байнга дагадаг цэс (бүх хуудсанд, зүүн доод буланд) ---------- */
 // Сонголт бүр дарах тутам түвшин нэмэгдэж (3 хүрээд унтарна), тохиргоо энэ төхөөрөмж дээр хадгалагдана.
 const A11Y_SVG = (p, w = 34) => `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 const A11Y = [ // [түлхүүр, нэр, түвшний тоо (1 = асаах/унтраах), түвшний нэр, дүрс]
@@ -5564,7 +5564,8 @@ function mountA11y() {
   });
   document.body.append(fab, panel); apply();
 }
-if (document.getElementById("lessonStage")) mountA11y();
+// Бүх хуудсанд (зүүн доод буланд); iframe дотор (хичээлд суулгасан хуудас) давхардуулахгүй.
+if (window.self === window.top) mountA11y();
 
 window.SG = { THREAD_EVENTS, panelIn, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
@@ -5692,7 +5693,96 @@ function explore() {
   setMode("map"); setPlay(!still); layout();
   addEventListener("hashchange", fromHash); fromHash();
 }
-if (page === "home") { homePage(); explore(); }
+/* ---------- Нүүр: Шилдэг багш нар — 4 зэрэглэл × 10 багш, гүйдэг карт (сум, чирэх, автоматаар шилжинэ) ---------- */
+const TT_BOARDS = [
+  ["views", "eye", "Хамгийн их хандалттай", "үзэлт", "Профайл нь хамгийн олон удаа үзэгдсэн"],
+  ["students", "users", "Хамгийн их авагдсан", "элсэлт", "Сургалтыг нь хамгийн олон суралцагч авсан"],
+  ["courses", "courses", "Хамгийн олон сургалттай", "сургалт", "Хамгийн олон сургалт нийтэлсэн"],
+  ["talks", "chat", "Хамгийн идэвхтэй харилцаа", "хүнтэй харилцсан", "Хамгийн олон хүнтэй чат, сэтгэгдлээр харилцсан"],
+];
+// Урьдчилан харах (?demo=1): бодит өгөгдөл цөөн үед загварыг харуулах жишээ — «Жишээ өгөгдөл» гэж тэмдэглэж, холбоосгүй.
+function ttDemo() {
+  const P = [["Б.Энхжаргал", "Математикийн багш · ЭЕШ бэлтгэл"], ["Д.Тэмүүлэн", "Англи хэл · IELTS 8.0"], ["Г.Сарангэрэл", "Физик, олимпиадын дасгалжуулагч"],
+    ["Ц.Мөнхбат", "Програмчлал · Python, JavaScript"], ["О.Ариунаа", "Хими · ЭЕШ 800 оноо"], ["Н.Батбаяр", "Монгол хэл, уран зохиол"], ["Э.Номин", "Биологийн багш"],
+    ["С.Ганзориг", "Нягтлан бодох бүртгэл"], ["Л.Оюунчимэг", "Япон хэл · JLPT N2"], ["Ж.Төгөлдөр", "Гитарын хичээл"], ["Х.Солонго", "Зураг, дизайн · Figma"], ["П.Баярсайхан", "Түүх, нийгэм судлал"]];
+  const ppl = P.map(([display_name, headline], i) => ({ username: "", display_name, headline, subjects: [], avatar_url: "",
+    views: 4800 - ((i * 1373) % 4300), enrolls: 620 - ((i * 211) % 560), students: 540 - ((i * 197) % 500), courses: 12 - ((i * 5) % 11), talks: 380 - ((i * 149) % 350) }));
+  const board = (f) => ppl.map((x) => ({ ...x, value: x[f] })).sort((a, b) => b.value - a.value).slice(0, 10).map((x, i) => ({ ...x, rank: i + 1 }));
+  return { boards: { views: board("views"), students: board("enrolls"), courses: board("courses"), talks: board("talks") } };
+}
+async function topTeachers() {
+  const root = $("#topTeachers"); if (!root) return;
+  const demo = new URLSearchParams(location.search).has("demo");
+  let data;
+  if (demo) data = ttDemo();
+  else try { data = await api("/api/top-teachers", { token: null }); } catch { return; }
+  if (demo) {
+    root.classList.add("tt-demo");
+    $(".tt-head .eyebrow", root).insertAdjacentHTML("afterend", `<span class="tt-demo-tag">Жишээ өгөгдөл — бодит зэрэглэл биш</span>`);
+    root.addEventListener("click", (e) => { if (e.target.closest(".tt-card a")) e.preventDefault(); });
+  }
+  const boards = TT_BOARDS.filter(([k]) => data.boards?.[k]?.length);
+  if (!boards.length) return;
+  root.hidden = false;
+  const tabs = $(".tt-tabs", root), track = $(".tt-track", root), dots = $(".tt-dots", root), prev = $(".tt-prev", root), next = $(".tt-next", root);
+  const n = (v) => Number(v || 0).toLocaleString("en-US");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let cur = boards[0][0], timer = 0, paused = false;
+  tabs.innerHTML = boards.map(([k, ic, t]) => `<button type="button" role="tab" data-tt="${k}" aria-selected="false">${icon(ic, 17)}<span>${t}</span></button>`).join("");
+  const card = (x, top, unit) => {
+    const pct = top ? Math.max(6, Math.round((x.value / top) * 100)) : 0;
+    const medal = x.rank <= 3 ? ` tt-m${x.rank}` : "";
+    return `<li class="tt-card${medal}" style="--d:${(x.rank - 1) * 45}ms"><a href="${x.username ? "/t/" + encodeURIComponent(x.username) : "#topTeachers"}" aria-label="${x.rank}-р байр: ${esc(x.display_name)}, ${n(x.value)} ${unit}">
+      <span class="tt-rank" aria-hidden="true">${x.rank === 1 ? `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M3 8l4.5 3.5L12 5l4.5 6.5L21 8l-2 10H5z"/></svg>` : ""}${x.rank}</span>
+      ${avatarHTML(x, "tt-av")}
+      <b class="tt-name">${esc(x.display_name || x.username)}</b>
+      <small class="tt-line">${esc(x.headline || x.subjects.join(" · ") || "Багш")}</small>
+      <span class="tt-metric"><b>${n(x.value)}</b><small>${unit}</small></span>
+      <span class="tt-bar" aria-hidden="true"><i style="--w:${pct}%"></i></span>
+      <span class="tt-stats">${x.courses ? `<span>${icon("courses", 14)}${n(x.courses)}</span>` : ""}${x.students ? `<span>${icon("users", 14)}${n(x.students)}</span>` : ""}${x.views ? `<span>${icon("eye", 14)}${n(x.views)}</span>` : ""}</span>
+      <span class="tt-go">Профайл үзэх ${icon("next", 14)}</span></a></li>`;
+  };
+  const pages = () => Math.max(1, Math.ceil((track.scrollWidth - 4) / track.clientWidth));
+  const syncNav = () => {
+    const max = track.scrollWidth - track.clientWidth - 2;
+    prev.disabled = track.scrollLeft <= 2; next.disabled = track.scrollLeft >= max;
+    const p = pages(), at = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+    dots.innerHTML = p > 1 ? Array.from({ length: p }, (_, i) => `<i class="${i === Math.min(at, p - 1) ? "on" : ""}"></i>`).join("") : "";
+  };
+  const show = (k) => {
+    cur = k;
+    const b = TT_BOARDS.find((x) => x[0] === k), list = data.boards[k], top = list[0]?.value || 0;
+    $$("[data-tt]", tabs).forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tt === k)));
+    track.setAttribute("aria-label", `${b[2]} — ${b[4]}`);
+    track.innerHTML = list.map((x) => card(x, top, b[3])).join("");
+    track.classList.remove("in"); void track.offsetWidth; track.classList.add("in");
+    track.scrollLeft = 0; syncNav();
+  };
+  const step = (dir) => {
+    const w = track.querySelector(".tt-card")?.getBoundingClientRect().width || 240;
+    const max = track.scrollWidth - track.clientWidth - 2;
+    if (dir > 0 && track.scrollLeft >= max) return track.scrollTo({ left: 0, behavior: still ? "auto" : "smooth" });
+    track.scrollBy({ left: dir * (w + 16) * Math.max(1, Math.floor(track.clientWidth / (w + 16))), behavior: still ? "auto" : "smooth" });
+  };
+  tabs.addEventListener("click", (e) => { const t = e.target.closest("[data-tt]"); if (t) { show(t.dataset.tt); restart(); } });
+  tabs.addEventListener("keydown", (e) => { // сумаар таб солих
+    if (!["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+    const ks = boards.map((x) => x[0]), i = (ks.indexOf(cur) + (e.key === "ArrowRight" ? 1 : ks.length - 1)) % ks.length;
+    show(ks[i]); $(`[data-tt="${ks[i]}"]`, tabs).focus(); e.preventDefault();
+  });
+  prev.onclick = () => { step(-1); restart(); };
+  next.onclick = () => { step(1); restart(); };
+  track.addEventListener("scroll", () => requestAnimationFrame(syncNav), { passive: true });
+  addEventListener("resize", syncNav);
+  // Автоматаар 6 секунд тутам гүйлгэнэ (хулгана дээр нь, фокус, хүрэлт үед зогсоно; хөдөлгөөн багасгах тохиргоотой бол үгүй).
+  const restart = () => { clearInterval(timer); if (!still) timer = setInterval(() => { if (!paused && !document.hidden && root.getBoundingClientRect().top < innerHeight) step(1); }, 6000); };
+  root.addEventListener("pointerenter", () => (paused = true)); root.addEventListener("pointerleave", () => (paused = false));
+  root.addEventListener("focusin", () => (paused = true)); root.addEventListener("focusout", () => (paused = false));
+  track.addEventListener("touchstart", () => (paused = true), { passive: true });
+  show(cur); restart();
+}
+
+if (page === "home") { homePage(); explore(); topTeachers(); }
 if (page === "profile") profilePage();
 if (page === "profile" || page === "course") chatWidget();
 if (page === "course") coursePage();

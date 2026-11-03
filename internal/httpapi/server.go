@@ -72,6 +72,7 @@ type Server struct {
 	phoneLim  *ratelimit.Limiter // багшийн утасны дугаар нээх — дугаар хусуурдахаас сэргийлнэ
 	resetLim  *ratelimit.Limiter // нэг имэйл рүү нууц үг сэргээх захидал (2 минутад 1 орчим)
 	capLim    *ratelimit.Limiter // captcha зураг (IP тутам)
+	top       topCache           // нүүр хуудасны «Шилдэг багш нар» (top_teachers.go)
 	admLim    *ratelimit.Limiter // хянагчийн нууц үгээр нэвтрэх оролдлого (IP тус бүрт)
 	boardLim  *ratelimit.Limiter // цагаан самбарын өөрчлөлт (хэрэглэгч тус бүрт; анги нэг IP-аас орж болно)
 	boards    boardHub           // цагаан самбарын сессүүд (board.go)
@@ -357,6 +358,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /t/{username}/qr.png", s.handleQR)
 	mux.HandleFunc("GET /t/{username}/og.jpg", s.handleProfileOG)
 	mux.HandleFunc("GET /og.jpg", s.handleSiteOG)
+	mux.HandleFunc("GET /api/top-teachers", s.handleTopTeachers)
 
 	// Чат
 	mux.HandleFunc("POST /api/teachers/{username}/chat", s.handleStartChat)

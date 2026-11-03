@@ -606,6 +606,8 @@ type Store interface {
 	UpdateUsername(ctx context.Context, id, username string) error
 	// UsersByIDs нь өгөгдсөн хэрэглэгчдийг буцаана (олдоогүйг алгасна, дараалал баталгаагүй).
 	UsersByIDs(ctx context.Context, ids []string) ([]User, error)
+	// TeacherRanks — багш бүрийн үзэлт, сургалт, суралцагч, харилцааны тоо (нүүр хуудасны зэрэглэлд; багш бус ID байж болно).
+	TeacherRanks(ctx context.Context) (map[string]*TeacherRank, error)
 	TeacherStudentCount(ctx context.Context, teacherID string) (int64, error)
 	SetGoogleToken(ctx context.Context, userID, encrypted string) error
 	// Чатын мэдүүлэг (reports.go): нэг хүн нэг мессежийг давтан мэдүүлбэл ErrConflict.
