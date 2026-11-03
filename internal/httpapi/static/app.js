@@ -5693,55 +5693,60 @@ function explore() {
   setMode("map"); setPlay(!still); layout();
   addEventListener("hashchange", fromHash); fromHash();
 }
-/* ---------- Нүүр: Шилдэг багш нар — 4 зэрэглэл × 10 багш, гүйдэг карт (сум, чирэх, автоматаар шилжинэ) ---------- */
-const TT_BOARDS = [
+/* ---------- Нүүр: Шилдэг багш нар, Идэвхтэй суралцагчид — зэрэглэл × 10, гүйдэг карт (сум, чирэх, автоматаар) ---------- */
+const TT_BOARDS = [ // [түлхүүр, дүрс, таб, нэгж, тайлбар]
   ["views", "eye", "Хамгийн их хандалттай", "үзэлт", "Профайл нь хамгийн олон удаа үзэгдсэн"],
   ["students", "users", "Хамгийн их авагдсан", "элсэлт", "Сургалтыг нь хамгийн олон суралцагч авсан"],
   ["courses", "courses", "Хамгийн олон сургалттай", "сургалт", "Хамгийн олон сургалт нийтэлсэн"],
   ["talks", "chat", "Хамгийн идэвхтэй харилцаа", "хүнтэй харилцсан", "Хамгийн олон хүнтэй чат, сэтгэгдлээр харилцсан"],
 ];
+const TS_BOARDS = [
+  ["courses", "courses", "Олон сургалтад суралцсан", "сургалт", "Хамгийн олон сургалтад идэвхтэй суралцсан"],
+  ["rank", "medal", "Өндөр цолтой", "оноо", "Цолын оноо хамгийн өндөр"],
+  ["creative", "edit", "Бүтээлч суралцагч", "бүтээл", "Хичээлийн дүгнэлт, даалгавар, үүлэн үг, тодруулга хамгийн их"],
+  ["discipline", "check", "Сахилга баттай", "мин сануулгагүй", "Сануулга авалгүй хамгийн удаан идэвхтэй суралцсан"],
+  ["talks", "chat", "Харилцаа сайтай", "мессеж, сэтгэгдэл", "Чат, хичээлийн сэтгэгдлээр хамгийн идэвхтэй харилцсан"],
+];
+const ttNum = (v) => Number(v || 0).toLocaleString("en-US");
+const TT_CROWN = `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M3 8l4.5 3.5L12 5l4.5 6.5L21 8l-2 10H5z"/></svg>`;
+const ttRank = (x) => `<span class="tt-rank" aria-hidden="true">${x.rank === 1 ? TT_CROWN : ""}${x.rank}</span>`;
+const ttBar = (x, top) => `<span class="tt-bar" aria-hidden="true"><i style="--w:${top ? Math.max(6, Math.round((x.value / top) * 100)) : 0}%"></i></span>`;
+const ttCls = (x) => `tt-card${x.rank <= 3 ? ` tt-m${x.rank}` : ""}`;
 // Урьдчилан харах (?demo=1): бодит өгөгдөл цөөн үед загварыг харуулах жишээ — «Жишээ өгөгдөл» гэж тэмдэглэж, холбоосгүй.
-function ttDemo() {
-  const P = [["Б.Энхжаргал", "Математикийн багш · ЭЕШ бэлтгэл"], ["Д.Тэмүүлэн", "Англи хэл · IELTS 8.0"], ["Г.Сарангэрэл", "Физик, олимпиадын дасгалжуулагч"],
-    ["Ц.Мөнхбат", "Програмчлал · Python, JavaScript"], ["О.Ариунаа", "Хими · ЭЕШ 800 оноо"], ["Н.Батбаяр", "Монгол хэл, уран зохиол"], ["Э.Номин", "Биологийн багш"],
-    ["С.Ганзориг", "Нягтлан бодох бүртгэл"], ["Л.Оюунчимэг", "Япон хэл · JLPT N2"], ["Ж.Төгөлдөр", "Гитарын хичээл"], ["Х.Солонго", "Зураг, дизайн · Figma"], ["П.Баярсайхан", "Түүх, нийгэм судлал"]];
-  const ppl = P.map(([display_name, headline], i) => ({ username: "", display_name, headline, subjects: [], avatar_url: "",
-    views: 4800 - ((i * 1373) % 4300), enrolls: 620 - ((i * 211) % 560), students: 540 - ((i * 197) % 500), courses: 12 - ((i * 5) % 11), talks: 380 - ((i * 149) % 350) }));
+const TT_NAMES = [["Б.Энхжаргал", "Математикийн багш · ЭЕШ бэлтгэл"], ["Д.Тэмүүлэн", "Англи хэл · IELTS 8.0"], ["Г.Сарангэрэл", "Физик, олимпиадын дасгалжуулагч"],
+  ["Ц.Мөнхбат", "Програмчлал · Python, JavaScript"], ["О.Ариунаа", "Хими · ЭЕШ 800 оноо"], ["Н.Батбаяр", "Монгол хэл, уран зохиол"], ["Э.Номин", "Биологийн багш"],
+  ["С.Ганзориг", "Нягтлан бодох бүртгэл"], ["Л.Оюунчимэг", "Япон хэл · JLPT N2"], ["Ж.Төгөлдөр", "Гитарын хичээл"], ["Х.Солонго", "Зураг, дизайн · Figma"], ["П.Баярсайхан", "Түүх, нийгэм судлал"]];
+const TS_NAMES = ["Анужин Б.", "Тэмүүжин Г.", "Мишээл Д.", "Билгүүн Э.", "Номуун С.", "Хулан Ц.", "Ананд О.", "Сувд Л.", "Эрдэнэ Н.", "Золбоо Х.", "Маралаа Ж.", "Тэлмүүн П."];
+function ttDemo(kind) {
+  const ppl = kind === "students"
+    ? TS_NAMES.map((name, i) => ({ key: "", name, avatar_url: "", courses: 9 - ((i * 4) % 8), points: 4200 - ((i * 977) % 3900), creative: 160 - ((i * 37) % 140),
+      discipline: 1800 - ((i * 431) % 1600), active_min: 2000 - ((i * 389) % 1500), warnings: (i * 3) % 5, talks: 240 - ((i * 59) % 220) }))
+    : TT_NAMES.map(([display_name, headline], i) => ({ username: "", display_name, headline, subjects: [], avatar_url: "",
+      views: 4800 - ((i * 1373) % 4300), enrolls: 620 - ((i * 211) % 560), students: 540 - ((i * 197) % 500), courses: 12 - ((i * 5) % 11), talks: 380 - ((i * 149) % 350) }));
+  if (kind === "students") ppl.forEach((x) => { const st = (RANK_STEPS.filter((s) => x.points >= s[0]).pop() || RANK_STEPS[0]); x.level = st[1]; x.insignia = st[2]; });
   const board = (f) => ppl.map((x) => ({ ...x, value: x[f] })).sort((a, b) => b.value - a.value).slice(0, 10).map((x, i) => ({ ...x, rank: i + 1 }));
-  return { boards: { views: board("views"), students: board("enrolls"), courses: board("courses"), talks: board("talks") } };
+  return kind === "students"
+    ? { boards: { courses: board("courses"), rank: board("points"), creative: board("creative"), discipline: board("discipline"), talks: board("talks") } }
+    : { boards: { views: board("views"), students: board("enrolls"), courses: board("courses"), talks: board("talks") } };
 }
-async function topTeachers() {
-  const root = $("#topTeachers"); if (!root) return;
-  const demo = new URLSearchParams(location.search).has("demo");
-  let data;
-  if (demo) data = ttDemo();
-  else try { data = await api("/api/top-teachers", { token: null }); } catch { return; }
+const RANK_STEPS = [[0, "Шинэ цэрэг", "·"], [60, "Байлдагч", "▪"], [150, "Ахлах байлдагч", "▪▪"], [260, "Дэд түрүүч", "▾"], [400, "Түрүүч", "▾▾"], [560, "Ахлах түрүүч", "▾▾▾"],
+  [750, "Сургагч ахлагч", "◆"], [980, "Дэд дэслэгч", "★"], [1250, "Дэслэгч", "★★"], [1560, "Ахлах дэслэгч", "★★★"], [1900, "Ахмад", "★★★★"], [2300, "Хошууч", "✦"],
+  [2750, "Дэд хурандаа", "✦✦"], [3300, "Хурандаа", "✦✦✦"], [4000, "Бригадын генерал", "✪"], [4800, "Хошууч генерал", "✪✪"], [5700, "Дэслэгч генерал", "✪✪✪"], [6800, "Генерал", "✪✪✪✪"]];
+
+// leaderboard — таб, гүйдэг карт, сум, цэг, автоматаар шилжих (хулгана/фокус/хүрэлт үед зогсоно).
+function leaderboard(root, data, defs, card, demo) {
+  const boards = defs.filter(([k]) => data.boards?.[k]?.length);
+  if (!boards.length) return false;
+  root.hidden = false;
   if (demo) {
     root.classList.add("tt-demo");
     $(".tt-head .eyebrow", root).insertAdjacentHTML("afterend", `<span class="tt-demo-tag">Жишээ өгөгдөл — бодит зэрэглэл биш</span>`);
     root.addEventListener("click", (e) => { if (e.target.closest(".tt-card a")) e.preventDefault(); });
   }
-  const boards = TT_BOARDS.filter(([k]) => data.boards?.[k]?.length);
-  if (!boards.length) return;
-  root.hidden = false;
   const tabs = $(".tt-tabs", root), track = $(".tt-track", root), dots = $(".tt-dots", root), prev = $(".tt-prev", root), next = $(".tt-next", root);
-  const n = (v) => Number(v || 0).toLocaleString("en-US");
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let cur = boards[0][0], timer = 0, paused = false;
   tabs.innerHTML = boards.map(([k, ic, t]) => `<button type="button" role="tab" data-tt="${k}" aria-selected="false">${icon(ic, 17)}<span>${t}</span></button>`).join("");
-  const card = (x, top, unit) => {
-    const pct = top ? Math.max(6, Math.round((x.value / top) * 100)) : 0;
-    const medal = x.rank <= 3 ? ` tt-m${x.rank}` : "";
-    return `<li class="tt-card${medal}" style="--d:${(x.rank - 1) * 45}ms"><a href="${x.username ? "/t/" + encodeURIComponent(x.username) : "#topTeachers"}" aria-label="${x.rank}-р байр: ${esc(x.display_name)}, ${n(x.value)} ${unit}">
-      <span class="tt-rank" aria-hidden="true">${x.rank === 1 ? `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M3 8l4.5 3.5L12 5l4.5 6.5L21 8l-2 10H5z"/></svg>` : ""}${x.rank}</span>
-      ${avatarHTML(x, "tt-av")}
-      <b class="tt-name">${esc(x.display_name || x.username)}</b>
-      <small class="tt-line">${esc(x.headline || x.subjects.join(" · ") || "Багш")}</small>
-      <span class="tt-metric"><b>${n(x.value)}</b><small>${unit}</small></span>
-      <span class="tt-bar" aria-hidden="true"><i style="--w:${pct}%"></i></span>
-      <span class="tt-stats">${x.courses ? `<span>${icon("courses", 14)}${n(x.courses)}</span>` : ""}${x.students ? `<span>${icon("users", 14)}${n(x.students)}</span>` : ""}${x.views ? `<span>${icon("eye", 14)}${n(x.views)}</span>` : ""}</span>
-      <span class="tt-go">Профайл үзэх ${icon("next", 14)}</span></a></li>`;
-  };
   const pages = () => Math.max(1, Math.ceil((track.scrollWidth - 4) / track.clientWidth));
   const syncNav = () => {
     const max = track.scrollWidth - track.clientWidth - 2;
@@ -5751,10 +5756,10 @@ async function topTeachers() {
   };
   const show = (k) => {
     cur = k;
-    const b = TT_BOARDS.find((x) => x[0] === k), list = data.boards[k], top = list[0]?.value || 0;
+    const b = defs.find((x) => x[0] === k), list = data.boards[k], top = list[0]?.value || 0;
     $$("[data-tt]", tabs).forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tt === k)));
     track.setAttribute("aria-label", `${b[2]} — ${b[4]}`);
-    track.innerHTML = list.map((x) => card(x, top, b[3])).join("");
+    track.innerHTML = list.map((x) => card(x, top, b)).join("");
     track.classList.remove("in"); void track.offsetWidth; track.classList.add("in");
     track.scrollLeft = 0; syncNav();
   };
@@ -5764,6 +5769,7 @@ async function topTeachers() {
     if (dir > 0 && track.scrollLeft >= max) return track.scrollTo({ left: 0, behavior: still ? "auto" : "smooth" });
     track.scrollBy({ left: dir * (w + 16) * Math.max(1, Math.floor(track.clientWidth / (w + 16))), behavior: still ? "auto" : "smooth" });
   };
+  const restart = () => { clearInterval(timer); if (!still) timer = setInterval(() => { if (!paused && !document.hidden && root.getBoundingClientRect().top < innerHeight) step(1); }, 6000); };
   tabs.addEventListener("click", (e) => { const t = e.target.closest("[data-tt]"); if (t) { show(t.dataset.tt); restart(); } });
   tabs.addEventListener("keydown", (e) => { // сумаар таб солих
     if (!["ArrowLeft", "ArrowRight"].includes(e.key)) return;
@@ -5774,15 +5780,69 @@ async function topTeachers() {
   next.onclick = () => { step(1); restart(); };
   track.addEventListener("scroll", () => requestAnimationFrame(syncNav), { passive: true });
   addEventListener("resize", syncNav);
-  // Автоматаар 6 секунд тутам гүйлгэнэ (хулгана дээр нь, фокус, хүрэлт үед зогсоно; хөдөлгөөн багасгах тохиргоотой бол үгүй).
-  const restart = () => { clearInterval(timer); if (!still) timer = setInterval(() => { if (!paused && !document.hidden && root.getBoundingClientRect().top < innerHeight) step(1); }, 6000); };
   root.addEventListener("pointerenter", () => (paused = true)); root.addEventListener("pointerleave", () => (paused = false));
   root.addEventListener("focusin", () => (paused = true)); root.addEventListener("focusout", () => (paused = false));
   track.addEventListener("touchstart", () => (paused = true), { passive: true });
   show(cur); restart();
+  root._show = () => show(cur);
+  return true;
 }
 
-if (page === "home") { homePage(); explore(); topTeachers(); }
+async function topTeachers() {
+  const root = $("#topTeachers"); if (!root) return;
+  const demo = new URLSearchParams(location.search).has("demo");
+  let data;
+  if (demo) data = ttDemo("teachers");
+  else try { data = await api("/api/top-teachers", { token: null }); } catch { return; }
+  leaderboard(root, data, TT_BOARDS, (x, top, b) => `<li class="${ttCls(x)}" style="--d:${(x.rank - 1) * 45}ms"><a class="tt-in" href="${x.username ? "/t/" + encodeURIComponent(x.username) : "#topTeachers"}" aria-label="${x.rank}-р байр: ${esc(x.display_name)}, ${ttNum(x.value)} ${b[3]}">
+      ${ttRank(x)}${avatarHTML(x, "tt-av")}
+      <b class="tt-name">${esc(x.display_name || x.username)}</b>
+      <small class="tt-line">${esc(x.headline || x.subjects.join(" · ") || "Багш")}</small>
+      <span class="tt-metric"><b>${ttNum(x.value)}</b><small>${b[3]}</small></span>${ttBar(x, top)}
+      <span class="tt-stats">${x.courses ? `<span>${icon("courses", 14)}${ttNum(x.courses)}</span>` : ""}${x.students ? `<span>${icon("users", 14)}${ttNum(x.students)}</span>` : ""}${x.views ? `<span>${icon("eye", 14)}${ttNum(x.views)}</span>` : ""}</span>
+      <span class="tt-go">Профайл үзэх ${icon("next", 14)}</span></a></li>`, demo);
+}
+
+// Идэвхтэй суралцагчид — нэрийг товчилж, холбоосгүй; өөрийн карт дээр «Нуух», нуусан бол «Дахин харуулах».
+async function topStudents() {
+  const root = $("#topStudents"); if (!root) return;
+  const demo = new URLSearchParams(location.search).has("demo");
+  let data;
+  if (demo) data = ttDemo("students");
+  else try { data = await api("/api/top-students", { token: null }); } catch { return; }
+  const meKey = !demo && Auth.user?.rank_key;
+  const shown = leaderboard(root, data, TS_BOARDS, (x, top, b) => {
+    const mine = meKey && x.key === meKey;
+    return `<li class="${ttCls(x)}${mine ? " tt-me" : ""}" style="--d:${(x.rank - 1) * 45}ms"><div class="tt-in" role="group" aria-label="${x.rank}-р байр: ${esc(x.name)}, ${ttNum(x.value)} ${b[3]}">
+      ${ttRank(x)}${mine ? `<span class="tt-you">Та</span>` : ""}${avatarHTML({ display_name: x.name, username: x.key || x.name, avatar_url: x.avatar_url }, "tt-av")}
+      <b class="tt-name">${esc(x.name)}</b>
+      <small class="tt-line tt-lv"><span class="tt-ins" aria-hidden="true">${esc(x.insignia || "")}</span>${esc(x.level || "")}</small>
+      <span class="tt-metric"><b>${ttNum(x.value)}</b><small>${b[3]}</small></span>${ttBar(x, top)}
+      <span class="tt-stats">${x.courses ? `<span title="Сургалт">${icon("courses", 14)}${ttNum(x.courses)}</span>` : ""}${x.creative ? `<span title="Бүтээл">${icon("edit", 14)}${ttNum(x.creative)}</span>` : ""}${x.active_min ? `<span title="Идэвхтэй минут">${icon("clock", 14)}${ttNum(x.active_min)}</span>` : ""}${b[0] === "discipline" ? `<span title="Сануулга" class="${x.warnings ? "tt-warn" : "tt-ok"}">${icon(x.warnings ? "alert" : "check", 14)}${ttNum(x.warnings)}</span>` : ""}</span>
+      ${mine ? `<button type="button" class="tt-hide" data-rank-hide>Жагсаалтаас нуух</button>` : ""}</div></li>`;
+  }, demo);
+  if (!Auth.user || demo) return;
+  const foot = document.createElement("p");
+  foot.className = "tt-foot";
+  const drawFoot = () => { foot.innerHTML = Auth.user?.rank_hidden ? `Та өөрийгөө энэ жагсаалтаас нуусан байна. <button type="button" class="linkish" data-rank-show>Дахин харуулах</button>` : ""; foot.hidden = !Auth.user?.rank_hidden; };
+  root.append(foot); drawFoot();
+  root.addEventListener("click", async (e) => {
+    const hide = e.target.closest("[data-rank-hide]"), showMe = e.target.closest("[data-rank-show]");
+    if (!hide && !showMe) return;
+    if (hide && !confirm("Нүүр хуудасны «Идэвхтэй суралцагчид» жагсаалтад таныг харуулахгүй. Үргэлжлүүлэх үү?")) return;
+    try {
+      const me = await api("/api/me/rank-hidden", { method: "PUT", body: { hidden: !!hide } });
+      Auth.set(Auth.token, me);
+      toast(hide ? "Таныг жагсаалтаас нууллаа" : "Та жагсаалтад дахин харагдана (хэдэн минутын дараа)");
+      const fresh = await api("/api/top-students", { token: null }).catch(() => null);
+      if (fresh) { data.boards = fresh.boards; root._show?.(); }
+      drawFoot();
+    } catch (x) { toast(x.message, true); }
+  });
+  if (!shown && Auth.user?.rank_hidden) root.hidden = false;
+}
+
+if (page === "home") { homePage(); explore(); topTeachers(); topStudents(); }
 if (page === "profile") profilePage();
 if (page === "profile" || page === "course") chatWidget();
 if (page === "course") coursePage();

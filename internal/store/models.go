@@ -38,6 +38,8 @@ type User struct {
 	PhoneVerified string `json:"-"`
 	// PhonePending — хэрэглэгч оруулсан, SMS-ээр хараахан баталгаажуулаагүй дугаар (түр хадгална; утсаар сэргээхэд SMS-ээр баталгаажна).
 	PhonePending string `json:"-"`
+	// RankHidden — нүүр хуудасны «Идэвхтэй суралцагчид» жагсаалтад өөрийгөө харуулахгүй.
+	RankHidden bool `json:"-"`
 	// Үйлчилгээний нөхцөл, нууцлалын бодлогыг зөвшөөрсөн хувилбар ба цаг (Хувь хүний мэдээлэл хамгаалах тухай хууль).
 	// Google/Facebook-ээр эсвэл өмнө бүртгүүлсэн хэрэглэгч нэвтрэхдээ зөвшөөрнө.
 	ConsentVersion string     `json:"-"`
@@ -608,6 +610,8 @@ type Store interface {
 	UsersByIDs(ctx context.Context, ids []string) ([]User, error)
 	// TeacherRanks — багш бүрийн үзэлт, сургалт, суралцагч, харилцааны тоо (нүүр хуудасны зэрэглэлд; багш бус ID байж болно).
 	TeacherRanks(ctx context.Context) (map[string]*TeacherRank, error)
+	// StudentRanks — суралцагч бүрийн сургалт, цол, бүтээл, идэвхтэй минут, сануулга, харилцааны тоо (warn — сануулгын төрлүүд).
+	StudentRanks(ctx context.Context, warn []string) (map[string]*StudentRank, error)
 	TeacherStudentCount(ctx context.Context, teacherID string) (int64, error)
 	SetGoogleToken(ctx context.Context, userID, encrypted string) error
 	// Чатын мэдүүлэг (reports.go): нэг хүн нэг мессежийг давтан мэдүүлбэл ErrConflict.

@@ -25,11 +25,15 @@ type meView struct {
 	PhoneVerified string `json:"phone_verified"`
 	PhonePending  string `json:"phone_pending"`
 	PhoneRequired bool   `json:"phone_required"`
+	// RankKey — нүүр хуудасны «Идэвхтэй суралцагчид» дээр өөрийн картаа танихад; RankHidden — жагсаалтаас нуусан.
+	RankKey    string `json:"rank_key"`
+	RankHidden bool   `json:"rank_hidden"`
 }
 
 func (s *Server) me(u *store.User) meView {
 	return meView{User: u, Phone: u.Phone, ConsentVersion: u.ConsentVersion, ConsentNeeded: u.ConsentVersion != TermsVersion, IsAdmin: s.isAdmin(u),
-		PhoneVerified: u.PhoneVerified, PhonePending: u.PhonePending, PhoneRequired: s.Verify != nil && u.PhoneVerified == "" && u.PhonePending == ""}
+		PhoneVerified: u.PhoneVerified, PhonePending: u.PhonePending, PhoneRequired: s.Verify != nil && u.PhoneVerified == "" && u.PhonePending == "",
+		RankKey: s.rankKey(u.ID), RankHidden: u.RankHidden}
 }
 
 // consentNow — бүртгүүлэх (эсвэл зөвшөөрөх) үед зөвшөөрлийг тэмдэглэнэ.

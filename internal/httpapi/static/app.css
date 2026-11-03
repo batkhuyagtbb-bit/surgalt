@@ -1197,32 +1197,32 @@ body.dragging-ol{user-select:none}
 .code-ico{font-size:2.6rem;line-height:1;margin:6px 0 4px}
 .code-card input{text-align:center;font:700 1.2rem ui-monospace,Consolas,monospace;letter-spacing:.1em}
 /* ===== Хүртээмж: хичээл унших хэсэгт харааны бэрхшээлтэй хүмүүст зориулсан байнга дагадаг цэс ===== */
-.a11y-fab{position:fixed;left:18px;bottom:18px;z-index:2500;display:grid;place-items:center;width:60px;height:60px;padding:0;border:3px solid rgba(255,255,255,.6);border-radius:50%;background:#3b2fa0;color:#fff;box-shadow:0 10px 26px rgba(30,20,90,.45);cursor:pointer;transition:transform .15s}
+.a11y-fab{position:fixed;left:18px;bottom:18px;z-index:2500;display:grid;place-items:center;width:60px;height:60px;padding:0;border:3px solid rgba(255,255,255,.6);border-radius:50%;background:#1f3c8f;color:#fff;box-shadow:0 10px 26px rgba(19,40,110,.45);cursor:pointer;transition:transform .15s}
 html:is(.intro-on,.bd-on,.lbx-open) .a11y-fab{display:none} /* интро, цагаан самбар, зураг томруулахад нууна */
 html.lp-focus:has(.lp .hl-a11y) .a11y-fab{display:none} /* маркерын самбарт товч байвал дугуй товч хэрэггүй */
-.hl-a11y{color:#3b2fa0}
+.hl-a11y{color:#1f3c8f}
 .hl-a11y svg{vertical-align:-4px}
-.hl-a11y[aria-expanded="true"],html[class*=" a11y-"] .hl-a11y,html[class^="a11y-"] .hl-a11y{background:#e7e3fb;border-color:#3b2fa0}
+.hl-a11y[aria-expanded="true"],html[class*=" a11y-"] .hl-a11y,html[class^="a11y-"] .hl-a11y{background:#e4eafb;border-color:#1f3c8f}
 .a11y-fab:hover{transform:scale(1.06)}
 .a11y-fab:focus-visible,.a11y-opt:focus-visible,.a11y-reset:focus-visible,.a11y-x:focus-visible{outline:3px solid #ffd60a;outline-offset:3px}
 .a11y-fab.on::after{content:"";position:absolute;top:1px;right:1px;width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:#34c759}
-.a11y-panel{position:fixed;left:18px;bottom:90px;z-index:2501;width:min(350px,calc(100vw - 36px));max-height:calc(100vh - 112px);max-height:calc(100svh - 112px);overflow:auto;padding:14px;border:1px solid #d9d4f2;border-radius:20px;background:#f1effb;box-shadow:0 24px 60px -14px rgba(30,20,90,.55);color:#1d1a3a}
+.a11y-panel{position:fixed;left:18px;bottom:90px;z-index:2501;width:min(350px,calc(100vw - 36px));max-height:calc(100vh - 112px);max-height:calc(100svh - 112px);overflow:auto;padding:14px;border:1px solid #d5def5;border-radius:20px;background:#f2f5fd;box-shadow:0 24px 60px -14px rgba(19,40,110,.5);color:#131b31}
 .a11y-panel[hidden],html:is(.intro-on,.bd-on,.lbx-open) .a11y-panel{display:none}
 .a11y-head{display:flex;align-items:center;justify-content:space-between;margin:0 2px 10px}
-.a11y-head b{font:800 1.08rem var(--sans);color:#2b2370}
-.a11y-x{width:36px;height:36px;border:0;border-radius:50%;background:#fff;color:#2b2370;font-size:1rem;cursor:pointer}
+.a11y-head b{font:800 1.08rem var(--sans);color:#172c6b}
+.a11y-x{width:36px;height:36px;border:0;border-radius:50%;background:#fff;color:#172c6b;font-size:1rem;cursor:pointer}
 .a11y-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.a11y-opt{display:grid;justify-items:center;align-content:center;gap:7px;min-height:124px;padding:12px 8px;border:2px solid #d4cfee;border-radius:16px;background:#fff;color:#1d1a3a;font:700 .92rem/1.25 var(--sans);text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
-.a11y-opt:hover{border-color:#8f86d6}
-.a11y-opt[aria-pressed="true"]{border-color:#3b2fa0;background:#e7e3fb}
-.a11y-ic{display:grid;place-items:center;height:36px;color:#3b2fa0}
-.a11y-df{font:700 1.7rem/1 Georgia,"Times New Roman",serif;color:#3b2fa0}
-.a11y-sub{min-height:1em;font-size:.74rem;font-weight:600;color:#5b55a0}
+.a11y-opt{display:grid;justify-items:center;align-content:center;gap:7px;min-height:124px;padding:12px 8px;border:2px solid #d3dcf3;border-radius:16px;background:#fff;color:#131b31;font:700 .92rem/1.25 var(--sans);text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.a11y-opt:hover{border-color:#7d93cf}
+.a11y-opt[aria-pressed="true"]{border-color:#1f3c8f;background:#e4eafb}
+.a11y-ic{display:grid;place-items:center;height:36px;color:#1f3c8f}
+.a11y-df{font:700 1.7rem/1 Georgia,"Times New Roman",serif;color:#1f3c8f}
+.a11y-sub{min-height:1em;font-size:.74rem;font-weight:600;color:#4a5f99}
 .a11y-lv{display:flex;gap:6px}
-.a11y-lv i{width:22px;height:6px;border-radius:4px;background:#cfc9ee}
-.a11y-lv i.on{background:#3b2fa0}
-.a11y-reset{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:12px;padding:15px;border:0;border-radius:14px;background:#8b84c6;color:#fff;font:800 1rem var(--sans);cursor:pointer}
-.a11y-reset:hover{background:#6f67b8}
+.a11y-lv i{width:22px;height:6px;border-radius:4px;background:#cdd8f0}
+.a11y-lv i.on{background:#1f3c8f}
+.a11y-reset{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:12px;padding:15px;border:0;border-radius:14px;background:#5b74b8;color:#fff;font:800 1rem var(--sans);cursor:pointer}
+.a11y-reset:hover{background:#3f5aa3}
 .a11y-live{position:absolute;width:1px;height:1px;margin:0;overflow:hidden;clip:rect(0 0 0 0)}
 @media (max-width:640px){.a11y-fab{left:12px;bottom:12px;width:54px;height:54px}.a11y-panel{left:8px;right:8px;width:auto;bottom:76px}.a11y-opt{min-height:112px}}
 /* Хэрэглэх: бүх хуудсанд (хичээл унших хэсэгт .lp-д нарийвчилсан дүрэм доор) */
@@ -4823,9 +4823,9 @@ a.np-item:active{background:var(--line)}
 .tt-card{scroll-snap-align:start;min-width:0}
 .tt-track.in .tt-card{animation:tt-in .5s var(--ease) both;animation-delay:var(--d)}
 @keyframes tt-in{from{opacity:0;transform:translateY(14px) scale(.98)}}
-.tt-card a{position:relative;display:grid;justify-items:center;gap:6px;height:100%;padding:22px 16px 16px;border:1px solid var(--line);border-radius:20px;background:var(--surface);color:inherit;text-align:center;text-decoration:none;box-shadow:0 1px 2px rgba(19,27,49,.05);transition:transform .25s var(--ease),box-shadow .25s,border-color .25s}
-.tt-card a:hover,.tt-card a:focus-visible{transform:translateY(-4px);border-color:var(--brand-tint,#cdd8f5);box-shadow:0 18px 34px -18px rgba(31,60,143,.45)}
-.tt-card a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tt-card .tt-in{position:relative;display:grid;justify-items:center;gap:6px;height:100%;padding:22px 16px 16px;border:1px solid var(--line);border-radius:20px;background:var(--surface);color:inherit;text-align:center;text-decoration:none;box-shadow:0 1px 2px rgba(19,27,49,.05);transition:transform .25s var(--ease),box-shadow .25s,border-color .25s}
+.tt-card .tt-in:hover,.tt-card a.tt-in:focus-visible{transform:translateY(-4px);border-color:var(--brand-tint,#cdd8f5);box-shadow:0 18px 34px -18px rgba(31,60,143,.45)}
+.tt-card a.tt-in:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .tt-rank{position:absolute;top:12px;left:12px;display:inline-flex;align-items:center;gap:3px;min-width:30px;height:30px;padding:0 8px;border-radius:999px;background:var(--surface-2);color:var(--text-2);font:800 .9rem var(--sans);justify-content:center}
 .tt-av{width:76px;height:76px;margin-top:6px;font-size:1.5rem;box-shadow:0 0 0 4px var(--surface),0 0 0 6px var(--line)}
 .tt-av img{width:100%;height:100%;object-fit:cover}
@@ -4841,15 +4841,15 @@ a.np-item:active{background:var(--line)}
 .tt-stats{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;min-height:20px;color:var(--muted);font-size:.8rem;font-weight:700}
 .tt-stats span{display:inline-flex;align-items:center;gap:4px}
 .tt-go{display:inline-flex;align-items:center;gap:4px;margin-top:4px;color:var(--brand);font-size:.82rem;font-weight:800;opacity:.75;transition:opacity .2s,gap .2s}
-.tt-card a:hover .tt-go{opacity:1;gap:8px}
+.tt-card .tt-in:hover .tt-go{opacity:1;gap:8px}
 /* Медаль: 1 — алт (титэм), 2 — мөнгө, 3 — хүрэл */
-.tt-m1 a{border-color:#f3cf74;background:linear-gradient(180deg,#fff8e4,var(--surface) 46%)}
+.tt-m1 .tt-in{border-color:#f3cf74;background:linear-gradient(180deg,#fff8e4,var(--surface) 46%)}
 .tt-m1 .tt-rank{background:linear-gradient(135deg,#f7d774,#e2a51f);color:#4a3200;box-shadow:0 4px 12px -4px rgba(226,165,31,.8)}
 .tt-m1 .tt-av{box-shadow:0 0 0 4px #fff8e4,0 0 0 7px #e9b93e}
-.tt-m2 a{border-color:#d6dbe6;background:linear-gradient(180deg,#f3f5fa,var(--surface) 46%)}
+.tt-m2 .tt-in{border-color:#d6dbe6;background:linear-gradient(180deg,#f3f5fa,var(--surface) 46%)}
 .tt-m2 .tt-rank{background:linear-gradient(135deg,#eef1f6,#b4bccb);color:#2d3443}
 .tt-m2 .tt-av{box-shadow:0 0 0 4px #f3f5fa,0 0 0 7px #b9c1cf}
-.tt-m3 a{border-color:#ebc9a8;background:linear-gradient(180deg,#fdf1e6,var(--surface) 46%)}
+.tt-m3 .tt-in{border-color:#ebc9a8;background:linear-gradient(180deg,#fdf1e6,var(--surface) 46%)}
 .tt-m3 .tt-rank{background:linear-gradient(135deg,#f0c39a,#c47a3a);color:#3e2207}
 .tt-m3 .tt-av{box-shadow:0 0 0 4px #fdf1e6,0 0 0 7px #d09460}
 .tt-nav{position:absolute;top:50%;z-index:2;display:grid;place-items:center;width:44px;height:44px;margin-top:-22px;border:1px solid var(--line-2);border-radius:50%;background:var(--surface);color:var(--brand);box-shadow:0 8px 20px -10px rgba(19,27,49,.45);cursor:pointer;transition:opacity .2s,transform .2s var(--ease)}
@@ -4870,4 +4870,17 @@ a.np-item:active{background:var(--line)}
 }
 @media (prefers-reduced-motion:reduce){.tt-track.in .tt-card,.tt-track.in .tt-bar i{animation:none}.tt-track{scroll-behavior:auto}}
 .tt-demo-tag{display:inline-block;padding:4px 12px;border-radius:999px;background:#fff1d9;border:1px dashed #e0a43a;color:#8a5400;font-size:.8rem;font-weight:800}
-.tt-demo .tt-card a{cursor:default}
+.tt-demo .tt-card .tt-in{cursor:default}
+/* Идэвхтэй суралцагчид: ногоон өнгө аяс, цол, өөрийн карт, нуух */
+.tt-stu .tt-tabs button[aria-selected="true"]{background:linear-gradient(115deg,#0f766e,#1f3c8f);box-shadow:0 10px 22px -12px rgba(15,118,110,.8)}
+.tt-stu .tt-metric b{color:#0f766e}
+.tt-stu .tt-bar i{background:linear-gradient(90deg,#0f766e,#22a38f)}
+.tt-stu .tt-dots i.on{background:#0f766e}
+.tt-lv{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:auto;color:#5b4a14;font-weight:700}
+.tt-ins{color:#c58a12;letter-spacing:.05em}
+.tt-warn{color:var(--coral)}.tt-ok{color:#13784a}
+.tt-me .tt-in{border:2px solid #0f766e;box-shadow:0 0 0 4px rgba(15,118,110,.12)}
+.tt-you{position:absolute;top:12px;right:12px;padding:3px 9px;border-radius:999px;background:#0f766e;color:#fff;font-size:.74rem;font-weight:800}
+.tt-hide{margin-top:4px;padding:4px 10px;border:1px solid var(--line-2);border-radius:999px;background:var(--surface);color:var(--muted);font:700 .76rem var(--sans);cursor:pointer}
+.tt-hide:hover{color:var(--coral);border-color:var(--coral)}
+.tt-foot{margin:10px 0 0;text-align:center;color:var(--muted);font-size:.86rem}
