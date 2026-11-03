@@ -187,12 +187,12 @@ func (m *Memory) UserByEmail(_ context.Context, email string) (*User, error) {
 	return m.userLocked(id)
 }
 
-func (m *Memory) UsersByVerifiedPhone(_ context.Context, phone string) ([]User, error) {
+func (m *Memory) UsersByRecoveryPhone(_ context.Context, phone string) ([]User, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	out := []User{}
 	for id, u := range m.users {
-		if phone != "" && u.PhoneVerified == phone {
+		if phone != "" && (u.PhoneVerified == phone || u.PhonePending == phone) {
 			c, _ := m.userLocked(id)
 			out = append(out, *c)
 		}

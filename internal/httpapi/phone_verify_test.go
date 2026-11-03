@@ -170,6 +170,24 @@ func TestPhoneVerifyAndReset(t *testing.T) {
 	if _, r := call(t, srv, "POST", "/api/auth/forgot/phone/check", "", `{"token":"`+fp["token"].(string)+`"}`); r["status"] != "expired" {
 		t.Fatalf("хугацаа дууссан: %v", r)
 	}
+	// Түр хадгалсан дугаар (SMS-гүй): дахин асуухгүй; утсаар сэргээхэд тэр дугаараас SMS ирмэгц баталгаажна.
+	pend, _ := register(t, srv, "php", "student")
+	if code, _ := call(t, srv, "PUT", "/api/me/phone", pend, `{"phone":"12"}`); code != http.StatusBadRequest {
+		t.Fatalf("буруу дугаар: %d", code)
+	}
+	if code, me := call(t, srv, "PUT", "/api/me/phone", pend, `{"phone":"8800 4455"}`); code != 200 || me["phone_pending"] != "88004455" || me["phone_required"] != false || me["phone_verified"] != "" {
+		t.Fatalf("түр хадгалах: %d %v", code, me)
+	}
+	body = strings.Replace(forgotBody(t, srv, "x@x.mn"), `"email":"x@x.mn"`, `"phone":"88004455"`, 1)
+	_, fp = call(t, srv, "POST", "/api/auth/forgot/phone", "", body)
+	fv.set("se", verifymn.Verified)
+	_, r = call(t, srv, "POST", "/api/auth/forgot/phone/check", "", `{"token":"`+fp["token"].(string)+`"}`)
+	if accts, _ := r["accounts"].([]any); r["status"] != "verified" || len(accts) != 1 || accts[0].(map[string]any)["username"] != "php" {
+		t.Fatalf("түр хадгалсан дугаараар сэргээх: %v", r)
+	}
+	if _, me := call(t, srv, "GET", "/api/me", pend, ""); me["phone_verified"] != "88004455" || me["phone_pending"] != "" {
+		t.Fatalf("SMS ирснээр баталгаажна: %v %v", me["phone_verified"], me["phone_pending"])
+	}
 	if got := maskEmail("google_1@users.noreply.surgalt"); got != "" {
 		t.Errorf("орлуулсан имэйлийг харуулахгүй: %q", got)
 	}

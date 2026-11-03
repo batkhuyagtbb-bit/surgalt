@@ -197,6 +197,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/auth/recovery", s.handleRecovery)
 	mux.HandleFunc("POST /api/auth/forgot/phone", s.handleForgotPhone)
 	mux.HandleFunc("POST /api/auth/forgot/phone/check", s.handleForgotPhoneCheck)
+	mux.HandleFunc("PUT /api/me/phone", s.handleMyPhoneSave)
 	mux.HandleFunc("POST /api/me/phone/verify", s.handleMyPhoneStart)
 	mux.HandleFunc("POST /api/me/phone/check", s.handleMyPhoneCheck)
 	mux.HandleFunc("GET /api/verify/callback", s.handleVerifyCallback)

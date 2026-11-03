@@ -36,6 +36,8 @@ type User struct {
 	Phone string `json:"-"`
 	// PhoneVerified — verify.mn-ээр (хэрэглэгч өөрийн утаснаас SMS илгээж) баталгаажуулсан дугаар: нууц үг сэргээхэд.
 	PhoneVerified string `json:"-"`
+	// PhonePending — хэрэглэгч оруулсан, SMS-ээр хараахан баталгаажуулаагүй дугаар (түр хадгална; утсаар сэргээхэд SMS-ээр баталгаажна).
+	PhonePending string `json:"-"`
 	// Үйлчилгээний нөхцөл, нууцлалын бодлогыг зөвшөөрсөн хувилбар ба цаг (Хувь хүний мэдээлэл хамгаалах тухай хууль).
 	// Google/Facebook-ээр эсвэл өмнө бүртгүүлсэн хэрэглэгч нэвтрэхдээ зөвшөөрнө.
 	ConsentVersion string     `json:"-"`
@@ -596,8 +598,8 @@ type Store interface {
 	CreateUser(ctx context.Context, u *User) error
 	UserByID(ctx context.Context, id string) (*User, error)
 	UserByEmail(ctx context.Context, email string) (*User, error)
-	// UsersByVerifiedPhone — тухайн дугаараар утсаа баталгаажуулсан (устгаагүй) бүртгэлүүд.
-	UsersByVerifiedPhone(ctx context.Context, phone string) ([]User, error)
+	// UsersByRecoveryPhone — тухайн дугаарыг (баталгаажсан эсвэл түр хадгалсан) сэргээх утсаараа бүртгүүлсэн бүртгэлүүд.
+	UsersByRecoveryPhone(ctx context.Context, phone string) ([]User, error)
 	UserByUsername(ctx context.Context, username string) (*User, error)
 	UpdateProfile(ctx context.Context, id string, p ProfileUpdate) error
 	// UpdateUsername нь хэрэглэгчийн нэрийг (профайлын холбоос) солино. Нэр эзэнтэй бол ErrConflict.

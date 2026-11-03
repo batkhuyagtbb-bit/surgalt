@@ -20,14 +20,16 @@ type meView struct {
 	ConsentVersion string `json:"consent_version"`
 	ConsentNeeded  bool   `json:"consent_needed"`     // нөхцөлийг дахин асууна
 	IsAdmin        bool   `json:"is_admin,omitempty"` // чатын мэдүүлэг шийдвэрлэх хянагч (moderation.go)
-	// Нууц үг сэргээх утас (verify.mn-ээр баталгаажсан); PhoneRequired — баталгаажуулаагүй бол нэвтрэхэд асууна.
+	// Нууц үг сэргээх утас: баталгаажсан (Verify.MN SMS) эсвэл түр хадгалсан. PhoneRequired — аль нь ч байхгүй бол
+	// нэвтрэхэд дугаар асууна (SMS шаардахгүй — сэргээх үед SMS-ээр баталгаажна).
 	PhoneVerified string `json:"phone_verified"`
+	PhonePending  string `json:"phone_pending"`
 	PhoneRequired bool   `json:"phone_required"`
 }
 
 func (s *Server) me(u *store.User) meView {
 	return meView{User: u, Phone: u.Phone, ConsentVersion: u.ConsentVersion, ConsentNeeded: u.ConsentVersion != TermsVersion, IsAdmin: s.isAdmin(u),
-		PhoneVerified: u.PhoneVerified, PhoneRequired: s.Verify != nil && u.PhoneVerified == ""}
+		PhoneVerified: u.PhoneVerified, PhonePending: u.PhonePending, PhoneRequired: s.Verify != nil && u.PhoneVerified == "" && u.PhonePending == ""}
 }
 
 // consentNow — бүртгүүлэх (эсвэл зөвшөөрөх) үед зөвшөөрлийг тэмдэглэнэ.

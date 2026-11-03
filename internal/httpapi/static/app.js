@@ -652,46 +652,38 @@ function smsVerify(box, v, check, done, restart) {
   timer = setTimeout(tick, 2500);
 }
 
-// Нэвтэрсэн хэрэглэгч нууц үг сэргээх утсаа баталгаажуулаагүй бол (Verify.MN идэвхтэй үед) заавал асууна.
+// Нэвтэрсэн хэрэглэгчээс нууц үг сэргээх утасны дугаарыг (Verify.MN идэвхтэй үед) нэг удаа асууна — зөвхөн бичээд
+// хадгална, SMS шаардахгүй (шинэ хэрэглэгчид ачаалал болохгүй). Утсаар сэргээх үед тэр дугаараас SMS ирснээр баталгаажна.
 async function phoneGate() {
-  if (["legal", "login", "reset", "error", "admin"].includes(page) || !Auth.token || Auth.user?.phone_verified || $(".cg")) return;
+  if (["legal", "login", "reset", "error", "admin"].includes(page) || !Auth.token || Auth.user?.phone_verified || Auth.user?.phone_pending || $(".cg")) return;
   let u; try { u = await api("/api/me"); } catch { return; }
   Auth.set(Auth.token, u);
-  if (!u.phone_required || u.phone_verified || $(".cg")) return;
+  if (!u.phone_required || $(".cg")) return;
   const el = document.createElement("div");
   el.className = "cg pg"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "pgT");
   el.innerHTML = `<div class="cg-card">
     <span class="cg-ico" aria-hidden="true">${icon("phone", 26)}</span>
-    <h3 id="pgT">Утасны дугаараа баталгаажуулна уу</h3>
-    <p>Нууц үгээ мартсан үед энэ дугаараараа шууд сэргээнэ. Дугаар тань бусдад харагдахгүй.</p>
-    <div class="pg-body"><form class="pg-form"><label>Гар утасны дугаар<input name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="12" placeholder="9911 2233" required value="${esc((u.phone || "").replace(/^(\d{4})(\d{4})$/, "$1 $2"))}"></label>
-      <button class="btn btn-gold btn-block">Үргэлжлүүлэх</button></form></div>
+    <h3 id="pgT">Утасны дугаараа үлдээнэ үү</h3>
+    <p>Нууц үгээ мартвал энэ дугаараараа хялбар сэргээнэ. Дугаар тань бусдад харагдахгүй.</p>
+    <form class="pg-form"><label>Гар утасны дугаар<input name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="12" placeholder="9911 2233" required value="${esc((u.phone || "").replace(/^(\d{4})(\d{4})$/, "$1 $2"))}"></label>
+      <button class="btn btn-gold btn-block">Хадгалах</button></form>
     <p class="cg-err" role="alert"></p>
-    <div class="cg-act"><button type="button" class="btn btn-ghost" data-cg-out>Гарах</button></div>
   </div>`;
   const behind = [...document.body.children];
   behind.forEach((c) => (c.inert = true));
   document.body.append(el); document.documentElement.classList.add("cg-open");
-  const body = $(".pg-body", el), errEl = $(".cg-err", el), formHTML = body.innerHTML;
-  $("[data-cg-out]", el).onclick = () => { Auth.clear(); location.href = "/"; };
-  const close = (me) => {
-    Auth.set(Auth.token, me); behind.forEach((c) => (c.inert = false));
-    el.remove(); document.documentElement.classList.remove("cg-open");
-    toast("✅ Утасны дугаар баталгаажлаа. Нууц үгээ мартвал энэ дугаараараа сэргээнэ.");
+  const f = $(".pg-form", el), errEl = $(".cg-err", el);
+  f.phone.focus();
+  f.onsubmit = async (e) => {
+    e.preventDefault(); errEl.textContent = "";
+    const b = $("button", f); b.disabled = true;
+    try {
+      const me = await api("/api/me/phone", { method: "PUT", body: { phone: f.phone.value } });
+      Auth.set(Auth.token, me); behind.forEach((c) => (c.inert = false));
+      el.remove(); document.documentElement.classList.remove("cg-open");
+      toast("✅ Дугаар хадгалагдлаа. Нууц үгээ мартвал «Утсаар» сэргээнэ.");
+    } catch (x) { errEl.textContent = x.message; b.disabled = false; }
   };
-  const bind = () => {
-    const f = $(".pg-form", body); f.phone.focus();
-    f.onsubmit = async (e) => {
-      e.preventDefault(); errEl.textContent = "";
-      const b = $("button", f); b.disabled = true;
-      try {
-        const v = await api("/api/me/phone/verify", { method: "POST", body: { phone: f.phone.value } });
-        smsVerify(body, v, (token) => api("/api/me/phone/check", { method: "POST", body: { token } }), (r) => setTimeout(() => close(r.user), 600),
-          () => { body.innerHTML = formHTML; bind(); });
-      } catch (x) { errEl.textContent = x.message; b.disabled = false; }
-    };
-  };
-  bind();
 }
 
 // Нөхцөл, нууцлалын бодлогын одоогийн хувилбарыг зөвшөөрөөгүй бол (Google г.м.-ээр шинээр орсон, эсвэл бодлого шинэчлэгдсэн)
@@ -5293,7 +5285,7 @@ function loginPage() {
   $("[data-forgot-back]").addEventListener("click", () => showForgot(false));
   $("[data-captcha-new]", ff).addEventListener("click", () => { newCaptcha(); ff.captcha.focus(); });
   // Сэргээх арга: имэйл эсвэл (Verify.MN идэвхтэй бол) баталгаажуулсан утас — утаснаасаа SMS илгээж шууд сэргээнэ.
-  const LEDE = { email: "Бүртгэлтэй имэйлээ бичнэ үү. Нууц үг сэргээх холбоос илгээнэ.", phone: "Баталгаажуулсан утасны дугаараа бичнэ үү. Тэр дугаараасаа нэг SMS илгээгээд нууц үгээ шууд солино." };
+  const LEDE = { email: "Бүртгэлтэй имэйлээ бичнэ үү. Нууц үг сэргээх холбоос илгээнэ.", phone: "Бүртгэлдээ үлдээсэн утасны дугаараа бичнэ үү. Тэр дугаараасаа нэг SMS илгээгээд нууц үгээ шууд солино." };
   let fgMode = "email";
   const sms = $(".fg-sms", ff), go = $(".fg-go", ff);
   const setMode = (m) => {

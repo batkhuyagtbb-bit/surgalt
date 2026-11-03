@@ -118,6 +118,38 @@ func (s *Server) handleRecovery(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"email": s.cfg.Mail != nil || s.cfg.DevPayments, "phone": s.Verify != nil})
 }
 
+// handleMyPhoneSave: PUT /api/me/phone {phone} — сэргээх утсыг түр хадгална (SMS шаардахгүй). Утсаар сэргээх үед
+// тэр дугаараас SMS ирснээр баталгаажна.
+func (s *Server) handleMyPhoneSave(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Phone string `json:"phone"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	phone, ok := mnPhone(in.Phone)
+	if !ok {
+		writeErr(w, http.StatusBadRequest, "Монголын 8 оронтой гар утасны дугаараа бичнэ үү")
+		return
+	}
+	u, err := s.store.UpdateUser(r.Context(), c.UID, func(u *store.User) error {
+		if phone == u.PhoneVerified {
+			u.PhonePending = ""
+		} else {
+			u.PhonePending = phone
+		}
+		return nil
+	})
+	if s.storeErr(w, r, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, s.me(u))
+}
+
 // handleMyPhoneStart: POST /api/me/phone/verify {phone}
 func (s *Server) handleMyPhoneStart(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireUser(w, r)
@@ -185,7 +217,7 @@ func (s *Server) handleMyPhoneCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, err := s.store.UpdateUser(r.Context(), c.UID, func(u *store.User) error {
-		u.PhoneVerified = pc.Phone
+		u.PhoneVerified, u.PhonePending = pc.Phone, ""
 		return nil
 	})
 	if s.storeErr(w, r, err) {
@@ -261,17 +293,27 @@ func (s *Server) handleForgotPhoneCheck(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusOK, phoneStatusView(status))
 		return
 	}
-	us, err := s.store.UsersByVerifiedPhone(r.Context(), pc.Phone)
+	us, err := s.store.UsersByRecoveryPhone(r.Context(), pc.Phone)
 	if s.storeErr(w, r, err) {
 		return
 	}
 	if len(us) == 0 {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "none", "error": "Энэ дугаараар баталгаажсан бүртгэл олдсонгүй. Имэйлээрээ сэргээнэ үү."})
+		writeJSON(w, http.StatusOK, map[string]any{"status": "none", "error": "Энэ дугаартай бүртгэл олдсонгүй. Имэйлээрээ сэргээнэ үү."})
 		return
 	}
 	accts := make([]map[string]any, 0, len(us))
 	for i := range us {
 		u := &us[i]
+		if u.PhonePending == pc.Phone { // SMS энэ дугаараас ирсэн — түр хадгалсан дугаар баталгаажлаа
+			if nu, err := s.store.UpdateUser(r.Context(), u.ID, func(x *store.User) error {
+				if x.PhonePending == pc.Phone {
+					x.PhoneVerified, x.PhonePending = pc.Phone, ""
+				}
+				return nil
+			}); err == nil {
+				u = nu
+			}
+		}
 		tok, err := s.tokens.Seal(resetClaim{K: resetKind, UID: u.ID, FP: s.resetFP(u)}, 15*time.Minute)
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, "дотоод алдаа")
