@@ -930,6 +930,8 @@ body[data-page=home] main{min-height:calc(100svh - 82px)}
 .pw-match.ok{color:var(--teal)}.pw-match.bad{color:var(--coral)}
 .btn-social{justify-content:center;gap:12px;background:var(--surface);border-color:var(--line-2);color:var(--text);font-weight:700}
 .btn-social svg,.btn-social .social-ico{flex:none}
+.inapp-note{display:grid;gap:8px;padding:12px 14px;border-radius:12px;background:#fff7e8;border:1px solid #f1c76b;color:#5b4210;font-size:.88rem;line-height:1.45}
+.inapp-note b{color:#3d2c08}.inapp-act{display:flex;flex-wrap:wrap;gap:8px}
 /* ===== студи: сургалтыг групп шиг удирдах ===== */
 .gp-list-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .gp-list-head h1{margin:0;font:800 1.7rem var(--sans);letter-spacing:-.03em}
@@ -4707,12 +4709,15 @@ a.np-item:active{background:var(--line)}
 .sp-card:hover{border-color:var(--line-2);box-shadow:var(--shadow);transform:translateY(-2px)}
 .sp-card.cur{padding:15px;border:2px solid var(--brand)}
 .sp-card h4{margin:0;font-size:1.08rem}
+.sp-label{color:var(--brand);font-size:.84rem;font-weight:700}
 .sp-term{color:var(--muted);font-size:.86rem;font-weight:600}
 .sp-tag{position:absolute;top:12px;right:12px;padding:2px 8px;border-radius:999px;background:var(--brand);color:var(--on-brand);font-size:.72rem;font-weight:700}
 .sp-price,.sp-pct{display:grid;margin:8px 0 0}
 .sp-price b{font-size:1.45rem;letter-spacing:-.01em}
 .sp-price small,.sp-pct small{color:var(--muted);font-size:.8rem}
 .sp-pct{margin-bottom:12px}
+.sp-store{display:flex;align-items:center;gap:6px;margin:8px 0 0;color:var(--muted);font-size:.84rem}
+.sp-store svg{color:var(--brand)}.sp-store b{color:var(--text)}
 .sp-pct b{color:var(--teal);font-size:1.1rem}
 .sp-card .btn{margin-top:auto}
 .sp-rules{display:grid;gap:4px;margin:0;padding-left:18px;color:var(--muted);font-size:.86rem}

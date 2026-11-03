@@ -5158,15 +5158,29 @@ function loginPage() {
     microsoft: [`<span class="social-ico" style="background:#0078d4">⊞</span>`, "Microsoft"],
     instagram: [`<span class="social-ico" style="background:linear-gradient(45deg,#f58529,#dd2a7b,#8134af)">◎</span>`, "Instagram"] };
   const social = $("#social");
+  // Facebook, Messenger, Instagram доторх хөтөчөөс Google нэвтрэлтийг Google өөрөө хаадаг (403 disallowed_useragent) —
+  // товчийг дарахад алдааны хуудас биш, жинхэнэ хөтөчөөр нээх заавар гаргана.
+  const inApp = /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Messenger/i.test(navigator.userAgent);
   const renderSocial = (ps) => {
     const nx = h.get("next") || q.get("next") || "", rl = tab === "register" ? role : ""; // нэвтрэх: шинэ хэрэглэгчээс дараа нь асууна
     social.innerHTML = ps.map((p) => {
       const [ic, name] = icons[p.name] || [`<span class="social-ico" style="background:#555">•</span>`, p.label];
       const u = `${p.url}?${new URLSearchParams({ ...(rl ? { role: rl } : {}), ...(nx ? { next: nx } : {}) })}`;
+      if (inApp && p.name === "google") return `<button type="button" class="btn btn-social" data-inapp>${ic}<span>${esc(name)}-ээр үргэлжлүүлэх</span></button>`;
       return `<a class="btn btn-social" href="${esc(u)}">${ic}<span>${esc(name)}-ээр үргэлжлүүлэх</span></a>`;
-    }).join("");
+    }).join("") + (inApp ? `<div class="inapp-note" hidden></div>` : "");
     $(".divider").hidden = !ps.length;
   };
+  social.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-inapp]")) return;
+    const note = $(".inapp-note", social), url = location.href.split("#")[0];
+    const android = /Android/i.test(navigator.userAgent);
+    note.innerHTML = `<b>Facebook доторх хөтөч Google-ээр нэвтрэхийг зөвшөөрдөггүй</b>
+      <span>${android ? "Доорх товчоор Chrome-оор нээгээд" : "Баруун дээд/доод буланд байрлах <b>⋯</b> → <b>«Open in browser» (Хөтчөөр нээх)</b>-ийг дарж Safari-д нээгээд"} Google-ээр нэвтэрнэ үү. Эсвэл Facebook, имэйлээр шууд нэвтэрч болно.</span>
+      <span class="inapp-act">${android ? `<a class="btn btn-gold btn-sm" href="${esc(`intent://${location.host}${location.pathname}${location.search}#Intent;scheme=https;S.browser_fallback_url=${encodeURIComponent(url)};end`)}">Chrome-оор нээх</a>` : ""}<button type="button" class="btn btn-ghost btn-sm" data-copy-link>Холбоос хуулах</button></span>`;
+    note.hidden = false;
+    $("[data-copy-link]", note).onclick = (ev) => navigator.clipboard?.writeText(url).then(() => (ev.target.textContent = "Хуулагдлаа ✓"), () => prompt("Холбоосыг хуулна уу:", url));
+  });
   let providers = [];
   api("/api/auth/providers", { token: null }).then((ps) => { providers = ps; sync(); }).catch(() => sync());
   if (role) $$(".tab")[1].click(); else sync();

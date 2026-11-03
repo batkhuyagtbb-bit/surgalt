@@ -269,7 +269,7 @@ VIEWS.teachers = {
 };
 
 // Системийн эрх (plans.go): шошго ба олгох сонголт.
-const PLAN_OPTS = [["start", "Эхлэл · 3 сар"], ["standard", "Standart · 6 сар"], ["major", "Major · 1 жил"], ["pro", "Pro · 1 жил"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+const PLAN_OPTS = [["start", "Starter (Эхлэл) · 3 сар"], ["standard", "Standard (Стандарт) · 6 сар"], ["major", "Advanced (Ахисан түвшин) · 1 жил"], ["pro", "Enterprise (Бизнес / Энтерпрайз) · 1 жил"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
 const planChip = (t) => `<span class="chip ${!t.plan_active ? "chip-coral" : t.plan === "trial" ? "chip-amber" : "chip-teal"}">${t.plan_active ? esc(t.plan_name) : "Дууссан"}</span>`;
 
 async function openTeacher(id) {

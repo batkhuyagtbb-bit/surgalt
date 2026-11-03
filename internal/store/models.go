@@ -107,12 +107,18 @@ type Meeting struct {
 	Buyers      int       `json:"buyers,omitempty"` // зөвхөн багшид: худалдаж авсан хүний тоо (хадгалагдахгүй)
 }
 
-// StorageQuota нь үнэгүй хэмжээ + хүчинтэй худалдан авсан багтаамж.
+// StorageQuota нь суурь хэмжээ (үнэгүй эсвэл системийн эрхийн багцад багтсан — аль их нь) + хүчинтэй худалдан авсан багтаамж.
 func (u *User) StorageQuota(freeBytes int64, now time.Time) int64 {
+	base := u.StorageBase(freeBytes, now)
 	if u.StorageExpiresAt != nil && now.Before(*u.StorageExpiresAt) {
-		return freeBytes + u.StorageExtraBytes
+		return base + u.StorageExtraBytes
 	}
-	return freeBytes
+	return base
+}
+
+// StorageBase — үнэгүй хэмжээ эсвэл идэвхтэй багцад багтсан файлын сан (аль их нь).
+func (u *User) StorageBase(freeBytes int64, now time.Time) int64 {
+	return max(freeBytes, u.PlanStorageBytes(now))
 }
 
 // Course бол багшийн явуулдаг сургалт. Price нь төгрөгөөр, 0 бол үнэгүй.

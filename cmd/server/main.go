@@ -263,6 +263,7 @@ func run(log *slog.Logger) error {
 		// Google Search Console / Bing Webmaster-ийн «HTML tag» баталгаажуулалтын content утга.
 		GoogleSiteVerification: strings.TrimSpace(os.Getenv("GOOGLE_SITE_VERIFICATION")),
 		BingSiteVerification:   strings.TrimSpace(os.Getenv("BING_SITE_VERIFICATION")),
+		FacebookAppID:          strings.TrimSpace(os.Getenv("FACEBOOK_CLIENT_ID")),
 	}, st, tokens, hub, fstore, log)
 
 	base := env("PUBLIC_URL", "http://localhost"+env("ADDR", ":8080"))

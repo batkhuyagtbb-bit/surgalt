@@ -411,7 +411,7 @@ func (m *Memory) CreatePlanOrder(_ context.Context, userID string, p Plan) (*Ord
 		return nil, ErrNotFound
 	}
 	o := &Order{ID: m.next(), Kind: OrderKindPlan, Plan: p.ID, Months: p.Months, UserID: userID, Amount: p.Price,
-		Title: "Системийн эрх · " + p.Name + " · " + PlanTerm(p.Months), Status: OrderPending, CreatedAt: time.Now()}
+		Title: "Системийн эрх · " + p.Title() + " · " + PlanTerm(p.Months), Status: OrderPending, CreatedAt: time.Now()}
 	m.orders[o.ID] = o
 	oc := *o
 	return &oc, nil

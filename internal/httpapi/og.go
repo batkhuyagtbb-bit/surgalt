@@ -257,34 +257,15 @@ func (s *Server) renderProfileOG(ctx context.Context, p *PublicProfile) ([]byte,
 	bold, reg := ogFonts()
 	dst := image.NewRGBA(image.Rect(0, 0, ogW, ogH))
 
-	// Дэвсгэр: брэндийн градиент (диагональ) + баруун дээд талд цайвар туяа; нүүр зурагтай бол түүн дээр бараан бүрхүүл.
-	bg := image.NewRGBA(dst.Bounds())
-	for y := 0; y < ogH; y++ {
-		for x := 0; x < ogW; x++ {
-			k := (float64(x)/ogW*0.6 + float64(y)/ogH*0.4)
-			c := color.RGBA{uint8(float64(ogNavy.R)*(1-k) + float64(ogIndigo.R)*k), uint8(float64(ogNavy.G)*(1-k) + float64(ogIndigo.G)*k), uint8(float64(ogNavy.B)*(1-k) + float64(ogIndigo.B)*k), 255}
-			if d := math.Hypot(float64(x-1080), float64(y-40)) / 620; d < 1 {
-				a := (1 - d) * (1 - d) * 0.38
-				c.R = uint8(float64(c.R)*(1-a) + float64(ogGlow.R)*a)
-				c.G = uint8(float64(c.G)*(1-a) + float64(ogGlow.G)*a)
-				c.B = uint8(float64(c.B)*(1-a) + float64(ogGlow.B)*a)
-			}
-			bg.SetRGBA(x, y, c)
-		}
-	}
+	// Дэвсгэр: брэндийн градиент; нүүр зурагтай бол түүн дээр бараан бүрхүүл.
+	bg := ogBrandBG()
 	if cover := s.ogPicture(ctx, t.CoverURL); cover != nil {
 		draw.Draw(dst, dst.Bounds(), ogCover(cover, ogW, ogH), image.Point{}, draw.Src)
 		draw.DrawMask(dst, dst.Bounds(), bg, image.Point{}, image.NewUniform(color.Alpha{196}), image.Point{}, draw.Over)
 	} else {
 		draw.Draw(dst, dst.Bounds(), bg, image.Point{}, draw.Src)
 	}
-	dot := image.NewUniform(color.NRGBA{255, 255, 255, 26})
-	for y := 18; y < ogH; y += 30 {
-		for x := 18; x < ogW; x += 30 {
-			ogRoundRect(dst, image.Rect(x, y, x+3, y+3), 1.5, dot)
-		}
-	}
-	ogFill(dst, image.Rect(0, ogH-10, ogW, ogH), 0, ogOrange)
+	ogDots(dst)
 
 	// Аватар: цагаан хүрээтэй дугуй.
 	const ax, ay, ad = 72, 104, 220
@@ -379,6 +360,106 @@ func (s *Server) renderProfileOG(ctx context.Context, p *PublicProfile) ([]byte,
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// ogBrandBG — брэндийн градиент (диагональ) + баруун дээд талд цайвар туяа.
+func ogBrandBG() *image.RGBA {
+	bg := image.NewRGBA(image.Rect(0, 0, ogW, ogH))
+	for y := 0; y < ogH; y++ {
+		for x := 0; x < ogW; x++ {
+			k := (float64(x)/ogW*0.6 + float64(y)/ogH*0.4)
+			c := color.RGBA{uint8(float64(ogNavy.R)*(1-k) + float64(ogIndigo.R)*k), uint8(float64(ogNavy.G)*(1-k) + float64(ogIndigo.G)*k), uint8(float64(ogNavy.B)*(1-k) + float64(ogIndigo.B)*k), 255}
+			if d := math.Hypot(float64(x-1080), float64(y-40)) / 620; d < 1 {
+				a := (1 - d) * (1 - d) * 0.38
+				c.R = uint8(float64(c.R)*(1-a) + float64(ogGlow.R)*a)
+				c.G = uint8(float64(c.G)*(1-a) + float64(ogGlow.G)*a)
+				c.B = uint8(float64(c.B)*(1-a) + float64(ogGlow.B)*a)
+			}
+			bg.SetRGBA(x, y, c)
+		}
+	}
+	return bg
+}
+
+// ogDots — цэгэн хээ, доод талын улбар шар зураас.
+func ogDots(dst draw.Image) {
+	dot := image.NewUniform(color.NRGBA{255, 255, 255, 26})
+	for y := 18; y < ogH; y += 30 {
+		for x := 18; x < ogW; x += 30 {
+			ogRoundRect(dst, image.Rect(x, y, x+3, y+3), 1.5, dot)
+		}
+	}
+	ogFill(dst, image.Rect(0, ogH-10, ogW, ogH), 0, ogOrange)
+}
+
+// renderSiteOG — өөрийн зураггүй хуудсыг (нүүр, нөхцөл г.м) хуваалцах зураг: брэнд, уриа, боломжууд, QR.
+func (s *Server) renderSiteOG() ([]byte, error) {
+	bold, reg := ogFonts()
+	dst := ogBrandBG()
+	ogDots(dst)
+
+	const tx, maxW = 80, 820
+	lt := newOGText(bold, 22)
+	label := "БАГШ, СУРАЛЦАГЧДЫН ПЛАТФОРМ"
+	ogFill(dst, image.Rect(tx, 92, tx+lt.width(label)+36, 132), 20, ogOrange)
+	lt.draw(dst, ogNavy, tx+18, 120, label)
+
+	bt := newOGText(bold, 104)
+	w := bt.draw(dst, ogWhite, tx-4, 262, "surgalt")
+	bt.draw(dst, ogOrange, tx-4+w, 262, ".mn")
+	st := newOGText(bold, 46)
+	st.draw(dst, ogWhite, tx, 338, "Сур, сур, бас дахин сур")
+	dt := newOGText(reg, 29)
+	y := 392
+	for _, ln := range dt.wrap("Багш нар сургалт, номоо зарж, суралцагчид нэг дороос хичээл үзэж, даалгавар, шалгалт өгнө", maxW, 2) {
+		dt.draw(dst, ogSoft, tx, y, ln)
+		y += 40
+	}
+
+	ct := newOGText(bold, 25)
+	cx := tx
+	for _, c := range []string{"Видео хичээл", "Цахим ном", "Шууд хичээл", "Шалгалт"} {
+		w := ct.width(c) + 40
+		if cx+w > 920 {
+			break
+		}
+		ogFill(dst, image.Rect(cx, 500, cx+w, 550), 25, color.NRGBA{255, 255, 255, 40})
+		ct.draw(dst, ogWhite, cx+20, 534, c)
+		cx += w + 12
+	}
+
+	link := s.cfg.PublicURL
+	if link == "" {
+		link = "https://surgalt.mn"
+	}
+	if q, err := qrcode.New(link, qrcode.Medium); err == nil {
+		q.DisableBorder = true
+		ogFill(dst, image.Rect(948, 330, 1128, 510), 20, ogWhite)
+		qi := q.Image(150)
+		draw.Draw(dst, image.Rect(963, 345, 963+150, 345+150), qi, qi.Bounds().Min, draw.Over)
+		qt := newOGText(bold, 19)
+		hint := "Уншуулаад нэвтэр"
+		qt.draw(dst, ogWhite, 1038-qt.width(hint)/2, 550, hint)
+	}
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, dst, &jpeg.Options{Quality: 90}); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// handleSiteOG: GET /og.jpg — сайтын хуваалцах зураг (нэг удаа зурж кэшлэнэ).
+func (s *Server) handleSiteOG(w http.ResponseWriter, r *http.Request) {
+	img, err := s.ogs.GetOrLoad(r.Context(), "|site", func(context.Context) ([]byte, error) { return s.renderSiteOG() })
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "зураг үүсгэж чадсангүй")
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", "image/jpeg")
+	h.Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write(img)
 }
 
 // hsl → RGBA (аватаргүй үед нэрийн өнгөөр дугуй).

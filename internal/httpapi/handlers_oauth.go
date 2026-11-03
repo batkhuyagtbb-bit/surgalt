@@ -44,6 +44,16 @@ func safeNext(n string) string {
 	return n
 }
 
+// inAppBrowser — Facebook, Messenger, Instagram апп доторх хөтөч.
+func inAppBrowser(ua string) bool {
+	for _, k := range []string{"FBAN/", "FBAV/", "FB_IAB/", "FBIOS", "Instagram", "Messenger"} {
+		if strings.Contains(ua, k) {
+			return true
+		}
+	}
+	return false
+}
+
 func randHex(n int) string {
 	b := make([]byte, n)
 	_, _ = rand.Read(b)
@@ -68,6 +78,12 @@ func (s *Server) handleOAuthStart(w http.ResponseWriter, r *http.Request) {
 	}
 	p, ok := s.provider(w, r)
 	if !ok {
+		return
+	}
+	// Google нь Facebook, Messenger, Instagram доторх хөтөчөөс нэвтрэхийг хаадаг (403 disallowed_useragent) —
+	// Google-ийн алдааны хуудас руу биш, ойлгомжтой тайлбартай нэвтрэх хуудас руу буцаана.
+	if p.Name == "google" && inAppBrowser(r.UserAgent()) {
+		http.Redirect(w, r, "/login#error="+url.QueryEscape("Facebook доторх хөтөч Google-ээр нэвтрэхийг зөвшөөрдөггүй. «⋯» → «Хөтчөөр нээх»-ийг дарж Chrome/Safari-д нээнэ үү, эсвэл Facebook, имэйлээр нэвтэрнэ үү."), http.StatusFound)
 		return
 	}
 	// role: «Бүртгүүлэх»-ээс сонгосон төрөл; хоосон бол («Нэвтрэх»-ээс) шинэ хэрэглэгчээс дараа нь асууна.

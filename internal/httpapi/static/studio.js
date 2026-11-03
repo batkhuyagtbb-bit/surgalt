@@ -122,8 +122,9 @@ function planCardsHTML(ps) {
   return `<div class="sp-grid">${ps.plans.map((p) => {
     const cur = ps.active && ps.plan === p.id;
     return `<article class="sp-card${cur ? " cur" : ""}">${cur ? `<span class="sp-tag">Одоогийн</span>` : ""}
-      <h4>${esc(p.name)}</h4><span class="sp-term">${planTerm(p.months)}</span>
+      <h4>${esc(p.name)}</h4>${p.label ? `<span class="sp-label">${esc(p.label)}</span>` : ""}<span class="sp-term">${planTerm(p.months)}</span>
       <p class="sp-price"><b>${money(p.price)}</b><small>сард ≈ ${money(Math.round(p.price / p.months))}</small></p>
+      <p class="sp-store">${ico("folder", 15)}<b>${p.storage_mb >= 1024 ? p.storage_mb / 1024 + "GB" : p.storage_mb + "MB"}</b> файлын сан</p>
       <p class="sp-pct"><b>${p.commission_pct}%</b><small>борлуулалтын шимтгэл</small></p>
       <button type="button" class="btn ${cur ? "btn-ghost" : "btn-gold"} btn-block" data-plan-buy="${esc(p.id)}">${cur ? "Сунгах" : "Авах"}</button></article>`;
   }).join("")}</div>`;
@@ -139,7 +140,7 @@ function bindPlanBuy(root, after) {
     b.disabled = true;
     try {
       const d = await api("/api/me/plan/purchase", { method: "POST", body: { plan: p.id } });
-      window.SG.pay(d.order, d.payment, `Системийн эрх · ${p.name} · ${planTerm(p.months)}`, async () => {
+      window.SG.pay(d.order, d.payment, `Системийн эрх · ${p.name}${p.label ? ` (${p.label})` : ""} · ${planTerm(p.months)}`, async () => {
         toast("✅ Системийн эрх сунгагдлаа"); celebrate(); await loadPlan(true); after?.();
       }, { name: "Системийн эрх" });
     } catch (x) { toast(x.message, true); }
@@ -1950,7 +1951,7 @@ async function files() {
   const pct = Math.min(100, (st.used / st.quota) * 100);
   main.innerHTML = panel(`<div class="panel-head"><h2>Файлын сан</h2><span class="chip ${pct > 85 ? "chip-coral" : "chip-gold"}">${fmtSize(st.used)} / ${fmtSize(st.quota)}</span></div>
       <div class="meter"><i id="fMeter"></i></div>
-      <p class="muted small">Үнэгүй ${plans.free_label}${st.plan_active ? ` + ${esc(String(st.plan_mb >= 1024 ? st.plan_mb / 1024 + "GB" : st.plan_mb + "MB"))} багц (${fmtDate(st.expires_at)} хүртэл)` : ""}.
+      <p class="muted small">${st.base_plan ? `«${esc(st.base_plan)}» багцад ${esc(st.base_label)}` : `Үнэгүй ${plans.free_label}`}${st.plan_active ? ` + ${esc(String(st.plan_mb >= 1024 ? st.plan_mb / 1024 + "GB" : st.plan_mb + "MB"))} нэмэлт сан (${fmtDate(st.expires_at)} хүртэл)` : ""}.
       Зураг автоматаар <b>WebP</b> болж ${plans.max_image_side}px хүртэл багасна, видео <b>WebM</b>, Word/PowerPoint <b>PDF (3D ном)</b> болно.</p>
       <div class="dropzone" id="drop" tabindex="0"><strong>${ico("upload", 18)} Файлаа энд чирж оруулах эсвэл дарж сонгох</strong><span class="muted small">Видео, PDF, Word, PowerPoint, зураг, аудио</span>
         <select id="vis" style="width:auto" onclick="event.stopPropagation()"><option value="private">🔒 Хаалттай (төлбөртэй хичээлд)</option><option value="public">🌐 Нээлттэй (профайл зураг г.м)</option></select>

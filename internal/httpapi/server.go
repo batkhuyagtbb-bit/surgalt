@@ -52,6 +52,8 @@ type Config struct {
 
 	// Хайлтын системд сайтаа баталгаажуулах код (Google Search Console, Bing Webmaster) — seo.go.
 	GoogleSiteVerification, BingSiteVerification string
+	// Facebook апп-ын ID (нийтийн утга): хуудсанд fb:app_id — Facebook-ийн хуваалцах шалгагч үүнийг шаарддаг.
+	FacebookAppID string
 }
 
 type Server struct {
@@ -111,6 +113,7 @@ type Server struct {
 func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore *files.Store, log *slog.Logger) *Server {
 	isNF := func(err error) bool { return errors.Is(err, store.ErrNotFound) }
 	siteVerifyGoogle, siteVerifyBing = cfg.GoogleSiteVerification, cfg.BingSiteVerification
+	siteURL, siteFBApp = strings.TrimRight(cfg.PublicURL, "/"), cfg.FacebookAppID
 	s := &Server{
 		cfg: cfg, store: st, tokens: tokens, hub: hub, files: fstore, log: log,
 		tmpl:      parseTemplates(),
@@ -339,6 +342,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/visits", s.handleMyVisits)
 	mux.HandleFunc("GET /t/{username}/qr.png", s.handleQR)
 	mux.HandleFunc("GET /t/{username}/og.jpg", s.handleProfileOG)
+	mux.HandleFunc("GET /og.jpg", s.handleSiteOG)
 
 	// Чат
 	mux.HandleFunc("POST /api/teachers/{username}/chat", s.handleStartChat)

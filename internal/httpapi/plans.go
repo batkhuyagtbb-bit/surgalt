@@ -190,7 +190,7 @@ func (s *Server) handleAdminGrantPlan(w http.ResponseWriter, r *http.Request) {
 	s.planEnds.Delete(u.ID)
 	s.adminInvalidate()
 	s.notify(r.Context(), &store.Notification{UserID: u.ID, Type: NotifPlan, Count: 1, ActorID: admin.ID, Title: "🎁 Танд системийн эрх олгогдлоо",
-		Body: p.Name + " · " + store.PlanTerm(p.Months) + " · дуусах: " + u.PlanUntil().In(mnLoc).Format("2006.01.02"), Link: "/me#wallet"})
+		Body: p.Title() + " · " + store.PlanTerm(p.Months) + " · дуусах: " + u.PlanUntil().In(mnLoc).Format("2006.01.02"), Link: "/me#wallet"})
 	s.hub.SendUsers([]string{u.ID}, map[string]any{"type": "plan_changed"})
 	s.log.Info("хянагч багц олгов", "user", u.ID, "plan", p.ID, "admin", admin.ID)
 	writeJSON(w, http.StatusOK, planStatus(u, time.Now()))

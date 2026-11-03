@@ -61,9 +61,17 @@ func (s *Server) handleMyStorage(w http.ResponseWriter, r *http.Request) {
 		s.filesErr(w, err)
 		return
 	}
-	active := u.StorageExpiresAt != nil && time.Now().Before(*u.StorageExpiresAt)
+	now := time.Now()
+	active := u.StorageExpiresAt != nil && now.Before(*u.StorageExpiresAt)
+	// base: үнэгүй хэмжээ эсвэл системийн эрхийн багцад багтсан сан (base_plan — тэр багцын нэр).
+	base, basePlan := u.StorageBase(s.cfg.StorageFreeMB<<20, now), ""
+	if base > s.cfg.StorageFreeMB<<20 {
+		id, _, _ := u.PlanAt(now)
+		basePlan = planName(id)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"used": used, "quota": s.quotaOf(u), "free_bytes": s.cfg.StorageFreeMB << 20,
+		"base_bytes": base, "base_label": sizeLabel(base >> 20), "base_plan": basePlan,
 		"plan_mb": u.StorageExtraBytes >> 20, "plan_active": active, "expires_at": u.StorageExpiresAt,
 	})
 }

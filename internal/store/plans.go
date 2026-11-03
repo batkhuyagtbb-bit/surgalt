@@ -14,19 +14,24 @@ import (
 
 // Plan — худалдаж авах багц: хугацаа (сар), үнэ, борлуулалтаас авах платформын шимтгэл (%).
 type Plan struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Months int     `json:"months"`
-	Price  int64   `json:"price"`
-	Pct    float64 `json:"commission_pct"`
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`       // Starter
+	Label     string  `json:"label"`      // Эхлэл
+	StorageMB int64   `json:"storage_mb"` // багцад багтсан файлын сан (үнэгүй хэмжээнээс их бол түүнийг орлоно)
+	Months    int     `json:"months"`
+	Price     int64   `json:"price"`
+	Pct       float64 `json:"commission_pct"`
 }
 
-// Plans — үнийн жагсаалт (хямдаас үнэтэй рүү).
+// Title — «Starter (Эхлэл)»: захиалга, мэдэгдэлд.
+func (p Plan) Title() string { return p.Name + " (" + p.Label + ")" }
+
+// Plans — үнийн жагсаалт (хямдаас үнэтэй рүү). ID-г хадгалсан эрх, захиалгад ашигладаг тул солихгүй.
 var Plans = []Plan{
-	{ID: "start", Name: "Эхлэл", Months: 3, Price: 69000, Pct: 20},
-	{ID: "standard", Name: "Standart", Months: 6, Price: 99000, Pct: 16},
-	{ID: "major", Name: "Major", Months: 12, Price: 189000, Pct: 12},
-	{ID: "pro", Name: "Pro", Months: 12, Price: 500000, Pct: 8},
+	{ID: "start", Name: "Starter", Label: "Эхлэл", StorageMB: 300, Months: 3, Price: 69000, Pct: 20},
+	{ID: "standard", Name: "Standard", Label: "Стандарт", StorageMB: 500, Months: 6, Price: 99000, Pct: 16},
+	{ID: "major", Name: "Advanced", Label: "Ахисан түвшин", StorageMB: 1024, Months: 12, Price: 189000, Pct: 12},
+	{ID: "pro", Name: "Enterprise", Label: "Бизнес / Энтерпрайз", StorageMB: 2048, Months: 12, Price: 500000, Pct: 8},
 }
 
 // Үнэгүй хугацааны (болон эрхгүй үеийн) шимтгэл = TEACHER_COMMISSION_PERCENT (анхдагч 21%).
@@ -111,6 +116,15 @@ func (u *User) PlanAt(t time.Time) (string, float64, bool) {
 		return PlanTrial, teacherCommission, true
 	}
 	return "", teacherCommission, false
+}
+
+// PlanStorageBytes — t үеийн идэвхтэй багцад багтсан файлын сан (үнэгүй хугацаа, эрхгүй үед 0).
+func (u *User) PlanStorageBytes(t time.Time) int64 {
+	id, _, ok := u.PlanAt(t)
+	if pl, found := PlanByID(id); ok && found {
+		return pl.StorageMB << 20
+	}
+	return 0
 }
 
 // PlanUntil — эрх дуусах хугацаа (үнэгүй хугацаа, дараалсан бүх багцыг оруулаад). Ирээдүйд завсар үүсдэггүй.

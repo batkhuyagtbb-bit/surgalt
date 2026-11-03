@@ -723,7 +723,7 @@ func (c *ClickHouse) CreateStorageOrder(ctx context.Context, userID string, mb i
 
 func (c *ClickHouse) CreatePlanOrder(ctx context.Context, userID string, p Plan) (*Order, error) {
 	o := &Order{ID: NewID(), Kind: OrderKindPlan, Plan: p.ID, Months: p.Months, UserID: userID, Amount: p.Price, Status: OrderPending, CreatedAt: time.Now(),
-		Title: "Системийн эрх · " + p.Name + " · " + PlanTerm(p.Months)}
+		Title: "Системийн эрх · " + p.Title() + " · " + PlanTerm(p.Months)}
 	return o, c.writeOrder(ctx, o, false)
 }
 

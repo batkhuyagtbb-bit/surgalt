@@ -27,6 +27,9 @@ import (
 // Хайлтын системийн баталгаажуулах кодууд (New-д Config-оос онооно; template-д gsv/bsv).
 var siteVerifyGoogle, siteVerifyBing string
 
+// siteURL — сайтын эх (зураггүй хуудасны хуваалцах зураг /og.jpg); siteFBApp — fb:app_id. New-д онооно.
+var siteURL, siteFBApp string
+
 const sitemapTTL = time.Hour
 
 type sitemapCache struct {
@@ -39,7 +42,8 @@ type sitemapCache struct {
 func (s *Server) handleRobots(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
-	_, _ = w.Write([]byte("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /board-img/\n\nSitemap: " + s.cfg.PublicURL + "/sitemap.xml\n"))
+	// Номын хавтас нь хуваалцах зураг (og:image) — Facebook, хайлтын систем татаж чаддаг байх ёстой.
+	_, _ = w.Write([]byte("User-agent: *\nAllow: /\nAllow: /api/books/*/cover\nDisallow: /api/\nDisallow: /board-img/\n\nSitemap: " + s.cfg.PublicURL + "/sitemap.xml\n"))
 }
 
 // handleSitemap: GET /sitemap.xml

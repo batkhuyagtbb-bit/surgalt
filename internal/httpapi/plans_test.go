@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -110,6 +111,13 @@ func TestTeacherPlans(t *testing.T) {
 	_, p = call(t, srv, "GET", "/api/me/plan", tt, "")
 	if p["plan"] != "pro" || p["active"] != true || p["commission_pct"] != 8.0 || p["days_left"].(float64) < 364 {
 		t.Fatalf("Pro: %v", p)
+	}
+	// Enterprise багцад 2GB файлын сан (үнэгүй 10MB-ийг орлоно); нэр, мэдэгдэлд «Enterprise (Бизнес / Энтерпрайз)».
+	if _, sq := call(t, srv, "GET", "/api/me/storage", tt, ""); p["name"] != "Enterprise" || sq["quota"] != float64(2048<<20) || sq["base_plan"] != "Enterprise" || sq["base_label"] != "2GB" {
+		t.Fatalf("багцын файлын сан: %v %v", p["name"], sq)
+	}
+	if _, ns := callList(t, srv, "GET", "/api/me/notifications", tt); countTitle(ns, "сунгагдлаа") != 1 || !strings.Contains(fmt.Sprint(ns), "Enterprise (Бизнес / Энтерпрайз)") {
+		t.Fatalf("мэдэгдэлд багцын нэр: %v", ns)
 	}
 	if code, _ := call(t, srv, "POST", "/api/courses", tt, `{"title":"Шинэ","price":0}`); code != 201 {
 		t.Fatalf("сунгасны дараа шууд нээгдэнэ: %d", code)

@@ -98,3 +98,32 @@ func TestOrderCommission(t *testing.T) {
 		t.Fatalf("холимог үлдэгдэл: %+v", b)
 	}
 }
+
+// Багцад багтсан файлын сан: үнэгүй хэмжээнээс их бол түүнийг орлож, нэмэлт худалдсан сан дээр нэмэгдэнэ; эрх дуусвал үнэгүй хэмжээ.
+func TestPlanStorage(t *testing.T) {
+	SetTeacherCommission(21)
+	defer SetTeacherCommission(0)
+	now := time.Now()
+	free := int64(300 << 20)
+	u := &User{Role: RoleTeacher, CreatedAt: now}
+	u.Plan.TrialFrom = &now
+	if q := u.StorageQuota(free, now); q != free {
+		t.Fatalf("үнэгүй хугацаанд: %d", q)
+	}
+	adv, _ := PlanByID("major")
+	u.AddPlan(adv, "o1", now)
+	if q := u.StorageQuota(free, now); q != 1024<<20 {
+		t.Fatalf("Advanced: %d", q)
+	}
+	exp := now.Add(24 * time.Hour)
+	u.StorageExtraBytes, u.StorageExpiresAt = 500<<20, &exp
+	if q := u.StorageQuota(free, now); q != (1024+500)<<20 {
+		t.Fatalf("Advanced + нэмэлт 500MB: %d", q)
+	}
+	if q := u.StorageQuota(free, u.PlanUntil().Add(time.Hour)); q != free {
+		t.Fatalf("эрх, нэмэлт дууссаны дараа: %d", q)
+	}
+	if st, _ := PlanByID("start"); st.StorageMB != 300 || st.Title() != "Starter (Эхлэл)" {
+		t.Fatalf("Starter: %+v", st)
+	}
+}
