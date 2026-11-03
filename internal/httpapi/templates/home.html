@@ -46,36 +46,6 @@
     <div class="tiles"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
     <div class="skeleton" style="height:220px;margin-top:24px"></div>
   </div>
-  {{/* Шилдэг багш нар — 4 зэрэглэл × 10 багш, гүйдэг карт (app.js topTeachers, /api/top-teachers). Зочин, нэвтэрсэн хүн хоёуланд. */}}
-  <section class="tt" id="topTeachers" aria-labelledby="ttTitle" hidden>
-    <div class="tt-head">
-      <p class="eyebrow shine">Шилдэг 10</p>
-      <h2 id="ttTitle">Шилдэг багш нар</h2>
-      <p class="lead">Суралцагчдын сонголт, идэвх, харилцаагаар тодорсон багш нар</p>
-    </div>
-    <div class="tt-tabs" role="tablist" aria-label="Зэрэглэл"></div>
-    <div class="tt-stage">
-      <button type="button" class="tt-nav tt-prev" aria-label="Өмнөх багш нар">{{icon "arrow" 20}}</button>
-      <ol class="tt-track" role="tabpanel" aria-live="polite" tabindex="0"></ol>
-      <button type="button" class="tt-nav tt-next" aria-label="Дараагийн багш нар">{{icon "arrow" 20}}</button>
-    </div>
-    <div class="tt-dots" aria-hidden="true"></div>
-  </section>
-  {{/* Идэвхтэй суралцагчид — 5 зэрэглэл × 10 (app.js topStudents, /api/top-students). Нэрийг товчилно, холбоосгүй, хүсвэл нууна. */}}
-  <section class="tt tt-stu" id="topStudents" aria-labelledby="tsTitle" hidden>
-    <div class="tt-head">
-      <p class="eyebrow shine">Шилдэг 10</p>
-      <h2 id="tsTitle">Идэвхтэй суралцагчид</h2>
-      <p class="lead">Олон сургалтад суралцаж, цол ахиулж, бүтээлчээр, сахилга баттай суралцдаг суралцагчид</p>
-    </div>
-    <div class="tt-tabs" role="tablist" aria-label="Зэрэглэл"></div>
-    <div class="tt-stage">
-      <button type="button" class="tt-nav tt-prev" aria-label="Өмнөх суралцагчид">{{icon "arrow" 20}}</button>
-      <ol class="tt-track" role="tabpanel" aria-live="polite" tabindex="0"></ol>
-      <button type="button" class="tt-nav tt-next" aria-label="Дараагийн суралцагчид">{{icon "arrow" 20}}</button>
-    </div>
-    <div class="tt-dots" aria-hidden="true"></div>
-  </section>
   <div class="landing">
   {{/* surgalt.mn хэрхэн ажилладаг вэ — нэгтгэсэн ухаалаг хэсэг: зүүнд оюуны зураглал (навигаци), баруунд дэлгэрэнгүй
        самбар (хөдөлгөөнт жишээ). Горим: Бүтэц / Сурагч сурах / Багш сургалт явуулах. app.js (explore) удирдана. */}}
@@ -204,6 +174,36 @@
       <div class="ex-visual"><div class="uc-stage"><span class="u-bars"><i class="k-grow" style="--h:.35;--d:.1"></i><i class="k-grow" style="--h:.55;--d:.25"></i><i class="k-grow" style="--h:.45;--d:.4"></i><i class="k-grow" style="--h:.75;--d:.55"></i><i class="k-grow" style="--h:1;--d:.7"></i></span><span class="u-chip amber k" style="--d:1.4">₮ 2,450,000</span></div></div></template>
   </section>
   </div>
+  {{/* Шилдэг багш нар — 4 зэрэглэл × 10 багш, гүйдэг карт (app.js topTeachers, /api/top-teachers). Зочин, нэвтэрсэн хүн хоёуланд. */}}
+  <section class="tt" id="topTeachers" aria-labelledby="ttTitle" hidden>
+    <div class="tt-head">
+      <p class="eyebrow shine">Шилдэг 10</p>
+      <h2 id="ttTitle">Шилдэг багш нар</h2>
+      <p class="lead">Суралцагчдын сонголт, идэвх, харилцаагаар тодорсон багш нар</p>
+    </div>
+    <div class="tt-tabs" role="tablist" aria-label="Зэрэглэл"></div>
+    <div class="tt-stage">
+      <button type="button" class="tt-nav tt-prev" aria-label="Өмнөх багш нар">{{icon "arrow" 20}}</button>
+      <ol class="tt-track" role="tabpanel" aria-live="polite" tabindex="0"></ol>
+      <button type="button" class="tt-nav tt-next" aria-label="Дараагийн багш нар">{{icon "arrow" 20}}</button>
+    </div>
+    <div class="tt-dots" aria-hidden="true"></div>
+  </section>
+  {{/* Идэвхтэй суралцагчид — 5 зэрэглэл × 10 (app.js topStudents, /api/top-students). Нэрийг товчилно, холбоосгүй, хүсвэл нууна. */}}
+  <section class="tt tt-stu" id="topStudents" aria-labelledby="tsTitle" hidden>
+    <div class="tt-head">
+      <p class="eyebrow shine">Шилдэг 10</p>
+      <h2 id="tsTitle">Идэвхтэй суралцагчид</h2>
+      <p class="lead">Олон сургалтад суралцаж, цол ахиулж, бүтээлчээр, сахилга баттай суралцдаг суралцагчид</p>
+    </div>
+    <div class="tt-tabs" role="tablist" aria-label="Зэрэглэл"></div>
+    <div class="tt-stage">
+      <button type="button" class="tt-nav tt-prev" aria-label="Өмнөх суралцагчид">{{icon "arrow" 20}}</button>
+      <ol class="tt-track" role="tabpanel" aria-live="polite" tabindex="0"></ol>
+      <button type="button" class="tt-nav tt-next" aria-label="Дараагийн суралцагчид">{{icon "arrow" 20}}</button>
+    </div>
+    <div class="tt-dots" aria-hidden="true"></div>
+  </section>
 </main>
 <footer class="footer footer-x">
   <div class="fx-brand"><a class="fx-logo" href="/">surgalt<b>.mn</b></a><p>Сур, сур, бас дахин сур — багш, суралцагчдын платформ.</p>{{with .Contact}}<a href="mailto:{{.}}">{{.}}</a>{{end}}</div>
