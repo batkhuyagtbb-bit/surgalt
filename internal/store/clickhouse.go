@@ -207,6 +207,7 @@ var chMigrations = []string{
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS meeting_id String DEFAULT ''",
 	"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS rubric String DEFAULT ''",
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS phone String DEFAULT ''",
+	"ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified String DEFAULT ''",
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS slot_id String DEFAULT ''",
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS fee Int64 DEFAULT 0", // үйлчилгээний хураамж
 	"ALTER TABLE slots ADD COLUMN IF NOT EXISTS series_id String DEFAULT ''",
@@ -247,7 +248,7 @@ var chTables = []chTable{
 		display_name String, headline String, bio String, avatar_url String, cover_url String,
 		subjects Array(String), location String, links Map(String, String),
 		created_at ` + tsType + `, storage_extra_bytes Int64, storage_expires_at Nullable(` + tsType + `),
-		google_token String, phone String DEFAULT '', consent_version String DEFAULT '', consent_at Nullable(` + tsType + `),
+		google_token String, phone String DEFAULT '', phone_verified String DEFAULT '', consent_version String DEFAULT '', consent_at Nullable(` + tsType + `),
 		tokens_after Nullable(` + tsType + `), plan String DEFAULT '',
 		ver UInt64, deleted Bool DEFAULT false,
 		INDEX ix_email email TYPE bloom_filter GRANULARITY 1,
@@ -564,7 +565,7 @@ func (c *ClickHouse) counters(ctx context.Context, entity string, ids []string) 
 // ---- хэрэглэгч ----
 
 const userCols = `id, username, email, password_hash, role, display_name, headline, bio, avatar_url, cover_url,
-	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, consent_version, consent_at, tokens_after, deleted, plan`
+	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, phone_verified, consent_version, consent_at, tokens_after, deleted, plan`
 
 func scanUser(r driver.Rows) (*User, bool, error) {
 	var u User
@@ -574,7 +575,7 @@ func scanUser(r driver.Rows) (*User, bool, error) {
 	var plan string
 	if err := r.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &role, &u.DisplayName, &u.Headline, &u.Bio,
 		&u.AvatarURL, &u.CoverURL, &u.Subjects, &u.Location, &u.Links, &u.CreatedAt, &u.StorageExtraBytes, &exp,
-		&u.GoogleToken, &u.Phone, &u.ConsentVersion, &u.ConsentAt, &u.TokensAfter, &deleted, &plan); err != nil {
+		&u.GoogleToken, &u.Phone, &u.PhoneVerified, &u.ConsentVersion, &u.ConsentAt, &u.TokensAfter, &deleted, &plan); err != nil {
 		return nil, false, err
 	}
 	u.Role = Role(role)
@@ -593,10 +594,10 @@ func scanUser(r driver.Rows) (*User, bool, error) {
 func (c *ClickHouse) writeUser(ctx context.Context, u *User, deleted bool) error {
 	return c.insert(ctx, "users", []string{"id", "username", "email", "password_hash", "role", "display_name", "headline", "bio",
 		"avatar_url", "cover_url", "subjects", "location", "links", "created_at", "storage_extra_bytes", "storage_expires_at",
-		"google_token", "phone", "consent_version", "consent_at", "tokens_after", "plan", "ver", "deleted"},
+		"google_token", "phone", "phone_verified", "consent_version", "consent_at", "tokens_after", "plan", "ver", "deleted"},
 		u.ID, u.Username, u.Email, u.PasswordHash, string(u.Role), u.DisplayName, u.Headline, u.Bio,
 		u.AvatarURL, u.CoverURL, nzStrings(u.Subjects), u.Location, nzLinks(u.Links), u.CreatedAt.UTC(), u.StorageExtraBytes,
-		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, u.ConsentVersion, nullTime(u.ConsentAt), nullTime(u.TokensAfter), u.Plan.encode(), ver(), deleted)
+		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, u.PhoneVerified, u.ConsentVersion, nullTime(u.ConsentAt), nullTime(u.TokensAfter), u.Plan.encode(), ver(), deleted)
 }
 
 func (c *ClickHouse) userWhere(ctx context.Context, where string, args ...any) (*User, error) {
@@ -667,6 +668,21 @@ func (c *ClickHouse) UserByEmail(ctx context.Context, email string) (*User, erro
 
 func (c *ClickHouse) UserByUsername(ctx context.Context, username string) (*User, error) {
 	return c.userWhere(ctx, "username = ?", username)
+}
+
+func (c *ClickHouse) UsersByVerifiedPhone(ctx context.Context, phone string) ([]User, error) {
+	out := []User{}
+	if phone == "" {
+		return out, nil
+	}
+	err := c.query(ctx, "SELECT "+userCols+" FROM users FINAL WHERE phone_verified = ? LIMIT 20", []any{phone}, func(r driver.Rows) error {
+		u, deleted, err := scanUser(r)
+		if err == nil && !deleted {
+			out = append(out, *u)
+		}
+		return err
+	})
+	return out, err
 }
 
 func (c *ClickHouse) UpdateProfile(ctx context.Context, id string, p ProfileUpdate) error {

@@ -930,6 +930,14 @@ body[data-page=home] main{min-height:calc(100svh - 82px)}
 .pw-match.ok{color:var(--teal)}.pw-match.bad{color:var(--coral)}
 .btn-social{justify-content:center;gap:12px;background:var(--surface);border-color:var(--line-2);color:var(--text);font-weight:700}
 .btn-social svg,.btn-social .social-ico{flex:none}
+.cap-field{display:grid;gap:6px}
+.captcha{display:grid;grid-template-columns:auto auto minmax(0,1fr);align-items:center;gap:8px}
+.captcha img{display:block;width:180px;height:56px;border-radius:10px;border:1px solid var(--line);background:#f0f4fc}
+.captcha-new{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--brand);font-size:1.2rem;cursor:pointer}
+.captcha-new:hover{border-color:var(--brand)}
+.captcha input{margin:0;min-width:0;font-size:1.15rem;letter-spacing:.25em;text-align:center}
+.captcha input::placeholder{letter-spacing:normal;font-size:.88rem}
+@media (max-width:420px){.captcha{grid-template-columns:auto auto}.captcha input{grid-column:1/-1}}
 .inapp-note{display:grid;gap:8px;padding:12px 14px;border-radius:12px;background:#fff7e8;border:1px solid #f1c76b;color:#5b4210;font-size:.88rem;line-height:1.45}
 .inapp-note b{color:#3d2c08}.inapp-act{display:flex;flex-wrap:wrap;gap:8px}
 /* ===== студи: сургалтыг групп шиг удирдах ===== */
@@ -4733,3 +4741,49 @@ a.np-item:active{background:var(--line)}
 .sp-banner.warn svg{color:var(--amber)}
 @media (max-width:560px){.sp-banner{flex-wrap:wrap}.sp-banner .btn{width:100%}}
 .linkish{padding:0;border:0;background:none;color:var(--brand);font:inherit;text-decoration:underline;cursor:pointer}
+
+/* ===== Утас баталгаажуулах (Verify.MN): SMS заавар (sv-), нэвтэрмэгц асуух цонх (pg), сэргээх арга (fg-) ===== */
+.sv{display:grid;gap:12px}
+.sv-lead{display:flex;align-items:flex-start;gap:10px;margin:0;color:var(--text-2);line-height:1.5}
+.sv-lead svg{flex:none;margin-top:2px;color:var(--brand)}
+.sv-lead b{color:var(--text)}
+.sv-code{display:flex;justify-content:center;gap:6px}
+.sv-code i{display:grid;place-items:center;width:42px;height:52px;border-radius:12px;background:var(--brand-soft);border:1px solid var(--brand-tint,#d5def5);color:var(--brand);font:800 1.6rem/1 Manrope,system-ui,sans-serif;font-style:normal;animation:sv-pop .4s var(--spring,ease) backwards}
+.sv-code i:nth-child(2){animation-delay:.05s}.sv-code i:nth-child(3){animation-delay:.1s}.sv-code i:nth-child(4){animation-delay:.15s}.sv-code i:nth-child(5){animation-delay:.2s}.sv-code i:nth-child(6){animation-delay:.25s}
+@keyframes sv-pop{from{opacity:0;transform:translateY(8px) scale(.9)}}
+.sv-sms{gap:8px}
+.sv-status{display:flex;align-items:center;gap:8px;margin:0;padding:10px 12px;border-radius:12px;background:var(--surface-2);color:var(--text-2);font-weight:700;font-size:.9rem}
+.sv-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);flex:none;animation:sv-blink 1.2s ease-in-out infinite}
+.sv-status.ok{background:#e6f6ee;color:#13784a}.sv-status.ok .sv-dot{background:#1a9b5f;animation:none}
+.sv-status.bad{background:var(--coral-soft);color:var(--coral)}.sv-status.bad .sv-dot{background:var(--coral);animation:none}
+.sv-left{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--muted)}
+@keyframes sv-blink{50%{opacity:.25;transform:scale(.8)}}
+.sv-note{margin:0;color:var(--muted);font-size:.82rem;line-height:1.5}
+.sv-again{justify-self:start}
+.pg .pg-form{display:grid;gap:12px}
+.pg .pg-form input{font-size:1.1rem;letter-spacing:.06em}
+.fg-mode{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line)}
+.fg-mode button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 10px;border:0;border-radius:999px;background:transparent;color:var(--text-2);font:inherit;font-weight:700;font-size:.9rem;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s}
+.fg-mode button.on{background:var(--surface);color:var(--brand);box-shadow:0 1px 3px rgba(19,27,49,.12)}
+.fg-pick-h{margin:0;font-weight:700;color:var(--text)}
+.fg-pick{display:grid;gap:8px}
+.fg-pick .btn{flex-direction:column;align-items:flex-start;gap:2px;border-radius:14px;padding:10px 14px}
+.fg-pick small{color:var(--muted);font-weight:500}
+@media (prefers-reduced-motion:reduce){.sv-code i,.sv-dot{animation:none}}
+
+/* ===== Навигацийн «Нэвтрэх» товч: градиент урсгал, гялбаа, зөөлөн долгион — зочны анхаарлыг татна ===== */
+.nav .nav-login{position:relative;isolation:isolate;overflow:hidden;gap:6px;padding:8px 16px 8px 18px;border:0;color:#fff;font-weight:800;
+  background:linear-gradient(115deg,#1f3c8f 0%,#3b2fa0 45%,#2c4ca6 70%,#1f3c8f 100%);background-size:220% 100%;
+  animation:nl-flow 7s ease-in-out infinite,nl-pulse 2.8s ease-out infinite;transition:transform .25s var(--spring),box-shadow .25s}
+.nav .nav-login::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;
+  background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.5) 50%,transparent 65%);transform:translateX(-130%);animation:nl-shine 3.6s ease-in-out infinite}
+.nav .nav-login::after{content:"";position:absolute;top:5px;right:9px;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px #fff3;animation:nl-dot 1.6s ease-in-out infinite}
+.nav .nav-login svg{transition:transform .25s var(--spring)}
+.nav .nav-login:hover,.nav .nav-login:focus-visible{color:#fff;transform:translateY(-2px) scale(1.03);box-shadow:0 10px 22px -8px rgba(59,47,160,.7)}
+.nav .nav-login:hover svg{transform:translateX(4px)}
+.nav .nav-login:active{transform:translateY(0) scale(.98)}
+@keyframes nl-flow{50%{background-position:100% 0}}
+@keyframes nl-shine{0%,55%{transform:translateX(-130%)}85%,100%{transform:translateX(130%)}}
+@keyframes nl-pulse{0%{box-shadow:0 0 0 0 rgba(234,160,46,.55),0 6px 16px -8px rgba(59,47,160,.6)}70%{box-shadow:0 0 0 12px rgba(234,160,46,0),0 6px 16px -8px rgba(59,47,160,.6)}100%{box-shadow:0 0 0 0 rgba(234,160,46,0),0 6px 16px -8px rgba(59,47,160,.6)}}
+@keyframes nl-dot{50%{transform:scale(1.5);opacity:.6}}
+@media (prefers-reduced-motion:reduce){.nav .nav-login,.nav .nav-login::before,.nav .nav-login::after{animation:none}}

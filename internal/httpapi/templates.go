@@ -106,6 +106,7 @@ var iconPaths = map[string]string{
 	"eye":     `<path d="M2 12s3.600-7 10-7 10 7 10 7-3.600 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>`,
 	"check":   `<path d="m5 12.500 4.500 4.500L19 7.500"/>`,
 	"plus":    `<path d="M12 5v14M5 12h14"/>`,
+	"arrow":   `<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>`,
 	"down":    `<path d="M12 4v12M7 11l5 5 5-5M5 20h14"/>`,
 	"link":    `<path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1"/><path d="M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"/>`,
 	"lock":    `<rect x="4.500" y="10.500" width="15" height="10" rx="2"/><path d="M8 10.500V7a4 4 0 0 1 8 0v3.500"/>`,

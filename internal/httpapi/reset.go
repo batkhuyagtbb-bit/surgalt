@@ -43,7 +43,9 @@ func (s *Server) handleForgot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Email string `json:"email"`
+		Email     string `json:"email"`
+		CaptchaID string `json:"captcha_id"`
+		Captcha   string `json:"captcha"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -55,6 +57,11 @@ func (s *Server) handleForgot(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.cfg.Mail == nil && !s.cfg.DevPayments {
 		writeErr(w, http.StatusServiceUnavailable, "Нууц үг сэргээх имэйл одоогоор ажиллахгүй байна — Google-ээр нэвтрэх эсвэл бидэнтэй холбогдоно уу")
+		return
+	}
+	// Хүн гэдгийг шалгана (робот олон хаяг руу захидал илгээлгэхээс сэргийлнэ).
+	if !captchas.check(in.CaptchaID, in.Captcha, time.Now()) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Зурган дээрх тоог буруу бичлээ — шинэ кодыг дахин бичнэ үү", "code": "captcha"})
 		return
 	}
 	if s.resetLim.Allow(email) { // нэг хаяг руу богино хугацаанд олон захидал илгээхгүй
@@ -89,13 +96,31 @@ func (s *Server) sendReset(email, base string) {
 	} else {
 		name = "Сайн байна уу, " + name
 	}
+	// Google/Facebook-тэй холбогдсон бүртгэл: нууц үггүйгээр шууд нэвтрэх боломжийг сануулна.
+	via := ""
+	if ps, err := s.store.IdentityProviders(ctx, u.ID); err == nil && len(ps) > 0 {
+		names := map[string]string{"google": "Google", "facebook": "Facebook", "microsoft": "Microsoft", "instagram": "Instagram"}
+		var ls []string
+		for _, p := range ps {
+			if n := names[p]; n != "" {
+				ls = append(ls, n)
+			}
+		}
+		if len(ls) > 0 {
+			via = "Таны бүртгэл " + strings.Join(ls, ", ") + "-тэй холбоотой тул нэвтрэх хуудасны «" + ls[0] + "-ээр үргэлжлүүлэх» товчоор нууц үггүйгээр шууд нэвтэрч болно."
+		}
+	}
+	viaText, viaHTML := "", ""
+	if via != "" {
+		viaText, viaHTML = via+"\n\n", `<p style="background:#eef3ff;border-radius:10px;padding:10px 14px">`+html.EscapeString(via)+`</p>`
+	}
 	m := mail.Message{To: u.Email, Subject: "surgalt.mn — нууц үг сэргээх",
 		Text: name + ",\n\nsurgalt.mn дээрх бүртгэлийн тань нууц үгийг сэргээх хүсэлт ирлээ. Доорх холбоосоор орж шинэ нууц үг тавина уу (1 цагийн дотор):\n\n" +
-			link + "\n\nХэрэв та хүсэлт илгээгээгүй бол энэ захидлыг үл тоомсорлоно уу — нууц үг тань өөрчлөгдөхгүй.\n\nsurgalt.mn",
+			link + "\n\n" + viaText + "Хэрэв та хүсэлт илгээгээгүй бол энэ захидлыг үл тоомсорлоно уу — нууц үг тань өөрчлөгдөхгүй.\n\nsurgalt.mn",
 		HTML: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#131b31;line-height:1.6">` +
 			`<p style="font-size:22px;font-weight:800;color:#1f3c8f;margin:0 0 16px">surgalt<span style="color:#eaa02e">.mn</span></p>` +
 			`<p>` + html.EscapeString(name) + `,</p><p>surgalt.mn дээрх бүртгэлийн тань нууц үгийг сэргээх хүсэлт ирлээ. Доорх товчоор орж шинэ нууц үг тавина уу. Холбоос 1 цагийн дотор хүчинтэй.</p>` +
-			`<p style="margin:24px 0"><a href="` + html.EscapeString(link) + `" style="background:#1f3c8f;color:#fff;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:700">Шинэ нууц үг тавих</a></p>` +
+			`<p style="margin:24px 0"><a href="` + html.EscapeString(link) + `" style="background:#1f3c8f;color:#fff;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:700">Шинэ нууц үг тавих</a></p>` + viaHTML +
 			`<p style="color:#647089;font-size:13px">Хэрэв та хүсэлт илгээгээгүй бол энэ захидлыг үл тоомсорлоно уу — нууц үг тань өөрчлөгдөхгүй.</p></div>`}
 	if err := s.cfg.Mail.Send(ctx, m); err != nil {
 		s.log.Error("нууц үг сэргээх имэйл илгээж чадсангүй", "err", err, "to", email)

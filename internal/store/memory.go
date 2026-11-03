@@ -187,6 +187,20 @@ func (m *Memory) UserByEmail(_ context.Context, email string) (*User, error) {
 	return m.userLocked(id)
 }
 
+func (m *Memory) UsersByVerifiedPhone(_ context.Context, phone string) ([]User, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := []User{}
+	for id, u := range m.users {
+		if phone != "" && u.PhoneVerified == phone {
+			c, _ := m.userLocked(id)
+			out = append(out, *c)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })
+	return out, nil
+}
+
 func (m *Memory) UserByUsername(_ context.Context, username string) (*User, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

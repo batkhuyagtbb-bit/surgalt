@@ -611,7 +611,87 @@ function authNav() {
   $$("[data-auth-hide]").forEach((el) => (el.hidden = !!u));
   $$("[data-logout]").forEach((b) => b.addEventListener("click", () => { Auth.clear(); location.href = "/"; }));
   if (u?.is_admin && !$(".nav-admin")) $(".nav-links")?.insertAdjacentHTML("afterbegin", `<a href="/admin" class="nav-link nav-admin">Мэдүүлэг</a>`);
-  if (u && Auth.token) { bell(); consentGate(); }
+  if (u && Auth.token) { bell(); consentGate().then((shown) => { if (!shown) phoneGate(); }); }
+}
+
+/* ---------- Утас баталгаажуулах (Verify.MN): хэрэглэгч өөрийн утаснаас 144773 руу кодыг SMS-ээр илгээнэ ----------
+   smsVerify(box, v, check, done): заавар, код, «SMS бичих», хугацаа тоолуур; 3 секунд тутам check(token)-оор шалгаж,
+   баталгаажмагц done(хариу). Хугацаа дуусвал/алдаа гарвал restart() дуудах товч. */
+function smsVerify(box, v, check, done, restart) {
+  const ph = String(v.phone || "").replace(/^(\d{4})(\d{4})$/, "$1 $2");
+  box.innerHTML = `<div class="sv">
+    <p class="sv-lead">${icon("phone", 18)}<span><b>${esc(ph)}</b> дугаараасаа <b>${esc(v.shortcode)}</b> руу доорх кодыг SMS-ээр илгээнэ үү</span></p>
+    <div class="sv-code" aria-label="Илгээх код">${esc(v.text).split("").map((c) => `<i>${c}</i>`).join("")}</div>
+    <a class="btn btn-gold btn-block sv-sms" href="${esc(v.sms_uri)}">${icon("chat", 18)} SMS бичих</a>
+    <p class="sv-status" role="status"><span class="sv-dot"></span><span class="sv-msg">SMS хүлээж байна…</span><b class="sv-left"></b></p>
+    <p class="sv-note">Компьютер дээр байгаа бол утаснаасаа <b>${esc(v.shortcode)}</b> дугаар руу <b>${esc(v.text)}</b> гэж бичиж илгээнэ үү. SMS-ийн үнэ 150₮ (операторын тарифаар).</p>
+    <button type="button" class="linkish sv-again" hidden>Дахин код авах</button></div>`;
+  const msg = $(".sv-msg", box), left = $(".sv-left", box), again = $(".sv-again", box), st = $(".sv-status", box);
+  const end = new Date(v.expires_at).getTime();
+  let stop = false, timer = 0;
+  const finish = (text, bad) => { stop = true; clearTimeout(timer); st.classList.toggle("bad", !!bad); msg.textContent = text; left.textContent = ""; again.hidden = !restart; };
+  again.onclick = () => restart?.();
+  const countdown = () => {
+    if (stop || !box.isConnected) return clearInterval(iv);
+    const sec = Math.max(0, Math.round((end - Date.now()) / 1000));
+    left.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+  };
+  const iv = setInterval(countdown, 1000);
+  countdown();
+  const tick = async () => {
+    if (stop || !box.isConnected) return;
+    try {
+      const r = await check(v.token);
+      if (stop) return;
+      if (r.status === "verified") { stop = true; st.classList.add("ok"); msg.textContent = "Баталгаажлаа ✓"; left.textContent = ""; return done(r); }
+      if (r.status === "expired" || r.status === "none") return finish(r.error || "Хугацаа дууссан", true);
+    } catch (x) { if (x.status && x.status < 500) return finish(x.message, true); } // сүлжээ/серверийн түр алдаа — дахин шалгана
+    if (Date.now() > end + 5000) return finish("Хугацаа дууссан — дахин код авна уу", true);
+    timer = setTimeout(tick, 3000);
+  };
+  timer = setTimeout(tick, 2500);
+}
+
+// Нэвтэрсэн хэрэглэгч нууц үг сэргээх утсаа баталгаажуулаагүй бол (Verify.MN идэвхтэй үед) заавал асууна.
+async function phoneGate() {
+  if (["legal", "login", "reset", "error", "admin"].includes(page) || !Auth.token || Auth.user?.phone_verified || $(".cg")) return;
+  let u; try { u = await api("/api/me"); } catch { return; }
+  Auth.set(Auth.token, u);
+  if (!u.phone_required || u.phone_verified || $(".cg")) return;
+  const el = document.createElement("div");
+  el.className = "cg pg"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "pgT");
+  el.innerHTML = `<div class="cg-card">
+    <span class="cg-ico" aria-hidden="true">${icon("phone", 26)}</span>
+    <h3 id="pgT">Утасны дугаараа баталгаажуулна уу</h3>
+    <p>Нууц үгээ мартсан үед энэ дугаараараа шууд сэргээнэ. Дугаар тань бусдад харагдахгүй.</p>
+    <div class="pg-body"><form class="pg-form"><label>Гар утасны дугаар<input name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="12" placeholder="9911 2233" required value="${esc((u.phone || "").replace(/^(\d{4})(\d{4})$/, "$1 $2"))}"></label>
+      <button class="btn btn-gold btn-block">Үргэлжлүүлэх</button></form></div>
+    <p class="cg-err" role="alert"></p>
+    <div class="cg-act"><button type="button" class="btn btn-ghost" data-cg-out>Гарах</button></div>
+  </div>`;
+  const behind = [...document.body.children];
+  behind.forEach((c) => (c.inert = true));
+  document.body.append(el); document.documentElement.classList.add("cg-open");
+  const body = $(".pg-body", el), errEl = $(".cg-err", el), formHTML = body.innerHTML;
+  $("[data-cg-out]", el).onclick = () => { Auth.clear(); location.href = "/"; };
+  const close = (me) => {
+    Auth.set(Auth.token, me); behind.forEach((c) => (c.inert = false));
+    el.remove(); document.documentElement.classList.remove("cg-open");
+    toast("✅ Утасны дугаар баталгаажлаа. Нууц үгээ мартвал энэ дугаараараа сэргээнэ.");
+  };
+  const bind = () => {
+    const f = $(".pg-form", body); f.phone.focus();
+    f.onsubmit = async (e) => {
+      e.preventDefault(); errEl.textContent = "";
+      const b = $("button", f); b.disabled = true;
+      try {
+        const v = await api("/api/me/phone/verify", { method: "POST", body: { phone: f.phone.value } });
+        smsVerify(body, v, (token) => api("/api/me/phone/check", { method: "POST", body: { token } }), (r) => setTimeout(() => close(r.user), 600),
+          () => { body.innerHTML = formHTML; bind(); });
+      } catch (x) { errEl.textContent = x.message; b.disabled = false; }
+    };
+  };
+  bind();
 }
 
 // Нөхцөл, нууцлалын бодлогын одоогийн хувилбарыг зөвшөөрөөгүй бол (Google г.м.-ээр шинээр орсон, эсвэл бодлого шинэчлэгдсэн)
@@ -649,11 +729,13 @@ async function consentGate() {
       behind.forEach((c) => (c.inert = false));
       el.remove(); document.documentElement.classList.remove("cg-open");
       toast("Баярлалаа! Зөвшөөрлийг тань хадгаллаа.");
+      phoneGate(); // дараа нь утсаа баталгаажуулна
     } catch (x) {
       if (x.status === 409) return location.reload(); // хуудас хуучирсан — шинэ хувилбарыг ачаална
       $(".cg-err", el).textContent = x.message; ok.disabled = false;
     }
   };
+  return true; // цонх гарсан — утасны цонхыг зөвшөөрсний дараа
 }
 
 function bell() {
@@ -5135,8 +5217,9 @@ function loginPage() {
   }
   if (h.get("error")) err.textContent = h.get("error");
   // Бүртгүүлэх: эхлээд багш уу, суралцагч уу гэдгийг сонгуулна; нэвтрэхэд төрөл асуухгүй.
-  let role = ["teacher", "student"].includes(q.get("role")) ? q.get("role") : "", tab = "login";
+  let role = ["teacher", "student"].includes(q.get("role")) ? q.get("role") : "", tab = "login", forgotOn = false;
   const sync = () => {
+    if (forgotOn) return; // «Нууц үгээ мартсан» нээлттэй үед (жишээ нь /login#forgot) товчнууд ачаалагдсаны дараа хаагдахгүй
     const reg = tab === "register", needRole = reg && !role;
     roleStep.hidden = !needRole; roleChosen.hidden = !reg || !role;
     if (role) $("span", roleChosen).innerHTML = `${icon(role === "teacher" ? "teacher" : "courses", 18)}<b>${role === "teacher" ? "Багш" : "Суралцагч"}</b>аар бүртгүүлж байна`;
@@ -5192,23 +5275,64 @@ function loginPage() {
   });
   // Нууц үг мартсан: имэйл рүү сэргээх холбоос.
   const ff = $("#forgotForm");
+  // Хялбар тоон captcha: нэг код нэг л удаа шалгагдана — илгээх бүрийн дараа шинийг татна.
+  let capId = "";
+  const newCaptcha = async () => {
+    const img = $(".captcha img", ff); ff.captcha.value = "";
+    try { const c = await api("/api/auth/captcha", { token: null }); capId = c.id; img.src = c.image; }
+    catch (x) { err.textContent = x.message; }
+  };
   const showForgot = (on) => {
-    ff.hidden = !on; tabs.hidden = on; err.textContent = "";
+    ff.hidden = !on; tabs.hidden = on; err.textContent = ""; forgotOn = on;
     if (!on) { sync(); return; }
     lf.hidden = true; rf.hidden = true; roleStep.hidden = true; roleChosen.hidden = true; $("#social").hidden = true; $(".divider").hidden = true;
-    ff.email.value = lf.email.value; ff.email.focus();
+    ff.email.value = lf.email.value; (fgMode === "phone" ? ff.phone : ff.email).focus();
+    newCaptcha();
   };
   $("[data-forgot]").addEventListener("click", () => showForgot(true));
   $("[data-forgot-back]").addEventListener("click", () => showForgot(false));
+  $("[data-captcha-new]", ff).addEventListener("click", () => { newCaptcha(); ff.captcha.focus(); });
+  // Сэргээх арга: имэйл эсвэл (Verify.MN идэвхтэй бол) баталгаажуулсан утас — утаснаасаа SMS илгээж шууд сэргээнэ.
+  const LEDE = { email: "Бүртгэлтэй имэйлээ бичнэ үү. Нууц үг сэргээх холбоос илгээнэ.", phone: "Баталгаажуулсан утасны дугаараа бичнэ үү. Тэр дугаараасаа нэг SMS илгээгээд нууц үгээ шууд солино." };
+  let fgMode = "email";
+  const sms = $(".fg-sms", ff), go = $(".fg-go", ff);
+  const setMode = (m) => {
+    fgMode = m; err.textContent = ""; sms.hidden = true; sms.innerHTML = "";
+    $$("[data-fg]", ff).forEach((b) => { const on = b.dataset.fg === m; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
+    $$("[data-fg-in]", ff).forEach((l) => { const on = l.dataset.fgIn === m; l.hidden = !on; $("input", l).disabled = !on; });
+    $(".cap-field", ff).hidden = false; go.hidden = false;
+    $(".forgot-lede", ff).textContent = LEDE[m];
+    go.textContent = m === "phone" ? "Үргэлжлүүлэх" : "Сэргээх холбоос илгээх";
+  };
+  $(".fg-mode", ff).addEventListener("click", (e) => { const b = e.target.closest("[data-fg]"); if (b) { setMode(b.dataset.fg); (fgMode === "phone" ? ff.phone : ff.email).focus(); } });
+  api("/api/auth/recovery", { token: null }).then((r) => {
+    if (!r.phone) return;
+    $(".fg-mode", ff).hidden = false;
+    if (!r.email) setMode("phone");
+  }).catch(() => {});
+  // Утсаар баталгаажсаны дараа: нэг бүртгэл бол шууд шинэ нууц үг тавих хуудас руу, олон бол сонгуулна.
+  const phoneDone = (r) => {
+    const a = r.accounts || [];
+    if (a.length === 1) { location.href = "/reset#t=" + a[0].token; return; }
+    sms.innerHTML = `<p class="fg-pick-h">Энэ дугаартай ${a.length} бүртгэл байна — алийнх нь нууц үгийг солих вэ?</p>
+      <div class="fg-pick">${a.map((x) => `<a class="btn btn-ghost btn-block" href="/reset#t=${esc(x.token)}"><b>${esc(x.name || x.username)}</b><small>${esc(x.email || "@" + x.username)} · ${x.role === "teacher" ? "Багш" : "Суралцагч"}</small></a>`).join("")}</div>`;
+  };
   ff.addEventListener("submit", async (e) => {
     e.preventDefault(); err.textContent = "";
-    const b = $("button.btn-gold", ff); b.disabled = true;
+    go.disabled = true;
     try {
-      await api("/api/auth/forgot", { method: "POST", body: { email: ff.email.value }, token: null });
-      $(".forgot-lede", ff).innerHTML = `<b>Имэйлээ шалгана уу.</b> Хэрэв <b>${esc(ff.email.value)}</b> хаягаар бүртгэл байвал нууц үг сэргээх холбоос илгээлээ (Spam хавтсыг ч харна уу). Холбоос 1 цаг хүчинтэй.`;
-      b.textContent = "Дахин илгээх";
-    } catch (x) { err.textContent = x.message; }
-    b.disabled = false;
+      if (fgMode === "phone") {
+        const v = await api("/api/auth/forgot/phone", { method: "POST", body: { phone: ff.phone.value, captcha_id: capId, captcha: ff.captcha.value }, token: null });
+        $$("[data-fg-in], .cap-field", ff).forEach((x) => (x.hidden = true)); go.hidden = true; sms.hidden = false;
+        smsVerify(sms, v, (token) => api("/api/auth/forgot/phone/check", { method: "POST", body: { token }, token: null }), phoneDone, () => { setMode("phone"); newCaptcha(); });
+      } else {
+        await api("/api/auth/forgot", { method: "POST", body: { email: ff.email.value, captcha_id: capId, captcha: ff.captcha.value }, token: null });
+        $(".forgot-lede", ff).innerHTML = `<b>Имэйлээ шалгана уу.</b> Хэрэв <b>${esc(ff.email.value)}</b> хаягаар бүртгэл байвал нууц үг сэргээх холбоос илгээлээ (Spam хавтсыг ч харна уу). Холбоос 1 цаг хүчинтэй.`;
+        go.textContent = "Дахин илгээх";
+      }
+    } catch (x) { err.textContent = x.message; if (x.data?.code === "captcha") ff.captcha.focus(); }
+    newCaptcha();
+    go.disabled = false;
   });
   if (location.hash === "#forgot") showForgot(true);
   // Давтсан нууц үгийг бичих зуур шалгана.

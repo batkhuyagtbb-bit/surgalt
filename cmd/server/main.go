@@ -29,6 +29,7 @@ import (
 	"surgalt/internal/oauth"
 	"surgalt/internal/qpay"
 	"surgalt/internal/store"
+	"surgalt/internal/verifymn"
 )
 
 func env(k, def string) string {
@@ -198,9 +199,22 @@ func run(log *slog.Logger) error {
 
 	fstore.StartTranscoder(ctx, int(envInt("VIDEO_WORKERS", 1)), log)
 
-	// Имэйл (нууц үг сэргээх): SMTP_HOST тохируулсан бол идэвхжинэ.
+	// Имэйл (нууц үг сэргээх): SMTP_HOST тохируулсан бол идэвхжинэ. Gmail: SMTP_USER=хаяг@gmail.com,
+	// SMTP_PASS=Google-ийн «App password» (16 үсэг, зайтай байж болно) — SMTP_HOST-ыг автоматаар smtp.gmail.com болгоно.
 	var mailer mail.Sender
-	if host := os.Getenv("SMTP_HOST"); host != "" {
+	host, pass := os.Getenv("SMTP_HOST"), os.Getenv("SMTP_PASS")
+	if u := strings.ToLower(os.Getenv("SMTP_USER")); strings.HasSuffix(u, "@gmail.com") || strings.HasSuffix(u, "@googlemail.com") {
+		if host == "" {
+			host = "smtp.gmail.com"
+		}
+		pass = strings.ReplaceAll(pass, " ", "")
+	}
+	if host != "" && os.Getenv("SMTP_USER") != "" && pass == "" {
+		// Нууц үггүй бол захидал илгээгдэхгүй — «илгээлээ» гэж хуурахын оронд сэргээх имэйлийг идэвхгүй гэж харуулна.
+		log.Warn("SMTP_PASS хоосон — имэйл идэвхгүй (Gmail бол Google бүртгэлийн App password)", "user", os.Getenv("SMTP_USER"))
+		host = ""
+	}
+	if host != "" {
 		user := os.Getenv("SMTP_USER")
 		from := os.Getenv("SMTP_FROM")
 		if from == "" {
@@ -209,7 +223,7 @@ func run(log *slog.Logger) error {
 				from = "surgalt.mn <" + user + ">" // Gmail г.м. нэвтэрсэн хаягаараа л илгээдэг
 			}
 		}
-		m, err := mail.NewSMTP(host, int(envInt("SMTP_PORT", 587)), user, os.Getenv("SMTP_PASS"), from)
+		m, err := mail.NewSMTP(host, int(envInt("SMTP_PORT", 587)), user, pass, from)
 		if err != nil {
 			return err
 		}
@@ -285,6 +299,11 @@ func run(log *slog.Logger) error {
 	if k, sec := os.Getenv("KHAN_CGW_CONSUMER_KEY"), os.Getenv("KHAN_CGW_SECRET_KEY"); k != "" && sec != "" {
 		srv.Khan = khanbank.New(env("KHAN_CGW_URL", khanbank.TestURL), k, sec)
 		log.Info("Хаан банк CGW идэвхтэй", "test", srv.Khan.Test(), "tran_password", os.Getenv("KHAN_CGW_TRAN_PASSWORD") != "", "auto", envBool("KHAN_CGW_AUTO"))
+	}
+	// Verify.MN: утас баталгаажуулах (нэвтэрмэгц асууна), утсаар нууц үг сэргээх. Түлхүүр: verify.mn → API KEY (vrf_…).
+	if k := strings.TrimSpace(os.Getenv("VERIFY_MN_API_KEY")); k != "" {
+		srv.Verify = verifymn.New(env("VERIFY_MN_URL", verifymn.DefaultURL), k)
+		log.Info("Verify.MN идэвхтэй — утас баталгаажуулах, утсаар нууц үг сэргээх", "url", srv.Verify.Base)
 	}
 	active := map[string]bool{}
 	for _, p := range srv.OAuth.List() {

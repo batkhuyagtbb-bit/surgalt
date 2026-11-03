@@ -24,6 +24,7 @@ import (
 	"surgalt/internal/qpay"
 	"surgalt/internal/ratelimit"
 	"surgalt/internal/store"
+	"surgalt/internal/verifymn"
 )
 
 type Config struct {
@@ -70,6 +71,7 @@ type Server struct {
 	chatLim   *ratelimit.Limiter // мессеж илгээх
 	phoneLim  *ratelimit.Limiter // багшийн утасны дугаар нээх — дугаар хусуурдахаас сэргийлнэ
 	resetLim  *ratelimit.Limiter // нэг имэйл рүү нууц үг сэргээх захидал (2 минутад 1 орчим)
+	capLim    *ratelimit.Limiter // captcha зураг (IP тутам)
 	admLim    *ratelimit.Limiter // хянагчийн нууц үгээр нэвтрэх оролдлого (IP тус бүрт)
 	boardLim  *ratelimit.Limiter // цагаан самбарын өөрчлөлт (хэрэглэгч тус бүрт; анги нэг IP-аас орж болно)
 	boards    boardHub           // цагаан самбарын сессүүд (board.go)
@@ -98,6 +100,8 @@ type Server struct {
 	QPay *qpay.Client
 	// Khan нь Хаан банкны Corporate Gateway — багшийн орлогыг данс руу шилжүүлэх (nil бол гараар).
 	Khan *khanbank.Client
+	// Verify нь Verify.MN — утас баталгаажуулах, утсаар нууц үг сэргээх (nil бол идэвхгүй, утас асуухгүй).
+	Verify *verifymn.Client
 	khanFrom struct {
 		sync.Mutex
 		acct string
@@ -123,6 +127,7 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 		chatLim:   ratelimit.New(2, 10),
 		phoneLim:  ratelimit.New(0.05, 8),
 		resetLim:  ratelimit.New(1.0/120, 2),
+		capLim:    ratelimit.New(0.5, 15),
 		admLim:    ratelimit.New(1.0/30, 5),
 		boardLim:  ratelimit.New(25, 100),
 		searchLim: ratelimit.New(0.5, 12),
@@ -153,6 +158,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.chatLim.Janitor(ctx)
 	go s.phoneLim.Janitor(ctx)
 	go s.resetLim.Janitor(ctx)
+	go s.capLim.Janitor(ctx)
 	go s.admLim.Janitor(ctx)
 	go s.boardLim.Janitor(ctx)
 	go s.searchLim.Janitor(ctx)
@@ -187,6 +193,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/me/consent", s.handleConsent)
 	mux.HandleFunc("POST /api/me/role", s.handleSetRole)
 	mux.HandleFunc("POST /api/auth/forgot", s.handleForgot)
+	mux.HandleFunc("GET /api/auth/captcha", s.handleCaptcha)
+	mux.HandleFunc("GET /api/auth/recovery", s.handleRecovery)
+	mux.HandleFunc("POST /api/auth/forgot/phone", s.handleForgotPhone)
+	mux.HandleFunc("POST /api/auth/forgot/phone/check", s.handleForgotPhoneCheck)
+	mux.HandleFunc("POST /api/me/phone/verify", s.handleMyPhoneStart)
+	mux.HandleFunc("POST /api/me/phone/check", s.handleMyPhoneCheck)
+	mux.HandleFunc("GET /api/verify/callback", s.handleVerifyCallback)
 	mux.HandleFunc("POST /api/auth/reset", s.handleReset)
 	mux.HandleFunc("GET /reset", s.pageStatic("reset"))
 	mux.HandleFunc("GET /api/me/export", s.handleExport)

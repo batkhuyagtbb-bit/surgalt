@@ -24,9 +24,15 @@
       <button type="button" class="auth-forgot" data-forgot>Нууц үгээ мартсан уу?</button>
     </form>
     <form id="forgotForm" class="form" hidden>
+      <div class="fg-mode" role="tablist" aria-label="Сэргээх арга" hidden><button type="button" role="tab" class="on" aria-selected="true" data-fg="email">{{icon "link" 16}} Имэйлээр</button><button type="button" role="tab" aria-selected="false" data-fg="phone">{{icon "phone" 16}} Утсаар</button></div>
       <p class="forgot-lede">Бүртгэлтэй имэйлээ бичнэ үү. Нууц үг сэргээх холбоос илгээнэ.</p>
-      <label>Имэйл<input type="email" name="email" required autocomplete="email"></label>
-      <button class="btn btn-gold btn-block">Сэргээх холбоос илгээх</button>
+      <label class="fg-in" data-fg-in="email">Имэйл<input type="email" name="email" required autocomplete="email"></label>
+      <label class="fg-in" data-fg-in="phone" hidden>Баталгаажуулсан утасны дугаар<input type="tel" name="phone" inputmode="numeric" autocomplete="tel-national" maxlength="12" placeholder="9911 2233" required disabled></label>
+      <div class="cap-field"><label for="capIn">Зурган дээрх тоо</label>
+        <span class="captcha"><img alt="Шалгах код — 4 оронтой тоо" width="180" height="56"><button type="button" class="captcha-new" data-captcha-new aria-label="Өөр код" title="Өөр код">↻</button>
+          <input id="capIn" name="captcha" required inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="4 оронтой тоо" title="Зурган дээрх 4 оронтой тоо"></span></div>
+      <button class="btn btn-gold btn-block fg-go">Сэргээх холбоос илгээх</button>
+      <div class="fg-sms" hidden></div>
       <button type="button" class="auth-forgot" data-forgot-back>← Нэвтрэх рүү буцах</button>
     </form>
     <form id="registerForm" class="form" hidden>
