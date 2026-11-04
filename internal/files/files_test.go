@@ -170,3 +170,25 @@ func TestOfficeConversionRules(t *testing.T) {
 		t.Fatal("LibreOffice байхгүй бол хөрвүүлэхгүй")
 	}
 }
+
+// Нэг файлд цонхны турш ижил URL/тасалбар (хөтөч кэшээс уншина); хүчинтэй хугацаа нь ttl-ээс богинохгүй.
+func TestStableURLs(t *testing.T) {
+	s, err := New(t.TempDir(), []byte("k"), 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := "/files/t1/private/0123456789abcdef__a.pdf"
+	a, b := s.Resolve(p, time.Hour), s.Resolve(p, time.Hour)
+	if a != b {
+		t.Fatalf("URL тогтворгүй: %s / %s", a, b)
+	}
+	if s.Ticket(p, "u1", 3*time.Hour) != s.Ticket(p, "u1", 3*time.Hour) {
+		t.Fatal("тасалбар тогтворгүй")
+	}
+	if s.Ticket(p, "u1", 3*time.Hour) == s.Ticket(p, "u2", 3*time.Hour) {
+		t.Fatal("өөр хэрэглэгчид ижил тасалбар")
+	}
+	if exp := stableExp(time.Hour); exp < time.Now().Add(time.Hour).Unix() || exp > time.Now().Add(time.Hour+urlWindow).Unix() {
+		t.Fatalf("хугацаа: %d", exp-time.Now().Unix())
+	}
+}

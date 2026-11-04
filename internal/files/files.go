@@ -75,6 +75,22 @@ type Store struct {
 	maxFileSize int64
 	tc          *Transcoder
 	locks       sync.Map // teacherID -> *sync.Mutex (квот шалгалтыг цуваа болгоно)
+	refs        sync.Map // тасалбарын богино лавлагаа -> refHit (видео гүйлгэх бүрт хавтас уншихгүй)
+}
+
+type refHit struct{ path, disk string }
+
+// urlWindow — гарын үсэгтэй URL, медиа тасалбарын хугацааг энэ цонхоор бүхэлтгэнэ: нэг файлд цонхны турш ижил URL
+// өгч, хөтөч дахин үзэх, гүйлгэхэд файлыг кэшээсээ уншина (хугацаа секундээр байхад URL бүр шинэ байв).
+const urlWindow = 6 * time.Hour
+
+// stableExp — ttl-ээс доошгүй, цонхны хил хүртэл (ttl … ttl+urlWindow) хүчинтэй хугацаа.
+func stableExp(ttl time.Duration) int64 {
+	if ttl <= 0 { // аль хэдийн дууссан (тест, хүчингүй болгох) — бүхэлтгэхгүй
+		return time.Now().Add(ttl).Unix()
+	}
+	w := int64(urlWindow / time.Second)
+	return (time.Now().Add(ttl).Unix()/w + 1) * w
 }
 
 func New(root string, signKey []byte, maxFileSize int64) (*Store, error) {
@@ -408,7 +424,7 @@ func (s *Store) Resolve(path string, ttl time.Duration) string {
 	if !strings.HasPrefix(path, "/files/") || !strings.Contains(path, "/"+Private+"/") {
 		return path
 	}
-	exp := time.Now().Add(ttl).Unix()
+	exp := stableExp(ttl)
 	return path + "?exp=" + strconv.FormatInt(exp, 10) + "&sig=" + s.sig(path, exp)
 }
 
@@ -431,7 +447,7 @@ func OwnedBy(path, teacherID string) bool {
 // Ticket нь private файлын замыг нууж, хугацаатай, хэрэглэгчид холбосон тасалбар үүсгэнэ:
 // base64url("path|uid|exp") + "." + HMAC. Суралцагчийн хөтөч файлын нэр, багшийн ID-г харахгүй.
 func (s *Store) Ticket(path, uid string, ttl time.Duration) string {
-	exp := time.Now().Add(ttl).Unix()
+	exp := stableExp(ttl)
 	payload := fmt.Sprintf("%s|%s|%d", ticketRef(path), uid, exp)
 	mac := hmac.New(sha256.New, append([]byte("ticket:"), s.key...))
 	mac.Write([]byte(payload))
@@ -485,6 +501,13 @@ func ticketRef(path string) string {
 
 // resolveRef — богино лавлагаагаас файлын замыг олно (16 hex угтвартай файлуудаас нэрийн хэшээр).
 func (s *Store) resolveRef(ref string) (string, bool) {
+	if v, ok := s.refs.Load(ref); ok {
+		h := v.(refHit)
+		if _, err := os.Stat(h.disk); err == nil {
+			return h.path, true
+		}
+		s.refs.Delete(ref) // файл устсан/солигдсон
+	}
 	parts := strings.Split(strings.TrimPrefix(ref, "@"), "/")
 	if len(parts) != 4 || (parts[1] != Public && parts[1] != Private) || !hex16Re.MatchString(parts[2]) {
 		return "", false
@@ -497,7 +520,9 @@ func (s *Store) resolveRef(ref string) (string, bool) {
 	for _, m := range ms {
 		n := filepath.Base(m)
 		if sum := sha256.Sum256([]byte(n)); hex.EncodeToString(sum[:4]) == parts[3] {
-			return "/files/" + parts[0] + "/" + parts[1] + "/" + url.PathEscape(n), true
+			p := "/files/" + parts[0] + "/" + parts[1] + "/" + url.PathEscape(n)
+			s.refs.Store(ref, refHit{path: p, disk: m})
+			return p, true
 		}
 	}
 	return "", false

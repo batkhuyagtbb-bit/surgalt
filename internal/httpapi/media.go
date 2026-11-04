@@ -76,7 +76,9 @@ func (s *Server) viewerMedia(path, uid string) string {
 
 // handleMedia: GET /api/media/{ticket}/{name}
 func (s *Server) handleMedia(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "private, no-store")
+	// Тасалбар хэрэглэгчид холбогдсон, 6 цагийн цонхонд тогтвортой: дахин үзэх, буцааж гүйлгэх, PDF дахин нээхэд
+	// хөтөч кэшээсээ уншина (урьд no-store байсан тул бүх хүсэлт файлыг дахин татдаг байв).
+	w.Header().Set("Cache-Control", "private, max-age=10800")
 	path, _, ok := s.files.ResolveTicket(r.PathValue("ticket"))
 	if !ok {
 		writeErr(w, http.StatusForbidden, "холбоосны хугацаа дууссан эсвэл хүчингүй")

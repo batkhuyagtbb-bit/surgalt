@@ -122,7 +122,7 @@ func (s *Server) handleServeFile(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Cache-Control", "private, max-age=3600")
 	} else {
-		w.Header().Set("Cache-Control", "public, max-age=86400")
+		w.Header().Set("Cache-Control", "public, max-age=2592000") // нэр нь байршуулалт бүрт давтагдашгүй (16 hex угтвар)
 	}
 	f, fi, err := s.files.Open(teacher, vis, names[0])
 	for _, n := range names[1:] {
