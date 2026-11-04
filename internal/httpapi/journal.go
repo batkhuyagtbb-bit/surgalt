@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"sort"
 	"strings"
@@ -119,13 +120,60 @@ func (s *Server) handleCourseJournal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	lessons, err := s.store.LessonsByCourse(ctx, course.ID)
+	jr, err := s.journals.GetOrLoad(ctx, course.ID, func(ctx context.Context) (*journalAgg, error) { return s.buildJournal(ctx, course) })
 	if s.storeErr(w, r, err) {
 		return
 	}
+	// Хуудас: нэрээр хайж, эхний journalStudents-ийг (сүүлд идэвхтэй байснаас) нүднүүдийнх нь хамт.
+	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
+	students := jr.students
+	if q != "" {
+		students = make([]JournalStudent, 0, 64)
+		for _, js := range jr.students {
+			if strings.Contains(strings.ToLower(js.Name), q) || strings.Contains(strings.ToLower(js.Username), q) {
+				students = append(students, js)
+			}
+		}
+	}
+	total := len(students)
+	if len(students) > journalStudents {
+		students = students[:journalStudents]
+	}
+	cells := make(map[string]map[string]*JournalCell, len(students))
+	for _, js := range students {
+		if row := jr.cells[js.UserID]; row != nil {
+			cells[js.UserID] = row
+		}
+	}
+	w.Header().Set("Cache-Control", "private, no-store")
+	writeJSON(w, http.StatusOK, map[string]any{
+		"course":         map[string]any{"id": course.ID, "title": course.Title},
+		"lessons":        jr.lessons,
+		"students":       students,
+		"cells":          cells,
+		"students_total": total,
+	})
+}
+
+// journalStudents — журналд нэг дор өгөх суралцагчийн дээд тоо (бусдыг нэрээр хайна).
+const journalStudents = 300
+
+// journalAgg — нэг сургалтын бүтэн журнал (бүх суралцагч × хичээл). 30 000 суралцагчтай сургалтад тооцоо хүнд тул
+// 30 секунд кэшилж, хариуд нь зөвхөн хуудсыг өгнө.
+type journalAgg struct {
+	lessons  []JournalLesson
+	students []JournalStudent // sortJournal-ийн дарааллаар
+	cells    map[string]map[string]*JournalCell
+}
+
+func (s *Server) buildJournal(ctx context.Context, course *store.Course) (*journalAgg, error) {
+	lessons, err := s.store.LessonsByCourse(ctx, course.ID)
+	if err != nil {
+		return nil, err
+	}
 	prog, err := s.store.CourseProgress(ctx, course.ID)
-	if s.storeErr(w, r, err) {
-		return
+	if err != nil {
+		return nil, err
 	}
 	f := store.ActivityFilter{CourseID: course.ID}
 	ss, _ := s.store.Sessions(ctx, f, 50000)
@@ -270,11 +318,5 @@ func (s *Server) handleCourseJournal(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	sortJournal(out)
-	w.Header().Set("Cache-Control", "private, no-store")
-	writeJSON(w, http.StatusOK, map[string]any{
-		"course":   map[string]any{"id": course.ID, "title": course.Title},
-		"lessons":  jl,
-		"students": out,
-		"cells":    cells,
-	})
+	return &journalAgg{lessons: jl, students: out, cells: cells}, nil
 }

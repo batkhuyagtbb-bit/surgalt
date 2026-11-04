@@ -91,6 +91,43 @@ func (h *Hub) Unsubscribe(c *Client, keys ...string) {
 
 func (h *Hub) Connections() int64 { return h.conns.Load() }
 
+// Join — нээлттэй холболтыг нэмэлт сувагт (ж: хичээлийн үүлэн үг) нэгтгэнэ. Холболтын тоонд нөлөөлөхгүй.
+func (h *Hub) Join(c *Client, key string) {
+	s := h.shard(key)
+	s.mu.Lock()
+	set := s.subs[key]
+	if set == nil {
+		set = make(map[*Client]struct{})
+		s.subs[key] = set
+	}
+	set[c] = struct{}{}
+	s.mu.Unlock()
+}
+
+// Leave — Join-оор нэгтгэсэн сувгаас салгана (холболтыг хаахгүй).
+func (h *Hub) Leave(c *Client, keys ...string) {
+	for _, k := range keys {
+		s := h.shard(k)
+		s.mu.Lock()
+		if set := s.subs[k]; set != nil {
+			delete(set, c)
+			if len(set) == 0 {
+				delete(s.subs, k)
+			}
+		}
+		s.mu.Unlock()
+	}
+}
+
+// Publish — сувгийн бүх холболт руу үйл явдал (нэг удаа JSON болгоно).
+func (h *Hub) Publish(key string, event any) {
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return
+	}
+	h.publish(key, payload)
+}
+
 // Online — тухайн сувагт дор хаяж нэг нээлттэй холболт байгаа эсэх (багшийн онлайн төлөв).
 func (h *Hub) Online(key string) bool {
 	s := h.shard(key)

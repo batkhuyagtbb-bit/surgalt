@@ -139,6 +139,27 @@ async function api(path, { method = "GET", body, token = Auth.token, raw } = {})
   return data;
 }
 
+// /api/me/home-ийг нэг хуудсанд давхар асуухгүй: 5 секундийн дотор ирсэн дуудлагууд нэг хариуг хуваалцана.
+// lite — чатын самбарт (чат, багш нар л хэрэгтэй): бүтэн хариу аль хэдийн ирж байвал түүнийг ашиглана.
+const homeMemo = { p: null, at: 0, lite: false };
+function meHome(lite = false) {
+  if (homeMemo.p && Date.now() - homeMemo.at < 5000 && (lite || !homeMemo.lite)) return homeMemo.p;
+  homeMemo.at = Date.now(); homeMemo.lite = lite;
+  const p = api("/api/me/home" + (lite ? "?lite=1" : ""));
+  homeMemo.p = p;
+  p.catch(() => { if (homeMemo.p === p) homeMemo.p = null; });
+  return p;
+}
+
+// Хуудасласан жагсаалт: бие нь массив хэвээр, нийт тоо X-Total-Count толгойд (олон мянган мөрийг нэг дор татахгүй).
+async function apiList(path) {
+  const res = await api(path, { raw: true });
+  const data = res.status === 204 ? null : await res.json().catch(() => null);
+  if (!res.ok) { const e = new Error(data?.error || "Алдаа гарлаа (" + res.status + ")"); e.status = res.status; e.data = data; throw e; }
+  const items = Array.isArray(data) ? data : data?.items || [];
+  return { items, total: +(res.headers.get("X-Total-Count") || items.length) };
+}
+
 function toast(msg, err) {
   const t = document.createElement("div");
   t.className = "toast" + (err ? " err" : "");
@@ -277,7 +298,12 @@ addEventListener("keydown", (e) => { if (e.key === "Escape") $$(".modal.open").f
 /* ---------- WebSocket: чат + мэдэгдэл (нэг холболт) ---------- */
 const Live = {
   ws: null, token: null, tries: 0, handlers: new Set(),
+  subs: new Map(), // нэмэлт суваг (ж: үүлэн үг) → бүртгэлийн мессеж; дахин холбогдоход дахин илгээнэ
   on(fn) { this.handlers.add(fn); },
+  off(fn) { this.handlers.delete(fn); },
+  send(msg) { if (this.ws?.readyState === 1) { try { this.ws.send(JSON.stringify(msg)); } catch {} } },
+  sub(key, msg) { this.subs.set(key, msg); this.send(msg); },
+  unsub(key) { const m = this.subs.get(key); if (!m) return; this.subs.delete(key); this.send({ ...m, t: "unsub" }); },
   // Бүлэгт шинээр орсны дараа (сувгууд холбогдох үед тооцогддог) дахин холбогдоно.
   reconnect() { const t = this.token || Auth.token; const ws = this.ws; this.ws = null; try { ws?.close(); } catch {} this.token = null; this.connect(t); },
   connect(token) {
@@ -287,7 +313,7 @@ const Live = {
     const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/chat/ws?token=" + encodeURIComponent(token));
     this.ws = ws;
     // Тасраад дахин холбогдвол тасарсан хугацаанд ирсэн мессежийг сонсогчид дахин татна.
-    ws.onopen = () => { this.tries = 0; if (this.opened) this.handlers.forEach((h) => h({ type: "reconnected" })); this.opened = true; };
+    ws.onopen = () => { this.tries = 0; this.subs.forEach((m) => this.send(m)); if (this.opened) this.handlers.forEach((h) => h({ type: "reconnected" })); this.opened = true; };
     ws.onmessage = (e) => { let d; try { d = JSON.parse(e.data); } catch { return; } this.handlers.forEach((h) => h(d)); };
     ws.onclose = () => {
       if (this.ws !== ws) return;
@@ -370,7 +396,7 @@ function chatRail() {
       const list = await api("/api/me/conversations").catch(() => []);
       list.forEach((c) => out.set(c.id, { id: c.id, kind: c.kind || "", title: c.visitor_name, sub: c.kind === "group" ? "Бүлэг · сургалтын суралцагчид" : c.user_id ? "Суралцагч" : "Зочин", peer: c.kind === "group" || c.kind === "team" ? "" : (c.teacher_id === u.id ? c.user_id : c.teacher_id) || "", last: c.last_message, at: c.last_message_at }));
     }
-    const h = await api("/api/me/home").catch(() => null);
+    const h = await meHome(true).catch(() => null);
     (h?.chats || []).forEach((c) => { if (!out.has(c.id)) out.set(c.id, { id: c.id, kind: c.kind || "", title: c.kind === "group" || c.kind === "team" ? c.title : c.teacher?.display_name || "", sub: c.kind === "group" ? "Бүлэг · " + (c.teacher?.display_name || "") : c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : "Багш", user: c.kind === "team" ? null : c.teacher, peer: c.kind === "group" || c.kind === "team" ? "" : c.teacher?.id || "", course: c.course_id || "", last: c.last_message, at: c.last_message_at }); });
     return [...out.values()].sort((a, b) => new Date(b.at) - new Date(a.at));
   };
@@ -379,14 +405,36 @@ function chatRail() {
   const loadPeople = async () => {
     try {
       if (teacher) {
-        const rows = await api("/api/me/students");
-        people = rows.map((r) => ({ id: r.user.id, user: r.user, name: r.user.display_name, sub: "Суралцагч" + (r.courses?.[0]?.title ? " · " + r.courses[0].title : ""), convId: r.conv_id || "", start: () => api(`/api/me/students/${r.user.id}/chat`, { method: "POST" }) }));
+        const { items, total } = await apiList(peopleURL());
+        people = items.map(toPerson); peopleTotal = total; peopleBase = items.length;
       } else {
-        const [h, mates] = await Promise.all([api("/api/me/home"), api("/api/me/classmates").catch(() => [])]);
+        const [h, mates] = await Promise.all([meHome(true), apiList(peopleURL()).catch(() => ({ items: [], total: 0 }))]);
         people = (h.teachers || []).map((t) => ({ id: t.id, user: t, name: t.display_name, sub: "Багш" + (t.headline ? " · " + t.headline : ""), convId: "", start: () => api(`/api/teachers/${t.username}/chat`, { method: "POST" }) }))
-          .concat(mates.map((m) => ({ id: m.user.id, user: m.user, name: m.user.display_name, sub: "Ангийн найз · " + (m.via || m.courses?.[0] || ""), convId: m.conv_id || "", mate: true, start: () => api(`/api/me/dm/${m.user.id}`, { method: "POST" }) })));
+          .concat(mates.items.map(toPerson));
+        peopleTotal = mates.total; peopleBase = mates.items.length;
       }
-    } catch { people = []; }
+    } catch { people = []; peopleTotal = peopleBase = 0; }
+  };
+  // Олон мянган суралцагчтай үед эхний 200-г л ачаална; бусдыг нь нэрээр серверээс хайж жагсаалтад нэмнэ.
+  let peopleTotal = 0, peopleBase = 0, findT = 0, findQ = "";
+  const PEOPLE = 200;
+  const peopleURL = (q = "") => (teacher ? `/api/me/students?sort=rail&limit=${q ? 50 : PEOPLE}` : `/api/me/classmates?limit=${q ? 50 : PEOPLE}`) + (q ? "&q=" + encodeURIComponent(q) : "");
+  const toPerson = (r) => teacher
+    ? { id: r.user.id, user: r.user, name: r.user.display_name, sub: "Суралцагч" + (r.courses?.[0]?.course_title ? " · " + r.courses[0].course_title : ""), convId: r.conv_id || "", start: () => api(`/api/me/students/${r.user.id}/chat`, { method: "POST" }) }
+    : { id: r.user.id, user: r.user, name: r.user.display_name, sub: "Ангийн найз · " + (r.via || r.courses?.[0] || ""), convId: r.conv_id || "", mate: true, start: () => api(`/api/me/dm/${r.user.id}`, { method: "POST" }) };
+  const findPeople = () => {
+    clearTimeout(findT);
+    const q = $("#railSearch").value.trim();
+    if (q.length < 2 || peopleTotal <= peopleBase || q === findQ) return;
+    findT = setTimeout(async () => {
+      findQ = q;
+      try {
+        const { items } = await apiList(peopleURL(q));
+        const known = new Set(people.map((p) => p.id));
+        people = people.concat(items.filter((r) => !known.has(r.user.id)).map(toPerson));
+        if ($("#railSearch").value.trim() === q) draw();
+      } catch {}
+    }, 300);
   };
   let firstDraw = true;
   const draw = () => {
@@ -414,7 +462,7 @@ function chatRail() {
     const person = (p) => `<button class="rail-item ${anim} rail-person ${isOn(p.id) ? "on" : ""}" style="--i:${Math.min(i++, 12)}" data-person="${esc(p.id)}">${avatarHTML(p.user)}<span class="grow"><strong>${esc(p.name)}</strong><small><b>${isOn(p.id) ? "Онлайн · " : ""}${esc(p.sub)}</b></small></span><span class="rail-new" aria-hidden="true">${I.chat}</span></button>`;
     const sec = (title, n, cls = "") => `<div class="rail-sec ${cls}"><span>${title}</span><em>${n}</em></div>`;
     $("#railList").innerHTML = (lv.length ? sec("Онлайн", lv.length, "live") + `<div class="rail-live">${lv.map(liveItem).join("")}</div>` : "") +
-      (shown.length ? sec("Сүүлийн яриа", shown.length) + shown.map(item).join("") : "") + (ppl.length ? sec("Хүмүүс", ppl.length) + ppl.map(person).join("") : "") ||
+      (shown.length ? sec("Сүүлийн яриа", shown.length) + shown.map(item).join("") : "") + (ppl.length ? sec("Хүмүүс", !q && peopleTotal > peopleBase ? peopleTotal : ppl.length) + ppl.map(person).join("") + (!q && peopleTotal > peopleBase ? `<p class="muted small rail-more-hint">Бусад ${peopleTotal - peopleBase} хүнийг нэрээр нь хайж олно уу</p>` : "") : "") ||
       `<p class="muted small" style="padding:16px">${q ? "Илэрц алга" : teacher ? "Одоогоор чат алга. Профайлаа түгээгээрэй!" : "Багшийн профайл дээрх «Чатлах» эсвэл сургалтын «Бүлэг чат»-аар яриа эхэлнэ."}</p>`;
   };
   const load = async () => { convs = await norm(); draw(); };
@@ -486,7 +534,7 @@ function chatRail() {
     }
   };
   $("#railBack").onclick = () => { meetOff(); cur = null; ss.set("sg_rail_conv", null); thread.hidden = true; home.hidden = false; draw(); };
-  $("#railSearch").addEventListener("input", draw);
+  $("#railSearch").addEventListener("input", () => { draw(); findPeople(); });
   $("#railList").addEventListener("click", (e) => { const mo = e.target.closest("[data-more]"); if (mo) return moreMenu(mo); const lv = e.target.closest("[data-live]"); if (lv) return lv.dataset.conv ? open(lv.dataset.conv) : startWith(lv.dataset.live); const p = e.target.closest("[data-person]"); if (p) return startWith(p.dataset.person); const it = e.target.closest(".rail-item"); if (it) open(it.dataset.id); });
   $("#railList").addEventListener("scroll", () => closeMenu(), { passive: true });
   // «⋯» цэс: «Чат устгах» → баталгаажуулах (зөвхөн өөрийн талд устгана, нөгөө тал хэвээр харна).
@@ -579,7 +627,7 @@ function chatRail() {
       if (changed) draw();
       if (curConv && cur === curConv.id && !thread.hidden) $("#railWho").innerHTML = whoHTML(curConv);
     } catch {}
-    presT = setTimeout(pollPresence, 30000);
+    presT = setTimeout(pollPresence, 60000); // минут тутам (жагсаалт ~200 хүнээр хязгаартай, санах ойгоос)
   };
   document.addEventListener("visibilitychange", () => { if (!document.hidden) pollPresence(); });
   Live.on((d) => {
@@ -1103,7 +1151,7 @@ function mountBoards(root, base, owner = false) {
     };
   });
 }
-/* ---------- Үүлэн үг: суралцагчдын хариулт үүл болж, 5 секунд тутам шинэчлэгдэнэ ---------- */
+/* ---------- Үүлэн үг: суралцагчдын хариулт үүл болж, шинэ хариулт WebSocket-оор шууд ирнэ ---------- */
 const CLOUD_HUES = ["#2f56d6", "#d9622b", "#1f9a4a", "#b45309", "#7c3aed", "#0e7490", "#be185d", "#1f3c8f"];
 // viewOnly — багш (өөрийн хичээл): маягтгүй, зөвхөн үр дүн.
 function mountClouds(root, base, viewOnly = false) {
@@ -1115,8 +1163,9 @@ function mountClouds(root, base, viewOnly = false) {
     const hideForm = () => $$(".cl-form, .cl-in, button[type=submit]", fig).forEach((x) => (x.hidden = true));
     if (!url) { hideForm(); box.innerHTML = `<p class="muted small">Нэвтэрч орвол хариулж, бусдын үгийг харна.</p>`; return; }
     if (viewOnly || !form) hideForm();
-    let last = "";
+    let last = "", lastMine = [];
     const render = (d) => {
+      if (d.mine) lastMine = d.mine; else d = { ...d, mine: lastMine }; // түлхэлтэд «миний үг» ирэхгүй
       const key = JSON.stringify([d.words, d.mine]); if (key === last) return; last = key;
       const ws = d.words || [], top = ws[0]?.n || 1, mine = new Set(d.mine || []);
       const arr = []; ws.forEach((w, i) => (i % 2 ? arr.push(w) : arr.unshift(w))); // том үгс голд
@@ -1140,7 +1189,18 @@ function mountClouds(root, base, viewOnly = false) {
       catch (err) { toast(err.message, true); } finally { b.disabled = false; }
     });
     load();
-    const t = setInterval(() => { if (!fig.isConnected) return clearInterval(t); if (!document.hidden) load(); }, 5000);
+    // Шинэ хариулт WebSocket-оор (блок бүрт 4 секундэд нэг удаа хүртэл) түлхэгдэнэ; холболт тасарсан үед 30 секунд тутам асууна.
+    const [, cid, lid] = url.match(/\/courses\/([^/]+)\/lessons\/([^/]+)\//) || [], bid = fig.dataset.bid, topic = `cloud:${lid}|${bid}`;
+    const onLive = (d) => {
+      if (!fig.isConnected) { Live.unsub(topic); Live.off(onLive); return; }
+      if (d.type === "cloud" && d.lesson === lid && d.block === bid) render(d);
+      else if (d.type === "reconnected") load(); // тасарсан хугацааны хариултууд
+    };
+    if (cid && lid) { Live.sub(topic, { t: "sub", topic: "cloud", course: cid, lesson: lid, block: bid }); Live.on(onLive); }
+    const t = setInterval(() => {
+      if (!fig.isConnected) { clearInterval(t); Live.unsub(topic); Live.off(onLive); return; }
+      if (!document.hidden) load();
+    }, 30000);
   });
 }
 
@@ -1190,7 +1250,7 @@ function timeAgo(t) {
   if (m < 10080) return Math.floor(m / 1440) + " өдөр";
   return fmtDate(t);
 }
-async function discussionPanel(box, { courseId, lessonId }) {
+async function discussionPanel(box, { courseId, lessonId, preload }) {
   const base = `/api/courses/${courseId}/lessons/${lessonId}`;
   box.hidden = false;
   if (!Auth.token) { box.innerHTML = `<div class="dc-head"><b>💬 Хэлэлцүүлэг</b></div><p class="muted small">Сэтгэгдэл бичих, лайк дарахын тулд <a href="/login?next=${encodeURIComponent(location.pathname)}">нэвтэрнэ үү</a>.</p>`; return; }
@@ -1215,7 +1275,7 @@ async function discussionPanel(box, { courseId, lessonId }) {
     $$(".dc-form textarea", box).forEach((t) => t.addEventListener("input", () => { t.style.height = "auto"; t.style.height = Math.min(160, t.scrollHeight) + "px"; }));
     $(".dc-form-reply textarea", box)?.focus();
   };
-  const load = async () => { try { d = await api(`${base}/discussion`); render(); } catch (e) { box.innerHTML = e.status === 409 ? "" : `<p class="form-error">${esc(e.message)}</p>`; if (e.status === 409) box.hidden = true; } };
+  const load = async (pre) => { try { d = pre || await api(`${base}/discussion`); render(); } catch (e) { box.innerHTML = e.status === 409 ? "" : `<p class="form-error">${esc(e.message)}</p>`; if (e.status === 409) box.hidden = true; } };
   box.onclick = async (e) => {
     const t = e.target;
     if (t.closest("[data-like-lesson]")) { try { const r = await api(`${base}/like`, { method: "POST", body: { target: "lesson" } }); d.liked = r.liked; d.likes = r.likes; render(); } catch (x) { toast(x.message, true); } return; }
@@ -1234,7 +1294,7 @@ async function discussionPanel(box, { courseId, lessonId }) {
     catch (x) { toast(x.message, true); } finally { b.disabled = false; }
   };
   box.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && e.target.matches(".dc-form textarea")) { e.preventDefault(); e.target.closest("form").requestSubmit(); } });
-  await load();
+  await load(preload); // хичээлийн хариунд ирсэн бол дахин асуухгүй
 }
 
 /* ---------- Цол олгох ёслол: өнгөлөг салют + баяр хүргэх карт (систем өөрөө) ---------- */
@@ -1796,7 +1856,7 @@ function lessonMarker(body, base, ctx = {}) {
   body.addEventListener("click", onMn); body.addEventListener("keydown", onMnKey);
   body.addEventListener("pointerup", onUp); body.addEventListener("keyup", onUp); body.addEventListener("click", onClick);
   document.addEventListener("pointerdown", onDoc); addEventListener("message", onMsg);
-  api(base).then((d) => {
+  (ctx.preload ? Promise.resolve(ctx.preload) : api(base)).then((d) => { // хичээлийн хариунд ирсэн бол дахин асуухгүй
     hs = d.highlights || []; paint();
     const nid = new URLSearchParams(location.hash.slice(1)).get("n"), h = nid && hs.find((x) => x.id === nid);
     if (h) setTimeout(() => { if (h.k) return goMedia(h); const m = $(`mark.hl[data-hid="${CSS.escape(h.id)}"]`, body); if (m) { m.scrollIntoView({ behavior: "smooth", block: "center" }); m.classList.remove("flash"); void m.offsetWidth; m.classList.add("flash"); } }, 900);
@@ -3830,7 +3890,7 @@ function profilePage() {
 
   // Хувийн болгох: суралцагчид өөрийнх нь сургалтыг тэмдэглэнэ, эзэмшигчид засах хэрэгслийг нээнэ.
   if (!Auth.token) return;
-  api("/api/me/home").then((h) => {
+  meHome().then((h) => { // бүтэн: эзэмшигчийн хэрэгсэлд h.teacher хэрэгтэй
     const mine = new Map(h.courses.map((c) => [c.course.id, c]));
     cards.forEach((card) => {
       const m = mine.get(card.dataset.course); if (!m || $(".flag-lock", card)) return; // нууц үгтэй: элссэн ч нууц үгээр л нээгдэнэ
@@ -4200,7 +4260,7 @@ async function homePage() {
   const dash = $("#dash");
   if (!dash || !Auth.token) return;
   let h;
-  try { h = await api("/api/me/home"); }
+  try { h = await meHome(); }
   catch (e) {
     if (e.status === 401) { authNav(); return; } // токен хүчингүй — танилцуулга хуудас руу буцна
     dash.innerHTML = `<div class="empty">${esc(e.message)} <button class="btn btn-ghost btn-sm" onclick="location.reload()">Дахин оролдох</button></div>`;
@@ -4825,7 +4885,8 @@ async function coursePage() {
     const r = rowById(lid); if (r && lid !== stageLid) expandRow(r, { push: false });
   });
   const play = async (lid) => {
-    const l = await api(`/api/courses/${id}/lessons/${lid}`);
+    // Тодруулга, хэлэлцүүлэг хичээлтэй нэг хүсэлтээр ирнэ (тус тусдаа 2 хүсэлтийн оронд).
+    const l = await api(`/api/courses/${id}/lessons/${lid}${Auth.token ? "?include=highlights,discussion" : ""}`);
     $("#lessonTitle").textContent = l.title;
     const nav = $("#lessonNav");
     if (nav) { nav.innerHTML = navHTML(lid); nav.hidden = lessonRows().length < 2; nav.onclick = async (e) => { const b = e.target.closest("[data-nav]"); if (!b || b.disabled) return; const li = lessonRows().find((r) => r.dataset.lesson === b.dataset.nav); if (li) await expandRow(li); }; }
@@ -4848,7 +4909,7 @@ async function coursePage() {
     stopMarker?.(); // маркер: шалгалтаас бусад хичээлд, нэвтэрсэн суралцагчид (тодруулга зөвхөн өөрт нь)
     $$(".hl-bar, .hl-pop", body.parentElement).forEach((x) => x.remove());
     const tHref = $(".teacher-chip")?.getAttribute("href") || "", tUser = tHref.startsWith("/t/") ? tHref.slice(3) : "";
-    stopMarker = Auth.token && !l.exam ? lessonMarker(body, `/api/courses/${id}/lessons/${lid}/highlights`, { teacher: tUser, self: !!tUser && Auth.user?.username === tUser, title: l.title }) : null;
+    stopMarker = Auth.token && !l.exam ? lessonMarker(body, `/api/courses/${id}/lessons/${lid}/highlights`, { teacher: tUser, self: !!tUser && Auth.user?.username === tUser, title: l.title, preload: l._highlights }) : null;
     const modal = $("#lessonModal");
     const isOwner = !!Auth.user?.username && $(".teacher-chip")?.getAttribute("href") === "/t/" + Auth.user.username;
     mountClouds(body, Auth.token ? `/api/courses/${id}/lessons/${lid}` : "", isOwner);
@@ -4862,7 +4923,7 @@ async function coursePage() {
       assignmentCard(body, { courseId: id, lessonId: lid });
     }
     const dbox = $("#lessonDiscuss");
-    if (dbox) { dbox.hidden = true; dbox.innerHTML = ""; if (l.discussion && !l.exam) discussionPanel(dbox, { courseId: id, lessonId: lid }); }
+    if (dbox) { dbox.hidden = true; dbox.innerHTML = ""; if (l.discussion && !l.exam) discussionPanel(dbox, { courseId: id, lessonId: lid, preload: l._discussion }); }
     // Видео: бүрэн үзэхээс өмнө урагш гүйлгэхгүй; хэдэн удаа аль хэсгийг үзсэнийг бичинэ.
     const watched = {};
     for (const [k, v] of Object.entries(access?.progress?.[lid]?.quiz || {})) if (k.startsWith("watch_") && v) watched[k.slice(6)] = true;
@@ -5567,7 +5628,7 @@ function mountA11y() {
 // Бүх хуудсанд (зүүн доод буланд); iframe дотор (хичээлд суулгасан хуудас) давхардуулахгүй.
 if (window.self === window.top) mountA11y();
 
-window.SG = { THREAD_EVENTS, panelIn, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
+window.SG = { THREAD_EVENTS, panelIn, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, apiList, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх
@@ -5848,6 +5909,10 @@ if (page === "profile" || page === "course") chatWidget();
 if (page === "course") coursePage();
 if (page === "login") loginPage();
 if (page === "home") findCourses();
+// 404: «Буцах» — сайтын өөр хуудаснаас ирсэн бол буцна, гаднаас (буруу холбоос) ирсэн бол нүүр хуудас руу.
+if (page === "error") $("[data-nf-back]")?.addEventListener("click", () => {
+  if (history.length > 1 && document.referrer.startsWith(location.origin)) history.back(); else location.href = "/";
+});
 // Үзэлт: хуудас нээгдэхэд бүртгэж, хэр удаан (идэвхтэй, харагдаж байсан) байсныг гарахдаа илгээнэ.
 // Багш өөрийнхийгөө үзвэл сервер тоолохгүй. Давтагдаагүй зочныг хөтчийн санамсаргүй ID-гаар ялгана.
 {

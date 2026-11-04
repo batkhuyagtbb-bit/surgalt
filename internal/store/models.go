@@ -675,6 +675,8 @@ type Store interface {
 	CreateCourse(ctx context.Context, c *Course) error
 	// UpdateCourse нь зөвхөн c.TeacherID эзэмшдэг сургалтыг шинэчилнэ.
 	UpdateCourse(ctx context.Context, c *Course) error
+	// DeleteCourse — багш өөрийн сургалтыг устгана (мөр deleted болно; хичээл, явцын түүх санд үлдэнэ).
+	DeleteCourse(ctx context.Context, teacherID, courseID string) error
 	CourseByID(ctx context.Context, id string) (*Course, error)
 	CoursesByTeacher(ctx context.Context, teacherID string, onlyPublished bool) ([]Course, error)
 	// PublishedCourses нь хайлтын индексэд: бүх нийтлэгдсэн сургалт (limit хүртэл).

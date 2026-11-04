@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"surgalt/internal/store"
@@ -435,8 +436,10 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 	activePct, attention, learn, reflections, qLessons, qMastered, cheated := 0, 0, 0, 0, 0, 0, 0
 	boardN, collab, boardOps, boardMsgs, boardVoice, boardActive := 0, 0, 0, 0, 0, 0
 	rankDist := map[string]int{}
+	riskN := map[string]int{"ok": 0, "watch": 0, "risk": 0} // бүх суралцагчаар (жагсаалт хуудаслагдсан ч)
 	topRank := RankInfo{}
 	for _, st := range out.Students {
+		riskN[st.Risk]++
 		if st.BoardDays > 0 {
 			boardN++
 			collab += st.CollabScore
@@ -470,7 +473,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 		"attention": attention, "violations": tot.Violations, "exams": len(atts), "learn_score": learn, "reflections": reflections,
 		"quiz_lessons": qLessons, "quiz_mastered": qMastered, "rank_dist": rankDist, "top_rank": topRank, "cheated_lessons": cheated,
 		"board_students": boardN, "collab_score": collab / max(boardN, 1), "board_ops": boardOps, "board_msgs": boardMsgs,
-		"board_voice_sec": boardVoice, "board_active_sec": boardActive}
+		"board_voice_sec": boardVoice, "board_active_sec": boardActive, "risk": riskN}
 	return out, ss, atts, nil
 }
 
@@ -565,17 +568,41 @@ func analyticsDays(r *http.Request) int {
 	return d
 }
 
-// handleAnalytics: GET /api/me/analytics?course=&days=
+// analyticsStudents — «Суралцагч бүрээр» хүснэгтэд нэг дор өгөх дээд тоо (сүүлд идэвхтэй байснаас; бусдыг нэрээр хайна).
+const analyticsStudents = 300
+
+// handleAnalytics: GET /api/me/analytics?course=&days=&q= — нэгтгэл бүх суралцагчаар, хүснэгт нь хязгаартай.
+// Студи минут тутам шинэчилдэг тул нэгтгэлийг 20 секунд кэшилнэ (хэд хэдэн цонх, давтан хүсэлт сангаас дахин тооцохгүй).
 func (s *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireTeacher(w, r)
 	if !ok {
 		return
 	}
-	data, _, _, err := s.buildAnalytics(r.Context(), c.UID, r.URL.Query().Get("course"), "", analyticsDays(r))
+	course, days := r.URL.Query().Get("course"), analyticsDays(r)
+	data, err := s.analyticsAgg.GetOrLoad(r.Context(), c.UID+"|"+course+"|"+strconv.Itoa(days), func(ctx context.Context) (*analyticsData, error) {
+		d, _, _, err := s.buildAnalytics(ctx, c.UID, course, "", days)
+		return d, err
+	})
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": data, "labels": eventLabels()})
+	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
+	students := data.Students
+	if q != "" {
+		students = make([]*StudentStat, 0, 64)
+		for _, st := range data.Students {
+			if strings.Contains(strings.ToLower(st.Name), q) {
+				students = append(students, st)
+			}
+		}
+	}
+	total := len(students)
+	if len(students) > analyticsStudents {
+		students = students[:analyticsStudents]
+	}
+	out := *data // кэшлэгдсэн өгөгдлийг өөрчлөхгүй
+	out.Students = students
+	writeJSON(w, http.StatusOK, map[string]any{"data": &out, "labels": eventLabels(), "students_total": total})
 }
 
 // handleAnalyticsEvents: GET /api/me/analytics/events?course=&student=&days=&limit=20&before_at=&before_id=

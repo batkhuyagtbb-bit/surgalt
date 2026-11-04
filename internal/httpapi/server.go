@@ -58,41 +58,49 @@ type Config struct {
 }
 
 type Server struct {
-	cfg       Config
-	store     store.Store
-	tokens    *auth.Signer
-	hub       *chat.Hub
-	files     *files.Store
-	log       *slog.Logger
-	tmpl      *template.Template
-	limiter   *ratelimit.Limiter
-	authLim   *ratelimit.Limiter // нэвтрэлт/бүртгэл/зочин токен — илүү чанга
-	codeLim   *ratelimit.Limiter // сургалтын нууц үг таах оролдлого (course_code.go)
-	chatLim   *ratelimit.Limiter // мессеж илгээх
-	phoneLim  *ratelimit.Limiter // багшийн утасны дугаар нээх — дугаар хусуурдахаас сэргийлнэ
-	resetLim  *ratelimit.Limiter // нэг имэйл рүү нууц үг сэргээх захидал (2 минутад 1 орчим)
-	capLim    *ratelimit.Limiter // captcha зураг (IP тутам)
-	top       topCache           // нүүр хуудасны «Шилдэг багш нар» (top_teachers.go)
-	topStu    topCache           // нүүр хуудасны «Идэвхтэй суралцагчид» (top_students.go)
-	admLim    *ratelimit.Limiter // хянагчийн нууц үгээр нэвтрэх оролдлого (IP тус бүрт)
-	boardLim  *ratelimit.Limiter // цагаан самбарын өөрчлөлт (хэрэглэгч тус бүрт; анги нэг IP-аас орж болно)
-	boards    boardHub           // цагаан самбарын сессүүд (board.go)
-	searchLim *ratelimit.Limiter // самбарын зураг хайлт (хэрэглэгч тус бүрт)
-	imgs      imgSearch          // зураг хайлтын кэш, орчуулга (board_images.go)
-	hits      hitBuf             // сайтын хандалтын түр сан (admin.go)
-	adm       adminCache         // хянагчийн самбарын агшин зураг
-	sys       sysCache           // хянагчийн «Систем»: файлын сангийн хэмжээ (60 сек кэш)
-	started   time.Time          // сервер асаасан мөч
-	profiles  *cache.Cache[*Rendered[PublicProfile]]
-	courses   *cache.Cache[*Rendered[PublicCourse]]
-	qrs       *cache.Cache[[]byte]
-	ogs       *cache.Cache[[]byte] // профайлыг хуваалцах зураг (og.go)
-	alive     *cache.Cache[int64]  // хэрэглэгч бүрийн «энэ цагаас өмнөх токен хүчингүй» (миллисекунд; account.go)
-	planEnds  *cache.Cache[time.Time] // багшийн системийн эрх дуусах хугацаа (plans.go)
-	seen      presence             // багшийн онлайн төлөв, сүүлд идэвхтэй байсан мөч (presence.go)
-	smap      sitemapCache         // /sitemap.xml (seo.go)
-	notif     *notifier
-	search    *searchIndex
+	cfg          Config
+	store        store.Store
+	tokens       *auth.Signer
+	hub          *chat.Hub
+	files        *files.Store
+	log          *slog.Logger
+	tmpl         *template.Template
+	limiter      *ratelimit.Limiter
+	authLim      *ratelimit.Limiter // нэвтрэлт/бүртгэл/зочин токен — илүү чанга
+	codeLim      *ratelimit.Limiter // сургалтын нууц үг таах оролдлого (course_code.go)
+	chatLim      *ratelimit.Limiter // мессеж илгээх
+	phoneLim     *ratelimit.Limiter // багшийн утасны дугаар нээх — дугаар хусуурдахаас сэргийлнэ
+	resetLim     *ratelimit.Limiter // нэг имэйл рүү нууц үг сэргээх захидал (2 минутад 1 орчим)
+	capLim       *ratelimit.Limiter // captcha зураг (IP тутам)
+	top          topCache           // нүүр хуудасны «Шилдэг багш нар» (top_teachers.go)
+	topStu       topCache           // нүүр хуудасны «Идэвхтэй суралцагчид» (top_students.go)
+	admLim       *ratelimit.Limiter // хянагчийн нууц үгээр нэвтрэх оролдлого (IP тус бүрт)
+	boardLim     *ratelimit.Limiter // цагаан самбарын өөрчлөлт (хэрэглэгч тус бүрт; анги нэг IP-аас орж болно)
+	boards       boardHub           // цагаан самбарын сессүүд (board.go)
+	searchLim    *ratelimit.Limiter // самбарын зураг хайлт (хэрэглэгч тус бүрт)
+	imgs         imgSearch          // зураг хайлтын кэш, орчуулга (board_images.go)
+	hits         hitBuf             // сайтын хандалтын түр сан (admin.go)
+	adm          adminCache         // хянагчийн самбарын агшин зураг
+	sys          sysCache           // хянагчийн «Систем»: файлын сангийн хэмжээ (60 сек кэш)
+	started      time.Time          // сервер асаасан мөч
+	profiles     *cache.Cache[*Rendered[PublicProfile]]
+	courses      *cache.Cache[*Rendered[PublicCourse]]
+	qrs          *cache.Cache[[]byte]
+	ogs          *cache.Cache[[]byte]         // профайлыг хуваалцах зураг (og.go)
+	alive        *cache.Cache[int64]          // хэрэглэгч бүрийн «энэ цагаас өмнөх токен хүчингүй» (миллисекунд; account.go)
+	planEnds     *cache.Cache[time.Time]      // багшийн системийн эрх дуусах хугацаа (plans.go)
+	clouds       *cache.Cache[*cloudAgg]      // үүлэн үгийн нэгтгэл (cloud.go): бүх суралцагч 2 секунд хуваалцана
+	rosters      *cache.Cache[*roster]        // багшийн суралцагчид (roster.go), 60 секунд
+	analyticsAgg *cache.Cache[*analyticsData] // багшийн хяналтын нэгтгэл (analytics.go), 20 секунд
+	journals     *cache.Cache[*journalAgg]    // сургалтын журнал (journal.go), 30 секунд
+	blocks       *cache.Cache[*LessonBlock]   // суралцагч × хичээлийн хориг (blocks.go), 15 секунд
+	dripOpen     *cache.Cache[bool]           // дараалсан нээлтээр нээгдсэн хичээл (service.go), 10 минут
+	activeBase   *cache.Cache[int]            // сесс → тухайн хичээлийн бусад сессийн идэвхтэй секунд (activity.go), 2 минут
+	cloudPush    cloudThrottle                // үүлэн үгийн WebSocket түлхэлт (ws_topics.go)
+	seen         presence                     // багшийн онлайн төлөв, сүүлд идэвхтэй байсан мөч (presence.go)
+	smap         sitemapCache                 // /sitemap.xml (seo.go)
+	notif        *notifier
+	search       *searchIndex
 
 	// OAuth нь Google/Microsoft/Facebook/Instagram нэвтрэлт (nil бол идэвхгүй).
 	OAuth *oauth.Registry
@@ -103,7 +111,7 @@ type Server struct {
 	// Khan нь Хаан банкны Corporate Gateway — багшийн орлогыг данс руу шилжүүлэх (nil бол гараар).
 	Khan *khanbank.Client
 	// Verify нь Verify.MN — утас баталгаажуулах, утсаар нууц үг сэргээх (nil бол идэвхгүй, утас асуухгүй).
-	Verify *verifymn.Client
+	Verify   *verifymn.Client
 	khanFrom struct {
 		sync.Mutex
 		acct string
@@ -122,23 +130,30 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 	siteURL, siteFBApp = strings.TrimRight(cfg.PublicURL, "/"), cfg.FacebookAppID
 	s := &Server{
 		cfg: cfg, store: st, tokens: tokens, hub: hub, files: fstore, log: log,
-		tmpl:      parseTemplates(),
-		limiter:   ratelimit.New(cfg.RateLimitRPS, cfg.RateBurst),
-		authLim:   ratelimit.New(1, 10),
-		codeLim:   ratelimit.New(1.0/30, 6),
-		chatLim:   ratelimit.New(2, 10),
-		phoneLim:  ratelimit.New(0.05, 8),
-		resetLim:  ratelimit.New(1.0/120, 2),
-		capLim:    ratelimit.New(0.5, 15),
-		admLim:    ratelimit.New(1.0/30, 5),
-		boardLim:  ratelimit.New(25, 100),
-		searchLim: ratelimit.New(0.5, 12),
-		profiles:  cache.New[*Rendered[PublicProfile]](30*time.Second, 5*time.Second, isNF),
-		courses:   cache.New[*Rendered[PublicCourse]](30*time.Second, 5*time.Second, isNF),
-		qrs:       cache.New[[]byte](time.Hour, 5*time.Second, isNF),
-		ogs:       cache.New[[]byte](time.Hour, 5*time.Second, isNF),
-		alive:     cache.New[int64](5*time.Minute, 5*time.Minute, isNF),
-		planEnds:  cache.New[time.Time](time.Minute, 5*time.Second, isNF),
+		tmpl:         parseTemplates(),
+		limiter:      ratelimit.New(cfg.RateLimitRPS, cfg.RateBurst),
+		authLim:      ratelimit.New(1, 10),
+		codeLim:      ratelimit.New(1.0/30, 6),
+		chatLim:      ratelimit.New(2, 10),
+		phoneLim:     ratelimit.New(0.05, 8),
+		resetLim:     ratelimit.New(1.0/120, 2),
+		capLim:       ratelimit.New(0.5, 15),
+		admLim:       ratelimit.New(1.0/30, 5),
+		boardLim:     ratelimit.New(25, 100),
+		searchLim:    ratelimit.New(0.5, 12),
+		profiles:     cache.New[*Rendered[PublicProfile]](30*time.Second, 5*time.Second, isNF),
+		courses:      cache.New[*Rendered[PublicCourse]](30*time.Second, 5*time.Second, isNF),
+		qrs:          cache.New[[]byte](time.Hour, 5*time.Second, isNF),
+		ogs:          cache.New[[]byte](time.Hour, 5*time.Second, isNF),
+		alive:        cache.New[int64](5*time.Minute, 5*time.Minute, isNF),
+		planEnds:     cache.New[time.Time](time.Minute, 5*time.Second, isNF),
+		clouds:       cache.New[*cloudAgg](2*time.Second, 0, nil),
+		rosters:      cache.New[*roster](time.Minute, 0, nil),
+		analyticsAgg: cache.New[*analyticsData](20*time.Second, 0, nil),
+		journals:     cache.New[*journalAgg](30*time.Second, 0, nil),
+		blocks:       cache.New[*LessonBlock](15*time.Second, 0, nil),
+		dripOpen:     cache.New[bool](10*time.Minute, 0, nil),
+		activeBase:   cache.New[int](2*time.Minute, 0, nil),
 	}
 	s.notif = newNotifier()
 	s.started = time.Now()
@@ -154,6 +169,13 @@ func (s *Server) Background(ctx context.Context) {
 	go s.qrs.Janitor(ctx, 10*time.Minute)
 	go s.alive.Janitor(ctx, 10*time.Minute)
 	go s.planEnds.Janitor(ctx, 10*time.Minute)
+	go s.clouds.Janitor(ctx, time.Minute)
+	go s.rosters.Janitor(ctx, time.Minute)
+	go s.analyticsAgg.Janitor(ctx, time.Minute)
+	go s.journals.Janitor(ctx, time.Minute)
+	go s.blocks.Janitor(ctx, time.Minute)
+	go s.dripOpen.Janitor(ctx, 5*time.Minute)
+	go s.activeBase.Janitor(ctx, time.Minute)
 	go s.limiter.Janitor(ctx)
 	go s.authLim.Janitor(ctx)
 	go s.codeLim.Janitor(ctx)
@@ -229,6 +251,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/courses/{id}/lessons/{lid}", s.handleGetLesson)
 	mux.HandleFunc("POST /api/courses/{id}/enroll", s.handleEnroll)
 	mux.HandleFunc("PUT /api/courses/{id}/lessons/{lid}", s.handleUpdateLesson)
+	mux.HandleFunc("DELETE /api/courses/{id}", s.handleDeleteCourse)
 	mux.HandleFunc("DELETE /api/courses/{id}/lessons/{lid}", s.handleDeleteLesson)
 	mux.HandleFunc("PUT /api/courses/{id}/lessons/{lid}/visibility", s.handleLessonVisibility)
 	mux.HandleFunc("PUT /api/courses/{id}/lesson-order", s.handleReorderLessons)
@@ -422,7 +445,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /studio", s.pageStatic("me"))
 	mux.Handle("GET /static/", staticHandler())
 
-	return s.recoverMW(s.logMW(s.limitMW(mux)))
+	return s.recoverMW(s.logMW(s.limitMW(compressMW(s.notFoundMW(mux)))))
 }
 
 // ---- middleware ----

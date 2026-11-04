@@ -10,6 +10,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"golang.org/x/sync/errgroup"
+
 	"surgalt/internal/store"
 )
 
@@ -276,30 +278,27 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	u, err := s.store.UserByID(ctx, c.UID)
-	if s.storeErr(w, r, err) {
+	// lite=1 — чатын самбарт зөвхөн чат, багш нар хэрэгтэй: шууд хичээл, багшийн самбар, цол тооцохгүй.
+	lite := r.URL.Query().Get("lite") == "1"
+	// Бие биеэсээ хамааралгүй асуулгуудыг зэрэг явуулна (алсын ClickHouse руу дараалан 7 удаа хүлээхгүй).
+	var (
+		u                         *store.User
+		enrolled                  []store.Course
+		orders                    []store.Order
+		convs, groups, dms, teams []store.Conversation
+	)
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() (err error) { u, err = s.store.UserByID(gctx, c.UID); return })
+	g.Go(func() (err error) { enrolled, err = s.store.EnrolledCourses(gctx, c.UID); return })
+	g.Go(func() (err error) { orders, err = s.store.UserOrders(gctx, c.UID, homeMaxOrders); return })
+	g.Go(func() (err error) { convs, err = s.store.UserConversations(gctx, c.UID, homeMaxChats); return })
+	g.Go(func() (err error) { groups, err = s.store.UserGroupConversations(gctx, c.UID, homeMaxChats); return })
+	g.Go(func() error { dms, _ = s.store.UserDMConversations(gctx, c.UID, homeMaxChats); return nil })
+	g.Go(func() error { teams, _ = s.store.UserTeamConversations(gctx, c.UID, homeMaxChats); return nil })
+	if s.storeErr(w, r, g.Wait()) {
 		return
 	}
-	enrolled, err := s.store.EnrolledCourses(ctx, c.UID)
-	if s.storeErr(w, r, err) {
-		return
-	}
-	orders, err := s.store.UserOrders(ctx, c.UID, homeMaxOrders)
-	if s.storeErr(w, r, err) {
-		return
-	}
-	convs, err := s.store.UserConversations(ctx, c.UID, homeMaxChats)
-	if s.storeErr(w, r, err) {
-		return
-	}
-	groups, err := s.store.UserGroupConversations(ctx, c.UID, homeMaxChats)
-	if s.storeErr(w, r, err) {
-		return
-	}
-	convs = append(convs, groups...)
-	dms, _ := s.store.UserDMConversations(ctx, c.UID, homeMaxChats)
-	teams, _ := s.store.UserTeamConversations(ctx, c.UID, homeMaxChats)
-	convs = append(append(convs, dms...), teams...)
+	convs = append(append(append(convs, groups...), dms...), teams...)
 	sort.SliceStable(convs, func(i, j int) bool { return convs[i].LastMessageAt.After(convs[j].LastMessageAt) })
 	convs = s.dropHiddenConvs(ctx, c.UID, convs)
 
@@ -422,59 +421,11 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Шууд хичээлүүд: холбоос нь handleCourseMeetings-тэй ижил дүрмээр (meetingOpen): үнэгүй нь элссэн
-	// эсвэл үнэгүй сургалтад, төлбөртэй нь худалдаж авсан хүнд.
-	bought, _ := s.store.MeetingAccess(ctx, c.UID)
-	listed := map[string]bool{}
-	if len(courseIDs) > 0 {
-		ms, err := s.store.MeetingsByCourses(ctx, courseIDs, time.Now(), homeMaxMeetings)
-		if s.storeErr(w, r, err) {
+	if !lite {
+		if err := s.homeMeetings(ctx, c.UID, &out, courses, isEnrolled, courseIDs); s.storeErr(w, r, err) {
 			return
 		}
-		for i := range ms {
-			m := &ms[i]
-			cr := courses[m.CourseID]
-			hm := HomeMeeting{ID: m.ID, Title: m.Title, CourseID: m.CourseID, CourseTitle: cr.Title, StartsAt: m.StartsAt, DurationMin: m.DurationMin,
-				Price: m.Price, MembersFree: m.MembersFree, Bought: bought[m.ID]}
-			if meetingOpen(m, &cr, c.UID, isEnrolled[cr.ID], bought) {
-				hm.MeetURL = m.MeetURL
-			}
-			listed[m.ID] = true
-			out.Meetings = append(out.Meetings, hm)
-		}
 	}
-	// Сургалтад элсээгүй ч худалдаж авсан төлбөртэй шууд хичээлүүд.
-	for id := range bought {
-		if listed[id] {
-			continue
-		}
-		m, err := s.store.MeetingByID(ctx, id)
-		if err != nil || m.StartsAt.Add(time.Duration(m.DurationMin)*time.Minute).Before(time.Now()) {
-			continue
-		}
-		title := ""
-		if cr, err := s.store.CourseByID(ctx, m.CourseID); err == nil {
-			title = cr.Title
-		}
-		out.Meetings = append(out.Meetings, HomeMeeting{ID: m.ID, Title: m.Title, CourseID: m.CourseID, CourseTitle: title, StartsAt: m.StartsAt,
-			DurationMin: m.DurationMin, MeetURL: m.MeetURL, Price: m.Price, Bought: true})
-	}
-	// Багштай захиалсан уулзах цагууд — «Шууд хичээл»-тэй нэг жагсаалтад.
-	if bs, err := s.store.StudentSlots(ctx, c.UID, time.Now().Add(-4*time.Hour)); err == nil {
-		for i := range bs {
-			b := &bs[i]
-			if b.End().Before(time.Now()) {
-				continue
-			}
-			hm := HomeMeeting{ID: b.ID, Title: "Уулзалт", StartsAt: b.StartsAt, DurationMin: b.DurationMin, MeetURL: b.MeetURL,
-				Price: b.Price, Bought: b.Price > 0, Booking: true, Mode: b.Mode, Location: b.Location}
-			if t, err := s.store.UserByID(ctx, b.TeacherID); err == nil {
-				hm.Title, hm.TeacherUsername = "Уулзалт: "+t.DisplayName, t.Username
-			}
-			out.Meetings = append(out.Meetings, hm)
-		}
-	}
-	sort.SliceStable(out.Meetings, func(i, j int) bool { return out.Meetings[i].StartsAt.Before(out.Meetings[j].StartsAt) })
 
 	for _, cv := range convs {
 		switch cv.Kind {
@@ -503,7 +454,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(out.Teachers, func(i, j int) bool { return out.Teachers[i].DisplayName < out.Teachers[j].DisplayName })
 
-	if u.Role == store.RoleTeacher {
+	if u.Role == store.RoleTeacher && !lite {
 		mine, err := s.store.CoursesByTeacher(ctx, u.ID, false)
 		if s.storeErr(w, r, err) {
 			return
@@ -523,10 +474,12 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 
 	// Цол: элссэн сургалтууд + элсээгүй ч үнэгүй хичээл үзэж оноо авсан сургалтууд (myProgress → RankCourseIDs).
 	// Багш ч бусдын сургалтад суралцагчтай яг адил суралцана (өөрийн сургалт тооцогдохгүй).
-	rank, byCourse, tasks, awarded := s.myProgress(ctx, c.UID, out.Courses)
-	out.CourseRanks, out.Tasks, out.RankAwarded = byCourse, tasks, awarded
-	if len(byCourse) > 0 {
-		out.Rank, out.RankLadder = &rank, RankLadder()
+	if !lite {
+		rank, byCourse, tasks, awarded := s.myProgress(ctx, c.UID, out.Courses)
+		out.CourseRanks, out.Tasks, out.RankAwarded = byCourse, tasks, awarded
+		if len(byCourse) > 0 {
+			out.Rank, out.RankLadder = &rank, RankLadder()
+		}
 	}
 	if out.CourseRanks == nil {
 		out.CourseRanks = []HomeCourseRank{}
@@ -541,6 +494,64 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "private, no-store")
 	writeJSON(w, http.StatusOK, out)
+}
+
+// homeMeetings — нүүрийн «Шууд хичээл»: элссэн сургалтуудын, худалдаж авсан, багштай захиалсан уулзалтууд.
+func (s *Server) homeMeetings(ctx context.Context, uid string, out *Home, courses map[string]store.Course, isEnrolled map[string]bool, courseIDs []string) error {
+	// Шууд хичээлүүд: холбоос нь handleCourseMeetings-тэй ижил дүрмээр (meetingOpen): үнэгүй нь элссэн
+	// эсвэл үнэгүй сургалтад, төлбөртэй нь худалдаж авсан хүнд.
+	bought, _ := s.store.MeetingAccess(ctx, uid)
+	listed := map[string]bool{}
+	if len(courseIDs) > 0 {
+		ms, err := s.store.MeetingsByCourses(ctx, courseIDs, time.Now(), homeMaxMeetings)
+		if err != nil {
+			return err
+		}
+		for i := range ms {
+			m := &ms[i]
+			cr := courses[m.CourseID]
+			hm := HomeMeeting{ID: m.ID, Title: m.Title, CourseID: m.CourseID, CourseTitle: cr.Title, StartsAt: m.StartsAt, DurationMin: m.DurationMin,
+				Price: m.Price, MembersFree: m.MembersFree, Bought: bought[m.ID]}
+			if meetingOpen(m, &cr, uid, isEnrolled[cr.ID], bought) {
+				hm.MeetURL = m.MeetURL
+			}
+			listed[m.ID] = true
+			out.Meetings = append(out.Meetings, hm)
+		}
+	}
+	// Сургалтад элсээгүй ч худалдаж авсан төлбөртэй шууд хичээлүүд.
+	for id := range bought {
+		if listed[id] {
+			continue
+		}
+		m, err := s.store.MeetingByID(ctx, id)
+		if err != nil || m.StartsAt.Add(time.Duration(m.DurationMin)*time.Minute).Before(time.Now()) {
+			continue
+		}
+		title := ""
+		if cr, err := s.store.CourseByID(ctx, m.CourseID); err == nil {
+			title = cr.Title
+		}
+		out.Meetings = append(out.Meetings, HomeMeeting{ID: m.ID, Title: m.Title, CourseID: m.CourseID, CourseTitle: title, StartsAt: m.StartsAt,
+			DurationMin: m.DurationMin, MeetURL: m.MeetURL, Price: m.Price, Bought: true})
+	}
+	// Багштай захиалсан уулзах цагууд — «Шууд хичээл»-тэй нэг жагсаалтад.
+	if bs, err := s.store.StudentSlots(ctx, uid, time.Now().Add(-4*time.Hour)); err == nil {
+		for i := range bs {
+			b := &bs[i]
+			if b.End().Before(time.Now()) {
+				continue
+			}
+			hm := HomeMeeting{ID: b.ID, Title: "Уулзалт", StartsAt: b.StartsAt, DurationMin: b.DurationMin, MeetURL: b.MeetURL,
+				Price: b.Price, Bought: b.Price > 0, Booking: true, Mode: b.Mode, Location: b.Location}
+			if t, err := s.store.UserByID(ctx, b.TeacherID); err == nil {
+				hm.Title, hm.TeacherUsername = "Уулзалт: "+t.DisplayName, t.Username
+			}
+			out.Meetings = append(out.Meetings, hm)
+		}
+	}
+	sort.SliceStable(out.Meetings, func(i, j int) bool { return out.Meetings[i].StartsAt.Before(out.Meetings[j].StartsAt) })
+	return nil
 }
 
 // handleProfileInsights: багшийн профайлын бүрдлийн оноо, зөвлөмжүүд (студид).
@@ -576,73 +587,10 @@ type StudentRow struct {
 	ConvID  string          `json:"conv_id,omitempty"` // өмнө нь чатласан бол тэр яриа
 }
 
-// studentRows нь өгөгдсөн сургалтуудын суралцагчдыг нэг хүн нэг мөр болгон нэгтгэнэ.
-func (s *Server) studentRows(ctx context.Context, teacherID string, courses []store.Course) ([]StudentRow, error) {
-	rows := map[string]*StudentRow{}
-	var order []string
-	for _, c := range courses {
-		students, err := s.store.CourseStudents(ctx, c.ID)
-		if err != nil {
-			return nil, err
-		}
-		if len(students) == 0 {
-			continue
-		}
-		titles := map[string]string{}
-		if ls, err := s.store.LessonsByCourse(ctx, c.ID); err == nil {
-			for _, l := range ls {
-				titles[l.ID] = l.Title
-			}
-		}
-		for _, st := range students {
-			if st.UserID == teacherID {
-				continue
-			}
-			row, ok := rows[st.UserID]
-			if !ok {
-				row = &StudentRow{User: TeacherBrief{ID: st.UserID}, Courses: []StudentCourse{}}
-				rows[st.UserID] = row
-				order = append(order, st.UserID)
-			}
-			sc := StudentCourse{CourseID: c.ID, CourseTitle: c.Title, Enrolled: st.EnrolledAt != nil, EnrolledAt: st.EnrolledAt, Lessons: []string{}}
-			for _, lid := range st.LessonIDs {
-				if t := titles[lid]; t != "" {
-					sc.Lessons = append(sc.Lessons, t)
-				}
-			}
-			row.Courses = append(row.Courses, sc)
-		}
-	}
-	if len(order) == 0 {
-		return []StudentRow{}, nil
-	}
-	users, err := s.store.UsersByIDs(ctx, order)
-	if err != nil {
-		return nil, err
-	}
-	for i := range users {
-		if row := rows[users[i].ID]; row != nil {
-			row.User = TeacherBrief{ID: users[i].ID, Username: users[i].Username, DisplayName: users[i].DisplayName, AvatarURL: users[i].AvatarURL}
-		}
-	}
-	// Өмнө нь чатласан бол яриаг нь холбоно — "Чат" дарахад шууд тэр яриа нээгдэнэ.
-	if convs, err := s.store.TeacherConversations(ctx, teacherID, 500); err == nil {
-		for _, cv := range convs {
-			if row := rows[cv.UserID]; row != nil && cv.Kind != store.ConvGroup {
-				row.ConvID = cv.ID
-			}
-		}
-	}
-	out := make([]StudentRow, 0, len(order))
-	for _, id := range order {
-		if rows[id].User.Username != "" { // устсан хэрэглэгчийг алгасна
-			out = append(out, *rows[id])
-		}
-	}
-	return out, nil
-}
+// studentsLimit — багшийн суралцагчдын жагсаалтын нэг хуудасны дээд хэмжээ (хуучин клиент limit өгөхгүй бол ч).
+const studentsLimit = 1000
 
-// handleCourseStudents: GET /api/me/courses/{id}/students
+// handleCourseStudents: GET /api/me/courses/{id}/students?q=&offset=&limit= — нэг сургалтын суралцагчид.
 func (s *Server) handleCourseStudents(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireTeacher(w, r)
 	if !ok {
@@ -652,27 +600,60 @@ func (s *Server) handleCourseStudents(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rows, err := s.studentRows(r.Context(), c.UID, []store.Course{*course})
+	ro, err := s.teacherRoster(r.Context(), c.UID)
 	if s.storeErr(w, r, err) {
 		return
 	}
+	p := parseListPage(r, studentsLimit)
+	rows := []StudentRow{}
+	for _, id := range ro.byCourse[course.ID] {
+		row := ro.rows[ro.index[id]]
+		if !p.match(row.User) {
+			continue
+		}
+		for _, sc := range row.Courses { // зөвхөн энэ сургалтын мэдээлэл
+			if sc.CourseID == course.ID {
+				row.Courses = []StudentCourse{sc}
+				break
+			}
+		}
+		rows = append(rows, row)
+	}
+	rows = s.withConvs(r.Context(), c.UID, cut(w, p, rows))
 	w.Header().Set("Cache-Control", "private, no-store")
 	writeJSON(w, http.StatusOK, rows)
 }
 
-// handleMyStudents: GET /api/me/students — бүх сургалтын суралцагчид нэг жагсаалтаар.
+// handleMyStudents: GET /api/me/students?q=&offset=&limit=&sort=rail — бүх сургалтын суралцагчид нэг жагсаалтаар.
+// sort=rail (чатын самбар): яриатай, онлайн хүмүүс эхэнд.
 func (s *Server) handleMyStudents(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireTeacher(w, r)
 	if !ok {
 		return
 	}
-	courses, err := s.store.CoursesByTeacher(r.Context(), c.UID, false)
+	ro, err := s.teacherRoster(r.Context(), c.UID)
 	if s.storeErr(w, r, err) {
 		return
 	}
-	rows, err := s.studentRows(r.Context(), c.UID, courses)
-	if s.storeErr(w, r, err) {
-		return
+	p := parseListPage(r, studentsLimit)
+	rows := make([]StudentRow, 0, len(ro.rows))
+	for _, row := range ro.rows {
+		if p.match(row.User) {
+			rows = append(rows, row)
+		}
+	}
+	if r.URL.Query().Get("sort") == "rail" {
+		rows = s.withConvs(r.Context(), c.UID, rows)
+		has := map[string]bool{}
+		for _, row := range rows {
+			if row.ConvID != "" {
+				has[row.User.ID] = true
+			}
+		}
+		s.sortForRail(rows, has)
+		rows = cut(w, p, rows)
+	} else {
+		rows = s.withConvs(r.Context(), c.UID, cut(w, p, rows))
 	}
 	for _, row := range rows {
 		s.seen.book.add(c.UID, row.User.ID)

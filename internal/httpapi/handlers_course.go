@@ -820,9 +820,35 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 			s.trackView(r, course.TeacherID, NotifLessonView, l.ID, l.Title, "/c/"+cid)
 		}
 	}
+	// ?include=highlights,discussion — хичээл нээхэд тодруулга, хэлэлцүүлгийг нэг хүсэлтээр (тус бүр эрх шалгадаг
+	// тусдаа 2 хүсэлтийн оронд).
+	var hl, disc any
+	if inc := r.URL.Query().Get("include"); inc != "" && l.Exam == nil {
+		if strings.Contains(inc, "highlights") {
+			if hs, err := s.store.Highlights(r.Context(), c.UID, l.ID); err == nil {
+				hl = map[string]any{"highlights": hs}
+			}
+		}
+		if strings.Contains(inc, "discussion") && l.Discussion {
+			if d, err := s.discussionData(r.Context(), c.UID, course, l); err == nil {
+				disc = d
+			}
+		}
+	}
 	l.VideoURL = s.viewerMedia(l.VideoURL, c.UID)
 	l.Blocks = s.viewerBlocks(examIntro(l))
+	if hl != nil || disc != nil {
+		writeJSON(w, http.StatusOK, lessonBundle{Lesson: l, Highlights: hl, Discussion: disc})
+		return
+	}
 	writeJSON(w, http.StatusOK, l)
+}
+
+// lessonBundle — хичээл + (хүссэн бол) тодруулга, хэлэлцүүлэг.
+type lessonBundle struct {
+	*store.Lesson
+	Highlights any `json:"_highlights,omitempty"`
+	Discussion any `json:"_discussion,omitempty"`
 }
 
 // handleEnroll: үнэгүй бол шууд элсүүлнэ, төлбөртэй бол захиалга үүсгэнэ.
@@ -862,6 +888,7 @@ func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		if err := s.store.Enroll(r.Context(), c.UID, course); s.storeErr(w, r, err) {
 			return
 		}
+		s.rosterChanged(course.TeacherID)
 		s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: NotifEnroll, Count: 1, ActorID: c.UID,
 			Title: "🎓 Шинэ суралцагч элслээ", Body: c.Name + " — " + course.Title, Link: "/c/" + course.ID})
 		writeJSON(w, http.StatusCreated, map[string]any{"enrolled": true})

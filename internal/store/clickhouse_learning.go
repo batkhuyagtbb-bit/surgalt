@@ -160,14 +160,28 @@ func scanSession(r driver.Rows) (StudySession, error) {
 }
 
 func (c *ClickHouse) writeSession(ctx context.Context, s *StudySession) error {
-	counts := make(map[string]int32, len(s.Counts))
-	for k, v := range s.Counts {
-		counts[k] = int32(v)
+	return c.writeSessions(ctx, []StudySession{*s})
+}
+
+// writeSessions — олон сессийг нэг INSERT-ээр (сессийн буфер 5 секунд тутам).
+func (c *ClickHouse) writeSessions(ctx context.Context, ss []StudySession) error {
+	b, err := c.conn.PrepareBatch(ctx, "INSERT INTO study_sessions (id, user_id, user_name, course_id, lesson_id, teacher_id, kind, title, "+
+		"started_at, last_at, active_sec, idle_sec, away_sec, focus_sum, focus_n, camera, ip, ended, end_reason, counts, ver)")
+	if err != nil {
+		return err
 	}
-	return c.insert(ctx, "study_sessions", []string{"id", "user_id", "user_name", "course_id", "lesson_id", "teacher_id", "kind", "title",
-		"started_at", "last_at", "active_sec", "idle_sec", "away_sec", "focus_sum", "focus_n", "camera", "ip", "ended", "end_reason", "counts", "ver"},
-		s.ID, s.UserID, s.UserName, s.CourseID, s.LessonID, s.TeacherID, s.Kind, s.Title, s.StartedAt.UTC(), s.LastAt.UTC(),
-		int32(s.ActiveSec), int32(s.IdleSec), int32(s.AwaySec), s.FocusSum, int32(s.FocusN), s.Camera, s.IP, s.Ended, s.EndReason, counts, ver())
+	for i := range ss {
+		s := &ss[i]
+		counts := make(map[string]int32, len(s.Counts))
+		for k, v := range s.Counts {
+			counts[k] = int32(v)
+		}
+		if err := b.Append(s.ID, s.UserID, s.UserName, s.CourseID, s.LessonID, s.TeacherID, s.Kind, s.Title, s.StartedAt.UTC(), s.LastAt.UTC(),
+			int32(s.ActiveSec), int32(s.IdleSec), int32(s.AwaySec), s.FocusSum, int32(s.FocusN), s.Camera, s.IP, s.Ended, s.EndReason, counts, ver()); err != nil {
+			return err
+		}
+	}
+	return b.Send()
 }
 
 func (c *ClickHouse) CreateSession(ctx context.Context, s *StudySession) error {
@@ -175,10 +189,31 @@ func (c *ClickHouse) CreateSession(ctx context.Context, s *StudySession) error {
 	if s.Counts == nil {
 		s.Counts = map[string]int{}
 	}
-	return c.writeSession(ctx, s)
+	if err := c.writeSession(ctx, s); err != nil {
+		return err
+	}
+	if c.sess != nil {
+		c.sess.keep(s)
+	}
+	return nil
 }
 
 func (c *ClickHouse) SessionByID(ctx context.Context, id string) (*StudySession, error) {
+	if c.sess == nil {
+		return c.sessionByIDDB(ctx, id)
+	}
+	if s, ok := c.sess.get(id); ok {
+		return s, nil
+	}
+	s, err := c.sessionByIDDB(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	c.sess.keep(s)
+	return s, nil
+}
+
+func (c *ClickHouse) sessionByIDDB(ctx context.Context, id string) (*StudySession, error) {
 	var found *StudySession
 	err := c.query(ctx, "SELECT "+sessionCols+" FROM study_sessions FINAL WHERE id = ? LIMIT 1", []any{id}, func(r driver.Rows) error {
 		s, err := scanSession(r)
@@ -198,12 +233,15 @@ func (c *ClickHouse) SessionByID(ctx context.Context, id string) (*StudySession,
 }
 
 func (c *ClickHouse) AddSessionBeat(ctx context.Context, id string, b SessionBeat) error {
+	if c.sess != nil { // санах ойд нэмж, 5 секунд тутам багцаар бичнэ
+		return c.sess.beat(ctx, id, b)
+	}
 	unlock, err := c.lock(ctx, "session:"+id)
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	s, err := c.SessionByID(ctx, id)
+	s, err := c.sessionByIDDB(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -235,6 +273,9 @@ func (c *ClickHouse) Sessions(ctx context.Context, f ActivityFilter, limit int) 
 			out = append(out, s)
 			return nil
 		})
+	if err == nil && c.sess != nil {
+		out = c.sess.overlay(out) // санах ойд хүлээгдэж буй (бичигдээгүй) beat-ийг оруулна
+	}
 	return out, err
 }
 
@@ -423,18 +464,33 @@ func (c *ClickHouse) VideoWatches(ctx context.Context, f ActivityFilter) ([]Vide
 
 // ---- цэргийн цол ----
 
+// SaveRankPoints — сургалтын оноог хадгалж, нэгдсэн цолын оноог (сургалтуудын дундаж) буцаана. Хуудас нээх бүрт
+// дуудагддаг тул эхлээд одоогийнхыг уншиж, оноо өөрчлөгдсөн үед л бичнэ; дундажийг уншсан мөрүүдээс тооцно.
 func (c *ClickHouse) SaveRankPoints(ctx context.Context, userID, courseID string, points int) (int, error) {
-	if err := c.insert(ctx, "rank_points", []string{"user_id", "course_id", "points", "ver"}, userID, courseID, int32(points), ver()); err != nil {
+	pts := map[string]int64{}
+	if err := c.query(ctx, "SELECT course_id, toInt64(points) FROM rank_points FINAL WHERE user_id = ?", []any{userID}, func(r driver.Rows) error {
+		var cid string
+		var p int64
+		if err := r.Scan(&cid, &p); err != nil {
+			return err
+		}
+		pts[cid] = p
+		return nil
+	}); err != nil {
 		return 0, err
+	}
+	if cur, ok := pts[courseID]; !ok || cur != int64(points) {
+		if err := c.insert(ctx, "rank_points", []string{"user_id", "course_id", "points", "ver"}, userID, courseID, int32(points), ver()); err != nil {
+			return 0, err
+		}
+		pts[courseID] = int64(points)
 	}
 	// Нэгдсэн цол — сургалт бүрийн онооны дундаж (бүхэл рүү тоймлоно).
 	var total int64
-	var n uint64
-	err := c.query(ctx, "SELECT toInt64(sum(points)), count() FROM rank_points FINAL WHERE user_id = ?", []any{userID}, func(r driver.Rows) error { return r.Scan(&total, &n) })
-	if err != nil || n == 0 {
-		return int(total), err
+	for _, p := range pts {
+		total += p
 	}
-	return int(math.Round(float64(total) / float64(n))), nil
+	return int(math.Round(float64(total) / float64(len(pts)))), nil
 }
 
 func (c *ClickHouse) RankCourseIDs(ctx context.Context, userID string) ([]string, error) {

@@ -23,7 +23,7 @@ func testClickHouse(t *testing.T) *ClickHouse {
 	u.Path = "/" + db
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	ch, err := NewClickHouse(ctx, ClickHouseOptions{DSN: u.String()})
+	ch, err := NewClickHouse(ctx, ClickHouseOptions{DSN: u.String(), CAFile: os.Getenv("SURGALT_TEST_CLICKHOUSE_CA")})
 	if err != nil {
 		t.Fatal(err)
 	}

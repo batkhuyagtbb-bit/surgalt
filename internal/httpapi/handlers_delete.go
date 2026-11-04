@@ -111,3 +111,46 @@ func (s *Server) handleDeleteLesson(w http.ResponseWriter, r *http.Request) {
 	s.profiles.Delete(c.Name)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted_files": removed})
 }
+
+// handleDeleteCourse: DELETE /api/courses/{id} — багш өөрийн сургалтыг устгана. Суралцагчтай (элссэн эсвэл хичээл
+// худалдаж авсан) сургалтыг устгахгүй — төлсөн суралцагчийн эрх алдагдана; тэр үед ноорог болгож нуухыг санал болгоно.
+// Зөвхөн энэ сургалтын хичээлүүдэд ашиглагдсан файлууд хамт устна.
+func (s *Server) handleDeleteCourse(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireTeacher(w, r)
+	if !ok {
+		return
+	}
+	course, ok := s.ownCourse(w, r, c.UID)
+	if !ok {
+		return
+	}
+	ctx := r.Context()
+	students, err := s.store.CourseStudents(ctx, course.ID)
+	if s.storeErr(w, r, err) {
+		return
+	}
+	n := 0
+	for _, st := range students {
+		if st.UserID != c.UID {
+			n++
+		}
+	}
+	if n > 0 {
+		s.apiErr(w, r, apiError(http.StatusConflict, "Энэ сургалтад "+itoa(n)+" суралцагч байгаа тул устгах боломжгүй — «Тохиргоо»-оос ноорог болгож нуугаарай.", map[string]any{"students": n}))
+		return
+	}
+	lessons, _ := s.store.LessonsByCourse(ctx, course.ID)
+	if err := s.store.DeleteCourse(ctx, c.UID, course.ID); s.storeErr(w, r, err) {
+		return
+	}
+	var refs []string
+	for i := range lessons {
+		refs = append(refs, lessonFileRefs(&lessons[i])...)
+	}
+	removed := s.deleteOrphanFiles(c.UID, refs, s.teacherFilesInUse(ctx, c.UID, "", ""))
+	s.courses.Delete(course.ID)
+	s.rosters.Delete(c.UID)
+	s.search.markDirty()
+	s.profiles.Delete(c.Name)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted_files": removed})
+}

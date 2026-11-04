@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"sync"
@@ -56,9 +57,18 @@ func (s *Server) handleDiscussion(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	cms, err := s.store.Comments(r.Context(), l.ID, 1000)
+	out, err := s.discussionData(r.Context(), c.UID, course, l)
 	if s.storeErr(w, r, err) {
 		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// discussionData — хичээлийн хэлэлцүүлэг (лайк, сэтгэгдэл, хариунууд). Хичээл нээх хүсэлтэд ч хамт өгнө (include).
+func (s *Server) discussionData(ctx context.Context, uid string, course *store.Course, l *store.Lesson) (map[string]any, error) {
+	cms, err := s.store.Comments(ctx, l.ID, 1000)
+	if err != nil {
+		return nil, err
 	}
 	ids := make([]string, len(cms))
 	userIDs := map[string]bool{}
@@ -66,28 +76,28 @@ func (s *Server) handleDiscussion(w http.ResponseWriter, r *http.Request) {
 		ids[i] = cm.ID
 		userIDs[cm.UserID] = true
 	}
-	likeCounts, likedMine, err := s.store.Likes(r.Context(), c.UID, store.LikeComment, ids)
-	if s.storeErr(w, r, err) {
-		return
+	likeCounts, likedMine, err := s.store.Likes(ctx, uid, store.LikeComment, ids)
+	if err != nil {
+		return nil, err
 	}
-	lessonLikes, lessonMine, err := s.store.Likes(r.Context(), c.UID, store.LikeLesson, []string{l.ID})
-	if s.storeErr(w, r, err) {
-		return
+	lessonLikes, lessonMine, err := s.store.Likes(ctx, uid, store.LikeLesson, []string{l.ID})
+	if err != nil {
+		return nil, err
 	}
 	uids := make([]string, 0, len(userIDs))
 	for id := range userIDs {
 		uids = append(uids, id)
 	}
 	avatars := map[string]string{}
-	if users, err := s.store.UsersByIDs(r.Context(), uids); err == nil {
+	if users, err := s.store.UsersByIDs(ctx, uids); err == nil {
 		for _, u := range users {
 			avatars[u.ID] = u.AvatarURL
 		}
 	}
-	isTeacher := course.TeacherID == c.UID
+	isTeacher := course.TeacherID == uid
 	view := func(cm store.Comment) commentView {
 		return commentView{ID: cm.ID, UserID: cm.UserID, UserName: cm.UserName, AvatarURL: avatars[cm.UserID], Teacher: cm.UserID == course.TeacherID,
-			Mine: cm.UserID == c.UID, Body: cm.Body, CreatedAt: cm.CreatedAt, Likes: likeCounts[cm.ID], Liked: likedMine[cm.ID], CanDelete: isTeacher || cm.UserID == c.UID}
+			Mine: cm.UserID == uid, Body: cm.Body, CreatedAt: cm.CreatedAt, Likes: likeCounts[cm.ID], Liked: likedMine[cm.ID], CanDelete: isTeacher || cm.UserID == uid}
 	}
 	top := []commentView{}
 	byID := map[string]int{}
@@ -104,7 +114,7 @@ func (s *Server) handleDiscussion(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"enabled": true, "likes": lessonLikes[l.ID], "liked": lessonMine[l.ID], "count": len(cms), "comments": top, "teacher": isTeacher})
+	return map[string]any{"enabled": true, "likes": lessonLikes[l.ID], "liked": lessonMine[l.ID], "count": len(cms), "comments": top, "teacher": isTeacher}, nil
 }
 
 // handleAddComment: POST .../discussion {body, parent_id}

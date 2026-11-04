@@ -5,3 +5,5 @@
 surgalt.new.exe
 surgalt.prev*.exe
 clickhouse-ca.crt
+/logs/
+surgalt.bad.exe

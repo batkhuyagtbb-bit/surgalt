@@ -1,4 +1,44 @@
 {{template "head" (dict "Title" .Message "Desc" .Message "Page" "error" "NoIndex" true)}}
-<main class="hero">
-<div class="hero-inner center"><p class="eyebrow">{{.Status}}</p><h1 class="display split">{{.Message}}</h1><a class="btn btn-gold reveal" href="/">Нүүр хуудас</a></div></main>
+{{$nf := eq .Status 404}}
+<main class="nf" aria-labelledby="nfTitle">
+  <div class="nf-inner">
+    <div class="nf-art" aria-hidden="true">
+      {{if $nf}}
+      <span class="nf-digit">4</span>
+      <svg class="nf-book" viewBox="0 0 120 120" width="120" height="120">
+        <circle cx="60" cy="60" r="56" fill="var(--brand-soft)"/>
+        <path d="M24 38c12-6 24-6 36 2v52c-12-8-24-8-36-2z" fill="#fff" stroke="var(--brand)" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M96 38c-12-6-24-6-36 2v52c12-8 24-8 36-2z" fill="#fff" stroke="var(--brand)" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M33 52c6-2 12-2 18 1M33 63c6-2 12-2 18 1M69 53c6-3 12-3 18-1M69 64c6-3 12-3 18-1" stroke="var(--accent)" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+        <circle class="nf-q" cx="92" cy="26" r="13" fill="var(--accent)"/>
+        <text x="92" y="31.5" text-anchor="middle" font-size="16" font-weight="800" fill="#fff" font-family="Manrope,system-ui,sans-serif">?</text>
+      </svg>
+      <span class="nf-digit">4</span>
+      {{else}}
+      <svg class="nf-book" viewBox="0 0 120 120" width="120" height="120">
+        <circle cx="60" cy="60" r="56" fill="var(--accent-soft)"/>
+        <path d="M60 30v38" stroke="var(--accent-2)" stroke-width="9" stroke-linecap="round"/>
+        <circle cx="60" cy="86" r="5.5" fill="var(--accent-2)"/>
+      </svg>
+      {{end}}
+    </div>
+    <p class="eyebrow">{{if $nf}}Алдаа 404{{else}}Алдаа {{.Status}}{{end}}</p>
+    <h1 id="nfTitle" class="nf-title">{{if $nf}}Энэ хуудас олдсонгүй{{else}}Түр алдаа гарлаа{{end}}</h1>
+    <p class="nf-lead">{{if $nf}}Холбоос буруу бичигдсэн, эсвэл хуудас нүүсэн, устсан байж магадгүй. Санаа зоволтгүй — доорхоос суралцахаа үргэлжлүүлээрэй.{{else}}Бид асуудлыг шалгаж байна. Хэсэг хугацааны дараа дахин оролдоно уу.{{end}}</p>
+    {{if and $nf .Path}}<p class="nf-path"><span class="muted small">Хайсан хаяг:</span> <code>{{.Path}}</code></p>{{end}}
+    <div class="nf-cta">
+      <a class="btn btn-gold" href="/"><span>Нүүр хуудас</span>{{icon "arrow" 16}}</a>
+      {{if $nf}}<button type="button" class="btn btn-ghost" data-nf-back>Буцах</button>{{else}}<button type="button" class="btn btn-ghost" onclick="location.reload()">Дахин оролдох</button>{{end}}
+    </div>
+    {{if $nf}}
+    <nav class="nf-links" aria-label="Санал болгох хуудсууд">
+      <a class="nf-link" href="/#explore"><b>surgalt.mn хэрхэн ажилладаг вэ?</b><span class="muted small">Багш, суралцагч хэрхэн эхлэх</span></a>
+      <a class="nf-link" href="/#topTeachers"><b>Шилдэг багш нар</b><span class="muted small">Хамгийн их хандалттай, олон сургалттай</span></a>
+      <a class="nf-link" href="/login" data-auth-hide><b>Нэвтрэх</b><span class="muted small">Сургалтдаа үргэлжлүүлэн суралцах</span></a>
+      <a class="nf-link" href="/me" data-auth-show hidden><b>Миний хуудас</b><span class="muted small">Сургалт, явц, мессеж</span></a>
+    </nav>
+    {{end}}
+    {{with .Contact}}<p class="muted small nf-help">Асуудал давтагдвал <a href="mailto:{{.}}">{{.}}</a> хаягаар бидэнд мэдэгдээрэй.</p>{{end}}
+  </div>
+</main>
 {{template "foot" (dict "Page" "error")}}

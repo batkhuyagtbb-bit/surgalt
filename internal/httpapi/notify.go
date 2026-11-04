@@ -233,6 +233,9 @@ var mnLoc = time.FixedZone("ULAT", 8*3600)
 
 // notifyPaid нь төлбөр баталгаажсаны дараа багш болон худалдан авагчид мэдэгдэнэ.
 func (s *Server) notifyPaid(ctx context.Context, o *store.Order) {
+	if o.TeacherID != "" {
+		s.rosterChanged(o.TeacherID) // шинэ суралцагч багшийн жагсаалт, ангийн найзуудад харагдана
+	}
 	if !o.Platform() {
 		defer s.instantPayout(context.WithoutCancel(ctx), o.TeacherID) // «Шууд» татах хуваарьтай багшид
 	}

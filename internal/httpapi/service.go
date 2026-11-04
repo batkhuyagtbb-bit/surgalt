@@ -77,7 +77,9 @@ func (s *Server) lessonFor(ctx context.Context, uid, cid, lid string, ignoreBloc
 			return nil, nil, blockedErr(b)
 		}
 	}
-	if course.Drip && !l.AlwaysOpen && course.TeacherID != uid {
+	// Дараалсан нээлт: нэг нээгдсэн хичээл (явц зөвхөн урагшилдаг) 10 минут кэштэй — хичээлийн хүсэлт бүрт бүх
+	// хичээл, явц, сесс, шалгалтыг дахин уншихгүй.
+	if course.Drip && !l.AlwaysOpen && course.TeacherID != uid && !s.dripOpenCached(uid, l.ID) {
 		lessons, err := s.store.LessonsByCourse(ctx, course.ID)
 		if err != nil {
 			return nil, nil, err
@@ -91,8 +93,14 @@ func (s *Server) lessonFor(ctx context.Context, uid, cid, lid string, ignoreBloc
 		if st := dripState(course, lessons, l, progress, fullAccess(course, uid, enrolled), time.Now(), s.dripFacts(ctx, uid, course.ID)); !st.Open {
 			return nil, nil, apiError(http.StatusLocked, "энэ хичээл хараахан нээгдээгүй", map[string]any{"state": st})
 		}
+		s.dripOpen.Set(uid+"|"+l.ID, true)
 	}
 	return course, l, nil
+}
+
+func (s *Server) dripOpenCached(uid, lessonID string) bool {
+	ok, found := s.dripOpen.Peek(uid + "|" + lessonID)
+	return found && ok
 }
 
 // ActivityStart — идэвхийн сесс эхлүүлсний хариу (усан тэмдэг, хяналтын бодлого).
@@ -219,8 +227,7 @@ func (s *Server) RecordBeat(ctx context.Context, uid string, in BeatInput) (int,
 			}
 		}
 	}
-	done, _ := s.lessonActiveSec(ctx, uid, sess.LessonID)
-	return done, nil
+	return s.sessionDone(ctx, sess, b.ActiveSec), nil
 }
 
 // Analytics — багшийн самбарын нэгтгэл (gRPC-д ч ижил).

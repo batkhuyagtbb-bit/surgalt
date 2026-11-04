@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sort"
 	"time"
 
@@ -25,11 +26,13 @@ func scanCourse(r driver.Rows) (Course, bool, error) {
 	return c, deleted, err
 }
 
-func (c *ClickHouse) writeCourse(ctx context.Context, co *Course) error {
+func (c *ClickHouse) writeCourse(ctx context.Context, co *Course, deleted ...bool) error {
+	del := len(deleted) > 0 && deleted[0]
+	defer c.forgetCourse(co.ID)
 	return c.insert(ctx, "courses", []string{"id", "teacher_id", "title", "description", "price", "published", "drip",
 		"unlock_all_paid", "camera", "certificate", "created_at", "updated_at", "ver", "deleted", "max_warnings", "block_hours", "block_minutes", "access_code"},
 		co.ID, co.TeacherID, co.Title, co.Description, co.Price, co.Published, co.Drip, co.UnlockAllPaid, co.Camera,
-		co.Certificate, co.CreatedAt.UTC(), co.UpdatedAt.UTC(), ver(), false, int32(co.MaxWarnings), int32(co.BlockHours), int32(co.BlockMinutes), co.AccessCode)
+		co.Certificate, co.CreatedAt.UTC(), co.UpdatedAt.UTC(), ver(), del, int32(co.MaxWarnings), int32(co.BlockHours), int32(co.BlockMinutes), co.AccessCode)
 }
 
 // enrichCourses нь хичээлийн тоо (lessons-оос) ба үзэлт (counters-оос) бөглөнө.
@@ -116,7 +119,42 @@ func (c *ClickHouse) UpdateCourse(ctx context.Context, co *Course) error {
 	return nil
 }
 
+func (c *ClickHouse) DeleteCourse(ctx context.Context, teacherID, courseID string) error {
+	unlock, err := c.lock(ctx, "course:"+courseID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	cur, err := c.CourseByID(ctx, courseID)
+	if err != nil {
+		return err
+	}
+	if cur.TeacherID != teacherID {
+		return ErrNotFound
+	}
+	cur.UpdatedAt = time.Now()
+	return c.writeCourse(ctx, cur, true)
+}
+
 func (c *ClickHouse) CourseByID(ctx context.Context, id string) (*Course, error) {
+	if c.rc == nil {
+		return c.courseByIDDB(ctx, id)
+	}
+	co, err := c.rc.courses.GetOrLoad(ctx, id, func(ctx context.Context) (Course, error) {
+		co, err := c.courseByIDDB(ctx, id)
+		if err != nil {
+			return Course{}, err
+		}
+		return *co, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	co = deepCopy(co)
+	return &co, nil
+}
+
+func (c *ClickHouse) courseByIDDB(ctx context.Context, id string) (*Course, error) {
 	cs, err := c.coursesWhere(ctx, "id = ?", "LIMIT 1", id)
 	if err != nil {
 		return nil, err
@@ -186,6 +224,7 @@ func scanLesson(r driver.Rows) (Lesson, bool, error) {
 }
 
 func (c *ClickHouse) writeLesson(ctx context.Context, l *Lesson, deleted bool) error {
+	defer c.forgetCourse(l.CourseID) // хичээлийн жагсаалт, сургалтын хичээлийн тоо
 	blocks := ""
 	if len(l.Blocks) > 0 {
 		b, _ := json.Marshal(l.Blocks)
@@ -240,10 +279,36 @@ func (c *ClickHouse) CreateLesson(ctx context.Context, l *Lesson) error {
 }
 
 func (c *ClickHouse) LessonsByCourse(ctx context.Context, courseID string) ([]Lesson, error) {
-	return c.lessonsWhere(ctx, "course_id = ?", courseID)
+	if c.rc == nil {
+		return c.lessonsWhere(ctx, "course_id = ?", courseID)
+	}
+	ls, err := c.cachedLessons(ctx, courseID)
+	if err != nil {
+		return nil, err
+	}
+	return deepCopy(ls), nil
+}
+
+func (c *ClickHouse) cachedLessons(ctx context.Context, courseID string) ([]Lesson, error) {
+	return c.rc.lessons.GetOrLoad(ctx, courseID, func(ctx context.Context) ([]Lesson, error) {
+		return c.lessonsWhere(ctx, "course_id = ?", courseID)
+	})
 }
 
 func (c *ClickHouse) LessonByID(ctx context.Context, courseID, lessonID string) (*Lesson, error) {
+	if c.rc != nil {
+		ls, err := c.cachedLessons(ctx, courseID)
+		if err != nil {
+			return nil, err
+		}
+		for i := range ls {
+			if ls[i].ID == lessonID {
+				l := deepCopy(ls[i])
+				return &l, nil
+			}
+		}
+		return nil, ErrNotFound
+	}
 	ls, err := c.lessonsWhere(ctx, "course_id = ? AND id = ?", courseID, lessonID)
 	if err != nil {
 		return nil, err
@@ -501,13 +566,33 @@ func (c *ClickHouse) progressWhere(ctx context.Context, where string, args ...an
 
 // ---- элсэлт ----
 
+// errNotEnrolled — кэшэд хадгалагдахгүй (элсээгүй хүн төлмөгц шууд нээгдэх ёстой).
+var errNotEnrolled = errors.New("not enrolled")
+
 func (c *ClickHouse) IsEnrolled(ctx context.Context, userID, courseID string) (bool, error) {
+	if c.rc == nil {
+		return c.isEnrolledDB(ctx, userID, courseID)
+	}
+	_, err := c.rc.enrolled.GetOrLoad(ctx, userID+"|"+courseID, func(ctx context.Context) (bool, error) {
+		ok, err := c.isEnrolledDB(ctx, userID, courseID)
+		if err == nil && !ok {
+			err = errNotEnrolled
+		}
+		return ok, err
+	})
+	if errors.Is(err, errNotEnrolled) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+func (c *ClickHouse) isEnrolledDB(ctx context.Context, userID, courseID string) (bool, error) {
 	n, err := c.count(ctx, "SELECT count() FROM enrollments FINAL WHERE user_id = ? AND course_id = ?", userID, courseID)
 	return n > 0, err
 }
 
 func (c *ClickHouse) enroll(ctx context.Context, userID, courseID, teacherID string, at time.Time) error {
-	ok, err := c.IsEnrolled(ctx, userID, courseID)
+	ok, err := c.isEnrolledDB(ctx, userID, courseID)
 	if err != nil || ok {
 		return err
 	}
@@ -897,12 +982,36 @@ func (c *ClickHouse) InvoiceByOrder(ctx context.Context, orderID string) (*Payme
 
 const visitCols = "id, teacher_id, kind, target_id, visitor_id, user_name, at, seconds, referrer, device"
 
+// SaveVisit — шинэ үзэлтийг (ID хоосон) шууд бичнэ; байгаа үзэлтийн хугацааны шинэчлэлийг буфер 5 секунд тутам багцаар.
 func (c *ClickHouse) SaveVisit(ctx context.Context, v *PageVisit) error {
+	if v.ID != "" && c.visits != nil {
+		c.visits.keep(*v, true)
+		return nil
+	}
 	if v.ID == "" {
 		v.ID = NewID()
 	}
-	return c.insert(ctx, "page_visits", []string{"id", "teacher_id", "kind", "target_id", "visitor_id", "user_name", "at", "seconds", "referrer", "device", "ver"},
-		v.ID, v.TeacherID, v.Kind, v.TargetID, v.VisitorID, v.UserName, v.At.UTC(), int32(v.Seconds), v.Referrer, v.Device, ver())
+	if err := c.writeVisits(ctx, []PageVisit{*v}); err != nil {
+		return err
+	}
+	if c.visits != nil {
+		c.visits.keep(*v, false)
+	}
+	return nil
+}
+
+func (c *ClickHouse) writeVisits(ctx context.Context, vs []PageVisit) error {
+	b, err := c.conn.PrepareBatch(ctx, "INSERT INTO page_visits (id, teacher_id, kind, target_id, visitor_id, user_name, at, seconds, referrer, device, ver)")
+	if err != nil {
+		return err
+	}
+	for i := range vs {
+		v := &vs[i]
+		if err := b.Append(v.ID, v.TeacherID, v.Kind, v.TargetID, v.VisitorID, v.UserName, v.At.UTC(), int32(v.Seconds), v.Referrer, v.Device, ver()); err != nil {
+			return err
+		}
+	}
+	return b.Send()
 }
 
 func scanVisit(r driver.Rows) (PageVisit, error) {
@@ -914,6 +1023,13 @@ func scanVisit(r driver.Rows) (PageVisit, error) {
 }
 
 func (c *ClickHouse) VisitByID(ctx context.Context, id string) (*PageVisit, error) {
+	if c.visits != nil {
+		return c.visits.get(ctx, id)
+	}
+	return c.visitByIDDB(ctx, id)
+}
+
+func (c *ClickHouse) visitByIDDB(ctx context.Context, id string) (*PageVisit, error) {
 	var out *PageVisit
 	err := c.query(ctx, "SELECT "+visitCols+" FROM page_visits FINAL WHERE id = ? LIMIT 1", []any{id}, func(r driver.Rows) error {
 		v, err := scanVisit(r)
@@ -941,5 +1057,8 @@ func (c *ClickHouse) Visits(ctx context.Context, teacherID string, since time.Ti
 			}
 			return err
 		})
+	if err == nil && c.visits != nil {
+		out = c.visits.overlay(out)
+	}
 	return out, err
 }

@@ -21,6 +21,7 @@ var eraseByUser = []struct{ table, col string }{
 }
 
 func (c *ClickHouse) DeleteUserData(ctx context.Context, uid string) error {
+	defer c.forgetAll() // нэр, сургалт, элсэлт олон газар өөрчлөгдөнө
 	unlock, err := c.lock(ctx, "user:"+uid)
 	if err != nil {
 		return err

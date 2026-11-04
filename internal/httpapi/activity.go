@@ -59,6 +59,7 @@ func (s *Server) logEvents(ctx context.Context, evs []store.ActivityEvent) {
 	if err := s.store.AddActivityEvents(ctx, evs); err != nil {
 		s.log.Warn("activity events", "err", err)
 	}
+	s.blocksChanged(evs)
 	var ns []*store.Notification
 	n := s.notif
 	n.mu.Lock()
@@ -125,6 +126,28 @@ func (s *Server) handleActivityStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// sessionDone — энэ хичээлд нийт идэвхтэй секунд: бусад сессүүдийн нийлбэр (2 минут кэштэй) + энэ сесс. Beat бүрт
+// (15 секунд) хичээлийн бүх сессийг сангаас уншихгүй.
+func (s *Server) sessionDone(ctx context.Context, sess *store.StudySession, add int) int {
+	base, err := s.activeBase.GetOrLoad(ctx, sess.ID, func(ctx context.Context) (int, error) {
+		ss, err := s.store.Sessions(ctx, store.ActivityFilter{UserID: sess.UserID, LessonID: sess.LessonID}, 1000)
+		if err != nil {
+			return 0, err
+		}
+		t := 0
+		for _, x := range ss {
+			if x.ID != sess.ID {
+				t += x.ActiveSec
+			}
+		}
+		return t, nil
+	})
+	if err != nil {
+		base = 0
+	}
+	return base + sess.ActiveSec + add
 }
 
 func (s *Server) lessonActiveSec(ctx context.Context, uid, lessonID string) (int, error) {

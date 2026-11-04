@@ -1,8 +1,8 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
-	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -10,7 +10,8 @@ import (
 )
 
 // Ангийн найзууд: нэг багшид дагасан (тэр багшийн аль нэг сургалтад элссэн эсвэл хичээл авсан) сурагчид
-// чат дээр хоорондоо харагдаж, шууд бичилцэж, дундаасаа бүлэг үүсгэнэ.
+// чат дээр хоорондоо харагдаж, шууд бичилцэж, дундаасаа бүлэг үүсгэнэ. Багш бүрийн жагсаалтыг roster-оос
+// (roster.go, кэштэй) уншина: 30 000 суралцагчтай багшийн найзуудыг хүсэлт бүрт сангаас ачаалахгүй.
 
 // Classmate — чатын "Хүмүүс" жагсаалтын нэг сурагч.
 type Classmate struct {
@@ -20,113 +21,118 @@ type Classmate struct {
 	ConvID  string       `json:"conv_id,omitempty"` // өмнө нь хувийн яриа нээсэн бол
 }
 
-// classmateIDs — uid-тэй нэг багшид дагадаг сурагчдын ID (өөрийг нь оруулахгүй) ба хамтын мэдээлэл.
-func (s *Server) classmates(r *http.Request, uid string) ([]Classmate, error) {
-	ctx := r.Context()
+// classmatesLimit — нэг хариуд өгөх найзын дээд тоо (бусдыг нь нэрээр хайж олно).
+const classmatesLimit = 300
+
+// myRosters — uid-ийн элссэн сургалтуудын багш нарын суралцагчдын жагсаалт.
+func (s *Server) myRosters(ctx context.Context, uid string) ([]*roster, error) {
 	enrolled, err := s.store.EnrolledCourses(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
-	// Миний багш нар → тэдний бүх сургалт → тэнд байгаа сурагчид.
-	teachers := map[string]bool{}
+	seen := map[string]bool{}
+	var out []*roster
 	for _, c := range enrolled {
-		teachers[c.TeacherID] = true
-	}
-	by := map[string]*Classmate{}
-	teacherName := map[string]string{}
-	for tid := range teachers {
-		courses, err := s.store.CoursesByTeacher(ctx, tid, false)
+		if seen[c.TeacherID] || c.TeacherID == uid {
+			continue
+		}
+		seen[c.TeacherID] = true
+		ro, err := s.teacherRoster(ctx, c.TeacherID)
 		if err != nil {
 			return nil, err
 		}
-		for _, c := range courses {
-			students, err := s.store.CourseStudents(ctx, c.ID)
-			if err != nil {
-				return nil, err
-			}
-			for _, st := range students {
-				if st.UserID == uid {
-					continue
-				}
-				cm := by[st.UserID]
-				if cm == nil {
-					cm = &Classmate{User: TeacherBrief{ID: st.UserID}}
-					by[st.UserID] = cm
-				}
-				cm.Courses = append(cm.Courses, c.Title)
-				if cm.Via == "" {
-					cm.Via = tid
-				}
-			}
-		}
+		out = append(out, ro)
 	}
-	if len(by) == 0 {
-		return []Classmate{}, nil
-	}
-	ids := make([]string, 0, len(by)+len(teachers))
-	for id := range by {
-		ids = append(ids, id)
-	}
-	for tid := range teachers {
-		ids = append(ids, tid)
-	}
-	users, err := s.store.UsersByIDs(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	for _, u := range users {
-		teacherName[u.ID] = u.DisplayName
-		if cm := by[u.ID]; cm != nil {
-			cm.User = TeacherBrief{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, Headline: u.Headline, AvatarURL: u.AvatarURL}
-		}
-	}
-	dms, _ := s.store.UserDMConversations(ctx, uid, 500)
-	dmWith := map[string]string{}
-	for _, d := range dms {
-		other := d.UserID
-		if other == uid {
-			other = d.TeacherID
-		}
-		dmWith[other] = d.ID
-	}
-	out := make([]Classmate, 0, len(by))
-	for _, cm := range by {
-		if cm.User.DisplayName == "" {
-			continue
-		}
-		cm.Via = teacherName[cm.Via]
-		cm.ConvID = dmWith[cm.User.ID]
-		out = append(out, *cm)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].User.DisplayName < out[j].User.DisplayName })
 	return out, nil
 }
 
-func (s *Server) isClassmate(r *http.Request, uid, other string) bool {
-	cms, err := s.classmates(r, uid)
+func (s *Server) isClassmate(ctx context.Context, uid, other string) bool {
+	if other == "" || other == uid {
+		return false
+	}
+	rs, err := s.myRosters(ctx, uid)
 	if err != nil {
 		return false
 	}
-	for _, c := range cms {
-		if c.User.ID == other {
+	for _, ro := range rs {
+		if _, ok := ro.index[other]; ok {
 			return true
 		}
 	}
 	return false
 }
 
-// handleClassmates: GET /api/me/classmates
+func courseTitles(row *StudentRow) []string {
+	out := make([]string, 0, len(row.Courses))
+	for _, sc := range row.Courses {
+		out = append(out, sc.CourseTitle)
+	}
+	return out
+}
+
+// handleClassmates: GET /api/me/classmates?q=&limit=&offset= — эхлээд яриатай, дараа нь онлайн, бусад нь
+// шинээр элссэнээс. Нийт тоо X-Total-Count толгойд.
 func (s *Server) handleClassmates(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireUser(w, r)
 	if !ok {
 		return
 	}
-	out, err := s.classmates(r, c.UID)
+	ctx := r.Context()
+	rs, err := s.myRosters(ctx, c.UID)
 	if s.storeErr(w, r, err) {
 		return
 	}
+	dmWith := map[string]string{}
+	if dms, err := s.store.UserDMConversations(ctx, c.UID, 500); err == nil {
+		for _, d := range dms {
+			other := d.UserID
+			if other == c.UID {
+				other = d.TeacherID
+			}
+			dmWith[other] = d.ID
+		}
+	}
+	p := parseListPage(r, classmatesLimit)
+	need := p.offset + p.limit
+	var dup map[string]bool // олон багштай бол давхардлыг арилгана
+	if len(rs) > 1 {
+		dup = map[string]bool{}
+	}
+	var withConv, onNow, rest []Classmate
+	total := 0
+	for _, ro := range rs {
+		for i := range ro.rows {
+			row := &ro.rows[i]
+			id := row.User.ID
+			if id == c.UID || !p.match(row.User) {
+				continue
+			}
+			if dup != nil {
+				if dup[id] {
+					continue
+				}
+				dup[id] = true
+			}
+			total++
+			conv := dmWith[id]
+			switch {
+			case conv != "":
+				withConv = append(withConv, Classmate{User: row.User, Via: ro.teacher, Courses: courseTitles(row), ConvID: conv})
+			case s.online(id):
+				onNow = append(onNow, Classmate{User: row.User, Via: ro.teacher, Courses: courseTitles(row)})
+			case len(rest) < need:
+				rest = append(rest, Classmate{User: row.User, Via: ro.teacher, Courses: courseTitles(row)})
+			}
+		}
+	}
+	all := append(append(withConv, onNow...), rest...)
+	out := cut(w, p, all)
+	w.Header().Set("X-Total-Count", itoa(total))
 	for _, cm := range out {
 		s.seen.book.add(c.UID, cm.User.ID)
+	}
+	if out == nil {
+		out = []Classmate{}
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -142,7 +148,7 @@ func (s *Server) handleStartDM(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "өөртэйгөө чатлах боломжгүй")
 		return
 	}
-	if !s.isClassmate(r, c.UID, other) {
+	if !s.isClassmate(r.Context(), c.UID, other) {
 		writeErr(w, http.StatusForbidden, "зөвхөн нэг багшид дагадаг ангийн найзтайгаа чатлана")
 		return
 	}
@@ -185,16 +191,20 @@ func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "1-100 гишүүн сонгоно уу")
 		return
 	}
-	cms, err := s.classmates(r, c.UID)
+	rs, err := s.myRosters(r.Context(), c.UID)
 	if s.storeErr(w, r, err) {
 		return
 	}
-	allowed := map[string]bool{}
-	for _, cm := range cms {
-		allowed[cm.User.ID] = true
+	allowed := func(id string) bool {
+		for _, ro := range rs {
+			if _, ok := ro.index[id]; ok && id != c.UID {
+				return true
+			}
+		}
+		return false
 	}
 	for _, m := range in.Members {
-		if !allowed[m] {
+		if !allowed(m) {
 			writeErr(w, http.StatusForbidden, "зөвхөн ангийн найзуудаа бүлэгт нэмнэ")
 			return
 		}

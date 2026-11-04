@@ -93,6 +93,7 @@ func (s *Server) handleUnlockCourse(w http.ResponseWriter, r *http.Request) {
 		if err := s.store.Enroll(ctx, c.UID, course); s.storeErr(w, r, err) {
 			return
 		}
+		s.rosterChanged(course.TeacherID)
 	}
 	s.notify(ctx, &store.Notification{UserID: course.TeacherID, Type: NotifEnroll, Count: 1, ActorID: c.UID,
 		Title: "🔑 Нууц үгээр элслээ", Body: s.displayName(ctx, c.UID, c.Name) + " — " + course.Title, Link: "/c/" + course.ID})

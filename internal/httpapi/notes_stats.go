@@ -227,9 +227,14 @@ func (s *Server) handleNotesStats(w http.ResponseWriter, r *http.Request) {
 			writers++
 		}
 	}
+	studentsTotal := len(students)
+	if len(students) > 300 { // олон мянган суралцагчтай сургалтад хүснэгтэд эхний 300 (их тэмдэглэлтэй нь); нэгтгэл бүгдээр
+		students = students[:300]
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"summary":  map[string]any{"writers": writers, "notes": total.Notes, "kinds": total.Kinds, "colors": total.Colors, "story_views": len(views), "viewers": len(viewers), "story_done": done},
-		"students": students,
-		"lessons":  order,
+		"summary":        map[string]any{"writers": writers, "notes": total.Notes, "kinds": total.Kinds, "colors": total.Colors, "story_views": len(views), "viewers": len(viewers), "story_done": done},
+		"students":       students,
+		"students_total": studentsTotal,
+		"lessons":        order,
 	})
 }

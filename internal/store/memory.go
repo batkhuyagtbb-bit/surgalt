@@ -280,6 +280,17 @@ func (m *Memory) UpdateCourse(_ context.Context, c *Course) error {
 	return nil
 }
 
+func (m *Memory) DeleteCourse(_ context.Context, teacherID, courseID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cur, ok := m.courses[courseID]
+	if !ok || cur.TeacherID != teacherID {
+		return ErrNotFound
+	}
+	delete(m.courses, courseID)
+	return nil
+}
+
 func (m *Memory) CourseByID(_ context.Context, id string) (*Course, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

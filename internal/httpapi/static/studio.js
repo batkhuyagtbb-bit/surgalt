@@ -3,7 +3,7 @@
 (async () => {
 "use strict";
 const isStudio = false; // тусдаа студи хуудас байхгүй; бүх зүйл профайл дээр
-const { $, $$, esc, api, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, msgHTML, celebrate, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT } = window.SG;
+const { $, $$, esc, api, apiList, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, msgHTML, celebrate, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT } = window.SG;
 if (!Auth.token) return;
 let me;
 try { me = await api("/api/me"); Auth.set(Auth.token, me); } catch { return; }
@@ -49,6 +49,7 @@ const ICON = {
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.500M12 18.500V21M3 12h2.500M18.500 12H21M5.600 5.600l1.800 1.800M16.600 16.600l1.800 1.800M5.600 18.400l1.800-1.800M16.600 7.400l1.800-1.800"/>',
   back: '<path d="M15 6l-6 6 6 6"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/>',
   grip: '<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
   image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
@@ -397,10 +398,11 @@ async function courses() {
   searchCourses = list;
   main.innerHTML = `<div class="gp-list-head"><div><h1>Миний сургалтууд</h1><p class="muted">${list.length} сургалт · ${list.filter((c) => c.published).length} нийтлэгдсэн</p></div>
       <button class="btn btn-gold" id="newCourse">${ico("plus", 18)}Шинэ сургалт үүсгэх</button></div>
-    <div class="group-grid gp-grid">${list.map((c) => `
+    <div class="group-grid gp-grid">${list.map((c) => `<div class="group-wrap">
       <a class="group" href="#course=${esc(c.id)}" style="--h:${hueOfName(c.title)}"><div class="group-art"><span class="chip">${c.published ? "Нийтлэгдсэн" : "Ноорог"}</span><b>${esc(c.title.trim()[0] || "?")}</b></div>
       <div class="group-body"><strong>${esc(c.title)}</strong><small>${ico("book", 14)}${c.lesson_count} хичээл · ${c.free_lesson_count} үнэгүй</small><small>${ico("eye", 14)}${c.views || 0} үзэлт · ${money(c.price) === "Үнэгүй" ? "Хичээлээр" : money(c.price)}</small>
-      <span class="btn btn-glass btn-sm" style="margin-top:6px">Удирдах</span></div></a>`).join("")}${list.length ? "" : `
+      <span class="btn btn-glass btn-sm" style="margin-top:6px">Удирдах</span></div></a>
+      <button type="button" class="group-del" data-del-course="${esc(c.id)}" data-title="${esc(c.title)}" title="Сургалт устгах" aria-label="«${esc(c.title)}» сургалтыг устгах">${ico("trash", 17)}</button></div>`).join("")}${list.length ? "" : `
       <button class="group group-new" id="newCourse2">${ico("plus", 26)}<strong>Анхны сургалтаа үүсгэх</strong></button>`}</div>
     <div class="modal" id="courseModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
       <h3 class="h3">Шинэ сургалт үүсгэх</h3><form class="form" id="courseForm">${courseFormHTML()}<p class="form-error" role="alert"></p>
@@ -413,6 +415,27 @@ async function courses() {
     try { const c = await api("/api/courses", { method: "POST", body: courseBody(f) }); toast("Сургалт үүслээ ✓"); location.hash = "course=" + c.id; }
     catch (err) { $(".form-error", f).textContent = err.message; }
   };
+  // Сургалт устгах: баталгаажуулах цонх. Суралцагчтай сургалтыг сервер устгахгүй (ноорог болгож нуухыг зөвлөнө).
+  $(".gp-grid").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-del-course]"); if (!b) return;
+    e.preventDefault();
+    const id = b.dataset.delCourse, title = b.dataset.title;
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="delCourseModal"><div class="modal-card" style="width:min(460px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+      <h3 class="h3">${ico("trash", 18)} Сургалтыг устгах уу?</h3>
+      <p><b>«${esc(title)}»</b> сургалт, түүний бүх хичээл, зөвхөн энэ сургалтад ашигласан файлууд устна. Буцааж сэргээх боломжгүй.</p>
+      <p class="muted small">Суралцагч элссэн эсвэл хичээл худалдаж авсан сургалтыг устгахгүй — тэр үед «Тохиргоо»-оос ноорог болгож нууна уу.</p>
+      <p class="form-error" role="alert"></p>
+      <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button type="button" class="btn btn-danger" data-confirm-del>${ico("trash", 16)}Устгах</button></div></div></div>`);
+    const m = $("#delCourseModal"); SG.openModal(m);
+    const close = () => { SG.closeModal(m); setTimeout(() => m.remove(), 300); };
+    m.addEventListener("click", async (ev) => {
+      if (ev.target === m || ev.target.closest("[data-close]")) return close();
+      const ok = ev.target.closest("[data-confirm-del]"); if (!ok) return;
+      ok.disabled = true;
+      try { await api(`/api/courses/${id}`, { method: "DELETE" }); close(); toast("Сургалт устгагдлаа"); courses(); }
+      catch (x) { $(".form-error", m).textContent = x.message; ok.disabled = false; }
+    });
+  });
 }
 
 let library = null;
@@ -1105,7 +1128,9 @@ function mountBlockEditor(f, blocks) {
 const blocksSummary = (bs) => bs.filter((b) => b.type === "text" || b.type === "heading").map((b) => b.text.replace(/\*\*|__|==|^[>-]\s|\[([^\]]*)\]\([^)]*\)/gm, "$1")).join("\n").slice(0, 1500);
 
 async function courseEditor(id) {
-  let [{ course: c, lessons, comments: commentCounts = {} }, lib, roster] = await Promise.all([api(`/api/me/courses/${id}`), loadLibrary(), api(`/api/me/courses/${id}/students`).catch(() => [])]);
+  let [{ course: c, lessons, comments: commentCounts = {} }, lib, rosterPage] = await Promise.all([api(`/api/me/courses/${id}`), loadLibrary(), apiList(rosterURL(id)).catch(() => ({ items: [], total: 0 }))]);
+  // Олон мянган суралцагчтай сургалтад эхний 100-г л ачаална; бусдыг нь цонхонд нэрээр хайна.
+  let roster = rosterPage.items, rosterTotal = rosterPage.total;
   const stripSig = (u) => (u && u.startsWith("/files/") ? u.split("?")[0] : u || ""); // гарын үсэгтэй URL-аас query-г хасна
   const fileName = (u) => { const f = lib.files.find((x) => x.path === stripSig(u)); return f ? f.original_name : decodeURIComponent(stripSig(u).split("/").pop() || ""); };
   const mediaLabel = (u) => (!u ? "" : /youtu\.?be|vimeo/.test(u) ? "Видео холбоос" : u.startsWith("/files/") ? fileName(u) : u);
@@ -1296,9 +1321,9 @@ async function courseEditor(id) {
             <p class="gp-desc">${c.description ? esc(c.description) : `<span class="muted">Тайлбар нэмээгүй байна — «Тохиргоо»-оос нэмнэ.</span>`}</p>
           </div>
           <div class="gp-hside">
-            <button type="button" class="gp-roster" id="gpRoster" aria-label="Суралцагчид (${roster.length})">
+            <button type="button" class="gp-roster" id="gpRoster" aria-label="Суралцагчид (${rosterTotal})">
               <span class="gp-avs">${roster.slice(0, 5).map((r) => avatar(r.user, "avatar-sm")).join("") || `<span class="gp-av0">${ico("users", 16)}</span>`}</span>
-              <span class="gp-rn"><b>${roster.length}</b> суралцагч</span>${ico("chevron", 15)}</button>
+              <span class="gp-rn"><b>${rosterTotal}</b> суралцагч</span>${ico("chevron", 15)}</button>
             <div class="gp-acts">
               ${c.published ? `<a class="btn btn-glass btn-sm" href="/c/${esc(c.id)}" target="_blank" rel="noopener">${ico("ext", 16)}Харах</a>` : `<button class="btn btn-gold btn-sm" id="gpPublish">${ico("globe", 16)}Нийтлэх</button>`}
               <button class="btn btn-glass btn-sm" id="gpChat" title="Элссэн бүх суралцагчтай нэг дор ярилцана">${ico("chat", 16)}Бүлэг чат</button>
@@ -1326,9 +1351,10 @@ async function courseEditor(id) {
             <button role="tab" data-view="notes" aria-selected="${view === "notes"}">${ico("edit", 16)}Тэмдэглэл</button></div>` : ""}
           <div id="gpView">${view === "notes" && lessons.length ? `<div class="ns" id="notesStats"><div class="loader"></div></div>` : view === "journal" && lessons.length ? `<div class="jr" id="journal"><div class="loader"></div></div>` : view === "outline" && (lessons.length || pending.length) ? outlineHTML() : feedHTML()}</div>
         </div></div>
-      <div class="modal" id="gpRosterModal"><div class="modal-card" style="width:min(580px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
-        <h3 class="h3">Суралцагчид <span class="chip">${roster.length}</span></h3>
-        <div class="items">${roster.map(studentRow).join("") || `<p class="muted small" style="margin:0">Хараахан хэн ч элсээгүй байна.</p>`}</div>
+      <div class="modal" id="gpRosterModal" data-course-id="${esc(c.id)}"><div class="modal-card" style="width:min(580px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+        <h3 class="h3">Суралцагчид <span class="chip">${rosterTotal}</span></h3>
+        ${rosterTotal > roster.length ? `<input type="search" class="input gp-roster-q" placeholder="Нэрээр хайх…" aria-label="Суралцагч хайх" style="margin:4px 0 10px"><p class="muted small gp-roster-note" style="margin:0 0 8px">Сүүлд элссэн ${roster.length}-г харуулж байна — бусдыг нь нэрээр хайна уу.</p>` : ""}
+        <div class="items gp-roster-items">${roster.map(studentRow).join("") || `<p class="muted small" style="margin:0">Хараахан хэн ч элсээгүй байна.</p>`}</div>
         ${roster.length ? `<a class="link" href="#students" style="display:inline-flex;margin-top:12px">${ico("chart", 15)}Хяналт ба статистик ${ico("chevron", 14)}</a>` : ""}</div></div>
       <div class="modal" id="lsModal"><div class="modal-card" style="width:min(680px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
         <h3 class="h3">${ico("gear", 18)} Хичээлийн тохиргоо</h3><form class="form ls-form" id="lsForm"></form></div></div>
@@ -1368,7 +1394,7 @@ async function courseEditor(id) {
       ${n ? `<div class="ns-grid"><section class="ns-card"><h3>Төрлөөр</h3>${bar(NS_KIND, S.kinds)}</section><section class="ns-card"><h3>Өнгөөр (утга)</h3>${bar(NS_COL, S.colors)}</section></div>` : ""}
       <section class="ns-card"><h3>Хичээл бүрээр</h3><div class="jr-wrap"><table class="tbl ns-t"><thead><tr><th>Хичээл</th><th>Тэмдэглэл</th><th>Суралцагч</th><th title="Ойлгоогүй гэж тэмдэглэсэн">❓ Ойлгоогүй</th><th>Story үзэлт</th></tr></thead><tbody>
         ${d.lessons.map((l) => `<tr class="${l.colors.r && l.colors.r === maxRed ? "ns-warn" : ""}"><td><b>${String(l.position).padStart(2, "0")}</b> ${esc(l.title)}${l.colors.r && l.colors.r === maxRed ? ` <span class="chip chip-coral">Анхаарах</span>` : ""}</td><td>${l.notes || "—"}</td><td>${l.students || "—"}</td><td>${l.colors.r || "—"}</td><td>${l.story_views || "—"}</td></tr>`).join("")}</tbody></table></div></section>
-      <section class="ns-card"><h3>Суралцагч бүрээр${nsRecent ? ` <small class="jr-live-n"><i class="jr-live"></i>${nsRecent} идэвхтэй — дээрээ</small>` : ""}</h3>${d.students.length ? `<div class="jr-wrap"><table class="tbl ns-t"><thead><tr><th>Суралцагч</th><th>Тэмдэглэл</th><th>Хичээл</th><th>Төрөл</th><th>Өнгө</th><th>Story үзсэн</th><th>Сүүлд</th></tr></thead><tbody>
+      <section class="ns-card"><h3>Суралцагч бүрээр${nsRecent ? ` <small class="jr-live-n"><i class="jr-live"></i>${nsRecent} идэвхтэй — дээрээ</small>` : ""}</h3>${(d.students_total ?? 0) > d.students.length ? `<p class="muted small">Нийт ${d.students_total} суралцагчаас хамгийн их тэмдэглэлтэй ${d.students.length}-г харуулж байна.</p>` : ""}${d.students.length ? `<div class="jr-wrap"><table class="tbl ns-t"><thead><tr><th>Суралцагч</th><th>Тэмдэглэл</th><th>Хичээл</th><th>Төрөл</th><th>Өнгө</th><th>Story үзсэн</th><th>Сүүлд</th></tr></thead><tbody>
         ${d.students.map((s) => `<tr><td>${s.recent ? `<i class="jr-live" title="Сүүлийн 7 хоногт тэмдэглэл хөтөлсөн / story үзсэн"></i>` : ""}<b>${esc(s.name)}</b>${s.username ? `<small class="muted"> @${esc(s.username)}</small>` : ""}</td><td><b>${s.notes}</b></td><td>${s.lessons}</td>
           <td class="ns-kinds">${NS_KIND.map(([k, t]) => s.kinds[k] ? `<span title="${t}">${{ text: "🖍", time: "▶", page: "📄", box: "▢" }[k]} ${s.kinds[k]}</span>` : "").join("") || "—"}</td>
           <td>${dots(s.colors) || "—"}</td><td>${s.story_views ? `${s.story_views}${s.story_done ? ` <small class="muted">(${s.story_done} бүрэн)</small>` : ""}` : "—"}</td>
@@ -1390,12 +1416,15 @@ async function courseEditor(id) {
   const loadJournal = async () => {
     const box = $("#journal"); if (!box) return;
     try { jr = await api(`/api/me/courses/${c.id}/journal`); } catch (e) { box.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
-    drawJournal();
+    jrAll = jr; drawJournal();
   };
+  // Олон мянган суралцагчтай сургалтад сервер эхний 300-г өгнө; бусдыг нэрээр серверээс хайна.
+  let jrAll = null, jrFindT = 0;
+  const capped = () => (jrAll?.students_total ?? 0) > (jrAll?.students.length ?? 0);
   const drawJournal = (q = "") => {
     const box = $("#journal"); if (!box || !jr) return;
     // Сервер идэвхтэй суралцагчдыг дээр нь эрэмбэлж өгнө; «Нэрээр» сонговол цагаан толгойн дарааллаар.
-    const L = jr.lessons, C = jr.cells, S = jr.students.filter((s) => !q || s.name.toLowerCase().includes(q.toLowerCase()));
+    const L = jr.lessons, C = jr.cells, S = jr.students.filter((s) => capped() || !q || s.name.toLowerCase().includes(q.toLowerCase()));
     if (jrSort === "name") S.sort((a, b) => a.name.localeCompare(b.name, "mn"));
     const nRecent = jr.students.filter((s) => s.recent).length;
     const secs = []; for (const l of L) { const k = l.section || ""; const last = secs[secs.length - 1]; if (last && last.name === k) last.n++; else secs.push({ name: k, n: 1 }); }
@@ -1406,13 +1435,22 @@ async function courseEditor(id) {
       ${L.map((l) => { const [t, k] = jrCell(l, C[s.user_id]?.[l.id]); return `<td class="jr-c ${k}" data-lid="${esc(l.id)}">${t}</td>`; }).join("")}
       <td class="jr-sum">${s.done}/${L.filter((l) => !l.hidden).length}</td><td class="jr-sum">${s.avg || "—"}</td><td class="jr-rank" title="${s.rank.points} оноо">${esc(s.rank.insignia || "")} ${esc(s.rank.name)}</td></tr>`).join("");
     const foot = `<tfoot><tr><th class="jr-name">Дууссан</th>${L.map((l) => { const n = S.filter((s) => { const x = C[s.user_id]?.[l.id]; return l.kind === "exam" ? x?.exam?.passed : l.kind === "assignment" ? x?.asg : x?.done; }).length; return `<td>${S.length ? n + "/" + S.length : ""}</td>`; }).join("")}<td colspan="3"></td></tr></tfoot>`;
-    box.innerHTML = `<div class="jr-head"><div><h2>Журнал</h2><span class="muted small">${jr.students.length} суралцагч${nRecent ? ` · <b class="jr-live-n"><i class="jr-live"></i>${nRecent} идэвхтэй</b>` : ""} · ${L.length} хичээл · нүд дээр дарж дэлгэрэнгүйг харна</span></div>
+    box.innerHTML = `<div class="jr-head"><div><h2>Журнал</h2><span class="muted small">${jrAll?.students_total ?? jr.students.length} суралцагч${capped() && !q ? ` (сүүлд идэвхтэй ${jr.students.length}-г харуулж байна — бусдыг нэрээр хайна уу)` : ""}${nRecent ? ` · <b class="jr-live-n"><i class="jr-live"></i>${nRecent} идэвхтэй</b>` : ""} · ${L.length} хичээл · нүд дээр дарж дэлгэрэнгүйг харна</span></div>
         <div class="jr-sort" role="group" aria-label="Эрэмбэлэх"><button type="button" data-jr-sort="active" aria-pressed="${jrSort !== "name"}">${ico("chart", 14)}Идэвхээр</button><button type="button" data-jr-sort="name" aria-pressed="${jrSort === "name"}">А–Я</button></div>
         <label class="rail-search jr-search">${ico("search", 15)}<input type="search" placeholder="Нэрээр шүүх…" value="${esc(q)}" aria-label="Нэрээр шүүх"></label>
         <button class="btn btn-glass btn-sm" data-jr-csv>${ico("files", 15)}Excel</button></div>
       <div class="jr-legend"><span class="jr-c ok">68</span>дууссан<span class="jr-c part">24</span>үзэж байна<span class="jr-c bad">40%</span>тэнцээгүй<span class="jr-c wait">✓</span>дүгнээгүй<span class="jr-c disq">⛔</span>хуулах оролдлого</div>
       ${S.length ? `<div class="jr-wrap"><table class="jr-t">${head}<tbody>${body}</tbody>${foot}</table></div>` : `<div class="empty">${q ? "Хайлтад тохирох суралцагч алга." : "Одоогоор суралцагч алга."}</div>`}`;
-    const inp = $(".jr-search input", box); inp.oninput = () => { const p = inp.selectionStart; drawJournal(inp.value); const i2 = $(".jr-search input"); i2.focus(); i2.setSelectionRange(p, p); };
+    const inp = $(".jr-search input", box);
+    const refocus = (p) => { const i2 = $(".jr-search input"); if (i2) { i2.focus(); i2.setSelectionRange(p, p); } };
+    inp.oninput = () => {
+      const p = inp.selectionStart, v = inp.value;
+      if (!capped()) { drawJournal(v); refocus(p); return; }
+      clearTimeout(jrFindT); // серверээс нэрээр хайна
+      jrFindT = setTimeout(async () => {
+        try { const d = await api(`/api/me/courses/${c.id}/journal${v.trim() ? "?q=" + encodeURIComponent(v.trim()) : ""}`); jr = { ...d, students_total: jrAll.students_total }; drawJournal(v); refocus(p); } catch {}
+      }, 400);
+    };
   };
   const jrCellModal = (uid, lid) => {
     const s = jr.students.find((x) => x.user_id === uid), l = jr.lessons.find((x) => x.id === lid), x = jr.cells[uid]?.[lid] || {};
@@ -1473,9 +1511,19 @@ async function courseEditor(id) {
       ${s.text ? `<p class="sub-text">${SG.linkify(s.text)}</p>` : ""}${s.links?.length ? `<p class="sub-files">${s.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 70))}</a>`).join("<br>")}</p>` : ""}${s.files?.length ? `<p class="sub-files">${s.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${ico("doc", 14)} ${esc(f.name)}</a>`).join(" ")}</p>` : ""}
       ${rub ? rbForm(s) : `<form class="sub-grade"><label>Оноо (0-${max})<input name="score" type="number" min="0" max="${max}" value="${s.score ?? ""}" required></label><label class="grow">Тайлбар<input name="feedback" maxlength="5000" value="${esc(s.feedback || "")}" placeholder="Юу сайн, юуг сайжруулах вэ?"></label><button class="btn btn-gold btn-sm">${s.graded_at ? "Шинэчлэх" : "Дүгнэх"}</button>${s.graded_at ? `<small class="muted">✓ ${fmtDate(s.graded_at)}</small>` : ""}</form>`}</article>`;
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="gradeModal"><div class="modal-card" style="width:min(820px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
-      <h3 class="h3">${esc(d.lesson)} — хариунууд (${d.submissions.length})</h3>${d.assignment?.due?.at || d.assignment?.due?.start_at ? `<p class="muted small">${d.assignment.due.start_at ? `Эхлэх: ${fmtDate(d.assignment.due.start_at)} · ` : ""}${d.assignment.due.at ? `Дуусах: ${fmtDate(d.assignment.due.at)} · хоцорвол ${d.assignment.due.late === "paid" ? money(d.assignment.due.late_fee) : d.assignment.due.late === "closed" ? "хаалттай" : "төлбөргүй"}` : ""}${d.assignment.due.fee ? ` · оролцооны төлбөр ${money(d.assignment.due.fee)}` : ""}</p>` : ""}
-      <div class="sub-list">${d.submissions.map(row).join("") || `<p class="muted">Хариу ирээгүй байна.</p>`}</div></div></div>`);
+      <h3 class="h3">${esc(d.lesson)} — хариунууд (${d.total ?? d.submissions.length})</h3>${d.assignment?.due?.at || d.assignment?.due?.start_at ? `<p class="muted small">${d.assignment.due.start_at ? `Эхлэх: ${fmtDate(d.assignment.due.start_at)} · ` : ""}${d.assignment.due.at ? `Дуусах: ${fmtDate(d.assignment.due.at)} · хоцорвол ${d.assignment.due.late === "paid" ? money(d.assignment.due.late_fee) : d.assignment.due.late === "closed" ? "хаалттай" : "төлбөргүй"}` : ""}${d.assignment.due.fee ? ` · оролцооны төлбөр ${money(d.assignment.due.fee)}` : ""}</p>` : ""}
+      <div class="sub-list">${d.submissions.map(row).join("") || `<p class="muted">Хариу ирээгүй байна.</p>`}</div>${(d.total ?? 0) > d.submissions.length ? `<button type="button" class="btn btn-ghost btn-sm btn-block" data-sub-more>Цааш ачаалах (${d.total - d.submissions.length} үлдсэн)</button>` : ""}</div></div>`);
     const m = $("#gradeModal"); SG.openModal(m);
+    let shown = d.submissions.length; // дүгнээгүй нь эхэнд; олон мянган хариутай үед 200-аар нэмж ачаална
+    m.addEventListener("click", async (e) => {
+      const more = e.target.closest("[data-sub-more]"); if (!more) return;
+      more.disabled = true;
+      try {
+        const n = await api(`/api/courses/${c.id}/lessons/${lid}/submissions?offset=${shown}`);
+        $(".sub-list", m).insertAdjacentHTML("beforeend", n.submissions.map(row).join("")); shown += n.submissions.length;
+        if (shown >= (n.total ?? shown)) more.remove(); else { more.disabled = false; more.textContent = `Цааш ачаалах (${n.total - shown} үлдсэн)`; }
+      } catch (x) { toast(x.message, true); more.disabled = false; }
+    });
     m.addEventListener("click", (e) => { if (e.target === m || e.target.closest("[data-close]")) { SG.closeModal(m); setTimeout(() => m.remove(), 300); } });
     m.addEventListener("change", (e) => { // рубрик: сонгосон нүд тодорч, нийт оноо шууд бодогдоно
       const r = e.target.closest(".rb-cell input"); if (!r || !rub) return;
@@ -1517,7 +1565,7 @@ async function courseEditor(id) {
   };
   const sectionOf = (f) => (f.section_pick.value === "__new" ? f.section_new.value : f.section_pick.value).trim();
   const lessonPut = (l, patch) => api(`/api/courses/${c.id}/lessons/${l.id}`, { method: "PUT", body: { title: l.title, content: l.content, video_url: stripSig(l.video_url), is_free: l.is_free, price: l.price || 0, unlock_after_h: l.unlock_after_h || 0, always_open: !!l.always_open, format: l.format || "", mode: l.mode || "", section: l.section || "", blocks: (l.blocks || []).map((b) => (b.url ? { ...b, url: stripQ(b.url) } : b.quiz?.image ? { ...b, quiz: { ...b.quiz, image: stripQ(b.quiz.image) } } : b)), active_min: l.active_min || 0, exam: l.exam || null, assignment: l.assignment || null, discussion: !!l.discussion, unlock_rule: l.unlock_rule || "", ...patch } });
-  const reload = async () => { const d = await api(`/api/me/courses/${id}`); c = d.course; lessons = d.lessons; commentCounts = d.comments || {}; roster = await api(`/api/me/courses/${id}/students`).catch(() => roster); render(); };
+  const reload = async () => { const d = await api(`/api/me/courses/${id}`); c = d.course; lessons = d.lessons; commentCounts = d.comments || {}; const rp = await apiList(rosterURL(id)).catch(() => null); if (rp) { roster = rp.items; rosterTotal = rp.total; } render(); };
 
   // Засварлах маягт + блок засварлагч.
   const putEditor = (box, l, preset, kind) => { box.innerHTML = editorHTML(l, preset, kind); const pf = $(".post-editor", box); pf.dataset.course = c.id; mountBlockEditor(pf, lessonBlocks(l)); };
@@ -2545,6 +2593,18 @@ async function chat(openId) {
 
 /* ---------- Профайл ---------- */
 /* ---------- Суралцагчид: хэн элссэн, юу авсан, шууд чат ---------- */
+const rosterURL = (id, q = "") => `/api/me/courses/${id}/students?limit=100${q ? "&q=" + encodeURIComponent(q) : ""}`;
+// Сургалтын суралцагчдын цонхонд нэрээр хайх (сервер талд — олон мянган суралцагчтай үед).
+let rosterFindT = 0;
+document.addEventListener("input", (e) => {
+  const inp = e.target.closest?.(".gp-roster-q"); if (!inp) return;
+  clearTimeout(rosterFindT);
+  rosterFindT = setTimeout(async () => {
+    const cid = (location.hash.match(/course=([^&]+)/) || [])[1] || inp.closest("[data-course-id]")?.dataset.courseId;
+    const box = inp.closest(".modal-card")?.querySelector(".gp-roster-items"); if (!box || !cid) return;
+    try { const { items } = await apiList(rosterURL(cid, inp.value.trim())); box.innerHTML = items.map(studentRow).join("") || `<p class="muted small" style="margin:0">Илэрц алга</p>`; } catch {}
+  }, 300);
+});
 const studentRow = (r) => {
   const total = r.courses.length, lessons = r.courses.reduce((n, c) => n + c.lessons.length, 0);
   const since = r.courses.map((c) => c.enrolled_at).filter(Boolean).sort()[0];
@@ -2572,7 +2632,9 @@ async function chatWithStudent(el) {
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-chat-student]"); if (b) chatWithStudent(b.closest(".student")); });
 
 async function students() {
-  const [rows, courseList] = await Promise.all([api("/api/me/students"), api("/api/me/courses")]);
+  // Олон мянган суралцагчтай үед эхний 200-г л ачаална; бусдыг нь «Бүх суралцагчид» дээр нэрээр хайна.
+  const [rowsPage, courseList] = await Promise.all([apiList("/api/me/students?limit=200"), api("/api/me/courses")]);
+  const rows = rowsPage.items, rowsTotal = rowsPage.total;
   const st = { course: "", days: 30 };
   let data = null, labels = {}, timer = null;
   const dur = (sec) => sec < 60 ? `${sec} сек` : sec < 3600 ? `${Math.round(sec / 60)} мин` : `${Math.floor(sec / 3600)} ц ${String(Math.round(sec % 3600 / 60)).padStart(2, "0")} мин`;
@@ -2661,7 +2723,8 @@ async function students() {
       return `<i style="background:${bg}" title="${mm}:${ss} — ${n ? n + " удаа үзсэн" : "алгассан"}"></i>`;
     }).join("")}</div></div>`;
   };
-  const qs = () => `course=${encodeURIComponent(st.course)}&days=${st.days}`;
+  // sq — серверээс нэрээр хайх (хүснэгт хязгаартай, олон мянган суралцагчтай үед); бусад үед хайлт хөтөч дээр.
+  const qs = () => `course=${encodeURIComponent(st.course)}&days=${st.days}` + (st.sq ? `&q=${encodeURIComponent(st.sq)}` : "");
   // Өдөр бүрийн идэвх: тэнхлэгтэй давхар багана (идэвхтэй — хар хөх, идэвхгүй — улбар шар).
   const chart2 = (daily) => {
     const tot = (d) => d.active_sec + d.inactive_sec, max = Math.max(0, ...daily.map(tot));
@@ -2681,7 +2744,7 @@ async function students() {
     const meter = (v) => `<span class="anx-meter"><i style="width:${pct(v)}%;background:${v >= 70 ? "var(--teal)" : v >= 40 ? "var(--accent)" : "var(--coral)"}"></i></span>`;
     const kpi = (ic, label, value, sub) => `<div class="anx-kpi"><span class="anx-ic">${ico(ic, 18)}</span><small>${label}</small><b>${value}</b><div class="anx-sub">${sub || ""}</div></div>`;
     const stat = (label, value, cls = "") => `<div class="anx-stat ${cls}"><small>${label}</small><b>${value}</b></div>`;
-    const risk = { ok: 0, watch: 0, risk: 0 }; list.forEach((x) => (risk[x.risk] = (risk[x.risk] || 0) + 1));
+    const risk = t.risk || { ok: 0, watch: 0, risk: 0 }; if (!t.risk) list.forEach((x) => (risk[x.risk] = (risk[x.risk] || 0) + 1));
     const ranks = Object.entries(t.rank_dist || {}).sort((a, b) => b[1] - a[1]).slice(0, 4), rankMax = Math.max(1, ...ranks.map(([, v]) => v));
     const initials = (n) => (n || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
     main.innerHTML = `<div class="anx">
@@ -2694,7 +2757,7 @@ async function students() {
         </div>
       </header>
       <div class="anx-kpis">
-        ${kpi("users", "Суралцагч", t.students, t.live ? `<span class="an-live">● ${t.live} одоо үзэж байна</span>` : `${rows.length} хүн элссэн / хичээл авсан`)}
+        ${kpi("users", "Суралцагч", t.students, t.live ? `<span class="an-live">● ${t.live} одоо үзэж байна</span>` : `${rowsTotal} хүн элссэн / хичээл авсан`)}
         ${kpi("clock", "Идэвхтэй хугацаа", dur(t.active_sec), `нийт ${dur(t.total_sec)}-аас · ${t.active_pct}%`)}
         ${kpi("eye", "Анхаарлын индекс", t.attention + "%", meter(t.attention))}
         ${kpi("target", "Суралцсан оноо", t.learn_score + "%", meter(t.learn_score))}
@@ -2713,7 +2776,7 @@ async function students() {
           ${ranks.length ? `<ul class="anx-ranks">${ranks.map(([k, v]) => `<li><span>${esc(k)}</span><i style="width:${v / rankMax * 100}%"></i><b>${v}</b></li>`).join("")}</ul>` : `<p class="muted small">Цол олгогдоогүй байна.</p>`}
           ${t.cheated_lessons ? `<p class="anx-warn">⛔ ${t.cheated_lessons} хичээлд хуулах оролдлого — оноо тооцогдоогүй</p>` : ""}</section>
       </div>
-      <section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Суралцагч бүрээр <span class="chip">${list.length}</span></h3><label class="rail-search anx-search">${ico("search", 16)}<input type="search" id="anSearch" placeholder="Нэрээр хайх…" aria-label="Хайх" value="${esc(st.q || "")}"></label></div>
+      <section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Суралцагч бүрээр <span class="chip">${data.total ?? list.length}</span></h3><label class="rail-search anx-search">${ico("search", 16)}<input type="search" id="anSearch" placeholder="Нэрээр хайх…" aria-label="Хайх" value="${esc(st.q || "")}"></label></div>
         <p class="muted small anx-hint">Мөр дээр дарж дэлгэрэнгүйг (бичсэн дүгнэлт, асуултын хариулт, видео үзэлтийн зураглал) харна.</p>
         <div class="an-table-wrap"><table class="tbl an-table anx-table"><thead><tr><th>Суралцагч</th><th>Идэвхтэй</th><th>Анхаарал</th><th>Суралцсан</th><th>Зөрчил</th><th>Шалгалт</th><th>Төлөв</th><th><span class="sr-only">Үйлдэл</span></th></tr></thead><tbody>
         ${list.map((x) => `<tr class="an-row" data-uid="${esc(x.user_id)}"><td><div class="anx-who"><span class="anx-av" style="--h:${hueOfName(x.name)}">${esc(initials(x.name))}</span><div><b>${esc(x.name)}</b>${x.live ? ` <span class="an-live">●</span>` : ""}<small class="muted">${x.lessons} хичээл · ${fmtDate(x.last_at)}</small><span class="an-rank ${x.rank?.cheated ? "bad" : ""}" title="${x.rank?.points || 0} оноо">🎖 ${esc(x.rank?.name || "Шинэ цэрэг")}${x.rank?.cheated ? ` · ⛔${x.rank.cheated}` : ""}</span></div></div></td>
@@ -2727,15 +2790,20 @@ async function students() {
       ${collabSection(list, t)}
       <div class="anx-grid">
         <section class="anx-card anx-wide"><div class="anx-card-head"><h3>${ico("clock", 18)}Сүүлийн үйл явдал</h3><span class="muted small">зөрчил, сануулга, шалгалт</span></div><div id="anFeed"></div></section>
-        <section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Бүх суралцагчид <span class="chip">${rows.length}</span></h3></div>
-          <p class="muted small anx-hint">Элссэн эсвэл хичээл худалдаж авсан хүмүүс. «Чат» дарахад баруун талд яриа нээгдэнэ.</p>
+        <section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Бүх суралцагчид <span class="chip">${rowsTotal}</span></h3></div>
+          <p class="muted small anx-hint">Элссэн эсвэл хичээл худалдаж авсан хүмүүс. «Чат» дарахад баруун талд яриа нээгдэнэ.${rowsTotal > rows.length ? ` Сүүлд элссэн ${rows.length}-г харуулж байна — бусдыг нь нэрээр хайна уу.` : ""}</p>
+          ${rowsTotal > rows.length ? `<input type="search" class="input" id="stuFind" placeholder="Нэрээр хайх…" aria-label="Суралцагч хайх" style="margin:0 0 8px">` : ""}
           <div class="anx-roster" id="stuList">${rows.map(studentMini).join("") || `<div class="anx-empty">${ico("users", 26)}<p>Одоогоор суралцагч алга. Профайлаа түгээж, үнэгүй хичээл нийтлээрэй.</p></div>`}</div></section>
       </div></div>`;
-    if (st.q) onInput({ target: $("#anSearch") });
+    if (st.q && !st.sq) onInput({ target: $("#anSearch") }); // хөтөч дээрх хайлтыг сэргээнэ (серверийнх аль хэдийн шүүгдсэн)
     $("#anCsv").href = "#";
     mountFeed();
   };
-  const load = async () => { const d = await api(`/api/me/analytics?${qs()}`); data = d.data; labels = d.labels; render(); };
+  const load = async () => {
+    const d = await api(`/api/me/analytics?${qs()}`); data = d.data; labels = d.labels; data.total = d.students_total ?? data.students.length;
+    const had = document.activeElement?.id === "anSearch"; render();
+    if (had) { const i = $("#anSearch"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } // хайж байхад курсор алдагдахгүй
+  };
   // Тайлан: CSV-г токентой татна; PDF-г хэвлэх цонхоор.
   const download = async (url, name) => {
     const res = await fetch(url, { headers: { Authorization: "Bearer " + Auth.token } });
@@ -2826,9 +2894,23 @@ async function students() {
     if (tr) return detail(tr.dataset.uid); // мөр хаана ч дарсан дэлгэрэнгүй нээнэ
   };
   const onChange = (e) => { if (e.target.id === "anCourse") { st.course = e.target.value; load(); } if (e.target.id === "anDays") { st.days = +e.target.value; load(); } };
-  function onInput(e) { if (e.target?.id !== "anSearch") return; st.q = e.target.value; const q = st.q.trim().toLowerCase(); $$(".an-table tbody tr[data-uid]").forEach((tr) => (tr.hidden = !!q && !tr.textContent.toLowerCase().includes(q))); }
+  let stuFindT = 0;
+  function onInput(e) {
+    if (e.target?.id === "stuFind") { // «Бүх суралцагчид»: серверээс нэрээр
+      clearTimeout(stuFindT); const q = e.target.value.trim();
+      stuFindT = setTimeout(async () => {
+        try { const { items } = await apiList("/api/me/students?limit=200" + (q ? "&q=" + encodeURIComponent(q) : "")); const box = $("#stuList"); if (box) box.innerHTML = items.map(studentMini).join("") || `<p class="muted small">Илэрц алга</p>`; } catch {}
+      }, 300);
+      return;
+    }
+    if (e.target?.id !== "anSearch") return;
+    if ((data?.total ?? 0) > data?.students.length || st.sq) { // хүснэгт хязгаартай — серверээс хайна
+      st.q = e.target.value; clearTimeout(stuFindT);
+      stuFindT = setTimeout(() => { st.sq = st.q.trim(); load().catch(() => {}); }, 400);
+      return;
+    } st.q = e.target.value; const q = st.q.trim().toLowerCase(); $$(".an-table tbody tr[data-uid]").forEach((tr) => (tr.hidden = !!q && !tr.textContent.toLowerCase().includes(q))); }
   main.addEventListener("click", onClick); main.addEventListener("change", onChange); main.addEventListener("input", onInput);
-  timer = setInterval(() => { if (!document.hidden && !$(".modal.open")) load().catch(() => {}); }, 30000); // бодит хугацаанд ойрхон
+  timer = setInterval(() => { if (!document.hidden && !$(".modal.open")) load().catch(() => {}); }, 60000); // минут тутам (сервер 20 сек кэштэй)
   cleanup = () => { clearInterval(timer); main.removeEventListener("click", onClick); main.removeEventListener("change", onChange); main.removeEventListener("input", onInput); };
   await load();
 }

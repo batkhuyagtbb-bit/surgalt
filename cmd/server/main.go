@@ -134,6 +134,19 @@ func main() {
 	} else if n > 0 {
 		log.Info(".env ачааллаа", "vars", n)
 	}
+	// LOG_FILE: Windows service-ийн wrapper stdout-ыг хаана ч хадгалдаггүй тул алдаа (500 г.м.) алга болдог байв.
+	if p := os.Getenv("LOG_FILE"); p != "" {
+		if w, err := openLogFile(p, 50<<20); err != nil {
+			log.Warn("LOG_FILE нээж чадсангүй", "err", err)
+		} else {
+			log = slog.New(slog.NewJSONHandler(w, nil))
+		}
+	}
+	// DEBUG_ADDR (ж: 127.0.0.1:6060): гацалт гарвал goroutine-ийн байдлыг /debug/pprof/goroutine?debug=2-оос харна.
+	// Зөвхөн localhost-д сонсоно (IIS-ээр гадагш нээгдэхгүй).
+	if addr := os.Getenv("DEBUG_ADDR"); strings.HasPrefix(addr, "127.0.0.1:") || strings.HasPrefix(addr, "localhost:") {
+		go func() { _ = http.ListenAndServe(addr, pprofMux()) }()
+	}
 	if err := run(log); err != nil {
 		log.Error("fatal", "err", err)
 		os.Exit(1)
@@ -176,7 +189,7 @@ func run(log *slog.Logger) error {
 			log.Info("ClickHouse Keeper холбогдлоо (олон хуулбарын түгжээ)", "addr", ka)
 		}
 		var err error
-		ch, err = store.NewClickHouse(cctx, store.ClickHouseOptions{DSN: chDSN, Locker: locker, CAFile: os.Getenv("CLICKHOUSE_CA")})
+		ch, err = store.NewClickHouse(cctx, store.ClickHouseOptions{DSN: chDSN, Locker: locker, CAFile: os.Getenv("CLICKHOUSE_CA"), NoCache: os.Getenv("CLICKHOUSE_CACHE") == "0"})
 		cancel()
 		if err != nil {
 			return err

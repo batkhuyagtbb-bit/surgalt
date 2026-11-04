@@ -484,7 +484,22 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	defer s.hub.Unsubscribe(client, keys...)
 	defer s.seen.left(c.UID) // «сүүлд идэвхтэй» — профайлын онлайн төлөвт
 
-	ctx := conn.CloseRead(context.Background()) // клиент хаахад ctx цуцлагдана
+	// Клиентээс ирэх жижиг мессеж: нэмэлт суваг (ж: нээлттэй хичээлийн үүлэн үг) — {"t":"sub"|"unsub", ...}.
+	// Клиент хаах эсвэл буруу мессеж илгээхэд ctx цуцлагдана.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	topics := &wsTopics{keys: map[string]bool{}}
+	defer func() { s.hub.Leave(client, topics.all()...) }()
+	go func() {
+		defer cancel()
+		for {
+			_, data, err := conn.Read(ctx)
+			if err != nil {
+				return
+			}
+			s.wsMessage(ctx, c.UID, client, topics, data)
+		}
+	}()
 	ping := time.NewTicker(25 * time.Second)
 	defer ping.Stop()
 	for {

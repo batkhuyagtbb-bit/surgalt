@@ -54,3 +54,28 @@ func TestNegativeCaching(t *testing.T) {
 		t.Fatal("Delete ажиллаагүй")
 	}
 }
+
+// Ачаалал явж байх хооронд Delete дуудагдвал (өгөгдөл өөрчлөгдсөн) хуучин үр дүн кэшэд үлдэх ёсгүй.
+func TestDeleteDuringLoadDropsStale(t *testing.T) {
+	c := New[int](time.Minute, time.Second, nil)
+	started, release := make(chan struct{}), make(chan struct{})
+	go func() {
+		_, _ = c.GetOrLoad(context.Background(), "k", func(context.Context) (int, error) {
+			close(started)
+			<-release
+			return 1, nil // хуучин утга
+		})
+	}()
+	<-started
+	c.Delete("k") // энэ хооронд бичилт болж кэш хүчингүй болсон
+	close(release)
+	time.Sleep(20 * time.Millisecond)
+	v, _ := c.GetOrLoad(context.Background(), "k", func(context.Context) (int, error) { return 2, nil })
+	if v != 2 {
+		t.Fatalf("хуучирсан утга кэшэд үлдлээ: %d", v)
+	}
+	c.Clear()
+	if c.Len() != 0 {
+		t.Fatal("Clear ажиллаагүй")
+	}
+}

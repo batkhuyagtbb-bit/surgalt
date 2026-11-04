@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	qrcode "github.com/skip2/go-qrcode"
@@ -412,9 +413,36 @@ func (s *Server) pageError(w http.ResponseWriter, r *http.Request, err error) {
 	} else {
 		s.log.Error("page", "err", err, "path", r.URL.Path)
 	}
+	s.renderError(w, r, status, msg)
+}
+
+// renderError — сайтын загвартай алдааны хуудас (404 бол хайсан хаяг, санал болгох холбоосуудтай).
+func (s *Server) renderError(w http.ResponseWriter, r *http.Request, status int, msg string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
-	_ = s.tmpl.ExecuteTemplate(w, "error.html", map[string]any{"Status": status, "Message": msg})
+	if r.Method == http.MethodHead {
+		return
+	}
+	p := r.URL.Path
+	if len([]rune(p)) > 120 {
+		p = string([]rune(p)[:120]) + "…"
+	}
+	_ = s.tmpl.ExecuteTemplate(w, "error.html", map[string]any{"Status": status, "Message": msg, "Path": p, "Contact": s.cfg.ContactEmail})
+}
+
+// notFoundMW — бүртгэлгүй хаягт Go-ийн «404 page not found» текстийн оронд сайтын загвартай 404 хуудас.
+// API (/api/...) болон бусад method-ийн хариу хэвээр (JSON клиентүүд, 405).
+func (s *Server) notFoundMW(mux *http.ServeMux) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if (r.Method == http.MethodGet || r.Method == http.MethodHead) && !strings.HasPrefix(r.URL.Path, "/api/") {
+			if _, pattern := mux.Handler(r); pattern == "" {
+				s.renderError(w, r, http.StatusNotFound, "Хуудас олдсонгүй")
+				return
+			}
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) pageHome(w http.ResponseWriter, r *http.Request) {

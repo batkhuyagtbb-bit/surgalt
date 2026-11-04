@@ -30,6 +30,10 @@ import (
 type ClickHouse struct {
 	conn   driver.Conn
 	locker Locker // процесс доторх эсвэл Keeper дээрх түгжээ (олон хуулбарт)
+	rc     *readCache       // уншилтын кэш (clickhouse_cache.go); олон хуулбарт nil
+	sess   *sessionBuffer   // идэвхтэй сессийн бичилтийн буфер (clickhouse_sessbuf.go); олон хуулбарт nil
+	visits *visitBuffer     // хуудас үзэлтийн хугацааны буфер (clickhouse_visitbuf.go); олон хуулбарт nil
+	stop   context.CancelFunc
 }
 
 type ClickHouseOptions struct {
@@ -40,6 +44,8 @@ type ClickHouseOptions struct {
 	Locker Locker
 	// CAFile: өөрийн CA-аар гарын үсэг зурсан серверийн сертификатыг шалгах PEM файл (secure=true-тэй).
 	CAFile string
+	// NoCache: уншилтын кэш, сессийн буферийг унтраана (CLICKHOUSE_CACHE=0 — асуудал гарвал шууд хаах).
+	NoCache bool
 }
 
 // chUnknownDatabase — ClickHouse-ийн UNKNOWN_DATABASE алдааны код.
@@ -80,7 +86,10 @@ func NewClickHouse(ctx context.Context, o ClickHouseOptions) (*ClickHouse, error
 	if opts.Settings == nil {
 		opts.Settings = clickhouse.Settings{}
 	}
-	for k, v := range map[string]any{"async_insert": 1, "wait_for_async_insert": 1, "async_insert_busy_timeout_ms": 50, "async_insert_max_data_size": 1_000_000} {
+	// max_query_size: has(?, id)-д дамжуулах ID-ийн жагсаалт (ж: 30 000 суралцагчийн нэр) query-ийн текст рүү
+	// бичигддэг; анхны 256KB-д ~9 500 ID л багтаж, түүнээс олон бол «Max query size exceeded» алдаа гардаг байв.
+	for k, v := range map[string]any{"async_insert": 1, "wait_for_async_insert": 1, "async_insert_busy_timeout_ms": 50, "async_insert_max_data_size": 1_000_000,
+		"max_query_size": 16 << 20} {
 		if _, ok := opts.Settings[k]; !ok {
 			opts.Settings[k] = v
 		}
@@ -101,6 +110,16 @@ func NewClickHouse(ctx context.Context, o ClickHouseOptions) (*ClickHouse, error
 	c := &ClickHouse{conn: conn, locker: o.Locker}
 	if c.locker == nil {
 		c.locker = &LocalLocker{}
+	}
+	if _, single := c.locker.(*LocalLocker); single && !o.NoCache { // нэг хуулбар: бичилт бүр энэ процессоор дамжина
+		bg, cancel := context.WithCancel(context.Background())
+		c.stop = cancel
+		c.rc = newReadCache()
+		c.rc.startJanitors(bg)
+		c.sess = newSessionBuffer(c)
+		go c.sess.run(bg)
+		c.visits = newVisitBuffer(c)
+		go c.visits.run(bg)
 	}
 	if err := c.ensureSchema(ctx); err != nil {
 		_ = conn.Close()
@@ -137,7 +156,19 @@ func ensureDatabase(ctx context.Context, opts *clickhouse.Options, db string) er
 	return nil
 }
 
-func (c *ClickHouse) Close() { _ = c.conn.Close() }
+// Close — буферт хүлээгдэж буй сессүүдийг бичээд холболтыг хаана.
+func (c *ClickHouse) Close() {
+	if c.sess != nil {
+		c.sess.flush(context.Background())
+	}
+	if c.visits != nil {
+		c.visits.flush(context.Background())
+	}
+	if c.stop != nil {
+		c.stop()
+	}
+	_ = c.conn.Close()
+}
 
 // DropAll нь тестэд: бүх хүснэгтийг устгана.
 func (c *ClickHouse) DropAll(ctx context.Context) error {
@@ -594,6 +625,7 @@ func scanUser(r driver.Rows) (*User, bool, error) {
 }
 
 func (c *ClickHouse) writeUser(ctx context.Context, u *User, deleted bool) error {
+	defer c.forgetUser(u.ID)
 	return c.insert(ctx, "users", []string{"id", "username", "email", "password_hash", "role", "display_name", "headline", "bio",
 		"avatar_url", "cover_url", "subjects", "location", "links", "created_at", "storage_extra_bytes", "storage_expires_at",
 		"google_token", "phone", "phone_verified", "phone_pending", "rank_hidden", "consent_version", "consent_at", "tokens_after", "plan", "ver", "deleted"},
@@ -661,7 +693,21 @@ func (c *ClickHouse) CreateUser(ctx context.Context, u *User) error {
 }
 
 func (c *ClickHouse) UserByID(ctx context.Context, id string) (*User, error) {
-	return c.userWhere(ctx, "id = ?", id)
+	if c.rc == nil {
+		return c.userWhere(ctx, "id = ?", id)
+	}
+	u, err := c.rc.users.GetOrLoad(ctx, id, func(ctx context.Context) (User, error) {
+		u, err := c.userWhere(ctx, "id = ?", id)
+		if err != nil {
+			return User{}, err
+		}
+		return *u, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	u = deepCopy(u)
+	return &u, nil
 }
 
 func (c *ClickHouse) UserByEmail(ctx context.Context, email string) (*User, error) {

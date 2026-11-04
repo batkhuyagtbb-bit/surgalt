@@ -7,6 +7,8 @@ import (
 	"mime"
 	"net/http"
 	"slices"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -421,7 +423,10 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"submission": s.subView(sub), "due": ds})
 }
 
-// handleSubmissions: GET .../submissions — багшид бүх хариу.
+// submissionsPage — нэг удаад өгөх хариуны тоо (дүгнээгүй нь эхэнд; «Цааш» дарж дараагийнхыг авна).
+const submissionsPage = 200
+
+// handleSubmissions: GET .../submissions?offset= — багшид хариунууд: дүгнээгүй нь эхэнд, дараа нь шинээс.
 func (s *Server) handleSubmissions(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireTeacher(w, r)
 	if !ok {
@@ -439,11 +444,22 @@ func (s *Server) handleSubmissions(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	out := make([]map[string]any, len(subs))
-	for i := range subs {
-		out[i] = s.subView(&subs[i])
+	sort.SliceStable(subs, func(i, j int) bool {
+		if (subs[i].Score == nil) != (subs[j].Score == nil) {
+			return subs[i].Score == nil
+		}
+		return subs[i].SubmittedAt.After(subs[j].SubmittedAt)
+	})
+	total, offset := len(subs), 0
+	if n, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && n > 0 {
+		offset = min(n, total)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"lesson": l.Title, "assignment": l.Assignment, "submissions": out})
+	page := subs[offset:min(offset+submissionsPage, total)]
+	out := make([]map[string]any, len(page))
+	for i := range page {
+		out[i] = s.subView(&page[i])
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"lesson": l.Title, "assignment": l.Assignment, "submissions": out, "total": total, "offset": offset})
 }
 
 // handleGrade: PUT .../submissions/{uid} — оноо, тайлбар; суралцагчид мэдэгдэнэ.
@@ -496,6 +512,7 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.GradeSubmission(r.Context(), l.ID, uid, in.Score, strings.TrimSpace(in.Feedback), picks); s.storeErr(w, r, err) {
 		return
 	}
+	s.journals.Delete(course.ID) // журнал шинэ дүнг шууд харуулна
 	s.notify(r.Context(), &store.Notification{UserID: uid, Type: "grade", ActorID: course.TeacherID, Title: fmt.Sprintf("✅ Даалгавар дүгнэгдлээ: %d/%d", in.Score, maxScore),
 		Body: "«" + l.Title + "»" + map[bool]string{true: " — " + in.Feedback, false: ""}[in.Feedback != ""], Link: "/c/" + course.ID + "#l=" + l.ID})
 	sub, err := s.store.SubmissionFor(r.Context(), uid, l.ID)

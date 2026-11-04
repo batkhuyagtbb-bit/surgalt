@@ -19,14 +19,49 @@ type Locker interface {
 	Lock(ctx context.Context, key string) (unlock func(), err error)
 }
 
-// LocalLocker — түлхүүр бүрт нэг sync.Mutex.
-type LocalLocker struct{ m sync.Map }
+// LocalLocker — түлхүүр бүрт нэг sync.Mutex. Хүлээж буй хүнгүй болмогц түлхүүрийг устгана (сесс, явц бүрийн
+// түлхүүр санах ойд үүрд үлдэж, олон мянган суралцагчтай үед санах ой өсөхгүй).
+type LocalLocker struct {
+	mu sync.Mutex
+	m  map[string]*lockEntry
+}
+
+type lockEntry struct {
+	mu sync.Mutex
+	n  int // эзэмшиж буй + хүлээж буй
+}
 
 func (l *LocalLocker) Lock(_ context.Context, key string) (func(), error) {
-	v, _ := l.m.LoadOrStore(key, &sync.Mutex{})
-	mu := v.(*sync.Mutex)
-	mu.Lock()
-	return mu.Unlock, nil
+	l.mu.Lock()
+	if l.m == nil {
+		l.m = map[string]*lockEntry{}
+	}
+	e := l.m[key]
+	if e == nil {
+		e = &lockEntry{}
+		l.m[key] = e
+	}
+	e.n++
+	l.mu.Unlock()
+	e.mu.Lock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			e.mu.Unlock()
+			l.mu.Lock()
+			if e.n--; e.n == 0 {
+				delete(l.m, key)
+			}
+			l.mu.Unlock()
+		})
+	}, nil
+}
+
+// size — тестэд: санах ойд үлдсэн түлхүүрийн тоо.
+func (l *LocalLocker) size() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.m)
 }
 
 // KeeperLocker — Keeper дээр /<prefix>/locks/<key> зам дор ephemeral sequential node-оор түгжинэ

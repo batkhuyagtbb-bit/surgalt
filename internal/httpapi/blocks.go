@@ -96,16 +96,35 @@ func (s *Server) lessonBlocks(ctx context.Context, uid string, f store.ActivityF
 	return out
 }
 
-// lessonBlocked — суралцагч энэ хичээлд хоригтой эсэх (багш өөрөө хэзээ ч хоригдохгүй).
+// lessonBlocked — суралцагч энэ хичээлд хоригтой эсэх (багш өөрөө хэзээ ч хоригдохгүй). Хичээлийн бараг бүх хүсэлт
+// (явц, үүлэн үг, тодруулга…) үүнийг шалгадаг тул 15 секунд кэшилнэ; хориг/цуцлалт бичигдэхэд шууд шинэчлэгдэнэ
+// (blocksChanged).
 func (s *Server) lessonBlocked(ctx context.Context, uid string, course *store.Course, lessonID string) *LessonBlock {
 	if uid == "" || course.TeacherID == uid {
 		return nil
 	}
-	bs := s.lessonBlocks(ctx, uid, store.ActivityFilter{CourseID: course.ID, LessonID: lessonID}, func(string) int { return blockMinutes(course) })
-	if b, ok := bs[lessonID]; ok {
-		return &b
+	b, _ := s.blocks.GetOrLoad(ctx, uid+"|"+lessonID, func(ctx context.Context) (*LessonBlock, error) {
+		bs := s.lessonBlocks(ctx, uid, store.ActivityFilter{CourseID: course.ID, LessonID: lessonID}, func(string) int { return blockMinutes(course) })
+		if b, ok := bs[lessonID]; ok {
+			return &b, nil
+		}
+		return nil, nil
+	})
+	if b == nil || (b.Until != nil && !time.Now().Before(*b.Until)) { // хугацаат хориг кэшэд байхдаа дуусч болно
+		return nil
 	}
-	return nil
+	cp := *b // дуудагч гарчиг нэмдэг
+	return &cp
+}
+
+// blocksChanged — хориг (auto_block) эсвэл цуцлалт (teacher_unblock) бичигдсэн хичээлүүдийн кэшийг хүчингүй болгоно.
+func (s *Server) blocksChanged(evs []store.ActivityEvent) {
+	for _, e := range evs {
+		if e.Type == "auto_block" || e.Type == "teacher_unblock" {
+			s.blocks.Delete(e.UserID + "|" + e.LessonID)
+			s.dripOpen.Delete(e.UserID + "|" + e.LessonID)
+		}
+	}
 }
 
 func blockedErr(b *LessonBlock) error {
@@ -191,6 +210,10 @@ func (s *Server) handleUnblockStudent(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.store.AddActivityEvents(r.Context(), evs); s.storeErr(w, r, err) {
 		return
+	}
+	s.blocksChanged(evs)
+	for lid := range targets {
+		s.journals.Delete(courseOf[lid]) // журнал шинэ төлвийг шууд харуулна
 	}
 	n := &store.Notification{UserID: uid, Type: "unblock", ActorID: c.UID, Title: "🔓 Багш хичээлийг тань дахин нээлээ", Body: "Анхааралтай, бусад цонхоо хаагаад үзээрэй.", Link: link}
 	if exam != "" {

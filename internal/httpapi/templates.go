@@ -164,8 +164,12 @@ func parseTemplates() *template.Template {
 func staticHandler() http.Handler {
 	sub, _ := fs.Sub(staticFS, "static")
 	fsrv := http.StripPrefix("/static/", http.FileServerFS(sub))
+	gz := &gzStatic{fsys: sub}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		if gz.serve(w, r, strings.TrimPrefix(r.URL.Path, "/static/")) {
+			return
+		}
 		fsrv.ServeHTTP(w, r)
 	})
 }

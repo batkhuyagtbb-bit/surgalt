@@ -4884,3 +4884,38 @@ a.np-item:active{background:var(--line)}
 .tt-hide{margin-top:4px;padding:4px 10px;border:1px solid var(--line-2);border-radius:999px;background:var(--surface);color:var(--muted);font:700 .76rem var(--sans);cursor:pointer}
 .tt-hide:hover{color:var(--coral);border-color:var(--coral)}
 .tt-foot{margin:10px 0 0;text-align:center;color:var(--muted);font-size:.86rem}
+
+/* ---- 404 / алдааны хуудас: найрсаг, брэндийн өнгөөр ---- */
+.nf{min-height:calc(100svh - 140px);display:flex;align-items:center;justify-content:center;padding:96px 16px 112px;
+  background:radial-gradient(60% 50% at 50% 0%,var(--brand-soft),transparent 70%),radial-gradient(40% 40% at 85% 90%,var(--accent-soft),transparent 70%)}
+.nf-inner{width:100%;max-width:640px;text-align:center}
+.nf-art{display:flex;align-items:center;justify-content:center;gap:clamp(4px,2vw,14px);margin-bottom:14px}
+.nf-digit{font:800 clamp(5rem,20vw,9rem)/1 var(--sans);letter-spacing:-.04em;color:var(--brand);text-shadow:0 10px 30px var(--brand-glow)}
+.nf-digit:last-child{color:var(--accent)}
+.nf-book{width:clamp(88px,22vw,132px);height:auto;filter:drop-shadow(0 12px 22px rgba(31,60,143,.18));animation:nf-float 4.5s ease-in-out infinite}
+.nf-q{transform-origin:92px 26px;animation:nf-pop 2.4s var(--spring) infinite}
+@keyframes nf-float{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-10px) rotate(3deg)}}
+@keyframes nf-pop{0%,70%,100%{transform:scale(1)}80%{transform:scale(1.18)}}
+.nf-title{font:800 clamp(1.8rem,5vw,2.6rem)/1.15 var(--sans);letter-spacing:-.02em;color:var(--text);margin:.25em 0 .35em}
+.nf-lead{font-size:clamp(1rem,2.2vw,1.12rem);color:var(--text-2);max-width:48ch;margin:0 auto}
+.nf-path{margin:14px auto 0;max-width:100%;overflow-wrap:anywhere}
+.nf-path code{padding:3px 8px;border-radius:8px;background:var(--surface);border:1px solid var(--line);color:var(--brand);font:600 .88rem ui-monospace,Consolas,monospace}
+.nf-cta{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:26px}
+.nf-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:34px;text-align:left}
+.nf-link{display:flex;flex-direction:column;gap:2px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+  box-shadow:var(--shadow-sm);transition:transform .2s var(--ease),border-color .2s,box-shadow .2s}
+.nf-link b{color:var(--brand);font-weight:800}
+.nf-link:hover{transform:translateY(-3px);border-color:var(--brand);box-shadow:var(--shadow)}
+.nf-help{margin-top:22px}
+.nf-help a{color:var(--brand);text-decoration:underline}
+@media (prefers-reduced-motion:reduce){.nf-book,.nf-q{animation:none}.nf-link:hover{transform:none}}
+.rail-more-hint{margin:6px 14px 12px;text-align:center}
+
+/* ---- Студи: сургалтын карт дээрх «устгах» товч (картын холбоосын гадна, баруун дээд буланд) ---- */
+.group-wrap{position:relative;display:flex;flex-direction:column}
+.group-wrap>.group{flex:1}
+.group-del{position:absolute;top:10px;right:10px;z-index:2;display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:10px;
+  background:rgba(255,255,255,.94);color:var(--coral);box-shadow:var(--shadow-sm);cursor:pointer;opacity:0;transform:scale(.9);transition:opacity .18s,transform .18s,background .18s}
+.group-wrap:hover .group-del,.group-del:focus-visible{opacity:1;transform:none}
+.group-del:hover{background:var(--coral);color:#fff}
+@media (hover:none){.group-del{opacity:1;transform:none}}
