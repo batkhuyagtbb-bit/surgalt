@@ -22,13 +22,17 @@
      Хуудас бүх зочинд ижил кэшлэгдэнэ; эзэмшигчийн засах хэрэгслийг ([data-owner]) app.js нэвтэрсэн эзэнд л нээнэ. */}}
 <main class="pf" data-teacher="{{$t.Username}}" style="--h:{{hue $t.Username}}">
   <header class="pf-head">
-    <div class="pf-cover" id="pfCover">{{if $t.CoverURL}}<img src="{{$t.CoverURL}}" alt="">{{end}}
+    <div class="pf-cover" id="pfCover">{{if $t.CoverURL}}<img class="pf-cover-img" src="{{$t.CoverURL}}" alt="" style="object-position:50% {{$t.CoverY}}%">{{end}}
+      <span class="pf-cover-hint" hidden>↕ Зургийг дээш, доош чирж байрлуулна уу</span>
       <button class="pf-cover-qr" data-open-qr aria-label="QR код томруулах" title="Профайлын QR код">
         <span class="pf-cover-qr-img"><img src="/t/{{$t.Username}}/qr.png?size=320" alt="" width="132" height="132"><i class="qr-scan"></i></span>
         <span class="pf-cover-qr-txt"><b>Уншуулаад шууд нэвтэр</b><small>surgalt.mn/t/{{$t.Username}}</small></span>
       </button>
       <div class="pf-cover-tools">
+        <button class="pf-cover-btn" data-owner data-cover-pos hidden title="Нүүр зургийг дээш, доош чирж байрлуулах">{{icon "layers"}}<span>Байрлал тохируулах</span></button>
         <button class="pf-cover-btn" data-owner data-upload="cover" hidden>{{icon "camera"}}<span>Нүүр зураг солих</span></button>
+        <button class="pf-cover-btn pf-cover-edit" data-cover-cancel hidden>Болих</button>
+        <button class="pf-cover-btn pf-cover-edit pf-cover-save" data-cover-save hidden>{{icon "check"}}<span>Хадгалах</span></button>
       </div>
     </div>
     <div class="pf-bar">

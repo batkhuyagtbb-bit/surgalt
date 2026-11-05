@@ -34,6 +34,7 @@ type PublicTeacher struct {
 	Bio             string       `json:"bio"`
 	AvatarURL       string       `json:"avatar_url"`
 	CoverURL        string       `json:"cover_url"`
+	CoverY          int          `json:"cover_y"` // нүүр зургийн босоо байрлал (%)
 	Subjects        []string     `json:"subjects"`
 	Location        string       `json:"location"`
 	Links           []PublicLink `json:"links"`
@@ -159,7 +160,7 @@ func groupLessons(ls []PublicLesson) ([]PublicSection, bool) {
 }
 
 func publicTeacher(u *store.User) PublicTeacher {
-	t := PublicTeacher{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, Headline: u.Headline, Bio: u.Bio, AvatarURL: u.AvatarURL, CoverURL: u.CoverURL,
+	t := PublicTeacher{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, Headline: u.Headline, Bio: u.Bio, AvatarURL: u.AvatarURL, CoverURL: u.CoverURL, CoverY: u.CoverY,
 		Subjects: u.Subjects, Location: u.Location, Links: []PublicLink{}, JoinedYear: u.CreatedAt.Year()}
 	_, _, t.PhoneHint = phoneParts(u.Phone)
 	if t.Subjects == nil {

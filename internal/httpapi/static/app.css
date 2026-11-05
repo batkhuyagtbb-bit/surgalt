@@ -4979,3 +4979,13 @@ a.np-item:active{background:var(--line)}
 @media (max-width:640px){.nav-org-item{max-width:150px}}
 .nav-org-name{min-width:0;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:640px){.org-acting{bottom:84px;max-width:calc(100% - 32px);border-radius:16px;text-align:center}}
+/* Нүүр зургийн байрлал тохируулах (эзэмшигч чирнэ) */
+.pf-cover:not(:has(img.pf-cover-img)) [data-cover-pos]{display:none!important}
+.pf.cover-edit [data-cover-pos],.pf.cover-edit [data-upload="cover"]{display:none!important}
+.pf.cover-edit .pf-cover{cursor:grab;touch-action:none;user-select:none;outline:3px dashed rgba(255,255,255,.75);outline-offset:-10px}
+.pf.cover-edit .pf-cover.dragging{cursor:grabbing}
+.pf.cover-edit .pf-cover-qr{opacity:0;pointer-events:none;transition:opacity .2s}
+.pf.cover-edit .pf-cover img.pf-cover-img{animation:none;pointer-events:none;-webkit-user-drag:none}
+.pf-cover-hint{position:absolute;left:50%;top:50%;z-index:2;transform:translate(-50%,-50%);max-width:calc(100% - 32px);padding:9px 16px;border-radius:999px;background:rgba(15,23,42,.62);color:#fff;font-weight:700;font-size:.9rem;text-align:center;pointer-events:none}
+.pf-cover-hint[hidden]{display:none}
+.pf-cover-save{background:var(--accent);color:#1b1305}

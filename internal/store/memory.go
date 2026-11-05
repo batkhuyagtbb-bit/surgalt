@@ -140,6 +140,9 @@ func (m *Memory) CreateUser(_ context.Context, u *User) error {
 		return ErrConflict
 	}
 	u.ID, u.CreatedAt, u.Email = m.next(), time.Now(), email
+	if u.CoverY == 0 {
+		u.CoverY = 50
+	}
 	u.Subjects, u.Links = cloneStrings(u.Subjects), cloneLinks(u.Links)
 	c := *u
 	c.Subjects, c.Links, c.Org = cloneStrings(u.Subjects), cloneLinks(u.Links), u.Org.Clone()
@@ -219,6 +222,9 @@ func (m *Memory) UpdateProfile(_ context.Context, id string, p ProfileUpdate) er
 		return ErrNotFound
 	}
 	u.DisplayName, u.Headline, u.Bio, u.AvatarURL = p.DisplayName, p.Headline, p.Bio, p.AvatarURL
+	if u.CoverURL != p.CoverURL {
+		u.CoverY = 50
+	}
 	u.CoverURL, u.Phone = p.CoverURL, p.Phone
 	u.Subjects, u.Location, u.Links = cloneStrings(p.Subjects), p.Location, cloneLinks(p.Links)
 	return nil

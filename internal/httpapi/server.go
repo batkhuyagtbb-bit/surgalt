@@ -217,6 +217,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/profile/insights", s.handleProfileInsights)
 	mux.HandleFunc("PUT /api/me/profile", s.handleUpdateProfile)
 	mux.HandleFunc("PUT /api/me/name", s.handleUpdateName)
+	mux.HandleFunc("PUT /api/me/cover-pos", s.handleCoverPos)
 	mux.HandleFunc("POST /api/me/consent", s.handleConsent)
 	mux.HandleFunc("POST /api/me/role", s.handleSetRole)
 	mux.HandleFunc("POST /api/auth/forgot", s.handleForgot)

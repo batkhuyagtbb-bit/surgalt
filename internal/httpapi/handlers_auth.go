@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"errors"
+	"math"
 	"net/http"
 	"net/mail"
 	"regexp"
@@ -236,6 +237,33 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, s.me(u))
+}
+
+// handleCoverPos: PUT /api/me/cover-pos {"y": 0-100} — нүүр зургийн босоо байрлал (эзэмшигч зургийг чирж тохируулна).
+func (s *Server) handleCoverPos(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Y float64 `json:"y"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if in.Y < 0 || in.Y > 100 || in.Y != in.Y {
+		writeErr(w, http.StatusBadRequest, "байрлал 0-100")
+		return
+	}
+	u, err := s.store.UpdateUser(r.Context(), c.UID, func(u *store.User) error {
+		u.CoverY = int(math.Round(in.Y))
+		return nil
+	})
+	if s.storeErr(w, r, err) {
+		return
+	}
+	s.profiles.Delete(u.Username) // профайлын хуудас, хуваалцах зураг шинэ байрлалаар
+	writeJSON(w, http.StatusOK, map[string]any{"cover_y": u.CoverY})
 }
 
 // handleUpdateName: PUT /api/me/name {"display_name"} — профайл, «Сурах» хуудсан дээрх нэрийг шууд (inline) засна.

@@ -31,6 +31,9 @@ type User struct {
 	Bio          string `json:"bio"`
 	AvatarURL    string `json:"avatar_url"`
 	CoverURL     string `json:"cover_url"` // профайлын дээд талын өргөн зураг
+	// CoverY — нүүр зургийн босоо байрлал (0 = дээд тал, 50 = гол, 100 = доод тал; CSS object-position). Эзэмшигч
+	// зургийг чирж тохируулна; шинэ зураг тавихад 50 болно.
+	CoverY int `json:"cover_y"`
 	// Утас: нээлттэй профайлд зөвхөн эхний 4 орон харагдана; бүтэн дугаарыг зочин дарж нээхэд л
 	// (багшид мэдэгдэж, бүртгэгдэнэ) өгнө — тиймээс JSON-д автоматаар гарахгүй.
 	Phone string `json:"-"`

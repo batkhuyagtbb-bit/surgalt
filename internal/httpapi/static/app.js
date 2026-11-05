@@ -4037,14 +4037,67 @@ function profileOwner(root, h) {
     return me;
   };
 
+  // Нүүр зургийн байрлал: «Байрлал тохируулах» (эсвэл шинэ зураг тавьсны дараа) → зургийг дээш, доош чирэх
+  // (гар: ↑ ↓, Enter хадгалах, Esc болих) → «Хадгалах». object-position-ийн Y хувь хадгалагдаж зочдод ч тэгж харагдана.
+  const coverPos = (() => {
+    const box = $("#pfCover"), hint = $(".pf-cover-hint", box);
+    const img = () => $("img.pf-cover-img", box);
+    let y = 50, orig = 50, drag = null;
+    const editing = () => root.classList.contains("cover-edit");
+    const cur = () => { const m = /([\d.]+)%\s*$/.exec(img()?.style.objectPosition || ""); return m ? +m[1] : 50; };
+    const set = (v) => { y = Math.round(Math.max(0, Math.min(100, v)) * 10) / 10; const im = img(); if (im) im.style.objectPosition = `50% ${y}%`; };
+    // Зураг хайрцгаас хэдэн px өндөр вэ (object-fit: cover) — чирэх зай.
+    const room = () => {
+      const im = img(), r = box.getBoundingClientRect(); if (!im?.naturalWidth) return 0;
+      const sc = Math.max(r.width / im.naturalWidth, r.height / im.naturalHeight);
+      return im.naturalHeight * sc - r.height;
+    };
+    const show = (on) => {
+      root.classList.toggle("cover-edit", on); hint.hidden = !on;
+      $$("[data-cover-cancel], [data-cover-save]", box).forEach((b) => (b.hidden = !on));
+    };
+    const start = () => {
+      if (!img()) return;
+      orig = cur(); set(orig); show(true);
+      if (room() < 8) toast("Энэ зураг хайрцгаас өндөр биш тул дээш, доош зөөх зай бараг алга — өндөр (босоо) зураг тавибал тохируулах боломжтой");
+      $("[data-cover-save]", box)?.focus({ preventScroll: true });
+    };
+    const stop = () => { show(false); drag = null; box.classList.remove("dragging"); };
+    const cancel = () => { set(orig); stop(); };
+    const commit = async () => {
+      const b = $("[data-cover-save]", box); b.disabled = true;
+      try { const r = await api("/api/me/cover-pos", { method: "PUT", body: { y } }); set(r.cover_y); toast("Нүүр зургийн байрлал хадгалагдлаа ✓"); stop(); }
+      catch (e) { toast(e.message, true); } finally { b.disabled = false; }
+    };
+    box.addEventListener("pointerdown", (e) => {
+      if (!editing() || e.button > 0 || e.target.closest("button, a")) return;
+      drag = { y0: e.clientY, from: y, room: room() };
+      box.setPointerCapture?.(e.pointerId); box.classList.add("dragging"); e.preventDefault();
+    });
+    box.addEventListener("pointermove", (e) => { if (drag && drag.room > 0) set(drag.from - ((e.clientY - drag.y0) / drag.room) * 100); });
+    const up = () => { drag = null; box.classList.remove("dragging"); };
+    box.addEventListener("pointerup", up); box.addEventListener("pointercancel", up);
+    document.addEventListener("keydown", (e) => {
+      if (!editing() || e.target.closest?.("input, textarea, select")) return;
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); set(y + (e.key === "ArrowUp" ? -2 : 2)); }
+      else if (e.key === "Escape") cancel();
+      else if (e.key === "Enter" && !e.target.closest?.("button")) { e.preventDefault(); commit(); }
+    });
+    $("[data-cover-pos]", box)?.addEventListener("click", start);
+    $("[data-cover-cancel]", box)?.addEventListener("click", cancel);
+    $("[data-cover-save]", box)?.addEventListener("click", commit);
+    return { start };
+  })();
+
   const file = $("#pfFile");
   let kind = null;
   $$("[data-upload]").forEach((b) => b.addEventListener("click", () => { kind = b.dataset.upload; file.value = ""; file.click(); }));
   file.addEventListener("change", async () => {
     const f = file.files[0]; if (!f || !kind) return;
     const target = kind === "cover" ? $("#pfCover") : $("#pfAvatar");
-    const preview = URL.createObjectURL(f), old = $("img", target)?.src;
-    const paint = (src) => { $("img", target)?.remove(); if (kind === "avatar") target.textContent = ""; target.insertAdjacentHTML("afterbegin", `<img src="${esc(src)}" alt="">`); };
+    const sel = kind === "cover" ? "img.pf-cover-img" : "img"; // нүүр зураг дээр QR-ын зураг ч байгаа
+    const preview = URL.createObjectURL(f), old = $(sel, target)?.src;
+    const paint = (src) => { $(sel, target)?.remove(); if (kind === "avatar") target.textContent = ""; target.insertAdjacentHTML("afterbegin", kind === "cover" ? `<img class="pf-cover-img" src="${esc(src)}" alt="" style="object-position:50% 50%">` : `<img src="${esc(src)}" alt="">`); };
     paint(preview); root.classList.add("uploading"); // шууд урьдчилан харуулна
     try {
       const fd = new FormData(); fd.append("file", f);
@@ -4052,7 +4105,8 @@ function profileOwner(root, h) {
       await save({ [kind + "_url"]: info.path });
       paint(info.path);
       if (kind === "avatar") $$(".pf-mini .avatar, .composer .avatar, .chat-head .avatar").forEach((a) => (a.innerHTML = `<img src="${esc(info.path)}" alt="">`));
-      toast(kind === "cover" ? "Нүүр зураг солигдлоо ✓" : "Профайл зураг солигдлоо ✓");
+      toast(kind === "cover" ? "Нүүр зураг солигдлоо ✓ — дээш, доош чирж байрлуулаад «Хадгалах» дарна уу" : "Профайл зураг солигдлоо ✓");
+      if (kind === "cover") { const im = $("img.pf-cover-img", target); if (im.complete) coverPos.start(); else im.addEventListener("load", () => coverPos.start(), { once: true }); }
     } catch (e) {
       toast(e.message, true);
       if (old) paint(old); else location.reload();

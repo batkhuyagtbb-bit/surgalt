@@ -173,12 +173,12 @@ func ogFill(dst draw.Image, r image.Rectangle, rad float32, c color.Color) {
 	ogRoundRect(dst, r, rad, image.NewUniform(c))
 }
 
-// ogCover — зургийг тэгш өнцөгтийг дүүргэтэл томруулж, голоос нь тайрна.
-func ogCover(src image.Image, w, h int) *image.RGBA {
+// ogCover — src-ийг w×h-д тааруулж тайрна; yFrac — босоо байрлал (0 дээд, 0.5 гол, 1 доод; профайлын нүүр зургийн cover_y).
+func ogCover(src image.Image, w, h int, yFrac float64) *image.RGBA {
 	sb := src.Bounds()
 	scale := math.Max(float64(w)/float64(sb.Dx()), float64(h)/float64(sb.Dy()))
 	cw, ch := int(float64(w)/scale), int(float64(h)/scale)
-	min0 := image.Pt(sb.Min.X+(sb.Dx()-cw)/2, sb.Min.Y+(sb.Dy()-ch)/2)
+	min0 := image.Pt(sb.Min.X+(sb.Dx()-cw)/2, sb.Min.Y+int(float64(sb.Dy()-ch)*math.Min(1, math.Max(0, yFrac))))
 	crop := image.Rectangle{Min: min0, Max: min0.Add(image.Pt(cw, ch))}
 	out := image.NewRGBA(image.Rect(0, 0, w, h))
 	xdraw.CatmullRom.Scale(out, out.Bounds(), src, crop, draw.Src, nil)
@@ -260,7 +260,7 @@ func (s *Server) renderProfileOG(ctx context.Context, p *PublicProfile) ([]byte,
 	// Дэвсгэр: брэндийн градиент; нүүр зурагтай бол түүн дээр бараан бүрхүүл.
 	bg := ogBrandBG()
 	if cover := s.ogPicture(ctx, t.CoverURL); cover != nil {
-		draw.Draw(dst, dst.Bounds(), ogCover(cover, ogW, ogH), image.Point{}, draw.Src)
+		draw.Draw(dst, dst.Bounds(), ogCover(cover, ogW, ogH, float64(t.CoverY)/100), image.Point{}, draw.Src)
 		draw.DrawMask(dst, dst.Bounds(), bg, image.Point{}, image.NewUniform(color.Alpha{196}), image.Point{}, draw.Over)
 	} else {
 		draw.Draw(dst, dst.Bounds(), bg, image.Point{}, draw.Src)
@@ -273,7 +273,7 @@ func (s *Server) renderProfileOG(ctx context.Context, p *PublicProfile) ([]byte,
 	circle := image.NewAlpha(image.Rect(0, 0, ad, ad))
 	ogRoundRect(circle, circle.Bounds(), ad/2, image.Opaque)
 	if av := s.ogPicture(ctx, t.AvatarURL); av != nil {
-		draw.DrawMask(dst, image.Rect(ax, ay, ax+ad, ay+ad), ogCover(av, ad, ad), image.Point{}, circle, image.Point{}, draw.Over)
+		draw.DrawMask(dst, image.Rect(ax, ay, ax+ad, ay+ad), ogCover(av, ad, ad, 0.5), image.Point{}, circle, image.Point{}, draw.Over)
 	} else {
 		h := float64(hue(t.Username))
 		c := hsl(h, 0.55, 0.42)
@@ -517,7 +517,7 @@ func profileShareDesc(t PublicTeacher, books int) string {
 
 // ogVersion — зураг өөрчлөгдөхөд холбоос солигдож, Facebook шинээр татна.
 func ogVersion(t PublicTeacher, books int) string {
-	sum := sha256.Sum256([]byte(fmt.Sprint(t.DisplayName, "|", t.Headline, "|", t.AvatarURL, "|", t.CoverURL, "|", t.Location, "|", t.Subjects, "|", t.CourseCount, t.StudentCount, t.LessonCount, books)))
+	sum := sha256.Sum256([]byte(fmt.Sprint(t.DisplayName, "|", t.Headline, "|", t.AvatarURL, "|", t.CoverURL, t.CoverY, "|", t.Location, "|", t.Subjects, "|", t.CourseCount, t.StudentCount, t.LessonCount, books)))
 	return hex.EncodeToString(sum[:5])
 }
 

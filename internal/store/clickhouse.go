@@ -257,6 +257,7 @@ var chMigrations = []string{
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS org String DEFAULT ''",             // байгууллагын гэрээ, хөтөлбөрүүд (JSON)
 	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS program_id String DEFAULT ''",    // байгууллагын мэргэжлийн хөтөлбөр
 	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS teachers Array(String)",          // байгууллагын сургалтад холбосон багш нар
+	"ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_y Int32 DEFAULT 50",          // нүүр зургийн босоо байрлал (%)
 	// Эцэг эхийн зөвшөөрлийн боломжийг хассан: хадгалсан нас, эцэг эхийн нэр, утсыг устгана.
 	"ALTER TABLE users DROP COLUMN IF EXISTS age_group",
 	"ALTER TABLE users DROP COLUMN IF EXISTS guardian_name",
@@ -602,7 +603,7 @@ func (c *ClickHouse) counters(ctx context.Context, entity string, ids []string) 
 // ---- хэрэглэгч ----
 
 const userCols = `id, username, email, password_hash, role, display_name, headline, bio, avatar_url, cover_url,
-	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, phone_verified, phone_pending, rank_hidden, consent_version, consent_at, tokens_after, deleted, plan, org`
+	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, phone_verified, phone_pending, rank_hidden, consent_version, consent_at, tokens_after, deleted, plan, org, cover_y`
 
 func scanUser(r driver.Rows) (*User, bool, error) {
 	var u User
@@ -610,11 +611,13 @@ func scanUser(r driver.Rows) (*User, bool, error) {
 	var deleted bool
 	var exp *time.Time
 	var plan, org string
+	var coverY int32
 	if err := r.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &role, &u.DisplayName, &u.Headline, &u.Bio,
 		&u.AvatarURL, &u.CoverURL, &u.Subjects, &u.Location, &u.Links, &u.CreatedAt, &u.StorageExtraBytes, &exp,
-		&u.GoogleToken, &u.Phone, &u.PhoneVerified, &u.PhonePending, &u.RankHidden, &u.ConsentVersion, &u.ConsentAt, &u.TokensAfter, &deleted, &plan, &org); err != nil {
+		&u.GoogleToken, &u.Phone, &u.PhoneVerified, &u.PhonePending, &u.RankHidden, &u.ConsentVersion, &u.ConsentAt, &u.TokensAfter, &deleted, &plan, &org, &coverY); err != nil {
 		return nil, false, err
 	}
+	u.CoverY = int(coverY)
 	u.Role = Role(role)
 	u.Plan = decodePlan(plan)
 	u.Org = decodeOrg(org)
@@ -633,10 +636,10 @@ func (c *ClickHouse) writeUser(ctx context.Context, u *User, deleted bool) error
 	defer c.forgetUser(u.ID)
 	return c.insert(ctx, "users", []string{"id", "username", "email", "password_hash", "role", "display_name", "headline", "bio",
 		"avatar_url", "cover_url", "subjects", "location", "links", "created_at", "storage_extra_bytes", "storage_expires_at",
-		"google_token", "phone", "phone_verified", "phone_pending", "rank_hidden", "consent_version", "consent_at", "tokens_after", "plan", "org", "ver", "deleted"},
+		"google_token", "phone", "phone_verified", "phone_pending", "rank_hidden", "consent_version", "consent_at", "tokens_after", "plan", "org", "cover_y", "ver", "deleted"},
 		u.ID, u.Username, u.Email, u.PasswordHash, string(u.Role), u.DisplayName, u.Headline, u.Bio,
 		u.AvatarURL, u.CoverURL, nzStrings(u.Subjects), u.Location, nzLinks(u.Links), u.CreatedAt.UTC(), u.StorageExtraBytes,
-		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, u.PhoneVerified, u.PhonePending, u.RankHidden, u.ConsentVersion, nullTime(u.ConsentAt), nullTime(u.TokensAfter), u.Plan.encode(), u.Org.encode(), ver(), deleted)
+		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, u.PhoneVerified, u.PhonePending, u.RankHidden, u.ConsentVersion, nullTime(u.ConsentAt), nullTime(u.TokensAfter), u.Plan.encode(), u.Org.encode(), int32(u.CoverY), ver(), deleted)
 }
 
 func (c *ClickHouse) userWhere(ctx context.Context, where string, args ...any) (*User, error) {
@@ -680,6 +683,9 @@ func (c *ClickHouse) CreateUser(ctx context.Context, u *User) error {
 		return ErrConflict
 	}
 	u.ID, u.CreatedAt, u.Email = NewID(), time.Now(), email
+	if u.CoverY == 0 {
+		u.CoverY = 50 // нүүр зураг голлож харагдана
+	}
 	if err := c.writeUser(ctx, u, false); err != nil {
 		return err
 	}
@@ -747,6 +753,9 @@ func (c *ClickHouse) UpdateProfile(ctx context.Context, id string, p ProfileUpda
 	u, err := c.UserByID(ctx, id)
 	if err != nil {
 		return err
+	}
+	if u.CoverURL != p.CoverURL {
+		u.CoverY = 50 // шинэ нүүр зураг голлож эхэлнэ
 	}
 	u.DisplayName, u.Headline, u.Bio, u.AvatarURL, u.CoverURL = p.DisplayName, p.Headline, p.Bio, p.AvatarURL, p.CoverURL
 	u.Subjects, u.Location, u.Links, u.Phone = cloneStrings(p.Subjects), p.Location, cloneLinks(p.Links), p.Phone
