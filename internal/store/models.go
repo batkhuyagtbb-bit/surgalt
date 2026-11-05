@@ -70,6 +70,9 @@ type Org struct {
 	Pct       float64   `json:"commission_pct"` // борлуулалтын шимтгэл (%)
 	StorageMB int64     `json:"storage_mb"`     // файлын сан
 	Programs  []Program `json:"programs"`
+	// Managers — байгууллагыг удирдах хэрэглэгчид (хянагч холбоно): өөрийн бүртгэлээр нэвтэрч байгууллагын профайл руу
+	// шилжиж удирдана (Facebook Page шиг).
+	Managers []string `json:"managers,omitempty"`
 }
 
 // Program — байгууллагын мэргэжлийн хөтөлбөр: сургалтуудыг бүлэглэнэ (Course.ProgramID).
@@ -714,6 +717,8 @@ type Store interface {
 	DeleteCourse(ctx context.Context, teacherID, courseID string) error
 	CourseByID(ctx context.Context, id string) (*Course, error)
 	CoursesByTeacher(ctx context.Context, teacherID string, onlyPublished bool) ([]Course, error)
+	// OrgsManagedBy — хэрэглэгчийн удирддаг байгууллагууд (Org.Managers).
+	OrgsManagedBy(ctx context.Context, userID string) ([]User, error)
 	// CoursesTaughtBy — байгууллагаас энэ багшийг холбосон сургалтууд (Course.Teachers).
 	CoursesTaughtBy(ctx context.Context, teacherID string) ([]Course, error)
 	// SetCourseOrg — байгууллага (эзэмшигч) сургалтынхаа хөтөлбөр, холбосон багш нарыг тохируулна.

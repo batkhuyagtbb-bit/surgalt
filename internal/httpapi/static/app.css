@@ -4965,3 +4965,17 @@ a.np-item:active{background:var(--line)}
 @media (max-width:560px){.ct-add{flex-direction:column}.prog-row{flex-direction:column}.prog-acts{align-self:flex-end}}
 .group-body small.g-org{flex-wrap:nowrap;align-items:flex-start}
 .group-body small.g-org svg{flex:none;margin-top:2px}
+/* Байгууллага руу шилжих (дээд цэс) ба «нэрийн өмнөөс» мөр */
+.nav-org{position:relative;display:inline-flex}
+.nav-org-item{display:inline-flex;align-items:center;gap:7px;max-width:220px;padding:5px 12px 5px 5px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font:700 .84rem var(--sans);color:var(--text);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;list-style:none}
+.nav-org-item::-webkit-details-marker{display:none}
+.nav-org-item:hover{border-color:var(--brand);color:var(--brand)}
+.nav-org-item i{font-style:normal;padding:0 7px;border-radius:999px;background:var(--brand);color:#fff;font-size:.72rem}
+.nav-org-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:60;display:grid;gap:6px;min-width:220px;padding:8px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow-sm)}
+.nav-org-menu .nav-org-item{max-width:none;border-radius:10px}
+.nav-org-back{border:1px solid var(--line);background:var(--surface-2);color:var(--text)}
+.org-acting{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:70;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:2px 12px;max-width:calc(100% - 180px);padding:8px 18px;border-radius:999px;background:var(--brand);color:#fff;font-size:.84rem;box-shadow:0 10px 30px -10px rgba(15,27,69,.55)}
+.org-acting .linkish{color:#fff;font-weight:700}
+@media (max-width:640px){.nav-org-item{max-width:150px}}
+.nav-org-name{min-width:0;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:640px){.org-acting{bottom:84px;max-width:calc(100% - 32px);border-radius:16px;text-align:center}}

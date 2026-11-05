@@ -289,11 +289,95 @@ func TestOrganization(t *testing.T) {
 		t.Fatalf("гарсан багш хичээл нэмэв: %d", code)
 	}
 
-	// Байгаа бүртгэлийг байгууллага болгох.
-	if code, r := call(t, srv, "POST", "/api/admin/orgs", boss, `{"existing":"@otherteach","commission_pct":0,"storage_mb":200}`); code != http.StatusCreated || r["username"] != "otherteach" {
-		t.Fatalf("байгаа бүртгэлийг байгууллага болгох: %d %v", code, r)
+}
+
+// Удирдагч: хянагч байгаа хэрэглэгчийг хайж байгууллагын удирдагчаар холбоно; тэр хүн өөрийн бүртгэлээр нэвтэрч
+// /api/me-ийн orgs-оос байгууллага руу шилжиж (байгууллагын токен) удирдана. Хянагч нэр, холбоос, нөхцөлийг засаж,
+// удирдагч хасахад шилжсэн эрх хүчингүй болно; сургалтгүй байгууллагыг устгана, сургалттайг устгахгүй.
+func TestOrganizationManagers(t *testing.T) {
+	srv, _ := newTestServerWith(t, func(c *Config) { c.AdminEmails = []string{"boss@x.mn"} })
+	defer srv.Close()
+	boss, _ := register(t, srv, "boss", "student")
+	mgr, mgrID := register(t, srv, "dorj", "student")
+	other, _ := register(t, srv, "bold", "student")
+
+	if code, _ := callArr(t, srv, "GET", "/api/admin/users?q=dorj", mgr, ""); code != http.StatusForbidden {
+		t.Fatalf("хянагч биш хэрэглэгч хайлаа: %d", code)
 	}
-	if code, _ := call(t, srv, "POST", "/api/admin/orgs", boss, `{"existing":"otherteach","commission_pct":5}`); code != http.StatusConflict {
-		t.Fatalf("давхар байгууллага: %d", code)
+	_, found := callArrMap(t, srv, "GET", "/api/admin/users?q=dor", boss)
+	if len(found) != 1 || found[0]["id"] != mgrID {
+		t.Fatalf("хэрэглэгч хайх: %v", found)
+	}
+	if code, _ := call(t, srv, "POST", "/api/admin/orgs", boss, `{"name":"Сургууль","username":"school1","commission_pct":5,"storage_mb":100}`); code != http.StatusBadRequest {
+		t.Fatalf("удирдагч, нэвтрэлтгүй байгууллага: %d", code)
+	}
+	code, row := call(t, srv, "POST", "/api/admin/orgs", boss, `{"name":"Сургууль","username":"school1","commission_pct":5,"storage_mb":100,"manager":"`+mgrID+`"}`)
+	if code != http.StatusCreated || row["login"] != false || len(row["managers"].([]any)) != 1 {
+		t.Fatalf("удирдагчтай байгууллага: %d %v", code, row)
+	}
+	orgID := row["id"].(string)
+
+	// Удирдагчийн цэсэнд байгууллага гарч, шилжинэ; бусад хүн шилжихгүй.
+	_, me := call(t, srv, "GET", "/api/me", mgr, "")
+	if os, _ := me["orgs"].([]any); len(os) != 1 || os[0].(map[string]any)["username"] != "school1" {
+		t.Fatalf("удирдагчийн /api/me orgs: %v", me["orgs"])
+	}
+	if code, _ := call(t, srv, "POST", "/api/me/orgs/"+orgID+"/switch", other, ""); code != http.StatusNotFound {
+		t.Fatalf("удирдагч биш хүн шилжлээ: %d", code)
+	}
+	code, sw := call(t, srv, "POST", "/api/me/orgs/"+orgID+"/switch", mgr, "")
+	if code != 200 || sw["token"] == nil {
+		t.Fatalf("шилжих: %d %v", code, sw)
+	}
+	orgTok := sw["token"].(string)
+	_, om := call(t, srv, "GET", "/api/me", orgTok, "")
+	if om["username"] != "school1" || om["org"] == nil || om["consent_needed"] != false || om["phone_required"] != false {
+		t.Fatalf("байгууллагын нэрийн өмнөөс: %v", om)
+	}
+	if code, _ := call(t, srv, "POST", "/api/courses", orgTok, `{"title":"Анхны сургалт","price":0}`); code != http.StatusCreated {
+		t.Fatalf("удирдагч байгууллагын сургалт үүсгэх: %d", code)
+	}
+
+	// Засах: нэр, профайлын холбоос, нөхцөл.
+	code, ed := call(t, srv, "PUT", "/api/admin/orgs/"+orgID, boss, `{"name":"Шинэ сургууль","username":"school2","commission_pct":7,"storage_mb":300}`)
+	if code != 200 || ed["name"] != "Шинэ сургууль" || ed["username"] != "school2" || ed["commission_pct"].(float64) != 7 {
+		t.Fatalf("байгууллага засах: %d %v", code, ed)
+	}
+	if code, _ := call(t, srv, "GET", "/api/teachers/school2", "", ""); code != 200 {
+		t.Fatalf("шинэ холбоос: %d", code)
+	}
+
+	// Удирдагч нэмэх, хасах: хассан хүний байгууллагын токен хүчингүй.
+	_, otherMe := call(t, srv, "GET", "/api/me", other, "")
+	if code, _ := call(t, srv, "POST", "/api/admin/orgs/"+orgID+"/managers", boss, `{"user_id":"`+otherMe["id"].(string)+`"}`); code != 200 {
+		t.Fatalf("удирдагч нэмэх: %d", code)
+	}
+	if code, _ := call(t, srv, "POST", "/api/admin/orgs/"+orgID+"/managers", boss, `{"user_id":"`+orgID+`"}`); code != http.StatusBadRequest {
+		t.Fatalf("байгууллагыг өөрийг нь удирдагч болголоо: %d", code)
+	}
+	time.Sleep(5 * time.Millisecond) // токены олгосон цагаас хойш хүчингүй болгоно
+	if code, _ := call(t, srv, "DELETE", "/api/admin/orgs/"+orgID+"/managers/"+mgrID, boss, ""); code != 200 {
+		t.Fatalf("удирдагч хасах: %d", code)
+	}
+	if code, _ := call(t, srv, "GET", "/api/me", orgTok, ""); code != http.StatusUnauthorized {
+		t.Fatalf("хассан удирдагчийн байгууллагын токен хүчинтэй хэвээр: %d", code)
+	}
+	if _, me := call(t, srv, "GET", "/api/me", mgr, ""); me["orgs"] != nil {
+		t.Fatalf("хассан удирдагчид байгууллага харагдсаар: %v", me["orgs"])
+	}
+
+	// Устгах: сургалттай бол устгахгүй; сургалтгүйг устгана.
+	if code, _ := call(t, srv, "DELETE", "/api/admin/orgs/"+orgID, boss, ""); code != http.StatusConflict {
+		t.Fatalf("сургалттай байгууллагыг устгалаа: %d", code)
+	}
+	_, empty := call(t, srv, "POST", "/api/admin/orgs", boss, `{"name":"Түр","username":"tmporg","commission_pct":5,"storage_mb":100,"email":"tmp@org.mn","password":"secret12"}`)
+	if empty["login"] != true {
+		t.Fatalf("нэвтрэлттэй байгууллага: %v", empty)
+	}
+	if code, _ := call(t, srv, "DELETE", "/api/admin/orgs/"+empty["id"].(string), boss, ""); code != 200 {
+		t.Fatalf("сургалтгүй байгууллага устгах: %d", code)
+	}
+	if code, _ := call(t, srv, "GET", "/api/teachers/tmporg", "", ""); code != http.StatusNotFound {
+		t.Fatalf("устгасан байгууллагын профайл: %d", code)
 	}
 }

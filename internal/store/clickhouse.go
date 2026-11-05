@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -767,6 +768,24 @@ func (c *ClickHouse) UpdateUsername(ctx context.Context, id, username string) er
 	}
 	_, err = c.UpdateUser(ctx, id, func(u *User) error { u.Username = username; return nil }) // мөрийг бүхэлд нь дахин бичдэг тул хэрэглэгчийн түгжээ ч авна
 	return err
+}
+
+func (c *ClickHouse) OrgsManagedBy(ctx context.Context, userID string) ([]User, error) {
+	out := []User{}
+	if userID == "" {
+		return out, nil
+	}
+	err := c.query(ctx, "SELECT "+userCols+" FROM users FINAL WHERE org != '' AND position(org, ?) > 0 LIMIT 50", []any{userID}, func(r driver.Rows) error {
+		u, deleted, err := scanUser(r)
+		if err != nil {
+			return err
+		}
+		if !deleted && u.Org != nil && slices.Contains(u.Org.Managers, userID) {
+			out = append(out, *u)
+		}
+		return nil
+	})
+	return out, err
 }
 
 func (c *ClickHouse) UsersByIDs(ctx context.Context, ids []string) ([]User, error) {

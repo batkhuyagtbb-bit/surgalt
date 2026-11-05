@@ -373,25 +373,46 @@ func (s *Server) handleRemoveCourseTeacher(w http.ResponseWriter, r *http.Reques
 
 // ---- Хянагч: байгууллагын бүртгэл ----
 
-type adminOrgRow struct {
-	ID        string    `json:"id"`
-	Username  string    `json:"username"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	AvatarURL string    `json:"avatar_url"`
-	Pct       float64   `json:"commission_pct"`
-	StorageMB int64     `json:"storage_mb"`
-	UsedBytes int64     `json:"used_bytes"`
-	Programs  int       `json:"programs"`
-	Courses   int       `json:"courses"`
-	Published int       `json:"courses_published"`
-	Teachers  int       `json:"teachers"`
-	CreatedAt time.Time `json:"created_at"`
+const maxOrgManagers = 10
+
+// adminPerson — хянагчид харагдах хэрэглэгчийн товч мэдээлэл (имэйлтэй).
+type adminPerson struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar_url"`
+	Role      string `json:"role,omitempty"`
 }
 
-func (s *Server) adminOrgRow(u *store.User, courses []store.Course) adminOrgRow {
-	row := adminOrgRow{ID: u.ID, Username: u.Username, Name: u.DisplayName, Email: u.Email, AvatarURL: u.AvatarURL,
-		Pct: u.Org.Pct, StorageMB: u.Org.StorageMB, Programs: len(u.Org.Programs), CreatedAt: u.CreatedAt}
+func adminPersonOf(u *store.User) adminPerson {
+	return adminPerson{ID: u.ID, Name: u.DisplayName, Username: u.Username, Email: u.Email, AvatarURL: u.AvatarURL, Role: string(u.Role)}
+}
+
+type adminOrgRow struct {
+	ID        string        `json:"id"`
+	Username  string        `json:"username"`
+	Name      string        `json:"name"`
+	Email     string        `json:"email"`
+	Login     bool          `json:"login"` // тусдаа имэйл, нууц үгээр нэвтэрч болно
+	AvatarURL string        `json:"avatar_url"`
+	Pct       float64       `json:"commission_pct"`
+	StorageMB int64         `json:"storage_mb"`
+	UsedBytes int64         `json:"used_bytes"`
+	Programs  int           `json:"programs"`
+	Courses   int           `json:"courses"`
+	Published int           `json:"courses_published"`
+	Teachers  int           `json:"teachers"`
+	Managers  []adminPerson `json:"managers"`
+	CreatedAt time.Time     `json:"created_at"`
+}
+
+func (s *Server) adminOrgRow(ctx context.Context, u *store.User, courses []store.Course) adminOrgRow {
+	row := adminOrgRow{ID: u.ID, Username: u.Username, Name: u.DisplayName, Email: u.Email, Login: u.PasswordHash != "" && !orgPlaceholderEmail(u.Email),
+		AvatarURL: u.AvatarURL, Pct: u.Org.Pct, StorageMB: u.Org.StorageMB, Programs: len(u.Org.Programs), CreatedAt: u.CreatedAt, Managers: []adminPerson{}}
+	if row.Login == false && orgPlaceholderEmail(u.Email) {
+		row.Email = ""
+	}
 	row.UsedBytes, _ = s.files.Usage(u.ID)
 	teachers := map[string]bool{}
 	for _, c := range courses {
@@ -407,8 +428,25 @@ func (s *Server) adminOrgRow(u *store.User, courses []store.Course) adminOrgRow 
 		}
 	}
 	row.Teachers = len(teachers)
+	if len(u.Org.Managers) > 0 {
+		if ms, err := s.store.UsersByIDs(ctx, u.Org.Managers); err == nil {
+			for i := range ms {
+				row.Managers = append(row.Managers, adminPersonOf(&ms[i]))
+			}
+		}
+	}
 	return row
 }
+
+func (s *Server) adminOrgReply(w http.ResponseWriter, r *http.Request, status int, u *store.User) {
+	courses, _ := s.store.CoursesByTeacher(r.Context(), u.ID, false)
+	writeJSON(w, status, s.adminOrgRow(r.Context(), u, courses))
+}
+
+// orgPlaceholderEmail — тусдаа нэвтрэлтгүй (зөвхөн удирдагчаар) байгууллагын дотоод имэйл.
+const orgEmailDomain = "@org.surgalt.invalid"
+
+func orgPlaceholderEmail(e string) bool { return strings.HasSuffix(e, orgEmailDomain) }
 
 // handleAdminOrgs: GET /api/admin/orgs — байгууллагууд.
 func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
@@ -427,10 +465,40 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 	rows := []adminOrgRow{}
 	for i := range users {
 		if users[i].Org != nil {
-			rows = append(rows, s.adminOrgRow(&users[i], courses))
+			rows = append(rows, s.adminOrgRow(ctx, &users[i], courses))
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"orgs": rows, "default_pct": store.TeacherCommission(), "free_mb": s.cfg.StorageFreeMB})
+}
+
+// handleAdminUserSearch: GET /api/admin/users?q= — удирдагч сонгоход хэрэглэгч хайх (нэр, @нэр, имэйл; байгууллагаас бусад).
+func (s *Server) handleAdminUserSearch(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	q := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(r.URL.Query().Get("q")), "@"))
+	out := []adminPerson{}
+	if utf8.RuneCountInString(q) < 2 {
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
+	users, err := s.store.AdminUsers(r.Context())
+	if s.storeErr(w, r, err) {
+		return
+	}
+	for i := range users {
+		u := &users[i]
+		if u.Org != nil {
+			continue
+		}
+		if strings.Contains(strings.ToLower(u.DisplayName), q) || strings.Contains(u.Username, q) || strings.Contains(strings.ToLower(u.Email), q) {
+			out = append(out, adminPersonOf(u))
+			if len(out) == 20 {
+				break
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 type orgTerms struct {
@@ -448,11 +516,40 @@ func (t orgTerms) validate() string {
 	return ""
 }
 
-var errAlreadyOrg = errors.New("аль хэдийн байгууллага")
+func validOrgName(name string) string {
+	if name == "" || utf8.RuneCountInString(name) > 80 {
+		return "байгууллагын нэр 1-80 тэмдэгт"
+	}
+	return ""
+}
 
-// handleAdminCreateOrg: POST /api/admin/orgs — байгууллагын бүртгэл үүсгэнэ:
-//   - шинэ: {name, username, email, password, commission_pct, storage_mb};
-//   - байгаа бүртгэлийг байгууллага болгох: {existing: "@нэр эсвэл имэйл", commission_pct, storage_mb}.
+// managerCandidate — удирдагч болох хэрэглэгч (байгууллагын бүртгэл биш).
+func (s *Server) managerCandidate(w http.ResponseWriter, r *http.Request, id string) (*store.User, bool) {
+	m, err := s.store.UserByID(r.Context(), id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, "удирдах хэрэглэгч олдсонгүй")
+		return nil, false
+	}
+	if s.storeErr(w, r, err) {
+		return nil, false
+	}
+	if m.Org != nil {
+		writeErr(w, http.StatusBadRequest, "байгууллагын бүртгэлийг удирдагчаар холбохгүй — хүний бүртгэл сонгоно уу")
+		return nil, false
+	}
+	return m, true
+}
+
+func (s *Server) notifyManager(ctx context.Context, uid string, org *store.User) {
+	s.managed.Delete(uid)
+	s.notify(ctx, &store.Notification{UserID: uid, Type: NotifAccount, Count: 1, ActorID: org.ID,
+		Title: "🏫 Та «" + org.DisplayName + "» байгууллагын удирдагч боллоо",
+		Body:  "Дээд цэсний «" + org.DisplayName + "» товчоор байгууллагын профайл руу шилжиж сургалт, багш, хөтөлбөрөө удирдана.", Link: "/"})
+}
+
+// handleAdminCreateOrg: POST /api/admin/orgs {name, username, commission_pct, storage_mb, manager?, email?, password?} —
+// байгууллагын тусдаа профайл үүсгэнэ. Удирдагч (байгаа хэрэглэгч) өөрийн бүртгэлээр нэвтэрч шилжинэ; имэйл, нууц үг
+// өгвөл байгууллага өөрөө ч нэвтэрнэ. Аль нэг нь заавал.
 func (s *Server) handleAdminCreateOrg(w http.ResponseWriter, r *http.Request) {
 	admin, ok := s.requireAdmin(w, r)
 	if !ok {
@@ -464,88 +561,85 @@ func (s *Server) handleAdminCreateOrg(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Email    string `json:"email"`
 		Password string `json:"password"`
-		Existing string `json:"existing"`
+		Manager  string `json:"manager"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	if msg := in.validate(); msg != "" {
+	in.Name = strings.TrimSpace(in.Name)
+	in.Username = strings.ToLower(strings.TrimSpace(in.Username))
+	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
+	msg := in.validate()
+	if msg == "" {
+		msg = validOrgName(in.Name)
+	}
+	switch {
+	case msg != "":
+	case !usernameRe.MatchString(in.Username):
+		msg = "профайлын нэр: 3-32 тэмдэгт, a-z 0-9 _"
+	case in.Manager == "" && in.Email == "":
+		msg = "удирдах хүнээ сонгоно уу (эсвэл байгууллагын нэвтрэх имэйл, нууц үг өгнө)"
+	case in.Email != "" && func() bool { _, err := mail.ParseAddress(in.Email); return err != nil }():
+		msg = "имэйл буруу"
+	case in.Email != "" && (len(in.Password) < minPassword || len(in.Password) > 72):
+		msg = "нууц үг 6-72 тэмдэгт"
+	}
+	if msg != "" {
 		writeErr(w, http.StatusBadRequest, msg)
 		return
 	}
 	ctx := r.Context()
-	org := &store.Org{Pct: in.Pct, StorageMB: in.StorageMB, Programs: []store.Program{}}
-	var u *store.User
-	if strings.TrimSpace(in.Existing) != "" {
-		cur, err := s.resolveTeacher(ctx, in.Existing)
-		if errors.Is(err, store.ErrNotFound) {
-			writeErr(w, http.StatusNotFound, "ийм бүртгэл олдсонгүй")
+	var manager *store.User
+	if in.Manager != "" {
+		if manager, ok = s.managerCandidate(w, r, in.Manager); !ok {
 			return
 		}
-		if s.storeErr(w, r, err) {
-			return
-		}
-		u, err = s.store.UpdateUser(ctx, cur.ID, func(x *store.User) error {
-			if x.Org != nil {
-				return errAlreadyOrg
-			}
-			x.Role, x.Org = store.RoleTeacher, org
-			return nil
-		})
-		if errors.Is(err, errAlreadyOrg) {
-			writeErr(w, http.StatusConflict, "энэ бүртгэл аль хэдийн байгууллага")
-			return
-		}
-		if s.storeErr(w, r, err) {
-			return
-		}
+	}
+	u := &store.User{Username: in.Username, Email: in.Email, Role: store.RoleTeacher, DisplayName: in.Name,
+		Org: &store.Org{Pct: in.Pct, StorageMB: in.StorageMB, Programs: []store.Program{}}}
+	if manager != nil {
+		u.Org.Managers = []string{manager.ID}
+	}
+	if in.Email == "" {
+		u.Email = in.Username + orgEmailDomain // нууц үггүй — зөвхөн удирдагчаар нэвтэрнэ
 	} else {
-		in.Name = strings.TrimSpace(in.Name)
-		in.Username = strings.ToLower(strings.TrimSpace(in.Username))
-		in.Email = strings.ToLower(strings.TrimSpace(in.Email))
-		switch {
-		case in.Name == "" || utf8.RuneCountInString(in.Name) > 80:
-			writeErr(w, http.StatusBadRequest, "байгууллагын нэр 1-80 тэмдэгт")
-			return
-		case !usernameRe.MatchString(in.Username):
-			writeErr(w, http.StatusBadRequest, "профайлын нэр: 3-32 тэмдэгт, a-z 0-9 _")
-			return
-		case func() bool { _, err := mail.ParseAddress(in.Email); return err != nil }():
-			writeErr(w, http.StatusBadRequest, "имэйл буруу")
-			return
-		case len(in.Password) < minPassword || len(in.Password) > 72:
-			writeErr(w, http.StatusBadRequest, "нууц үг 6-72 тэмдэгт")
-			return
-		}
 		hash, err := auth.HashPassword(ctx, in.Password)
 		if err != nil {
 			writeErr(w, http.StatusServiceUnavailable, "түр ачаалалтай байна")
 			return
 		}
-		u = &store.User{Username: in.Username, Email: in.Email, PasswordHash: hash, Role: store.RoleTeacher, DisplayName: in.Name, Org: org}
-		if err := s.store.CreateUser(ctx, u); errors.Is(err, store.ErrConflict) {
-			writeErr(w, http.StatusConflict, "энэ имэйл эсвэл профайлын нэр бүртгэлтэй байна")
-			return
-		} else if s.storeErr(w, r, err) {
-			return
-		}
+		u.PasswordHash = hash
+	}
+	consentNow(u) // нөхцөлийг удирдагч өөрийн бүртгэлээр зөвшөөрсөн
+	if err := s.store.CreateUser(ctx, u); errors.Is(err, store.ErrConflict) {
+		writeErr(w, http.StatusConflict, "энэ профайлын нэр эсвэл имэйл бүртгэлтэй байна")
+		return
+	} else if s.storeErr(w, r, err) {
+		return
 	}
 	s.onUserCreated(u)
 	s.planEnds.Delete(u.ID)
 	s.profiles.Delete(u.Username)
 	s.adminInvalidate()
-	s.log.Info("хянагч байгууллага үүсгэв", "org", u.ID, "admin", admin.ID, "pct", in.Pct, "storage_mb", in.StorageMB)
-	courses, _ := s.store.CoursesByTeacher(ctx, u.ID, false)
-	writeJSON(w, http.StatusCreated, s.adminOrgRow(u, courses))
+	if manager != nil {
+		s.notifyManager(ctx, manager.ID, u)
+	}
+	s.log.Info("хянагч байгууллага үүсгэв", "org", u.ID, "admin", admin.ID, "pct", in.Pct, "storage_mb", in.StorageMB, "manager", in.Manager)
+	s.adminOrgReply(w, r, http.StatusCreated, u)
 }
 
-// handleAdminUpdateOrg: PUT /api/admin/orgs/{id} {commission_pct, storage_mb} — гэрээний нөхцөл.
+// handleAdminUpdateOrg: PUT /api/admin/orgs/{id} {name?, username?, commission_pct, storage_mb} — нэр, профайлын
+// холбоос, гэрээний нөхцөл.
 func (s *Server) handleAdminUpdateOrg(w http.ResponseWriter, r *http.Request) {
 	admin, ok := s.requireAdmin(w, r)
 	if !ok {
 		return
 	}
-	var in orgTerms
+	var in struct {
+		orgTerms
+		Name     *string `json:"name"`
+		Username *string `json:"username"`
+	}
 	if !decode(w, r, &in) {
 		return
 	}
@@ -554,19 +648,200 @@ func (s *Server) handleAdminUpdateOrg(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	u, err := s.store.UpdateUser(ctx, r.PathValue("id"), func(x *store.User) error {
+	cur, err := s.store.UserByID(ctx, r.PathValue("id"))
+	if s.storeErr(w, r, err) {
+		return
+	}
+	if cur.Org == nil {
+		writeErr(w, http.StatusNotFound, "байгууллага олдсонгүй")
+		return
+	}
+	if in.Name != nil {
+		*in.Name = strings.TrimSpace(*in.Name)
+		if msg := validOrgName(*in.Name); msg != "" {
+			writeErr(w, http.StatusBadRequest, msg)
+			return
+		}
+	}
+	if in.Username != nil {
+		un := strings.ToLower(strings.TrimSpace(*in.Username))
+		if !usernameRe.MatchString(un) {
+			writeErr(w, http.StatusBadRequest, "профайлын нэр: 3-32 тэмдэгт, a-z 0-9 _")
+			return
+		}
+		if un != cur.Username {
+			if err := s.store.UpdateUsername(ctx, cur.ID, un); errors.Is(err, store.ErrConflict) {
+				writeErr(w, http.StatusConflict, "энэ профайлын нэр бүртгэлтэй байна")
+				return
+			} else if s.storeErr(w, r, err) {
+				return
+			}
+			s.profiles.Delete(cur.Username)
+		}
+	}
+	u, err := s.store.UpdateUser(ctx, cur.ID, func(x *store.User) error {
 		if x.Org == nil {
 			return store.ErrNotFound
 		}
 		x.Org.Pct, x.Org.StorageMB = in.Pct, in.StorageMB
+		if in.Name != nil {
+			x.DisplayName = *in.Name
+		}
 		return nil
 	})
 	if s.storeErr(w, r, err) {
 		return
 	}
 	s.planEnds.Delete(u.ID)
+	s.invalidateTeacher(r, u.ID, u.Username)
+	for _, m := range u.Org.Managers {
+		s.managed.Delete(m)
+	}
 	s.adminInvalidate()
-	s.log.Info("хянагч байгууллагын нөхцөл өөрчлөв", "org", u.ID, "admin", admin.ID, "pct", in.Pct, "storage_mb", in.StorageMB)
-	courses, _ := s.store.CoursesByTeacher(ctx, u.ID, false)
-	writeJSON(w, http.StatusOK, s.adminOrgRow(u, courses))
+	s.log.Info("хянагч байгууллагыг засав", "org", u.ID, "admin", admin.ID, "pct", in.Pct, "storage_mb", in.StorageMB)
+	s.adminOrgReply(w, r, http.StatusOK, u)
+}
+
+// handleAdminOrgManager: POST /api/admin/orgs/{id}/managers {user_id} — удирдагч нэмнэ;
+// DELETE /api/admin/orgs/{id}/managers/{uid} — хасна (байгууллагын нээлттэй сессүүд хүчингүй болно).
+func (s *Server) handleAdminOrgManager(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+	ctx := r.Context()
+	add := r.Method == http.MethodPost
+	uid := r.PathValue("uid")
+	if add {
+		var in struct {
+			UserID string `json:"user_id"`
+		}
+		if !decode(w, r, &in) {
+			return
+		}
+		m, ok := s.managerCandidate(w, r, in.UserID)
+		if !ok {
+			return
+		}
+		uid = m.ID
+	}
+	errFull, errHas := errors.New("full"), errors.New("has")
+	u, err := s.store.UpdateUser(ctx, r.PathValue("id"), func(x *store.User) error {
+		if x.Org == nil {
+			return store.ErrNotFound
+		}
+		has := slices.Contains(x.Org.Managers, uid)
+		switch {
+		case add && has:
+			return errHas
+		case add && len(x.Org.Managers) >= maxOrgManagers:
+			return errFull
+		case add:
+			x.Org.Managers = append(x.Org.Managers, uid)
+		case !has:
+			return store.ErrNotFound
+		default:
+			x.Org.Managers = slices.DeleteFunc(x.Org.Managers, func(v string) bool { return v == uid })
+			now := time.Now()
+			x.TokensAfter = &now // хассан удирдагчийн шилжиж авсан эрх (байгууллагын токен) шууд хүчингүй
+		}
+		return nil
+	})
+	switch {
+	case errors.Is(err, errHas):
+		writeErr(w, http.StatusConflict, "энэ хүн аль хэдийн удирдагч")
+		return
+	case errors.Is(err, errFull):
+		writeErr(w, http.StatusBadRequest, "нэг байгууллагад 10 хүртэл удирдагч")
+		return
+	case s.storeErr(w, r, err):
+		return
+	}
+	s.alive.Delete(u.ID)
+	s.managed.Delete(uid)
+	if add {
+		s.notifyManager(ctx, uid, u)
+	} else {
+		s.notify(ctx, &store.Notification{UserID: uid, Type: NotifAccount, Count: 1, ActorID: u.ID, Title: "«" + u.DisplayName + "» байгууллагын удирдах эрх хаагдлаа"})
+	}
+	s.log.Info("хянагч байгууллагын удирдагч өөрчлөв", "org", u.ID, "admin", admin.ID, "user", uid, "add", add)
+	s.adminOrgReply(w, r, http.StatusOK, u)
+}
+
+// handleAdminDeleteOrg: DELETE /api/admin/orgs/{id} — байгууллагын бүртгэл, профайлыг устгана. Сургалт, номтой бол
+// устгахгүй (суралцагчдын төлбөр, хандалт хамааралтай) — эхлээд сургалтуудаа устгана.
+func (s *Server) handleAdminDeleteOrg(w http.ResponseWriter, r *http.Request) {
+	admin, ok := s.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+	ctx := r.Context()
+	u, err := s.store.UserByID(ctx, r.PathValue("id"))
+	if s.storeErr(w, r, err) {
+		return
+	}
+	if u.Org == nil {
+		writeErr(w, http.StatusNotFound, "байгууллага олдсонгүй")
+		return
+	}
+	blocked, err := s.eraseAccount(ctx, u)
+	if s.storeErr(w, r, err) {
+		return
+	}
+	if blocked != "" {
+		writeErr(w, http.StatusConflict, "Сургалт, номтой байгууллагыг устгахгүй — суралцагчдын төлбөр, хандалт хамааралтай. Эхлээд байгууллагын сургалтуудыг устгана уу (суралцагчтай бол ноорог болгож нууна).")
+		return
+	}
+	for _, m := range u.Org.Managers {
+		s.managed.Delete(m)
+	}
+	s.adminInvalidate()
+	s.log.Info("хянагч байгууллагыг устгав", "org", u.ID, "admin", admin.ID)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// ---- Удирдагч: байгууллага руу шилжих ----
+
+// managedOrgs — хэрэглэгчийн удирддаг байгууллагууд (2 минут кэштэй; удирдагч өөрчлөгдөхөд цэвэрлэнэ).
+func (s *Server) managedOrgs(ctx context.Context, uid string) []TeacherRef {
+	refs, err := s.managed.GetOrLoad(ctx, uid, func(ctx context.Context) ([]TeacherRef, error) {
+		us, err := s.store.OrgsManagedBy(ctx, uid)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]TeacherRef, 0, len(us))
+		for i := range us {
+			out = append(out, refOf(&us[i]))
+		}
+		return out, nil
+	})
+	if err != nil {
+		return nil
+	}
+	return refs
+}
+
+// handleMyOrgs: GET /api/me/orgs — миний удирддаг байгууллагууд.
+func (s *Server) handleMyOrgs(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, s.managedOrgs(r.Context(), c.UID))
+}
+
+// handleSwitchOrg: POST /api/me/orgs/{id}/switch — удирдагч байгууллагын профайл руу шилжинэ: байгууллагын нэрийн
+// өмнөөс ажиллах токен авна (клиент хувийн токеноо хадгалж «буцах»-д ашиглана).
+func (s *Server) handleSwitchOrg(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	org, err := s.store.UserByID(r.Context(), r.PathValue("id"))
+	if err != nil || org.Org == nil || !slices.Contains(org.Org.Managers, c.UID) {
+		writeErr(w, http.StatusNotFound, "байгууллага олдсонгүй")
+		return
+	}
+	s.log.Info("удирдагч байгууллага руу шилжив", "user", c.UID, "org", org.ID)
+	s.issue(w, http.StatusOK, org)
 }

@@ -160,7 +160,9 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, s.me(u))
+	v := s.me(u)
+	v.Orgs = s.managedOrgs(r.Context(), u.ID) // удирддаг байгууллагууд (дээд цэсэнд)
+	writeJSON(w, http.StatusOK, v)
 }
 
 func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {

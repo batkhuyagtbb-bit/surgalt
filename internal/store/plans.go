@@ -73,6 +73,9 @@ func (o *Org) Clone() *Org {
 	}
 	c := *o
 	c.Programs = append([]Program{}, o.Programs...)
+	if len(o.Managers) > 0 {
+		c.Managers = append([]string{}, o.Managers...)
+	}
 	return &c
 }
 

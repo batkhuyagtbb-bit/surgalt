@@ -15,6 +15,19 @@ type adminMem struct {
 	expenses map[string]*Expense
 }
 
+func (m *Memory) OrgsManagedBy(_ context.Context, userID string) ([]User, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := []User{}
+	for id, u := range m.users {
+		if u.Org != nil && slices.Contains(u.Org.Managers, userID) {
+			c, _ := m.userLocked(id)
+			out = append(out, *c)
+		}
+	}
+	return out, nil
+}
+
 func (m *Memory) AdminUsers(_ context.Context) ([]User, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

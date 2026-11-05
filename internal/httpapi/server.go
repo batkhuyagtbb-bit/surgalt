@@ -89,6 +89,7 @@ type Server struct {
 	ogs          *cache.Cache[[]byte]         // профайлыг хуваалцах зураг (og.go)
 	alive        *cache.Cache[int64]          // хэрэглэгч бүрийн «энэ цагаас өмнөх токен хүчингүй» (миллисекунд; account.go)
 	planEnds     *cache.Cache[time.Time]      // багшийн системийн эрх дуусах хугацаа (plans.go)
+	managed      *cache.Cache[[]TeacherRef]   // хэрэглэгчийн удирддаг байгууллагууд (org.go)
 	clouds       *cache.Cache[*cloudAgg]      // үүлэн үгийн нэгтгэл (cloud.go): бүх суралцагч 2 секунд хуваалцана
 	rosters      *cache.Cache[*roster]        // багшийн суралцагчид (roster.go), 60 секунд
 	analyticsAgg *cache.Cache[*analyticsData] // багшийн хяналтын нэгтгэл (analytics.go), 20 секунд
@@ -147,6 +148,7 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 		ogs:          cache.New[[]byte](time.Hour, 5*time.Second, isNF),
 		alive:        cache.New[int64](5*time.Minute, 5*time.Minute, isNF),
 		planEnds:     cache.New[time.Time](time.Minute, 5*time.Second, isNF),
+		managed:      cache.New[[]TeacherRef](2*time.Minute, 2*time.Minute, isNF),
 		clouds:       cache.New[*cloudAgg](2*time.Second, 0, nil),
 		rosters:      cache.New[*roster](time.Minute, 0, nil),
 		analyticsAgg: cache.New[*analyticsData](20*time.Second, 0, nil),
@@ -169,6 +171,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.qrs.Janitor(ctx, 10*time.Minute)
 	go s.alive.Janitor(ctx, 10*time.Minute)
 	go s.planEnds.Janitor(ctx, 10*time.Minute)
+	go s.managed.Janitor(ctx, 10*time.Minute)
 	go s.clouds.Janitor(ctx, time.Minute)
 	go s.rosters.Janitor(ctx, time.Minute)
 	go s.analyticsAgg.Janitor(ctx, time.Minute)
@@ -355,6 +358,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/plan", s.handleMyPlan)
 	mux.HandleFunc("POST /api/me/plan/purchase", s.handleBuyPlan)
 	mux.HandleFunc("GET /api/me/org", s.handleMyOrg)
+	mux.HandleFunc("GET /api/me/orgs", s.handleMyOrgs)
+	mux.HandleFunc("POST /api/me/orgs/{id}/switch", s.handleSwitchOrg)
 	mux.HandleFunc("PUT /api/me/org/programs", s.handleOrgPrograms)
 
 	// Google Meet
@@ -420,6 +425,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/admin/orgs", s.handleAdminOrgs)
 	mux.HandleFunc("POST /api/admin/orgs", s.handleAdminCreateOrg)
 	mux.HandleFunc("PUT /api/admin/orgs/{id}", s.handleAdminUpdateOrg)
+	mux.HandleFunc("DELETE /api/admin/orgs/{id}", s.handleAdminDeleteOrg)
+	mux.HandleFunc("POST /api/admin/orgs/{id}/managers", s.handleAdminOrgManager)
+	mux.HandleFunc("DELETE /api/admin/orgs/{id}/managers/{uid}", s.handleAdminOrgManager)
+	mux.HandleFunc("GET /api/admin/users", s.handleAdminUserSearch)
 	mux.HandleFunc("GET /api/admin/students", s.handleAdminStudents)
 	mux.HandleFunc("GET /api/admin/students/{id}", s.handleAdminStudent)
 	mux.HandleFunc("POST /api/admin/students/{id}/make-teacher", s.handleAdminMakeTeacher)

@@ -30,11 +30,13 @@ type meView struct {
 	RankHidden bool   `json:"rank_hidden"`
 	// Org — байгууллагын бүртгэл бол гэрээний нөхцөл, мэргэжлийн хөтөлбөрүүд (студи байгууллагын горимд).
 	Org *orgView `json:"org,omitempty"`
+	// Orgs — энэ хүний удирддаг байгууллагууд (GET /api/me): дээд цэсээс шилжинэ.
+	Orgs []TeacherRef `json:"orgs,omitempty"`
 }
 
 func (s *Server) me(u *store.User) meView {
-	return meView{User: u, Phone: u.Phone, ConsentVersion: u.ConsentVersion, ConsentNeeded: u.ConsentVersion != TermsVersion, IsAdmin: s.isAdmin(u),
-		PhoneVerified: u.PhoneVerified, PhonePending: u.PhonePending, PhoneRequired: s.Verify != nil && u.PhoneVerified == "" && u.PhonePending == "",
+	return meView{User: u, Phone: u.Phone, ConsentVersion: u.ConsentVersion, ConsentNeeded: u.ConsentVersion != TermsVersion && u.Org == nil, IsAdmin: s.isAdmin(u),
+		PhoneVerified: u.PhoneVerified, PhonePending: u.PhonePending, PhoneRequired: s.Verify != nil && u.PhoneVerified == "" && u.PhonePending == "" && u.Org == nil,
 		RankKey: s.rankKey(u.ID), RankHidden: u.RankHidden, Org: viewOrg(u.Org)}
 }
 

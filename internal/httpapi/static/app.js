@@ -657,10 +657,55 @@ function authNav() {
   $$("[data-auth-show]").forEach((el) => (el.hidden = !u || (el.dataset.role && el.dataset.role !== u.role)));
   document.documentElement.classList.toggle("authed", !!u);
   $$("[data-auth-hide]").forEach((el) => (el.hidden = !!u));
-  $$("[data-logout]").forEach((b) => b.addEventListener("click", () => { Auth.clear(); location.href = "/"; }));
+  $$("[data-logout]").forEach((b) => b.addEventListener("click", () => { Auth.clear(); store.set("sg_main", null); location.href = "/"; }));
   if (u?.is_admin && !$(".nav-admin")) $(".nav-links")?.insertAdjacentHTML("afterbegin", `<a href="/admin" class="nav-link nav-admin">Мэдүүлэг</a>`);
   if (u && Auth.token) { bell(); consentGate().then((shown) => { if (!shown) phoneGate(); }); }
+  orgNav(u);
+  // Удирддаг байгууллага (хянагч шинээр холбосон г.м.) — хадгалсан мэдээлэл 2 минутаас хуучин бол /api/me-ээс шинэчилнэ.
+  if (u && Auth.token) {
+    let at = 0; try { at = +sessionStorage.getItem("sg_me_at") || 0; } catch {}
+    if (Date.now() - at > 120000) {
+      try { sessionStorage.setItem("sg_me_at", String(Date.now())); } catch {}
+      const tok = Auth.token;
+      api("/api/me").then((me) => { if (Auth.token !== tok) return; Auth.set(tok, me); orgNav(me); }).catch(() => {});
+    }
+  }
 }
+
+/* ---------- Байгууллага: удирдагч өөрийн бүртгэлээс байгууллагын профайл руу шилжиж удирдана (Facebook Page шиг) ----------
+   sg_main — шилжихээс өмнөх хувийн бүртгэлийн токен; «буцах»-д сэргээнэ. */
+function orgNav(u) {
+  const links = $(".nav-links"); if (!links) return;
+  $$(".nav-org").forEach((x) => x.remove()); $(".org-acting")?.remove();
+  if (!u || !Auth.token) return;
+  const main = store.get("sg_main");
+  if (u.org && main?.token) {
+    links.insertAdjacentHTML("afterbegin", `<button type="button" class="btn btn-sm nav-org nav-org-back" data-org-back title="Хувийн бүртгэл рүү буцах">← ${esc(main.user?.display_name || "Хувийн бүртгэл")}</button>`);
+    document.body.insertAdjacentHTML("afterbegin", `<div class="org-acting" role="status"><span>🏫 Та <b>${esc(u.display_name)}</b> байгууллагын нэрийн өмнөөс ажиллаж байна</span><button type="button" class="linkish" data-org-back>Хувийн бүртгэл рүү буцах</button></div>`);
+    return;
+  }
+  if (!u.orgs?.length) return;
+  const btn = (o) => `<button type="button" class="nav-org-item" data-org-switch="${esc(o.id)}" title="«${esc(o.display_name)}» байгууллагыг удирдах"><span class="avatar avatar-xs" style="--h:${hueOfName(o.username)}">${o.avatar_url ? `<img src="${esc(o.avatar_url)}" alt="">` : esc((o.display_name || "?").trim().slice(0, 1).toUpperCase())}</span><span class="nav-org-name">${esc(o.display_name)}</span></button>`;
+  links.insertAdjacentHTML("afterbegin", u.orgs.length === 1
+    ? `<span class="nav-org">${btn(u.orgs[0])}</span>`
+    : `<details class="nav-org"><summary class="nav-org-item">🏫 Байгууллага <i>${u.orgs.length}</i></summary><div class="nav-org-menu">${u.orgs.map(btn).join("")}</div></details>`);
+}
+document.addEventListener("click", async (e) => {
+  const sw = e.target.closest("[data-org-switch]"), back = e.target.closest("[data-org-back]");
+  if (sw) {
+    sw.disabled = true;
+    try {
+      const d = await api(`/api/me/orgs/${sw.dataset.orgSwitch}/switch`, { method: "POST" });
+      store.set("sg_main", { token: Auth.token, user: Auth.user });
+      Auth.set(d.token, d.user); location.href = "/t/" + d.user.username + "#courses";
+    } catch (x) { toast(x.message, true); sw.disabled = false; }
+  }
+  if (back) {
+    const m = store.get("sg_main"); store.set("sg_main", null);
+    try { sessionStorage.removeItem("sg_me_at"); } catch {}
+    if (m?.token) { Auth.set(m.token, m.user); location.href = "/me"; } else { Auth.clear(); location.href = "/login"; }
+  }
+});
 
 /* ---------- Утас баталгаажуулах (Verify.MN): хэрэглэгч өөрийн утаснаас 144773 руу кодыг SMS-ээр илгээнэ ----------
    smsVerify(box, v, check, done): заавар, код, «SMS бичих», хугацаа тоолуур; 3 секунд тутам check(token)-оор шалгаж,

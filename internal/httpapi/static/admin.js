@@ -269,74 +269,144 @@ VIEWS.teachers = {
   },
 };
 
-/* ---------- Байгууллага (org.go): бүртгэл үүсгэх, шимтгэл, файлын сан ---------- */
+/* ---------- Байгууллага (org.go): тусдаа профайл, удирдагч (байгаа хэрэглэгч), шимтгэл, файлын сан ---------- */
 const mbLabel = (mb) => (mb >= 1024 ? +(mb / 1024).toFixed(1) + " GB" : num(mb) + " MB");
+// Хэрэглэгч хайж сонгох талбар: input[data-us] бичихэд доор нь илэрц, дарахад onPick(user).
+function userPicker(box, onPick) {
+  const inp = $("input", box), res = $(".us-res", box);
+  let t = 0, seq = 0;
+  inp.addEventListener("input", () => {
+    clearTimeout(t);
+    const q = inp.value.trim();
+    if (q.length < 2) { res.innerHTML = ""; return; }
+    t = setTimeout(async () => {
+      const my = ++seq;
+      let list = [];
+      try { list = await api("/api/admin/users?q=" + encodeURIComponent(q)); } catch (x) { toast(x.message, true); }
+      if (my !== seq) return;
+      res.innerHTML = list.map((u) => `<button type="button" class="us-item" data-uid="${esc(u.id)}">${avatar(u.name, u.avatar_url)}<span><b>${esc(u.name || u.username)}</b><small>@${esc(u.username)} · ${esc(u.email || "имэйлгүй")} · ${u.role === "teacher" ? "багш" : "суралцагч"}</small></span></button>`).join("") || `<p class="muted small" style="margin:6px 2px">Олдсонгүй — нэр, @нэр эсвэл имэйлээр хайна уу</p>`;
+      res._list = list;
+    }, 250);
+  });
+  res.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-uid]"); if (!b) return;
+    const u = res._list.find((x) => x.id === b.dataset.uid);
+    inp.value = ""; res.innerHTML = ""; onPick(u);
+  });
+}
+const pickerHTML = (ph) => `<div class="us-pick"><input type="search" data-us maxlength="80" placeholder="${esc(ph)}" autocomplete="off" aria-label="Хэрэглэгч хайх"><div class="us-res"></div></div>`;
+const personChip = (p, del) => `<span class="us-chip">${avatar(p.name, p.avatar_url)}<span><b>${esc(p.name || p.username)}</b><small>@${esc(p.username)}</small></span>${del ? `<button type="button" class="adm-x" data-${del}="${esc(p.id)}" aria-label="Хасах">✕</button>` : ""}</span>`;
+
 VIEWS.orgs = {
-  title: "Байгууллага", sub: "Сургууль, сургалтын төв: бүртгэл үүсгэж, борлуулалтын шимтгэл, файлын санг гэрээгээр тогтооно",
+  title: "Байгууллага", sub: "Сургууль, сургалтын төв: тусдаа профайл үүсгэж удирдах хүнийг холбоно; шимтгэл, файлын санг гэрээгээр тогтооно",
   async render(tools, el, live) {
     const d = await api("/api/admin/orgs");
     if (!live()) return;
     const all = d.orgs;
+    let mgr = null;
     el.innerHTML = `
-    <section class="adm-card"><header><h3>Байгууллага бүртгэх</h3><span class="muted small">Байгууллага өөрөө нэвтэрч «Сургалтууд» хэсэгт мэргэжлийн хөтөлбөр, сургалтаа үүсгээд сургалт бүрт багш холбоно.</span></header>
-      ${seg("orgmode", [["new", "Шинэ бүртгэл"], ["existing", "Байгаа бүртгэлийг байгууллага болгох"]], "new")}
-      <form class="exp-form org-form" id="orgF" style="margin-top:12px">
-        <label data-m="new">Байгууллагын нэр<input name="name" maxlength="80" placeholder="Жишээ: Шинжлэх ухааны их сургууль"></label>
-        <label data-m="new">Профайлын нэр (surgalt.mn/t/…)<input name="username" maxlength="32" placeholder="muis" autocapitalize="off" spellcheck="false"></label>
-        <label data-m="new">Нэвтрэх имэйл<input name="email" type="email" maxlength="120" placeholder="info@muis.edu.mn"></label>
-        <label data-m="new">Анхны нууц үг<input name="password" type="text" minlength="6" maxlength="72" autocomplete="new-password" placeholder="6+ тэмдэгт — байгууллагад дамжуулна"></label>
-        <label data-m="existing" hidden class="wide">Бүртгэл (@нэр эсвэл имэйл)<input name="existing" maxlength="120" placeholder="@school эсвэл info@school.mn"></label>
+    <section class="adm-card"><header><h3>Байгууллага бүртгэх</h3><span class="muted small">Удирдах хүн өөрийн бүртгэлээр нэвтэрч, дээд цэсний байгууллагын товчоор профайл руу шилжиж удирдана.</span></header>
+      <form class="exp-form org-form" id="orgF">
+        <label>Байгууллагын нэр<input name="name" maxlength="80" required placeholder="Жишээ: Шинжлэх ухааны их сургууль"></label>
+        <label>Профайлын нэр (surgalt.mn/t/…)<input name="username" maxlength="32" required placeholder="muis" autocapitalize="off" spellcheck="false"></label>
         <label>Борлуулалтын шимтгэл (%)<input name="commission_pct" type="number" min="0" max="100" step="0.5" value="${esc(d.default_pct)}" required></label>
+        <div class="wide org-mgr-field"><span>Удирдах хүн</span><div id="orgMgr">${pickerHTML("Нэр, @нэр эсвэл имэйлээр хайх…")}<div class="us-sel"></div></div></div>
         <label>Файлын сан (MB)<input name="storage_mb" type="number" min="0" max="1048576" step="1" value="2048" required></label>
+        <details class="wide org-login"><summary>Байгууллагад тусдаа нэвтрэх имэйл, нууц үг өгөх (заавал биш)</summary>
+          <div class="exp-form" style="margin-top:8px"><label>Нэвтрэх имэйл<input name="email" type="email" maxlength="120" placeholder="info@school.mn"></label>
+          <label>Нууц үг<input name="password" type="text" minlength="6" maxlength="72" autocomplete="new-password" placeholder="6+ тэмдэгт"></label></div></details>
         <button class="btn btn-gold">${ic("school", 16)} Бүртгэх</button>
       </form>
-      <p class="muted small">Шимтгэл нь байгууллагын сургалтын борлуулалт бүрээс авах платформын хувь. Үнэгүй багшийн шимтгэл ${esc(d.default_pct)}%, үнэгүй файлын сан ${mbLabel(d.free_mb)}. Байгууллага системийн эрх (багц) худалдаж авахгүй — хугацаагүй.</p>
+      <p class="muted small">Шимтгэл нь байгууллагын борлуулалт бүрээс авах платформын хувь (энгийн багшийнх ${esc(d.default_pct)}%, үнэгүй файлын сан ${mbLabel(d.free_mb)}). Байгууллага багц худалдаж авахгүй — хугацаагүй.</p>
     </section>
     <div class="adm-table-wrap"><table class="adm-table" id="oTable"><thead><tr>
-      <th data-sort="name" data-type="text">Байгууллага</th><th data-sort="commission_pct">Шимтгэл</th><th data-sort="storage_mb">Файлын сан</th><th data-sort="programs">Хөтөлбөр</th>
-      <th data-sort="courses">Сургалт</th><th data-sort="teachers">Багш</th><th data-sort="created_at" data-type="text">Бүртгэсэн</th><th></th>
+      <th data-sort="name" data-type="text">Байгууллага</th><th>Удирдагч</th><th data-sort="commission_pct">Шимтгэл</th><th data-sort="storage_mb">Файлын сан</th>
+      <th data-sort="programs">Хөтөлбөр</th><th data-sort="courses">Сургалт</th><th data-sort="teachers">Багш</th><th data-sort="created_at" data-type="text">Бүртгэсэн</th><th></th>
     </tr></thead><tbody></tbody></table></div>`;
     const row = (o) => `<tr data-org="${esc(o.id)}">
-      <td><span class="adm-person" title="${esc(o.email || "")}">${avatar(o.name, o.avatar_url)}<span><b>${esc(o.name || o.username)}</b><small>@${esc(o.username)} · ${esc(o.email || "")}</small></span></span></td>
+      <td><span class="adm-person">${avatar(o.name, o.avatar_url)}<span><b>${esc(o.name || o.username)}</b><small>@${esc(o.username)}${o.login ? " · " + esc(o.email) : ""}</small></span></span></td>
+      <td>${o.managers.length ? o.managers.map((m) => `<span class="who"><b>${esc(m.name || m.username)}</b><small>@${esc(m.username)}</small></span>`).join("") : `<span class="chip chip-coral">Удирдагчгүй</span>`}</td>
       <td class="n"><b>${o.commission_pct}%</b></td>
       <td class="n">${mbLabel(o.storage_mb)}<small>${bytes(o.used_bytes)} ашигласан</small></td>
       <td class="n">${num(o.programs)}</td><td class="n">${num(o.courses)}<small>${num(o.courses_published)} нийтэлсэн</small></td><td class="n">${num(o.teachers)}</td><td>${dd(o.created_at)}</td>
-      <td><button type="button" class="btn btn-ghost btn-sm" data-org-edit="${esc(o.id)}">Нөхцөл</button> <a class="btn btn-ghost btn-sm" href="/t/${esc(o.username)}" target="_blank" rel="noopener">${ic("ext", 14)}</a></td></tr>`;
+      <td class="org-acts"><button type="button" class="btn btn-ghost btn-sm" data-org-edit="${esc(o.id)}">Засах</button> <a class="btn btn-ghost btn-sm" href="/t/${esc(o.username)}" target="_blank" rel="noopener" title="Профайл">${ic("ext", 14)}</a></td></tr>`;
     const tbl = sortable($("#oTable"), all, row, ["created_at", -1]);
-    const f = $("#orgF");
-    let mode = "new";
-    el.onclick = async (e) => {
-      const sb = e.target.closest("[data-seg=orgmode] button");
-      if (sb) {
-        mode = sb.dataset.val;
-        $$("[data-seg=orgmode] button", el).forEach((b) => b.classList.toggle("on", b === sb));
-        $$("[data-m]", f).forEach((l) => (l.hidden = l.dataset.m !== mode));
-        return;
-      }
+    const f = $("#orgF"), sel = $("#orgMgr .us-sel");
+    const drawSel = () => { sel.innerHTML = mgr ? personChip(mgr, "mgr-clear") : ""; };
+    userPicker($("#orgMgr .us-pick"), (u) => { mgr = u; drawSel(); });
+    sel.addEventListener("click", (e) => { if (e.target.closest("[data-mgr-clear]")) { mgr = null; drawSel(); } });
+    el.onclick = (e) => {
       const ed = e.target.closest("[data-org-edit]"); if (!ed) return;
-      const o = all.find((x) => x.id === ed.dataset.orgEdit); if (!o) return;
-      const pctIn = prompt(`${o.name}: борлуулалтын шимтгэл (%)`, o.commission_pct); if (pctIn === null) return;
-      const mbIn = prompt(`${o.name}: файлын сан (MB)`, o.storage_mb); if (mbIn === null) return;
-      try {
-        const r = await api(`/api/admin/orgs/${encodeURIComponent(o.id)}`, { method: "PUT", body: { commission_pct: +pctIn, storage_mb: Math.round(+mbIn) } });
-        Object.assign(o, r); tbl.set(all); toast(`Хадгаллаа · ${r.commission_pct}% · ${mbLabel(r.storage_mb)}`);
-      } catch (x) { toast(x.message, true); }
+      const o = all.find((x) => x.id === ed.dataset.orgEdit); if (o) openOrg(o, (r) => { if (r) Object.assign(o, r); else all.splice(all.indexOf(o), 1); tbl.set(all); });
     };
     f.addEventListener("submit", async (e) => {
       e.preventDefault();
       const v = (n) => f[n].value.trim();
-      const body = { commission_pct: +f.commission_pct.value, storage_mb: Math.round(+f.storage_mb.value) };
-      if (mode === "existing") body.existing = v("existing");
-      else Object.assign(body, { name: v("name"), username: v("username").toLowerCase(), email: v("email"), password: f.password.value });
-      const b = $("button", f); b.disabled = true;
+      const body = { name: v("name"), username: v("username").toLowerCase(), commission_pct: +f.commission_pct.value, storage_mb: Math.round(+f.storage_mb.value), manager: mgr?.id || "", email: v("email"), password: f.password.value };
+      if (!body.manager && !body.email) { toast("Удирдах хүнээ хайж сонгоно уу", true); $("#orgMgr input").focus(); return; }
+      const b = $("button.btn-gold", f); b.disabled = true;
       try {
         const r = await api("/api/admin/orgs", { method: "POST", body });
-        all.unshift(r); tbl.set(all); f.reset(); toast(`«${r.name}» байгууллага бүртгэгдлээ — нэвтрэх имэйл: ${r.email}`);
+        all.unshift(r); tbl.set(all); f.reset(); mgr = null; drawSel();
+        toast(`«${r.name}» бүртгэгдлээ${r.managers.length ? ` — ${r.managers[0].name}-д мэдэгдэл очлоо` : ""}`);
       } catch (x) { toast(x.message, true); }
       b.disabled = false;
     });
   },
 };
+
+// Байгууллага засах (баруун цонх): нэр, холбоос, шимтгэл, файлын сан, удирдагчид, устгах.
+function openOrg(o, done) {
+  const body = drawer(o.name, "");
+  const draw = () => {
+    body.innerHTML = `
+    <div class="dr-head">${avatar(o.name, o.avatar_url)}<div><b>${esc(o.name)}</b><small>@${esc(o.username)} · ${num(o.courses)} сургалт · ${num(o.teachers)} багш · ${bytes(o.used_bytes)} / ${mbLabel(o.storage_mb)}</small></div>
+      <a class="btn btn-ghost btn-sm" href="/t/${esc(o.username)}" target="_blank" rel="noopener">${ic("ext", 15)} Профайл</a></div>
+    <section class="adm-card"><header><h3>Мэдээлэл ба гэрээ</h3></header>
+      <form class="exp-form" id="orgEd">
+        <label>Байгууллагын нэр<input name="name" maxlength="80" required value="${esc(o.name)}"></label>
+        <label>Профайлын нэр (surgalt.mn/t/…)<input name="username" maxlength="32" required value="${esc(o.username)}" autocapitalize="off" spellcheck="false"></label>
+        <label>Борлуулалтын шимтгэл (%)<input name="commission_pct" type="number" min="0" max="100" step="0.5" value="${esc(o.commission_pct)}" required></label>
+        <label>Файлын сан (MB)<input name="storage_mb" type="number" min="0" max="1048576" step="1" value="${esc(o.storage_mb)}" required></label>
+        <button class="btn btn-gold">Хадгалах</button>
+      </form>
+      <p class="muted small">Профайлын нэрийг солибол хуучин холбоос, хэвлэсэн QR ажиллахгүй болно.</p></section>
+    <section class="adm-card"><header><h3>Удирдагчид</h3><span class="muted small">Өөрийн бүртгэлээр нэвтэрч байгууллага руу шилжинэ. Хассан хүний нээлттэй эрх шууд хаагдана.</span></header>
+      <div class="us-sel" id="orgMgrs">${o.managers.map((m) => personChip(m, "mgr-del")).join("") || `<p class="muted small" style="margin:0">Удирдагч алга</p>`}</div>
+      <div id="orgMgrAdd" style="margin-top:10px">${pickerHTML("Удирдагч нэмэх — нэр, @нэр эсвэл имэйл…")}</div></section>
+    <section class="adm-card org-danger"><header><h3>Устгах</h3></header>
+      <p class="muted small">Байгууллагын профайл, бүртгэл бүрмөсөн устна. Сургалт, номтой бол устгахгүй — эхлээд сургалтуудыг нь устгана (суралцагчтай сургалтыг устгах боломжгүй).</p>
+      <button type="button" class="btn btn-danger btn-sm" data-org-del>${ic("trash", 15)} Байгууллагыг устгах</button></section>`;
+    $("#orgEd", body).addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = e.target, b = $("button", f); b.disabled = true;
+      try {
+        const r = await api(`/api/admin/orgs/${encodeURIComponent(o.id)}`, { method: "PUT", body: { name: f.name.value.trim(), username: f.username.value.trim().toLowerCase(), commission_pct: +f.commission_pct.value, storage_mb: Math.round(+f.storage_mb.value) } });
+        Object.assign(o, r); done(r); toast("Хадгаллаа ✓"); $("#admDrawerTitle").textContent = o.name; draw();
+      } catch (x) { toast(x.message, true); b.disabled = false; }
+    });
+    userPicker($("#orgMgrAdd .us-pick", body), async (u) => {
+      try { const r = await api(`/api/admin/orgs/${encodeURIComponent(o.id)}/managers`, { method: "POST", body: { user_id: u.id } }); Object.assign(o, r); done(r); toast(`${u.name} удирдагч боллоо — мэдэгдэл очлоо`); draw(); }
+      catch (x) { toast(x.message, true); }
+    });
+    body.onclick = async (e) => {
+      const rm = e.target.closest("[data-mgr-del]");
+      if (rm) {
+        const m = o.managers.find((x) => x.id === rm.dataset.mgrDel);
+        if (!confirm(`${m?.name || "Энэ хүн"}-ийг удирдагчаас хасах уу? Байгууллагын нээлттэй эрх нь шууд хаагдана.`)) return;
+        try { const r = await api(`/api/admin/orgs/${encodeURIComponent(o.id)}/managers/${encodeURIComponent(rm.dataset.mgrDel)}`, { method: "DELETE" }); Object.assign(o, r); done(r); toast("Хаслаа"); draw(); }
+        catch (x) { toast(x.message, true); }
+        return;
+      }
+      if (e.target.closest("[data-org-del]")) {
+        if (prompt(`«${o.name}» байгууллагыг бүрмөсөн устгах бол профайлын нэрийг (${o.username}) бичнэ үү:`) !== o.username) return;
+        try { await api(`/api/admin/orgs/${encodeURIComponent(o.id)}`, { method: "DELETE" }); toast("Байгууллага устгагдлаа"); closeDrawer(); done(null); }
+        catch (x) { toast(x.message, true); }
+      }
+    };
+  };
+  draw();
+}
 
 // Системийн эрх (plans.go): шошго ба олгох сонголт.
 const PLAN_OPTS = [["start", "Starter (Эхлэл) · 3 сар"], ["standard", "Standard (Стандарт) · 6 сар"], ["major", "Advanced (Ахисан түвшин) · 1 жил"], ["pro", "Enterprise (Бизнес / Энтерпрайз) · 1 жил"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");

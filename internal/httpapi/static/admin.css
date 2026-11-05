@@ -248,3 +248,26 @@ html.adm-noscroll{overflow:hidden}
 .ad-holder{display:block;margin-top:4px;font-size:.82rem;font-weight:600}
 .ad-warn{margin:0;padding:8px 12px;border-radius:10px;background:var(--amber-soft,#fff3d6);color:var(--amber,#b45309);font-size:.86rem}
 @media (max-width:760px){.ad-bank .ad-acct{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Байгууллага: удирдагч хайж сонгох, засах цонх */
+.exp-form .wide{grid-column:1/-2}
+.org-mgr-field{display:grid;gap:4px;font-size:.76rem;font-weight:800;color:var(--muted);min-width:0}
+.us-pick{position:relative}
+.us-pick input{width:100%;height:38px;padding:0 10px;border:1px solid var(--line-2);border-radius:10px;background:#fff;font-weight:600;color:var(--text)}
+.us-pick input:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)}
+.us-res{display:grid;gap:2px;margin-top:4px}
+.us-res:empty{display:none}
+.us-item{display:flex;align-items:center;gap:10px;padding:7px 9px;border:1px solid var(--line);border-radius:10px;background:#fff;text-align:left;cursor:pointer;font:inherit;color:var(--text)}
+.us-item:hover,.us-item:focus-visible{border-color:var(--brand);background:var(--brand-soft)}
+.us-item span,.us-chip span{display:grid;min-width:0}
+.us-item b,.us-chip b{font-size:.86rem;color:var(--text)}
+.us-item small,.us-chip small{font-size:.74rem;font-weight:600;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.us-sel{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.us-sel:empty{display:none}
+.us-chip{display:inline-flex;align-items:center;gap:8px;padding:5px 6px 5px 5px;border:1px solid var(--line);border-radius:999px;background:#f7f9fd}
+.us-chip .adm-x{width:26px;height:26px;font-size:.8rem}
+.org-login{font-size:.8rem;font-weight:700;color:var(--muted)}
+.org-login summary{cursor:pointer}
+.org-acts{white-space:nowrap}
+.org-danger{border-color:#f5c2c0}
+@media (max-width:760px){.exp-form .wide{grid-column:1/-1}}
