@@ -225,7 +225,7 @@ func (s *Server) handleAnswerQuiz(w http.ResponseWriter, r *http.Request) {
 		s.apiErr(w, r, errLessonHidden)
 		return
 	}
-	if !course.Published && course.TeacherID != uid {
+	if !course.Published && !teaches(course, uid) {
 		writeErr(w, http.StatusNotFound, "олдсонгүй")
 		return
 	}

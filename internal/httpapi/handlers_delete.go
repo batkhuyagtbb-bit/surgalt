@@ -90,11 +90,11 @@ func (s *Server) deleteOrphanFiles(teacherID string, refs []string, used map[str
 // handleDeleteLesson: DELETE /api/courses/{id}/lessons/{lid} — багш өөрийн хичээлийг устгана,
 // зөвхөн энэ хичээлд ашиглагдсан файлууд хамт устна. Суралцагчдын явц, худалдан авалтын түүх хэвээр.
 func (s *Server) handleDeleteLesson(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
-	course, ok := s.ownCourse(w, r, c.UID)
+	course, ok := s.teachCourse(w, r, c.UID)
 	if !ok {
 		return
 	}
@@ -105,10 +105,8 @@ func (s *Server) handleDeleteLesson(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.DeleteLesson(r.Context(), course.ID, l.ID); s.storeErr(w, r, err) {
 		return
 	}
-	removed := s.deleteOrphanFiles(c.UID, lessonFileRefs(l), s.teacherFilesInUse(r.Context(), c.UID, l.ID, ""))
-	s.courses.Delete(course.ID)
-	s.search.markDirty()
-	s.profiles.Delete(c.Name)
+	removed := s.deleteOrphanFiles(course.TeacherID, lessonFileRefs(l), s.teacherFilesInUse(r.Context(), course.TeacherID, l.ID, ""))
+	s.courseEdited(r.Context(), course)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted_files": removed})
 }
 

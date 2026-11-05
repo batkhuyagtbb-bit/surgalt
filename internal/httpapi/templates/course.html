@@ -20,8 +20,10 @@
       <div class="hero-left">
         <a class="teacher-chip reveal" href="/t/{{$t.Username}}">
           <span class="avatar avatar-sm" style="--h:{{hue $t.Username}}">{{if $t.AvatarURL}}<img src="{{$t.AvatarURL}}" alt="">{{else}}{{initials $t.DisplayName}}{{end}}</span>
-          <span>{{$t.DisplayName}}{{with $t.Headline}}<small>{{.}}</small>{{end}}</span>
+          <span>{{$t.DisplayName}}{{if .D.Org}}<small>{{with .D.Program}}{{.}} · {{end}}Байгууллага</small>{{else}}{{with $t.Headline}}<small>{{.}}</small>{{end}}{{end}}</span>
         </a>
+        {{if .D.Teachers}}<div class="org-teachers reveal"><span class="muted small">Заадаг багш:</span>{{range .D.Teachers}}
+          <a class="org-teacher" href="/t/{{.Username}}"><span class="avatar avatar-xs" style="--h:{{hue .Username}}">{{if .AvatarURL}}<img src="{{.AvatarURL}}" alt="" loading="lazy">{{else}}{{initials .DisplayName}}{{end}}</span>{{.DisplayName}}</a>{{end}}</div>{{end}}
         <h1 class="display split">{{$c.Title}}</h1>
         <p class="lead reveal pre">{{$c.Description}}</p>
         <div class="hero-cta reveal">
@@ -87,7 +89,7 @@
 </div>
 
 <footer class="footer"><span class="slogan">Сур, сур, бас дахин сур</span><a href="/t/{{$t.Username}}">← {{$t.DisplayName}}-ийн профайл</a><span class="footer-links"><a href="/privacy">Нууцлал</a><a href="/terms">Нөхцөл</a></span></footer>
-{{template "chat" $t}}
+{{/* Байгууллагын сургалт: «Багшаас асуух» нь заадаг (эхний) багш руу. */}}{{if .D.Teachers}}{{template "chat" (index .D.Teachers 0)}}{{else}}{{template "chat" $t}}{{end}}
 {{template "foot" (dict "Page" "course")}}
 
 {{define "lessonRow"}}{{$l := .}}

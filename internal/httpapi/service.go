@@ -54,7 +54,7 @@ func (s *Server) lessonFor(ctx context.Context, uid, cid, lid string, ignoreBloc
 	if err != nil {
 		return nil, nil, err
 	}
-	if !course.Published && course.TeacherID != uid {
+	if !course.Published && !teaches(course, uid) {
 		return nil, nil, apiError(http.StatusNotFound, "олдсонгүй", nil)
 	}
 	l, err := s.store.LessonByID(ctx, cid, lid)
@@ -79,7 +79,7 @@ func (s *Server) lessonFor(ctx context.Context, uid, cid, lid string, ignoreBloc
 	}
 	// Дараалсан нээлт: нэг нээгдсэн хичээл (явц зөвхөн урагшилдаг) 10 минут кэштэй — хичээлийн хүсэлт бүрт бүх
 	// хичээл, явц, сесс, шалгалтыг дахин уншихгүй.
-	if course.Drip && !l.AlwaysOpen && course.TeacherID != uid && !s.dripOpenCached(uid, l.ID) {
+	if course.Drip && !l.AlwaysOpen && !teaches(course, uid) && !s.dripOpenCached(uid, l.ID) {
 		lessons, err := s.store.LessonsByCourse(ctx, course.ID)
 		if err != nil {
 			return nil, nil, err
@@ -149,7 +149,7 @@ func (s *Server) StartActivity(ctx context.Context, uid, fallbackName, ip, cours
 		SessionID: sess.ID,
 		Watermark: map[string]string{"name": name, "id": tail(uid, 6), "ip": sess.IP},
 		Policy: ActivityPolicy{Camera: camera, PingSec: 300, PingAnswerSec: 30, IdleSec: 120, BeatSec: 15,
-			ActiveMin: l.ActiveMin, ActiveDoneSec: done, Owner: course.TeacherID == uid, MaxWarn: maxWarnings(course)},
+			ActiveMin: l.ActiveMin, ActiveDoneSec: done, Owner: teaches(course, uid), MaxWarn: maxWarnings(course)},
 	}, nil
 }
 

@@ -38,7 +38,43 @@ var Plans = []Plan{
 const (
 	PlanTrial       = "trial" // үнэгүй хугацаа
 	PlanTrialMonths = 3
+	PlanOrg         = "org" // байгууллагын гэрээ (User.Org): шимтгэл, файлын санг хянагч тогтооно
 )
+
+// OrgUntil — байгууллагын эрхийн «дуусах» хугацаа (гэрээгээр, хугацаагүй).
+var OrgUntil = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+
+func (o *Org) encode() string {
+	if o == nil {
+		return ""
+	}
+	b, _ := json.Marshal(o)
+	return string(b)
+}
+
+func decodeOrg(s string) *Org {
+	if s == "" {
+		return nil
+	}
+	var o Org
+	if json.Unmarshal([]byte(s), &o) != nil {
+		return nil
+	}
+	if o.Programs == nil {
+		o.Programs = []Program{}
+	}
+	return &o
+}
+
+// Clone — гүн хуулбар (санах ойн сан, кэш дуудагчийн өөрчлөлтөөс хамгаална).
+func (o *Org) Clone() *Org {
+	if o == nil {
+		return nil
+	}
+	c := *o
+	c.Programs = append([]Program{}, o.Programs...)
+	return &c
+}
 
 // PlanTrialFrom — журам эхэлсэн өдөр: үүнээс өмнө бүртгүүлсэн багшийн үнэгүй 3 сар энэ өдрөөс тоологдоно.
 var PlanTrialFrom = time.Date(2026, 11, 3, 0, 0, 0, 0, time.FixedZone("ULAT", 8*3600))
@@ -105,6 +141,9 @@ func (u *User) TrialUntil() time.Time {
 
 // PlanAt — t үеийн эрх: багцын ID (эсвэл PlanTrial), шимтгэлийн хувь, эрхтэй эсэх.
 func (u *User) PlanAt(t time.Time) (string, float64, bool) {
+	if u.Org != nil { // байгууллага: хянагчийн тогтоосон шимтгэл, хугацаагүй
+		return PlanOrg, u.Org.Pct, true
+	}
 	for _, p := range u.Plan.Periods {
 		if !t.Before(p.From) && t.Before(p.Until) {
 			if pl, ok := PlanByID(p.Plan); ok {
@@ -120,6 +159,9 @@ func (u *User) PlanAt(t time.Time) (string, float64, bool) {
 
 // PlanStorageBytes — t үеийн идэвхтэй багцад багтсан файлын сан (үнэгүй хугацаа, эрхгүй үед 0).
 func (u *User) PlanStorageBytes(t time.Time) int64 {
+	if u.Org != nil {
+		return u.Org.StorageMB << 20
+	}
 	id, _, ok := u.PlanAt(t)
 	if pl, found := PlanByID(id); ok && found {
 		return pl.StorageMB << 20
@@ -129,6 +171,9 @@ func (u *User) PlanStorageBytes(t time.Time) int64 {
 
 // PlanUntil — эрх дуусах хугацаа (үнэгүй хугацаа, дараалсан бүх багцыг оруулаад). Ирээдүйд завсар үүсдэггүй.
 func (u *User) PlanUntil() time.Time {
+	if u.Org != nil {
+		return OrgUntil
+	}
 	end := u.TrialUntil()
 	for _, p := range u.Plan.Periods {
 		if p.Until.After(end) {
@@ -208,11 +253,17 @@ func (o *Order) Platform() bool { return o.Kind == OrderKindStorage || o.Kind ==
 
 // CommissionRate — борлуулалтын шимтгэлийн хувь: төлөгдөх үеийн багцын хувь; хуучин захиалгад TEACHER_COMMISSION_PERCENT.
 func (o *Order) CommissionRate() float64 {
-	if o.CommissionPct > 0 {
+	switch {
+	case o.CommissionPct > 0:
 		return o.CommissionPct
+	case o.CommissionPct < 0: // шимтгэлгүй гэрээ (0%) — 0 нь «хуучин захиалга» гэсэн утгатай тул zeroCommission-оор тэмдэглэнэ
+		return 0
 	}
 	return teacherCommission
 }
+
+// zeroCommission — 0%-ийн шимтгэлийг (байгууллагын гэрээ) захиалгад хадгалах утга.
+const zeroCommission = -1
 
 // OrderCommission — нэг борлуулалтаас авах платформын шимтгэл (бүхэл төгрөг рүү тоймлоно).
 func OrderCommission(o *Order) int64 {
@@ -228,5 +279,8 @@ func saleCommissionPct(teacher *User, now time.Time) float64 {
 		return teacherCommission
 	}
 	_, pct, _ := teacher.PlanAt(now)
+	if pct <= 0 {
+		return zeroCommission
+	}
 	return pct
 }

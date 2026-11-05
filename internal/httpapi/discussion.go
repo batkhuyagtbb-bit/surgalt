@@ -94,9 +94,9 @@ func (s *Server) discussionData(ctx context.Context, uid string, course *store.C
 			avatars[u.ID] = u.AvatarURL
 		}
 	}
-	isTeacher := course.TeacherID == uid
+	isTeacher := teaches(course, uid)
 	view := func(cm store.Comment) commentView {
-		return commentView{ID: cm.ID, UserID: cm.UserID, UserName: cm.UserName, AvatarURL: avatars[cm.UserID], Teacher: cm.UserID == course.TeacherID,
+		return commentView{ID: cm.ID, UserID: cm.UserID, UserName: cm.UserName, AvatarURL: avatars[cm.UserID], Teacher: teaches(course, cm.UserID),
 			Mine: cm.UserID == uid, Body: cm.Body, CreatedAt: cm.CreatedAt, Likes: likeCounts[cm.ID], Liked: likedMine[cm.ID], CanDelete: isTeacher || cm.UserID == uid}
 	}
 	top := []commentView{}
@@ -165,8 +165,8 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	link := "/c/" + course.ID + "#l=" + l.ID
-	if c.UID != course.TeacherID { // багшид: шинэ сэтгэгдэл/асуулт
-		s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: "comment", ActorID: c.UID, Title: "💬 " + cm.UserName + ": «" + l.Title + "»", Body: short(in.Body), Link: link})
+	if c.UID != course.TeacherID || len(course.Teachers) > 0 { // багш нарт (бичсэн хүнээс бусад): шинэ сэтгэгдэл/асуулт
+		s.notifyCourse(r.Context(), course, c.UID, store.Notification{Type: "comment", ActorID: c.UID, Title: "💬 " + cm.UserName + ": «" + l.Title + "»", Body: short(in.Body), Link: link})
 	}
 	if parent != nil && parent.UserID != c.UID && parent.UserID != course.TeacherID { // хариу авсан суралцагчид
 		s.notify(r.Context(), &store.Notification{UserID: parent.UserID, Type: "reply", ActorID: c.UID, Title: "↩ " + cm.UserName + " танд хариуллаа", Body: short(in.Body), Link: link})
@@ -190,7 +190,7 @@ func (s *Server) handleDeleteComment(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "сэтгэгдэл олдсонгүй")
 		return
 	}
-	if cm.UserID != c.UID && course.TeacherID != c.UID {
+	if cm.UserID != c.UID && !teaches(course, c.UID) {
 		writeErr(w, http.StatusForbidden, "зөвхөн өөрийн сэтгэгдлийг устгана")
 		return
 	}

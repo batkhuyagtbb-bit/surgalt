@@ -1,5 +1,21 @@
+{{define "pfCourseCard"}}{{$c := .C}}{{$paid := sub $c.LessonCount $c.FreeLessonCount}}
+          <a class="course-card tilt reveal" href="/c/{{$c.ID}}{{if $c.Locked}}#unlock{{end}}" style="--h:{{hue $c.Title}};--d:{{.I}}" data-course="{{$c.ID}}" data-free="{{$c.FreeLessonCount}}" data-paid="{{if or $c.Price $paid}}1{{else}}0{{end}}">
+            <div class="course-art"><div class="course-flags">{{if $c.Locked}}<span class="flag flag-lock">🔒 Нууц үгтэй</span>{{end}}{{if eq $c.ID .Top}}<span class="flag">Эрэлттэй</span>{{end}}{{if recent $c.CreatedAt}}<span class="flag flag-new">Шинэ</span>{{end}}</div><span class="course-num">{{printf "%02d" (inc .I)}}</span><span class="glare"></span></div>
+            <div class="course-body">
+              <h3>{{$c.Title}}</h3>
+              <p class="clamp muted">{{$c.Description}}</p>
+              <div class="course-meta">
+                <span>{{$c.LessonCount}} хичээл</span>
+                {{if $c.Locked}}<span class="price price-lock">🔒 Нууц үгээр нээх</span>{{else}}
+                {{if $c.FreeLessonCount}}<span class="chip chip-amber">{{$c.FreeLessonCount}} үнэгүй</span>{{end}}
+                {{if $paid}}<span class="chip chip-gold">{{$paid}} төлбөртэй</span>{{end}}
+                <span class="price {{if and (eq $c.Price 0) (eq $paid 0)}}free{{end}}">{{if $c.Price}}{{money $c.Price}}{{else if $paid}}Хичээлээр{{else}}Үнэгүй{{end}}</span>{{end}}
+              </div>
+            </div>
+          </a>{{end}}
+{{define "orgTeachers"}}{{if .}}<div class="org-teachers"><span class="muted small">Багш:</span>{{range .}}<a class="org-teacher" href="/t/{{.Username}}" title="{{.DisplayName}}{{with .Headline}} — {{.}}{{end}}"><span class="avatar avatar-xs" style="--h:{{hue .Username}}">{{if .AvatarURL}}<img src="{{.AvatarURL}}" alt="" loading="lazy">{{else}}{{initials .DisplayName}}{{end}}</span>{{.DisplayName}}</a>{{end}}</div>{{end}}{{end}}
 {{$t := .D.Teacher}}
-{{template "head" (dict "Title" (pageTitle $t.DisplayName (or $t.Headline "Багш")) "Desc" .D.OGDesc "Image" .D.OGImage "ImageW" 1200 "ImageH" 630 "ImageAlt" (printf "%s — surgalt.mn дээрх багшийн профайл" $t.DisplayName) "URL" (printf "%s/t/%s" .PublicURL $t.Username) "Type" "profile" "Page" "profile")}}
+{{template "head" (dict "Title" (pageTitle $t.DisplayName (or $t.Headline (or (and .D.Org "Байгууллага") "Багш"))) "Desc" .D.OGDesc "Image" .D.OGImage "ImageW" 1200 "ImageH" 630 "ImageAlt" (printf "%s — surgalt.mn дээрх %s" $t.DisplayName (or (and .D.Org "байгууллагын профайл") "багшийн профайл")) "URL" (printf "%s/t/%s" .PublicURL $t.Username) "Type" "profile" "Page" "profile")}}
 <script type="application/ld+json">{{ldProfile .D .PublicURL}}</script>
 
 {{/* Бүтэц: нүүр зураг → давхцсан зураг + нэр + үйлдлүүд → таб цэс → зүүн танилцуулга / баруун агуулга.
@@ -22,10 +38,10 @@
         <span class="pf-presence" id="pfPresence" hidden title="Онлайн — одоо сайтад байна"></span>
       </div>
       <div class="pf-id">
-        <h1><span class="pf-name" id="pfName">{{$t.DisplayName}}</span><span class="pf-verified" title="Баталгаажсан багш">{{icon "check" 14}}</span></h1>
+        <h1><span class="pf-name" id="pfName">{{$t.DisplayName}}</span><span class="pf-verified" title="{{if .D.Org}}Баталгаажсан байгууллага{{else}}Баталгаажсан багш{{end}}">{{icon "check" 14}}</span></h1>
         <p class="pf-live" id="pfLive" hidden aria-live="polite"></p>
         {{with $t.Headline}}<p class="pf-headline">{{.}}</p>{{end}}
-        <p class="pf-counts"><b data-count="{{$t.StudentCount}}">{{$t.StudentCount}}</b> суралцагч · <b data-count="{{$t.CourseCount}}">{{$t.CourseCount}}</b> сургалт · <b data-count="{{$t.LessonCount}}">{{$t.LessonCount}}</b> хичээл</p>
+        <p class="pf-counts"><b data-count="{{$t.StudentCount}}">{{$t.StudentCount}}</b> суралцагч · <b data-count="{{$t.CourseCount}}">{{$t.CourseCount}}</b> сургалт · <b data-count="{{$t.LessonCount}}">{{$t.LessonCount}}</b> хичээл{{if .D.Staff}} · <b data-count="{{len .D.Staff}}">{{len .D.Staff}}</b> багш{{end}}</p>
       </div>
       <div class="pf-actions" data-visitor>
         <button class="btn btn-gold magnetic" data-open-chat>{{icon "chat"}}Чатлах</button>
@@ -49,6 +65,7 @@
       <button class="pf-tab" data-tab="students" data-owner-tab hidden>Суралцагчид</button>
       <button class="pf-tab" data-tab="wallet" data-owner-tab hidden>Данс</button>
       <button class="pf-tab" data-tab="files" data-owner-tab hidden>Файлын сан</button>
+      {{if .D.Staff}}<button class="pf-tab" data-tab="staff">Багш нар <i>{{len .D.Staff}}</i></button>{{end}}
       <button class="pf-tab" data-tab="about" data-visitor-tab>Тухай</button>
       <button class="pf-tab" data-tab="qr" data-visitor-tab>QR</button>
       <span class="pf-ink" aria-hidden="true"></span>
@@ -61,7 +78,7 @@
       <section class="card">
         <div class="card-head"><h2>Танилцуулга</h2><button class="icon-btn" data-owner data-edit-profile hidden aria-label="Танилцуулга засах">{{icon "edit"}}</button></div>
         {{if $t.Bio}}<p class="pf-bio clamped" id="pfBio">{{$t.Bio}}</p><button class="link pf-more" id="pfBioMore" hidden>Цааш унших</button>
-        {{else}}<p class="muted" data-visitor>Багш удахгүй танилцуулгаа нэмнэ.</p><button class="btn btn-ghost btn-block" data-owner data-edit-profile hidden>{{icon "plus"}}Танилцуулга нэмэх</button>{{end}}
+        {{else}}<p class="muted" data-visitor>{{if .D.Org}}Удахгүй танилцуулга нэмэгдэнэ.{{else}}Багш удахгүй танилцуулгаа нэмнэ.{{end}}</p><button class="btn btn-ghost btn-block" data-owner data-edit-profile hidden>{{icon "plus"}}Танилцуулга нэмэх</button>{{end}}
         <ul class="pf-facts">
           {{with $t.Headline}}<li>{{icon "work"}}<span>{{.}}</span></li>{{end}}
           {{with $t.Location}}<li>{{icon "pin"}}<span><b>{{.}}</b>-д байрладаг</span></li>{{end}}
@@ -100,41 +117,48 @@
         {{end}}{{end}}
 
         {{if .D.Courses}}
-        {{if gt (len .D.Courses) 3}}
+        {{if and (gt (len .D.Courses) 3) (not .D.Programs)}}
         <div class="filter-bar card" id="courseFilter">
           <button class="pill active" data-f="all">Бүгд</button>
           <button class="pill" data-f="free">Үнэгүй хичээлтэй</button>
           <button class="pill" data-f="paid">Төлбөртэй</button>
         </div>
         {{end}}
+        {{if .D.Programs}}
+        {{/* Байгууллага: мэргэжлийн хөтөлбөр бүрийн сургалтууд, карт бүрийн доор заадаг багш (профайл руу холбоостой). */}}
+        {{range $pi, $p := .D.Programs}}
+        <section class="org-prog reveal" style="--d:{{$pi}}">
+          <header class="org-prog-head"><span class="lg-num">{{printf "%02d" (inc $pi)}}</span><div><h2>{{if $p.Name}}{{$p.Name}}{{else}}Бусад сургалтууд{{end}}</h2>{{with $p.Description}}<p class="muted">{{.}}</p>{{end}}</div><span class="chip">{{len $p.Courses}} сургалт</span></header>
+          <div class="course-grid">{{range $i, $c := $p.Courses}}<div class="org-course">{{template "pfCourseCard" (dict "C" $c "I" $i "Top" $.D.TopCourseID)}}{{template "orgTeachers" (index $.D.CourseTeachers $c.ID)}}</div>{{end}}</div>
+        </section>
+        {{end}}
+        {{else}}
         <div class="course-grid" id="courseGrid">
-          {{range $i, $c := .D.Courses}}
-          {{$paid := sub $c.LessonCount $c.FreeLessonCount}}
-          <a class="course-card tilt reveal" href="/c/{{$c.ID}}{{if $c.Locked}}#unlock{{end}}" style="--h:{{hue $c.Title}};--d:{{$i}}" data-course="{{$c.ID}}" data-free="{{$c.FreeLessonCount}}" data-paid="{{if or $c.Price $paid}}1{{else}}0{{end}}">
-            <div class="course-art"><div class="course-flags">{{if $c.Locked}}<span class="flag flag-lock">🔒 Нууц үгтэй</span>{{end}}{{if eq $c.ID $.D.TopCourseID}}<span class="flag">Эрэлттэй</span>{{end}}{{if recent $c.CreatedAt}}<span class="flag flag-new">Шинэ</span>{{end}}</div><span class="course-num">{{printf "%02d" (inc $i)}}</span><span class="glare"></span></div>
-            <div class="course-body">
-              <h3>{{$c.Title}}</h3>
-              <p class="clamp muted">{{$c.Description}}</p>
-              <div class="course-meta">
-                <span>{{$c.LessonCount}} хичээл</span>
-                {{if $c.Locked}}<span class="price price-lock">🔒 Нууц үгээр нээх</span>{{else}}
-                {{if $c.FreeLessonCount}}<span class="chip chip-amber">{{$c.FreeLessonCount}} үнэгүй</span>{{end}}
-                {{if $paid}}<span class="chip chip-gold">{{$paid}} төлбөртэй</span>{{end}}
-                <span class="price {{if and (eq $c.Price 0) (eq $paid 0)}}free{{end}}">{{if $c.Price}}{{money $c.Price}}{{else if $paid}}Хичээлээр{{else}}Үнэгүй{{end}}</span>{{end}}
-              </div>
-            </div>
-          </a>
+          {{range $i, $c := .D.Courses}}{{if $.D.Org}}<div class="org-course">{{template "pfCourseCard" (dict "C" $c "I" $i "Top" $.D.TopCourseID)}}{{template "orgTeachers" (index $.D.CourseTeachers $c.ID)}}</div>{{else}}
+          {{template "pfCourseCard" (dict "C" $c "I" $i "Top" $.D.TopCourseID)}}{{end}}
           {{end}}
         </div>
         <div class="empty" id="courseNone" hidden>Тохирох сургалт олдсонгүй</div>
+        {{end}}
         {{else}}
         <div class="empty">Удахгүй шинэ сургалт нэмэгдэнэ</div>
         {{end}}
       </div>
 
+      {{if .D.Staff}}
+      <div class="pf-panel" data-panel="staff" id="staff" hidden>
+        <div class="org-staff">{{range $i, $p := .D.Staff}}
+          <a class="org-staff-card card reveal" href="/t/{{$p.Username}}" style="--d:{{$i}}">
+            <span class="avatar avatar-md" style="--h:{{hue $p.Username}}">{{if $p.AvatarURL}}<img src="{{$p.AvatarURL}}" alt="" loading="lazy">{{else}}{{initials $p.DisplayName}}{{end}}</span>
+            <span class="grow"><strong>{{$p.DisplayName}}</strong>{{with $p.Headline}}<small class="muted">{{.}}</small>{{end}}<small class="link">Профайл үзэх →</small></span>
+          </a>{{end}}
+        </div>
+      </div>
+      {{end}}
+
       <div class="pf-panel" data-panel="about" hidden>
         <section class="card">
-          <div class="card-head"><h2>Багшийн тухай</h2><button class="icon-btn" data-owner data-edit-profile hidden aria-label="Засах">{{icon "edit"}}</button></div>
+          <div class="card-head"><h2>{{if .D.Org}}Байгууллагын тухай{{else}}Багшийн тухай{{end}}</h2><button class="icon-btn" data-owner data-edit-profile hidden aria-label="Засах">{{icon "edit"}}</button></div>
           {{if $t.Bio}}<p class="pf-bio">{{$t.Bio}}</p>{{else}}<p class="muted">Танилцуулга оруулаагүй байна.</p>{{end}}
         </section>
         <section class="card">

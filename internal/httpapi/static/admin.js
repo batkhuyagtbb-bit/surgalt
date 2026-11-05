@@ -33,6 +33,7 @@ const ICONS = {
   live: '<circle cx="12" cy="12" r="3"/><path d="M6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4"/>',
   db: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  school: '<path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M9 21v-5h6v5"/><path d="M12 5V2.5h3"/>',
 };
 const ic = (n, s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ""}</svg>`;
 
@@ -264,6 +265,75 @@ VIEWS.teachers = {
     $("input", tools).addEventListener("input", (e) => {
       const q = e.target.value.trim().toLowerCase();
       tbl.set(q ? all.filter((t) => `${t.name} ${t.username} ${t.email}`.toLowerCase().includes(q)) : all);
+    });
+  },
+};
+
+/* ---------- Байгууллага (org.go): бүртгэл үүсгэх, шимтгэл, файлын сан ---------- */
+const mbLabel = (mb) => (mb >= 1024 ? +(mb / 1024).toFixed(1) + " GB" : num(mb) + " MB");
+VIEWS.orgs = {
+  title: "Байгууллага", sub: "Сургууль, сургалтын төв: бүртгэл үүсгэж, борлуулалтын шимтгэл, файлын санг гэрээгээр тогтооно",
+  async render(tools, el, live) {
+    const d = await api("/api/admin/orgs");
+    if (!live()) return;
+    const all = d.orgs;
+    el.innerHTML = `
+    <section class="adm-card"><header><h3>Байгууллага бүртгэх</h3><span class="muted small">Байгууллага өөрөө нэвтэрч «Сургалтууд» хэсэгт мэргэжлийн хөтөлбөр, сургалтаа үүсгээд сургалт бүрт багш холбоно.</span></header>
+      ${seg("orgmode", [["new", "Шинэ бүртгэл"], ["existing", "Байгаа бүртгэлийг байгууллага болгох"]], "new")}
+      <form class="exp-form org-form" id="orgF" style="margin-top:12px">
+        <label data-m="new">Байгууллагын нэр<input name="name" maxlength="80" placeholder="Жишээ: Шинжлэх ухааны их сургууль"></label>
+        <label data-m="new">Профайлын нэр (surgalt.mn/t/…)<input name="username" maxlength="32" placeholder="muis" autocapitalize="off" spellcheck="false"></label>
+        <label data-m="new">Нэвтрэх имэйл<input name="email" type="email" maxlength="120" placeholder="info@muis.edu.mn"></label>
+        <label data-m="new">Анхны нууц үг<input name="password" type="text" minlength="6" maxlength="72" autocomplete="new-password" placeholder="6+ тэмдэгт — байгууллагад дамжуулна"></label>
+        <label data-m="existing" hidden class="wide">Бүртгэл (@нэр эсвэл имэйл)<input name="existing" maxlength="120" placeholder="@school эсвэл info@school.mn"></label>
+        <label>Борлуулалтын шимтгэл (%)<input name="commission_pct" type="number" min="0" max="100" step="0.5" value="${esc(d.default_pct)}" required></label>
+        <label>Файлын сан (MB)<input name="storage_mb" type="number" min="0" max="1048576" step="1" value="2048" required></label>
+        <button class="btn btn-gold">${ic("school", 16)} Бүртгэх</button>
+      </form>
+      <p class="muted small">Шимтгэл нь байгууллагын сургалтын борлуулалт бүрээс авах платформын хувь. Үнэгүй багшийн шимтгэл ${esc(d.default_pct)}%, үнэгүй файлын сан ${mbLabel(d.free_mb)}. Байгууллага системийн эрх (багц) худалдаж авахгүй — хугацаагүй.</p>
+    </section>
+    <div class="adm-table-wrap"><table class="adm-table" id="oTable"><thead><tr>
+      <th data-sort="name" data-type="text">Байгууллага</th><th data-sort="commission_pct">Шимтгэл</th><th data-sort="storage_mb">Файлын сан</th><th data-sort="programs">Хөтөлбөр</th>
+      <th data-sort="courses">Сургалт</th><th data-sort="teachers">Багш</th><th data-sort="created_at" data-type="text">Бүртгэсэн</th><th></th>
+    </tr></thead><tbody></tbody></table></div>`;
+    const row = (o) => `<tr data-org="${esc(o.id)}">
+      <td><span class="adm-person" title="${esc(o.email || "")}">${avatar(o.name, o.avatar_url)}<span><b>${esc(o.name || o.username)}</b><small>@${esc(o.username)} · ${esc(o.email || "")}</small></span></span></td>
+      <td class="n"><b>${o.commission_pct}%</b></td>
+      <td class="n">${mbLabel(o.storage_mb)}<small>${bytes(o.used_bytes)} ашигласан</small></td>
+      <td class="n">${num(o.programs)}</td><td class="n">${num(o.courses)}<small>${num(o.courses_published)} нийтэлсэн</small></td><td class="n">${num(o.teachers)}</td><td>${dd(o.created_at)}</td>
+      <td><button type="button" class="btn btn-ghost btn-sm" data-org-edit="${esc(o.id)}">Нөхцөл</button> <a class="btn btn-ghost btn-sm" href="/t/${esc(o.username)}" target="_blank" rel="noopener">${ic("ext", 14)}</a></td></tr>`;
+    const tbl = sortable($("#oTable"), all, row, ["created_at", -1]);
+    const f = $("#orgF");
+    let mode = "new";
+    el.onclick = async (e) => {
+      const sb = e.target.closest("[data-seg=orgmode] button");
+      if (sb) {
+        mode = sb.dataset.val;
+        $$("[data-seg=orgmode] button", el).forEach((b) => b.classList.toggle("on", b === sb));
+        $$("[data-m]", f).forEach((l) => (l.hidden = l.dataset.m !== mode));
+        return;
+      }
+      const ed = e.target.closest("[data-org-edit]"); if (!ed) return;
+      const o = all.find((x) => x.id === ed.dataset.orgEdit); if (!o) return;
+      const pctIn = prompt(`${o.name}: борлуулалтын шимтгэл (%)`, o.commission_pct); if (pctIn === null) return;
+      const mbIn = prompt(`${o.name}: файлын сан (MB)`, o.storage_mb); if (mbIn === null) return;
+      try {
+        const r = await api(`/api/admin/orgs/${encodeURIComponent(o.id)}`, { method: "PUT", body: { commission_pct: +pctIn, storage_mb: Math.round(+mbIn) } });
+        Object.assign(o, r); tbl.set(all); toast(`Хадгаллаа · ${r.commission_pct}% · ${mbLabel(r.storage_mb)}`);
+      } catch (x) { toast(x.message, true); }
+    };
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const v = (n) => f[n].value.trim();
+      const body = { commission_pct: +f.commission_pct.value, storage_mb: Math.round(+f.storage_mb.value) };
+      if (mode === "existing") body.existing = v("existing");
+      else Object.assign(body, { name: v("name"), username: v("username").toLowerCase(), email: v("email"), password: f.password.value });
+      const b = $("button", f); b.disabled = true;
+      try {
+        const r = await api("/api/admin/orgs", { method: "POST", body });
+        all.unshift(r); tbl.set(all); f.reset(); toast(`«${r.name}» байгууллага бүртгэгдлээ — нэвтрэх имэйл: ${r.email}`);
+      } catch (x) { toast(x.message, true); }
+      b.disabled = false;
     });
   },
 };

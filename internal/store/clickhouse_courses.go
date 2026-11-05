@@ -13,14 +13,17 @@ import (
 // ---- сургалт ----
 
 const courseCols = `id, teacher_id, title, description, price, published, drip, unlock_all_paid, camera, certificate,
-	created_at, updated_at, deleted, max_warnings, block_hours, block_minutes, access_code`
+	created_at, updated_at, deleted, max_warnings, block_hours, block_minutes, access_code, program_id, teachers`
 
 func scanCourse(r driver.Rows) (Course, bool, error) {
 	var c Course
 	var deleted bool
 	var mw, bh, bm int32
 	err := r.Scan(&c.ID, &c.TeacherID, &c.Title, &c.Description, &c.Price, &c.Published, &c.Drip, &c.UnlockAllPaid,
-		&c.Camera, &c.Certificate, &c.CreatedAt, &c.UpdatedAt, &deleted, &mw, &bh, &bm, &c.AccessCode)
+		&c.Camera, &c.Certificate, &c.CreatedAt, &c.UpdatedAt, &deleted, &mw, &bh, &bm, &c.AccessCode, &c.ProgramID, &c.Teachers)
+	if len(c.Teachers) == 0 {
+		c.Teachers = nil
+	}
 	c.MaxWarnings, c.BlockHours, c.BlockMinutes = int(mw), int(bh), int(bm)
 	c.Locked = c.AccessCode != ""
 	return c, deleted, err
@@ -30,9 +33,10 @@ func (c *ClickHouse) writeCourse(ctx context.Context, co *Course, deleted ...boo
 	del := len(deleted) > 0 && deleted[0]
 	defer c.forgetCourse(co.ID)
 	return c.insert(ctx, "courses", []string{"id", "teacher_id", "title", "description", "price", "published", "drip",
-		"unlock_all_paid", "camera", "certificate", "created_at", "updated_at", "ver", "deleted", "max_warnings", "block_hours", "block_minutes", "access_code"},
+		"unlock_all_paid", "camera", "certificate", "created_at", "updated_at", "ver", "deleted", "max_warnings", "block_hours", "block_minutes", "access_code", "program_id", "teachers"},
 		co.ID, co.TeacherID, co.Title, co.Description, co.Price, co.Published, co.Drip, co.UnlockAllPaid, co.Camera,
-		co.Certificate, co.CreatedAt.UTC(), co.UpdatedAt.UTC(), ver(), del, int32(co.MaxWarnings), int32(co.BlockHours), int32(co.BlockMinutes), co.AccessCode)
+		co.Certificate, co.CreatedAt.UTC(), co.UpdatedAt.UTC(), ver(), del, int32(co.MaxWarnings), int32(co.BlockHours), int32(co.BlockMinutes), co.AccessCode,
+		co.ProgramID, nzStrings(co.Teachers))
 }
 
 // enrichCourses нь хичээлийн тоо (lessons-оос) ба үзэлт (counters-оос) бөглөнө.
@@ -171,6 +175,33 @@ func (c *ClickHouse) CoursesByTeacher(ctx context.Context, teacherID string, onl
 		where += " AND published = true"
 	}
 	return c.coursesWhere(ctx, where, "ORDER BY created_at DESC LIMIT 500", teacherID)
+}
+
+func (c *ClickHouse) CoursesTaughtBy(ctx context.Context, teacherID string) ([]Course, error) {
+	return c.coursesWhere(ctx, "has(teachers, ?)", "ORDER BY created_at DESC LIMIT 500", teacherID)
+}
+
+func (c *ClickHouse) SetCourseOrg(ctx context.Context, ownerID, courseID, programID string, teachers []string) (*Course, error) {
+	unlock, err := c.lock(ctx, "course:"+courseID)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	cur, err := c.CourseByID(ctx, courseID)
+	if err != nil {
+		return nil, err
+	}
+	if cur.TeacherID != ownerID {
+		return nil, ErrNotFound
+	}
+	cur.ProgramID, cur.Teachers, cur.UpdatedAt = programID, cloneStrings(teachers), time.Now()
+	if len(cur.Teachers) == 0 {
+		cur.Teachers = nil
+	}
+	if err := c.writeCourse(ctx, cur); err != nil {
+		return nil, err
+	}
+	return cur, nil
 }
 
 func (c *ClickHouse) PublishedCourses(ctx context.Context, limit int) ([]Course, error) {

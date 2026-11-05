@@ -28,14 +28,14 @@ func (s *Server) filesErr(w http.ResponseWriter, err error) {
 // handleUpload: multipart "file" талбар, ?visibility=private|public.
 // Том видео ч урсгалаар шууд дискэнд бичигдэнэ.
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	owner, ok := s.filesOwner(w, r)
 	if !ok {
 		return
 	}
 	rc := http.NewResponseController(w)
 	_ = rc.SetReadDeadline(time.Now().Add(2 * time.Hour))
 	_ = rc.SetWriteDeadline(time.Now().Add(2 * time.Hour))
-	u, err := s.store.UserByID(r.Context(), c.UID)
+	u, err := s.store.UserByID(r.Context(), owner)
 	if s.storeErr(w, r, err) {
 		return
 	}
@@ -59,7 +59,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 			part.Close()
 			continue
 		}
-		info, err := s.files.SaveOpts(c.UID, visibility, part.FileName(), part, quota, r.URL.Query().Get("convert") == "pdf")
+		info, err := s.files.SaveOpts(owner, visibility, part.FileName(), part, quota, r.URL.Query().Get("convert") == "pdf")
 		part.Close()
 		if err != nil {
 			s.filesErr(w, err)
@@ -71,21 +71,48 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListFiles(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	owner, ok := s.filesOwner(w, r)
 	if !ok {
 		return
 	}
-	list, err := s.files.List(c.UID)
+	list, err := s.files.List(owner)
 	if err != nil {
 		s.filesErr(w, err)
 		return
 	}
-	u, err := s.store.UserByID(r.Context(), c.UID)
+	u, err := s.store.UserByID(r.Context(), owner)
 	if s.storeErr(w, r, err) {
 		return
 	}
-	used, _ := s.files.Usage(c.UID)
+	used, _ := s.files.Usage(owner)
 	writeJSON(w, http.StatusOK, map[string]any{"files": list, "used": used, "quota": s.quotaOf(u)})
+}
+
+// filesOwner — файл хуулах, жагсаах сан: өөрийнх, эсвэл ?course= байгууллагын сургалтын хичээлд бол сургалтын
+// эзэмшигчийнх (холбосон багш байгууллагын санд хуулж, хэмжээ нь байгууллагын багтаамжаас хасагдана — хичээлийн
+// файл сургалтын эзэмшигчийн санд байх ёстой).
+func (s *Server) filesOwner(w http.ResponseWriter, r *http.Request) (string, bool) {
+	cid := r.URL.Query().Get("course")
+	if cid == "" {
+		c, ok := s.requireTeacher(w, r)
+		return c.UID, ok
+	}
+	c, ok := s.requireTeacherAny(w, r)
+	if !ok {
+		return "", false
+	}
+	course, err := s.store.CourseByID(r.Context(), cid)
+	if s.storeErr(w, r, err) {
+		return "", false
+	}
+	if !teaches(course, c.UID) {
+		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		return "", false
+	}
+	if !s.planOpen(w, r, course.TeacherID) {
+		return "", false
+	}
+	return course.TeacherID, true
 }
 
 func (s *Server) handleDeleteFile(w http.ResponseWriter, r *http.Request) {

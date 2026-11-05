@@ -75,6 +75,13 @@ type PublicProfile struct {
 	Meetings    []PublicMeeting `json:"meetings"`
 	Books       []PublicBook    `json:"books"`
 
+	// Байгууллага: мэргэжлийн хөтөлбөрөөр бүлэглэсэн сургалтууд (хөтөлбөргүйг сүүлийн нэргүй бүлэгт), сургалт бүрийн
+	// багш нар ба нийт багш нар — нэр нь багшийн профайл руу холбогдоно (сургалт багшийн профайлд гардаггүй).
+	Org            bool                    `json:"org,omitempty"`
+	Programs       []PublicProgram         `json:"programs,omitempty"`
+	CourseTeachers map[string][]TeacherRef `json:"course_teachers,omitempty"`
+	Staff          []TeacherRef            `json:"staff,omitempty"`
+
 	// Facebook, Messenger-т хуваалцахад: зураг (og.go) ба тайлбар.
 	OGImage string `json:"-"`
 	OGDesc  string `json:"-"`
@@ -107,9 +114,21 @@ type PublicSection struct {
 	Lessons []PublicLesson `json:"lessons"`
 }
 
+// PublicProgram — байгууллагын мэргэжлийн хөтөлбөр ба түүний нийтлэгдсэн сургалтууд.
+type PublicProgram struct {
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Courses     []store.Course `json:"courses"`
+}
+
 type PublicCourse struct {
-	Course   store.Course    `json:"course"`
-	Teacher  PublicTeacher   `json:"teacher"`
+	Course  store.Course  `json:"course"`
+	Teacher PublicTeacher `json:"teacher"`
+	// Байгууллагын сургалт: Teacher нь байгууллага; Teachers — хичээл заадаг багш нар, Program — мэргэжлийн хөтөлбөр.
+	Org      bool            `json:"org,omitempty"`
+	Teachers []TeacherRef    `json:"teachers,omitempty"`
+	Program  string          `json:"program,omitempty"`
 	Lessons  []PublicLesson  `json:"lessons"`
 	Sections []PublicSection `json:"sections"`
 	// Grouped: дор хаяж нэг хичээл бүлэгтэй — хөтөлбөрийг бүлгээр харуулна.
@@ -245,6 +264,9 @@ func (s *Server) publicProfile(ctx context.Context, username string) (*Rendered[
 			}
 		}
 		pp := PublicProfile{Teacher: t, Courses: courses, TopCourseID: topCourse(courses), Meetings: meetings, Books: books}
+		if u.Org != nil {
+			s.orgProfile(ctx, u.Org, &pp)
+		}
 		pp.OGImage = s.cfg.PublicURL + "/t/" + t.Username + "/og.jpg?v=" + ogVersion(t, len(books))
 		pp.OGDesc = profileShareDesc(t, len(books))
 		return render(s, pp, "profile.html")
@@ -274,8 +296,65 @@ func (s *Server) publicCourse(ctx context.Context, id string) (*Rendered[PublicC
 			pls[i] = PublicLesson{ID: l.ID, Title: l.Title, IsFree: l.IsFree && !c.Locked, Locked: c.Locked, Price: l.Price, Position: l.Position, UnlockAfterH: l.UnlockAfterH, AlwaysOpen: l.AlwaysOpen, Format: l.Format, Mode: l.Mode, Section: l.Section, ActiveMin: l.ActiveMin, Exam: l.Exam, Assignment: l.Assignment, Discussion: l.Discussion, UnlockRule: l.UnlockRule}
 		}
 		secs, grouped := groupLessons(pls)
-		return render(s, PublicCourse{Course: *c, Teacher: publicTeacher(u), Lessons: pls, Sections: secs, Grouped: grouped}, "course.html")
+		pc := PublicCourse{Course: *c, Teacher: publicTeacher(u), Lessons: pls, Sections: secs, Grouped: grouped}
+		if u.Org != nil {
+			pc.Org, pc.Teachers = true, pickRefs(s.peopleRefs(ctx, c.Teachers), c.Teachers)
+			if p := u.Org.ProgramByID(c.ProgramID); p != nil {
+				pc.Program = p.Name
+			}
+		}
+		return render(s, pc, "course.html")
 	})
+}
+
+// orgProfile — байгууллагын профайлд хөтөлбөрүүд, сургалт бүрийн багш нар, нийт багш нарыг бөглөнө.
+func (s *Server) orgProfile(ctx context.Context, org *store.Org, pp *PublicProfile) {
+	pp.Org = true
+	var ids []string
+	for _, c := range pp.Courses {
+		ids = append(ids, c.Teachers...)
+	}
+	refs := s.peopleRefs(ctx, ids)
+	pp.CourseTeachers = map[string][]TeacherRef{}
+	seen := map[string]bool{}
+	for _, c := range pp.Courses {
+		ts := pickRefs(refs, c.Teachers)
+		if len(ts) == 0 {
+			continue
+		}
+		pp.CourseTeachers[c.ID] = ts
+		for _, t := range ts {
+			if !seen[t.ID] {
+				seen[t.ID] = true
+				pp.Staff = append(pp.Staff, t)
+			}
+		}
+	}
+	if len(org.Programs) == 0 {
+		return
+	}
+	placed := map[string]bool{}
+	for _, p := range org.Programs {
+		pg := PublicProgram{ID: p.ID, Name: p.Name, Description: p.Description, Courses: []store.Course{}}
+		for _, c := range pp.Courses {
+			if c.ProgramID == p.ID {
+				pg.Courses = append(pg.Courses, c)
+				placed[c.ID] = true
+			}
+		}
+		if len(pg.Courses) > 0 {
+			pp.Programs = append(pp.Programs, pg)
+		}
+	}
+	rest := PublicProgram{Courses: []store.Course{}}
+	for _, c := range pp.Courses {
+		if !placed[c.ID] {
+			rest.Courses = append(rest.Courses, c)
+		}
+	}
+	if len(rest.Courses) > 0 {
+		pp.Programs = append(pp.Programs, rest)
+	}
 }
 
 // serveRendered нь ETag-аар 304 буцааж, CDN/браузерт богино кэш зөвшөөрнө.
@@ -380,7 +459,7 @@ func (s *Server) handleTrackView(w http.ResponseWriter, r *http.Request) {
 			teacherID, target = t.ID, t.ID
 		}
 	case "course":
-		if c, err := s.publicCourse(r.Context(), in.ID); err == nil && c.Data.Course.TeacherID != uid {
+		if c, err := s.publicCourse(r.Context(), in.ID); err == nil && !teaches(&c.Data.Course, uid) {
 			s.trackView(r, c.Data.Course.TeacherID, NotifCourseView, c.Data.Course.ID, c.Data.Course.Title, "/c/"+c.Data.Course.ID)
 			teacherID, target = c.Data.Course.TeacherID, c.Data.Course.ID
 		}

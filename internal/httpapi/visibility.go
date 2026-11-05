@@ -26,7 +26,7 @@ func visibleLessons(ls []store.Lesson, owner bool) []store.Lesson {
 
 // hiddenFrom — хичээл энэ хэрэглэгчээс нуугдсан эсэх (багш өөрийн хичээлийг үргэлж харна).
 func hiddenFrom(l *store.Lesson, course *store.Course, uid string) bool {
-	return l.Hidden && (uid == "" || uid != course.TeacherID)
+	return l.Hidden && !teaches(course, uid)
 }
 
 var errLessonHidden = apiError(http.StatusNotFound, "хичээл олдсонгүй", nil)
@@ -34,11 +34,11 @@ var errLessonHidden = apiError(http.StatusNotFound, "хичээл олдсонг
 // handleLessonVisibility: PUT /api/courses/{id}/lessons/{lid}/visibility {hidden} — багш хичээлийг
 // суралцагчдад нээх / хаах (бэлтгэж дуусаагүй).
 func (s *Server) handleLessonVisibility(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
-	course, ok := s.ownCourse(w, r, c.UID)
+	course, ok := s.teachCourse(w, r, c.UID)
 	if !ok {
 		return
 	}
@@ -51,8 +51,6 @@ func (s *Server) handleLessonVisibility(w http.ResponseWriter, r *http.Request) 
 	if err := s.store.SetLessonHidden(r.Context(), course.ID, r.PathValue("lid"), in.Hidden); s.storeErr(w, r, err) {
 		return
 	}
-	s.courses.Delete(course.ID) // сургалтын хуудас, хайлт, профайл шууд шинэчлэгдэнэ
-	s.search.markDirty()
-	s.profiles.Delete(c.Name)
+	s.courseEdited(r.Context(), course) // сургалтын хуудас, хайлт, профайл шууд шинэчлэгдэнэ
 	writeJSON(w, http.StatusOK, map[string]any{"hidden": in.Hidden})
 }

@@ -190,6 +190,11 @@ func (s *Server) notifyMessage(ctx context.Context, conv *store.Conversation, m 
 			who = "Суралцагч"
 		}
 		title = "💬 " + who + " · " + conv.VisitorName + " бүлэгт бичлээ"
+		if co, err := s.store.CourseByID(ctx, conv.CourseID); err == nil && len(co.Teachers) > 0 { // байгууллагын холбосон багш нарт ч
+			s.notifyCourse(ctx, co, m.SenderID, store.Notification{Type: NotifMessage, Count: 1, ActorID: m.SenderID,
+				Title: title, Body: short(m.Body), Link: "/me#chat=" + conv.ID})
+			return
+		}
 	}
 	s.notify(ctx, &store.Notification{UserID: conv.TeacherID, Type: NotifMessage, Count: 1, ActorID: m.SenderID,
 		Title: title, Body: short(m.Body), Link: "/me#chat=" + conv.ID})

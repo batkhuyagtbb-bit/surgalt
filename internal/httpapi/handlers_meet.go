@@ -166,7 +166,7 @@ func meetingPriceErr(price int64, courseID string) string {
 // сургалт эсвэл элссэн хүн.
 func meetingOpen(m *store.Meeting, course *store.Course, uid string, enrolled bool, bought map[string]bool) bool {
 	switch {
-	case uid != "" && uid == m.TeacherID:
+	case uid != "" && (uid == m.TeacherID || teaches(course, uid)):
 		return true
 	case m.Price > 0:
 		return uid != "" && (bought[m.ID] || (m.MembersFree && enrolled))
@@ -179,7 +179,7 @@ func meetingOpen(m *store.Meeting, course *store.Course, uid string, enrolled bo
 // handleCreateMeeting: {title, starts_at (RFC3339), duration_min, course_id?, price?, members_free?, meet_url?} —
 // meet_url (meet.new-ээс хуулсан холбоос) байвал Google холболтгүйгээр товлоно, үгүй бол багшийн Google Meet-ээр.
 func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r) // эрхийг доор: сургалтын эзэмшигчээр
 	if !ok {
 		return
 	}
@@ -222,15 +222,27 @@ func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "эхлэх цаг өнгөрсөн байна")
 		return
 	}
+	var course *store.Course
 	if in.CourseID != "" {
-		course, err := s.store.CourseByID(r.Context(), in.CourseID)
-		if s.storeErr(w, r, err) {
+		var err error
+		if course, err = s.store.CourseByID(r.Context(), in.CourseID); s.storeErr(w, r, err) {
 			return
 		}
-		if course.TeacherID != c.UID {
+		if !teaches(course, c.UID) {
 			writeErr(w, http.StatusNotFound, "олдсонгүй")
 			return
 		}
+		// Байгууллагын сургалт: холбосон багш сургалтад элссэн суралцагчдад зориулсан үнэгүй шууд хичээл товлоно
+		// (төлбөртэйг байгууллага — орлого нь байгууллагынх).
+		if course.TeacherID != c.UID && in.Price > 0 {
+			writeErr(w, http.StatusBadRequest, "байгууллагын сургалтад төлбөртэй шууд хичээлийг байгууллага товлоно — үнэгүйгээр (элссэн суралцагчдад) товлоно уу")
+			return
+		}
+		if !s.planOpen(w, r, course.TeacherID) {
+			return
+		}
+	} else if !s.planOpen(w, r, c.UID) {
+		return
 	}
 	var m *store.Meeting
 	var err error
@@ -245,8 +257,8 @@ func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
 		s.meetErr(w, r, err)
 		return
 	}
-	if in.CourseID != "" {
-		s.profiles.Delete(c.Name) // профайл дээрх "Удахгүй болох" жагсаалт шууд шинэчлэгдэнэ
+	if course != nil {
+		s.courseEdited(r.Context(), course) // эзэмшигчийн профайл дээрх "Удахгүй болох" жагсаалт шууд шинэчлэгдэнэ
 	}
 	writeJSON(w, http.StatusCreated, m)
 }
@@ -311,7 +323,7 @@ func (s *Server) handleBuyMeeting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	course, err := s.store.CourseByID(r.Context(), m.CourseID)
-	if err != nil || (!course.Published && course.TeacherID != c.UID) {
+	if err != nil || (!course.Published && !teaches(course, c.UID)) {
 		writeErr(w, http.StatusNotFound, "шууд хичээл олдсонгүй")
 		return
 	}
@@ -346,7 +358,7 @@ func (s *Server) handleCourseMeetings(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	ms, err := s.store.Meetings(r.Context(), course.TeacherID, course.ID, time.Now(), 20)
+	ms, err := s.store.MeetingsByCourses(r.Context(), []string{course.ID}, time.Now(), 20) // байгууллагын холбосон багшийнх ч
 	if s.storeErr(w, r, err) {
 		return
 	}
@@ -356,7 +368,7 @@ func (s *Server) handleCourseMeetings(w http.ResponseWriter, r *http.Request) {
 		enrolled, _ = s.store.IsEnrolled(r.Context(), uid, course.ID)
 		bought, _ = s.store.MeetingAccess(r.Context(), uid)
 	}
-	access := uid == course.TeacherID || (course.Price == 0 && course.Published) || enrolled // сургалтын (үнэгүй) шууд хичээлд
+	access := teaches(course, uid) || (course.Price == 0 && course.Published) || enrolled // сургалтын (үнэгүй) шууд хичээлд
 	if !course.Published && !access {
 		writeErr(w, http.StatusNotFound, "олдсонгүй")
 		return

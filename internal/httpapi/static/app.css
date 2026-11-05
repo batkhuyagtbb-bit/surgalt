@@ -4919,3 +4919,49 @@ a.np-item:active{background:var(--line)}
 .group-wrap:hover .group-del,.group-del:focus-visible{opacity:1;transform:none}
 .group-del:hover{background:var(--coral);color:#fff}
 @media (hover:none){.group-del{opacity:1;transform:none}}
+
+/* ---- Байгууллага (org.go): хөтөлбөр, заадаг багш, багш нар ---- */
+.avatar-xs{width:24px;height:24px;font-size:.62rem}
+.org-teachers{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 14px}
+.org-course .org-teachers{margin:10px 4px 0}
+.org-teacher{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:.82rem;font-weight:700;color:var(--text);transition:border-color .15s,color .15s}
+.org-teacher:hover{border-color:var(--brand);color:var(--brand)}
+.org-course{display:flex;flex-direction:column;min-width:0}
+.org-course>.course-card{flex:1}
+.org-prog{margin:0 0 30px}
+.org-prog-head{display:flex;align-items:flex-start;gap:12px;margin:0 0 14px}
+.org-prog-head>div{flex:1;min-width:0}
+.org-prog-head h2{margin:0;font:800 1.25rem var(--sans);letter-spacing:-.02em}
+.org-prog-head p{margin:4px 0 0;font-size:.9rem}
+.org-staff{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.org-staff-card{display:flex;align-items:center;gap:14px;padding:16px;transition:transform .15s,border-color .15s}
+.org-staff-card:hover{transform:translateY(-2px);border-color:var(--brand)}
+.org-staff-card strong{display:block}
+.org-staff-card small{display:block;margin-top:2px}
+/* студи */
+.gp-list-acts{display:flex;flex-wrap:wrap;gap:8px}
+.gp-courses{display:grid;gap:4px;margin-top:18px}
+.gp-courses>.gp-grid{margin-top:0}
+.gp-prog{margin:0 0 22px}
+.gp-prog h2{display:flex;align-items:center;gap:8px;margin:0 0 4px;font:800 1.08rem var(--sans)}
+.gp-prog h2 small{padding:2px 9px;border-radius:999px;background:var(--surface-2);color:var(--muted);font-size:.75rem;font-weight:700}
+.gp-prog>p{margin:0 0 10px}
+.gp-prog>.gp-grid{margin-top:10px}
+.g-teachers,.g-org{font-weight:700}
+.g-org{color:var(--brand)!important}
+.gp-shared,.gp-teachers{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;margin:8px 0 0;font-size:.88rem;color:var(--text-2)}
+.gp-shared{padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
+.gp-shared span,.gp-teachers span{flex:1;min-width:200px}
+.gp-shared svg,.gp-teachers svg{color:var(--brand);flex:none}
+.gp-teachers a{font-weight:700;color:var(--text)}
+.gp-teachers a:hover{color:var(--brand)}
+.prog-list{display:grid;gap:10px;margin-bottom:10px}
+.prog-row{display:flex;gap:8px;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
+.prog-fields{flex:1;display:grid;gap:6px;min-width:0}
+.prog-acts{display:flex;gap:2px}
+.ct-add{display:flex;gap:8px;margin:12px 0 4px}
+.ct-add .input{flex:1;min-width:0}
+.ct-list{margin-top:10px}
+@media (max-width:560px){.ct-add{flex-direction:column}.prog-row{flex-direction:column}.prog-acts{align-self:flex-end}}
+.group-body small.g-org{flex-wrap:nowrap;align-items:flex-start}
+.group-body small.g-org svg{flex:none;margin-top:2px}

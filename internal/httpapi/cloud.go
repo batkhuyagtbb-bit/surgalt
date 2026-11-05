@@ -125,7 +125,7 @@ func (s *Server) handleSendCloud(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "үүлэн үгийн хэсэг олдсонгүй")
 		return
 	}
-	if course.TeacherID == c.UID {
+	if teaches(course, c.UID) {
 		writeErr(w, http.StatusBadRequest, "багш өөрийн хичээлийн үүлэн үгэнд хариулахгүй — үр дүнг л харна")
 		return
 	}

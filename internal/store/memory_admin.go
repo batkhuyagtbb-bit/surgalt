@@ -19,7 +19,8 @@ func (m *Memory) AdminUsers(_ context.Context) ([]User, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	out := make([]User, 0, len(m.users))
-	for _, u := range m.users {
+	for id := range m.users {
+		u, _ := m.userLocked(id)
 		out = append(out, *u)
 	}
 	slices.SortFunc(out, func(a, b User) int { return b.CreatedAt.Compare(a.CreatedAt) })

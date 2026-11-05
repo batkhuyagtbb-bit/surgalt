@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,8 @@ type courseInput struct {
 	BlockMinutes  int    `json:"block_minutes"`   // хэтэрвэл хэдэн минутын дараа автоматаар нээгдэх (0 = анхдагч 30 мин, -1 = багш нээтэл)
 	// AccessCode — нууц үгтэй сургалт ("" = нууц үггүй); ирээгүй (nil) бол одоогийнхоо хэвээр.
 	AccessCode *string `json:"access_code"`
+	// ProgramID — байгууллагын мэргэжлийн хөтөлбөр ("" = хөтөлбөргүй); ирээгүй (nil) бол хэвээр.
+	ProgramID *string `json:"program_id"`
 }
 
 // teacherCourse — багшид: нууц үгтэй сургалтын нууц үг харагдана (нийтэд хэзээ ч гарахгүй).
@@ -87,6 +90,25 @@ func (s *Server) invalidateTeacher(r *http.Request, teacherID, username string) 
 			s.search.markDirty()
 		}
 	}
+	// Байгууллагын сургалтад холбогдсон бол тэдгээрийн хуудас, байгууллагын профайл багшийн нэр, зургийг харуулдаг.
+	if cs, err := s.store.CoursesTaughtBy(r.Context(), teacherID); err == nil {
+		for i := range cs {
+			s.courseEdited(r.Context(), &cs[i])
+		}
+	}
+}
+
+// courseProgram — сургалтын хөтөлбөрийг шалгана: байгууллагын хөтөлбөр эсвэл хоосон.
+func (s *Server) courseProgram(w http.ResponseWriter, r *http.Request, uid string, id *string) (string, bool) {
+	if id == nil || *id == "" {
+		return "", true
+	}
+	org, _ := s.orgOf(r.Context(), uid)
+	p, ok := validProgram(org, *id)
+	if !ok {
+		writeErr(w, http.StatusBadRequest, "ийм мэргэжлийн хөтөлбөр алга — хуудсаа сэргээнэ үү")
+	}
+	return p, ok
 }
 
 func (s *Server) handleCreateCourse(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +124,11 @@ func (s *Server) handleCreateCourse(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, msg)
 		return
 	}
-	course := &store.Course{TeacherID: c.UID, Title: in.Title, Description: in.Description, Price: in.Price, Published: in.Published, Drip: in.Drip, UnlockAllPaid: in.UnlockAllPaid, Camera: in.Camera, Certificate: in.Certificate, MaxWarnings: in.MaxWarnings, BlockHours: in.BlockHours, BlockMinutes: in.BlockMinutes}
+	program, ok := s.courseProgram(w, r, c.UID, in.ProgramID)
+	if !ok {
+		return
+	}
+	course := &store.Course{TeacherID: c.UID, Title: in.Title, Description: in.Description, Price: in.Price, Published: in.Published, Drip: in.Drip, UnlockAllPaid: in.UnlockAllPaid, Camera: in.Camera, Certificate: in.Certificate, MaxWarnings: in.MaxWarnings, BlockHours: in.BlockHours, BlockMinutes: in.BlockMinutes, ProgramID: program}
 	if in.AccessCode != nil {
 		course.AccessCode, course.Locked = *in.AccessCode, *in.AccessCode != ""
 	}
@@ -133,12 +159,21 @@ func (s *Server) handleUpdateCourse(w http.ResponseWriter, r *http.Request) {
 	} else if cur, err := s.store.CourseByID(r.Context(), course.ID); err == nil && cur.TeacherID == c.UID {
 		course.AccessCode = cur.AccessCode // «Нийтлэх» г.м хэсэгчилсэн хадгалалт нууц үгийг арилгахгүй
 	}
+	program, ok := s.courseProgram(w, r, c.UID, in.ProgramID)
+	if !ok {
+		return
+	}
 	if err := s.store.UpdateCourse(r.Context(), course); s.storeErr(w, r, err) {
 		return
 	}
-	s.courses.Delete(course.ID)
-	s.search.markDirty()
-	s.profiles.Delete(c.Name)
+	if in.ProgramID != nil && program != course.ProgramID {
+		updated, err := s.store.SetCourseOrg(r.Context(), c.UID, course.ID, program, course.Teachers)
+		if s.storeErr(w, r, err) {
+			return
+		}
+		course = updated
+	}
+	s.courseEdited(r.Context(), course)
 	writeJSON(w, http.StatusOK, teacherCourse{course, course.AccessCode})
 }
 
@@ -231,11 +266,11 @@ func lessonFromInput(in lessonInput, courseID string) *store.Lesson {
 }
 
 func (s *Server) handleCreateLesson(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
-	course, ok := s.ownCourse(w, r, c.UID)
+	course, ok := s.teachCourse(w, r, c.UID)
 	if !ok {
 		return
 	}
@@ -243,7 +278,7 @@ func (s *Server) handleCreateLesson(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if msg := in.validate(c.UID, course); msg != "" {
+	if msg := in.validate(course.TeacherID, course); msg != "" {
 		writeErr(w, http.StatusBadRequest, msg)
 		return
 	}
@@ -251,18 +286,16 @@ func (s *Server) handleCreateLesson(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.CreateLesson(r.Context(), l); s.storeErr(w, r, err) {
 		return
 	}
-	s.courses.Delete(course.ID)
-	s.search.markDirty()
-	s.profiles.Delete(c.Name)
+	s.courseEdited(r.Context(), course)
 	writeJSON(w, http.StatusCreated, l)
 }
 
 func (s *Server) handleUpdateLesson(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
-	course, ok := s.ownCourse(w, r, c.UID)
+	course, ok := s.teachCourse(w, r, c.UID)
 	if !ok {
 		return
 	}
@@ -270,7 +303,7 @@ func (s *Server) handleUpdateLesson(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if msg := in.validate(c.UID, course); msg != "" {
+	if msg := in.validate(course.TeacherID, course); msg != "" {
 		writeErr(w, http.StatusBadRequest, msg)
 		return
 	}
@@ -279,19 +312,17 @@ func (s *Server) handleUpdateLesson(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.UpdateLesson(r.Context(), l); s.storeErr(w, r, err) {
 		return
 	}
-	s.courses.Delete(course.ID)
-	s.search.markDirty()
-	s.profiles.Delete(c.Name)
+	s.courseEdited(r.Context(), course)
 	writeJSON(w, http.StatusOK, l)
 }
 
 // handleReorderLessons: багш хичээлүүдийг чирж зөөсний дараа бүх дараалал ба бүлгийг нэг дор хадгална.
 func (s *Server) handleReorderLessons(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
-	course, ok := s.ownCourse(w, r, c.UID)
+	course, ok := s.teachCourse(w, r, c.UID)
 	if !ok {
 		return
 	}
@@ -320,9 +351,7 @@ func (s *Server) handleReorderLessons(w http.ResponseWriter, r *http.Request) {
 		s.storeErr(w, r, err)
 		return
 	}
-	s.courses.Delete(course.ID)
-	s.search.markDirty()
-	s.profiles.Delete(c.Name)
+	s.courseEdited(r.Context(), course)
 	lessons, err := s.store.LessonsByCourse(r.Context(), course.ID)
 	if s.storeErr(w, r, err) {
 		return
@@ -333,7 +362,7 @@ func (s *Server) handleReorderLessons(w http.ResponseWriter, r *http.Request) {
 // lessonAccess: үнэгүй, багш, дангаар худалдаж авсан, эсвэл үнэтэй багцад элссэн.
 // Нууц үгтэй сургалт: зөвхөн багш болон одоогийн нууц үгийг оруулсан хүн (өмнө нь элссэн ч) — үнэгүй хичээл ч түгжээтэй.
 func (s *Server) lessonAccess(ctx context.Context, uid string, course *store.Course, l *store.Lesson) (bool, error) {
-	if course.TeacherID == uid {
+	if teaches(course, uid) {
 		return true, nil
 	}
 	if course.Locked {
@@ -494,7 +523,7 @@ func dripState(course *store.Course, lessons []store.Lesson, l *store.Lesson, pr
 
 // fullAccess: багш, эсвэл үнэтэй багцад элссэн бөгөөд сургалт "багц төлсөн бол бүгд нээлттэй" тохиргоотой.
 func fullAccess(course *store.Course, uid string, enrolled bool) bool {
-	return course.TeacherID == uid || (course.UnlockAllPaid && enrolled && course.Price > 0)
+	return teaches(course, uid) || (course.UnlockAllPaid && enrolled && course.Price > 0)
 }
 
 // handleCompleteLesson: суралцагч хичээлээ дууссан гэж тэмдэглэнэ (явцын хэсэгт харагдана).
@@ -523,17 +552,17 @@ func (s *Server) handleCompleteLesson(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, "энэ хичээлд эрхгүй")
 		return
 	}
-	if l.Exam != nil && course.TeacherID != c.UID {
+	if l.Exam != nil && !teaches(course, c.UID) {
 		writeErr(w, http.StatusConflict, "шалгалтыг өгч тэнцсэнээр дуусна")
 		return
 	}
-	if l.Assignment != nil && course.TeacherID != c.UID {
+	if l.Assignment != nil && !teaches(course, c.UID) {
 		if _, err := s.store.SubmissionFor(r.Context(), c.UID, l.ID); err != nil {
 			writeErr(w, http.StatusConflict, "даалгаврын хариугаа илгээснээр дуусна")
 			return
 		}
 	}
-	if l.ActiveMin > 0 && course.TeacherID != c.UID {
+	if l.ActiveMin > 0 && !teaches(course, c.UID) {
 		done, err := s.lessonActiveSec(r.Context(), c.UID, l.ID)
 		if s.storeErr(w, r, err) {
 			return
@@ -605,19 +634,58 @@ func (s *Server) handleMyCourses(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	cs, err := s.store.CoursesByTeacher(r.Context(), c.UID, false)
+	ctx := r.Context()
+	cs, err := s.store.CoursesByTeacher(ctx, c.UID, false)
 	if s.storeErr(w, r, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, cs)
+	// ?shared=1 — студийн «Сургалтууд»: байгууллагаас энэ багшийг холбосон сургалтуудыг ч (shared, org) нэмнэ.
+	// Бусад дуудлага (шууд хичээл, суралцагчид…) зөвхөн өөрийн сургалтыг авна.
+	var shared []store.Course
+	if r.URL.Query().Get("shared") == "1" {
+		if shared, err = s.store.CoursesTaughtBy(ctx, c.UID); s.storeErr(w, r, err) {
+			return
+		}
+	}
+	var ids []string
+	for _, list := range [][]store.Course{cs, shared} {
+		for _, co := range list {
+			ids = append(ids, co.Teachers...)
+			ids = append(ids, co.TeacherID)
+		}
+	}
+	refs := map[string]TeacherRef{}
+	if len(shared) > 0 || slices.ContainsFunc(cs, func(co store.Course) bool { return len(co.Teachers) > 0 }) {
+		refs = s.peopleRefs(ctx, ids)
+	}
+	out := make([]myCourse, 0, len(cs)+len(shared))
+	for _, co := range cs {
+		out = append(out, myCourse{Course: co, TeacherList: pickRefs(refs, co.Teachers)})
+	}
+	for _, co := range shared {
+		mc := myCourse{Course: co, Shared: true, TeacherList: pickRefs(refs, co.Teachers)}
+		if o, ok := refs[co.TeacherID]; ok {
+			mc.Org = &o
+		}
+		out = append(out, mc)
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// myCourse — студийн сургалтын жагсаалтын мөр: холбосон багш нар; байгууллагаас хуваалцсан бол Shared ба байгууллага.
+type myCourse struct {
+	store.Course
+	TeacherList []TeacherRef `json:"teacher_list"`
+	Shared      bool         `json:"shared,omitempty"`
+	Org         *TeacherRef  `json:"org,omitempty"`
 }
 
 func (s *Server) handleMyCourse(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
-	course, ok := s.ownCourse(w, r, c.UID)
+	course, ok := s.teachCourse(w, r, c.UID)
 	if !ok {
 		return
 	}
@@ -650,7 +718,19 @@ func (s *Server) handleMyCourse(w http.ResponseWriter, r *http.Request) {
 		ids[i] = lessons[i].ID
 	}
 	counts, _ := s.store.CommentCounts(r.Context(), ids) // хэлэлцүүлгийн сэтгэгдлийн тоо (жагсаалтад)
-	writeJSON(w, http.StatusOK, map[string]any{"course": teacherCourse{course, course.AccessCode}, "lessons": lessons, "comments": counts})
+	out := map[string]any{"course": teacherCourse{course, course.AccessCode}, "lessons": lessons, "comments": counts}
+	// Байгууллагын сургалт: эзэмшигчид хөтөлбөрүүд, холбосон багш нар; холбосон багшид — байгууллага (shared).
+	refs := s.peopleRefs(r.Context(), append(slices.Clone(course.Teachers), course.TeacherID))
+	out["teacher_list"] = pickRefs(refs, course.Teachers)
+	if course.TeacherID != c.UID {
+		out["shared"] = true
+		if o, ok := refs[course.TeacherID]; ok {
+			out["org"] = o
+		}
+	} else if org, ok := s.orgOf(r.Context(), c.UID); ok {
+		out["programs"] = viewOrg(org.Org).Programs
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) handleMyEnrollments(w http.ResponseWriter, r *http.Request) {
@@ -690,7 +770,7 @@ func (s *Server) handleCourseAccess(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	owner := course.TeacherID == c.UID
+	owner := teaches(course, c.UID)
 	enrolled := owner
 	if !owner {
 		if enrolled, err = s.store.IsEnrolled(r.Context(), c.UID, course.ID); s.storeErr(w, r, err) {
@@ -753,7 +833,7 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
-	if course.TeacherID != c.UID && !course.Published {
+	if !teaches(course, c.UID) && !course.Published {
 		writeErr(w, http.StatusNotFound, "олдсонгүй")
 		return
 	}
@@ -774,7 +854,7 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Дараалсан нээлт: өмнөх хичээлээ үзсэн, хүлээх хугацаа нь өнгөрсөн байх ёстой (үнэгүй хичээл үргэлж нээлттэй).
-	if course.Drip && !l.AlwaysOpen && !l.IsFree && course.TeacherID != c.UID {
+	if course.Drip && !l.AlwaysOpen && !l.IsFree && !teaches(course, c.UID) {
 		lessons, err := s.store.LessonsByCourse(r.Context(), course.ID)
 		if s.storeErr(w, r, err) {
 			return
@@ -814,7 +894,7 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 		s.apiErr(w, r, blockedErr(b))
 		return
 	}
-	if course.TeacherID != c.UID {
+	if !teaches(course, c.UID) {
 		_ = s.store.MarkLessonViewed(r.Context(), c.UID, course.ID, l.ID)
 		if l.IsFree { // үнэгүй хичээл үзсэнийг багшид мэдэгдэнэ (нэгтгэж)
 			s.trackView(r, course.TeacherID, NotifLessonView, l.ID, l.Title, "/c/"+cid)
@@ -865,7 +945,7 @@ func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "олдсонгүй")
 		return
 	}
-	if course.TeacherID == c.UID {
+	if teaches(course, c.UID) {
 		writeErr(w, http.StatusBadRequest, "өөрийн сургалтыг худалдан авах боломжгүй")
 		return
 	}

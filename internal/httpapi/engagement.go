@@ -25,7 +25,7 @@ func (s *Server) handleSaveReflection(w http.ResponseWriter, r *http.Request) {
 	if s.apiErr(w, r, err) {
 		return
 	}
-	if course.TeacherID == c.UID {
+	if teaches(course, c.UID) {
 		writeErr(w, http.StatusBadRequest, "өөрийн хичээлд дүгнэлт бичихгүй")
 		return
 	}
@@ -71,7 +71,7 @@ func (s *Server) handleVideoProgress(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if course.TeacherID == c.UID {
+	if teaches(course, c.UID) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}

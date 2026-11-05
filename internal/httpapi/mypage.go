@@ -46,7 +46,7 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 	now := time.Now()
 	for _, hc := range courses {
 		c := hc.Course
-		if c.TeacherID == uid { // багшийн өөрийн сургалт (урьдчилан үзсэн) цол, даалгаварт орохгүй
+		if teaches(&c, uid) { // багшийн өөрийн сургалт (урьдчилан үзсэн) цол, даалгаварт орохгүй
 			continue
 		}
 		lessons, err := s.store.LessonsByCourse(ctx, c.ID)
@@ -134,7 +134,7 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 				continue
 			}
 			c, err := s.store.CourseByID(ctx, id)
-			if err != nil || c.TeacherID == uid {
+			if err != nil || teaches(c, uid) {
 				continue
 			}
 			lessons, err := s.store.LessonsByCourse(ctx, c.ID)

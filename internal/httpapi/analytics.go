@@ -192,6 +192,15 @@ type analyticsData struct {
 func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID string, days int) (*analyticsData, []store.StudySession, []store.ExamAttempt, error) {
 	since := time.Now().AddDate(0, 0, -days)
 	f := store.ActivityFilter{TeacherID: teacherID, CourseID: courseID, UserID: userID, Since: since}
+	// Багш нар өөрсдөө урьдчилан үзсэн нь тоологдохгүй: эзэмшигч ба (байгууллагын сургалтад) холбосон багш нар.
+	skip := map[string]bool{teacherID: true}
+	if courseID != "" {
+		if co, err := s.store.CourseByID(ctx, courseID); err == nil {
+			for _, t := range co.Teachers {
+				skip[t] = true
+			}
+		}
+	}
 	ss, err := s.store.Sessions(ctx, f, 20000)
 	if err != nil {
 		return nil, nil, nil, err
@@ -239,7 +248,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 	userDays := map[string]map[string]bool{} // uid -> "2006-01-02" -> идэвхтэй байсан эсэх
 	for i := range ss {
 		x := &ss[i]
-		if x.UserID == teacherID {
+		if skip[x.UserID] {
 			continue // багш өөрөө үзсэнийг тоолохгүй
 		}
 		st := get(x.UserID, x.UserName)
@@ -261,7 +270,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 	seenQ := map[string]bool{}                // uid|lesson|block — хамгийн эртний лог = анхны оролдлого
 	for i := len(quizLogs) - 1; i >= 0; i-- { // QuizLogs шинэ → хуучин ирдэг тул урвуугаар
 		l := quizLogs[i]
-		if l.UserID == teacherID {
+		if skip[l.UserID] {
 			continue
 		}
 		st := get(l.UserID, l.UserName)
@@ -293,7 +302,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 	scope := s.scopeCourses(ctx, teacherID, courseID)
 	s.addBoardStats(ctx, scope, teacherID, userID, since, get)
 	for _, m := range quizMasteryFromScope(scope, userID) {
-		if m.UserID == teacherID {
+		if skip[m.UserID] {
 			continue
 		}
 		st := get(m.UserID, "")
@@ -312,7 +321,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 		return evidence[k]
 	}
 	for i := range ss {
-		if ss[i].UserID != teacherID {
+		if !skip[ss[i].UserID] {
 			ev(ss[i].UserID, ss[i].CourseID).addSession(&ss[i])
 		}
 	}
@@ -336,7 +345,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 			}
 		}
 		for uid := range users {
-			if uid == teacherID || (userID != "" && uid != userID) {
+			if skip[uid] || (userID != "" && uid != userID) {
 				continue
 			}
 			ranks, info := computeRanks(sc.lessons, sc.progress[uid], ev(uid, sc.course.ID))
@@ -356,7 +365,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 		}
 	}
 	for _, rf := range refs {
-		if rf.UserID == teacherID {
+		if skip[rf.UserID] {
 			continue
 		}
 		st := get(rf.UserID, rf.UserName)
@@ -364,7 +373,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 		st.ReflectionWords += rf.Words
 	}
 	for _, v := range watches {
-		if v.UserID == teacherID || v.Duration <= 0 {
+		if skip[v.UserID] || v.Duration <= 0 {
 			continue
 		}
 		st := get(v.UserID, v.UserName)
@@ -393,7 +402,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 		st.StreakDays = streak
 	}
 	for _, a := range atts {
-		if a.UserID == teacherID {
+		if skip[a.UserID] {
 			continue
 		}
 		st := get(a.UserID, a.UserName)
@@ -428,7 +437,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 		out.Daily = append(out.Daily, map[string]any{"day": d, "active_min": v[0] / 60, "inactive_min": v[1] / 60, "active_sec": v[0], "inactive_sec": v[1]})
 	}
 	for _, e := range evs {
-		if e.UserID != teacherID || e.Type == "teacher_remind" {
+		if !skip[e.UserID] || e.Type == "teacher_remind" {
 			out.Events = append(out.Events, e)
 		}
 	}
@@ -574,13 +583,17 @@ const analyticsStudents = 300
 // handleAnalytics: GET /api/me/analytics?course=&days=&q= — нэгтгэл бүх суралцагчаар, хүснэгт нь хязгаартай.
 // Студи минут тутам шинэчилдэг тул нэгтгэлийг 20 секунд кэшилнэ (хэд хэдэн цонх, давтан хүсэлт сангаас дахин тооцохгүй).
 func (s *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
+	if !ok {
+		return
+	}
+	tid, ok := s.analyticsOwner(w, r, c.UID) // байгууллагын сургалтад эзэмшигчийн хүрээ
 	if !ok {
 		return
 	}
 	course, days := r.URL.Query().Get("course"), analyticsDays(r)
-	data, err := s.analyticsAgg.GetOrLoad(r.Context(), c.UID+"|"+course+"|"+strconv.Itoa(days), func(ctx context.Context) (*analyticsData, error) {
-		d, _, _, err := s.buildAnalytics(ctx, c.UID, course, "", days)
+	data, err := s.analyticsAgg.GetOrLoad(r.Context(), tid+"|"+course+"|"+strconv.Itoa(days), func(ctx context.Context) (*analyticsData, error) {
+		d, _, _, err := s.buildAnalytics(ctx, tid, course, "", days)
 		return d, err
 	})
 	if s.storeErr(w, r, err) {
@@ -608,7 +621,11 @@ func (s *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
 // handleAnalyticsEvents: GET /api/me/analytics/events?course=&student=&days=&limit=20&before_at=&before_id=
 // "Сүүлийн үйл явдал"-ыг хуудсаар (scroll хийхэд дараагийн 20) өгнө. (at, id) курсороор тогтвортой.
 func (s *Server) handleAnalyticsEvents(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
+	if !ok {
+		return
+	}
+	tid, ok := s.analyticsOwner(w, r, c.UID)
 	if !ok {
 		return
 	}
@@ -617,7 +634,7 @@ func (s *Server) handleAnalyticsEvents(w http.ResponseWriter, r *http.Request) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
-	f := store.ActivityFilter{TeacherID: c.UID, CourseID: q.Get("course"), UserID: q.Get("student"),
+	f := store.ActivityFilter{TeacherID: tid, CourseID: q.Get("course"), UserID: q.Get("student"),
 		Since: time.Now().AddDate(0, 0, -analyticsDays(r))}
 	if v := q.Get("before_at"); v != "" {
 		t, err := time.Parse(time.RFC3339Nano, v)
@@ -633,7 +650,7 @@ func (s *Server) handleAnalyticsEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	out := []store.ActivityEvent{}
 	for _, e := range evs {
-		if e.UserID != c.UID || e.Type == "teacher_remind" {
+		if (e.UserID != tid && e.UserID != c.UID) || e.Type == "teacher_remind" {
 			out = append(out, e)
 		}
 	}
@@ -646,18 +663,22 @@ func (s *Server) handleAnalyticsEvents(w http.ResponseWriter, r *http.Request) {
 
 // handleStudentAnalytics: GET /api/me/analytics/students/{uid}?course=&days=
 func (s *Server) handleStudentAnalytics(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
+	if !ok {
+		return
+	}
+	tid, ok := s.analyticsOwner(w, r, c.UID)
 	if !ok {
 		return
 	}
 	uid := r.PathValue("uid")
 	days := analyticsDays(r)
 	courseID := r.URL.Query().Get("course")
-	data, ss, atts, err := s.buildAnalytics(r.Context(), c.UID, courseID, uid, days)
+	data, ss, atts, err := s.buildAnalytics(r.Context(), tid, courseID, uid, days)
 	if s.storeErr(w, r, err) {
 		return
 	}
-	f := store.ActivityFilter{TeacherID: c.UID, CourseID: courseID, UserID: uid, Since: time.Now().AddDate(0, 0, -days)}
+	f := store.ActivityFilter{TeacherID: tid, CourseID: courseID, UserID: uid, Since: time.Now().AddDate(0, 0, -days)}
 	quizLogs, err := s.store.QuizLogs(r.Context(), f, 300)
 	if s.storeErr(w, r, err) {
 		return
@@ -685,7 +706,7 @@ func (s *Server) handleStudentAnalytics(w http.ResponseWriter, r *http.Request) 
 	}
 	qrows := map[string]*quizLessonRow{}
 	var qorder []string
-	for _, m := range s.quizMasteryRows(r.Context(), c.UID, courseID, uid) {
+	for _, m := range s.quizMasteryRows(r.Context(), tid, courseID, uid) {
 		qrows[m.LessonID] = &quizLessonRow{quizMasteryRow: m}
 		qorder = append(qorder, m.LessonID)
 		titleByLesson[m.LessonID] = m.Title
@@ -785,7 +806,7 @@ func (s *Server) handleStudentAnalytics(w http.ResponseWriter, r *http.Request) 
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"student": st, "sessions": ss, "lessons": perLesson, "exams": atts, "events": data.Events, "daily": data.Daily, "labels": eventLabels(),
 		"quiz_logs": quizLogs, "quiz_lessons": quizLessons, "lesson_titles": titleByLesson, "reflections": refs, "watches": watchRows,
-		"blocks": s.teacherStudentBlocks(r, c.UID, uid, titleByLesson)})
+		"blocks": s.teacherStudentBlocks(r, tid, uid, titleByLesson)})
 }
 
 func eventLabels() map[string]string {
@@ -798,12 +819,16 @@ func eventLabels() map[string]string {
 
 // handleAnalyticsExport: GET /api/me/analytics/export?course=&student=&days= — Excel-д нээгдэх CSV (UTF-8 BOM).
 func (s *Server) handleAnalyticsExport(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
+	if !ok {
+		return
+	}
+	tid, ok := s.analyticsOwner(w, r, c.UID)
 	if !ok {
 		return
 	}
 	q := r.URL.Query()
-	data, ss, atts, err := s.buildAnalytics(r.Context(), c.UID, q.Get("course"), q.Get("student"), analyticsDays(r))
+	data, ss, atts, err := s.buildAnalytics(r.Context(), tid, q.Get("course"), q.Get("student"), analyticsDays(r))
 	if s.storeErr(w, r, err) {
 		return
 	}

@@ -137,7 +137,7 @@ func (s *Server) handleExamStart(w http.ResponseWriter, r *http.Request) {
 		}
 		s.finishAttempt(r, a, l, course, nil, store.AttemptExpired, "хугацаа дууссан")
 	}
-	if allowed := l.Exam.Attempts + s.reopenCount(r, c.UID, l.ID); l.Exam.Attempts > 0 && len(atts) >= allowed && course.TeacherID != c.UID {
+	if allowed := l.Exam.Attempts + s.reopenCount(r, c.UID, l.ID); l.Exam.Attempts > 0 && len(atts) >= allowed && !teaches(course, c.UID) {
 		writeErr(w, http.StatusConflict, fmt.Sprintf("оролдлогын тоо дууссан (%d)", allowed))
 		return
 	}
@@ -255,8 +255,8 @@ func (s *Server) finishAttempt(r *http.Request, a *store.ExamAttempt, l *store.L
 			Type: "auto_block", Detail: "Шалгалт зөрчлөөр хаагдсан · " + reason, At: now})
 	}
 	s.logEvents(r.Context(), evs)
-	if a.UserID != course.TeacherID && status != store.AttemptTerminated {
-		s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: "exam", ActorID: a.UserID, Title: title, Body: short(l.Title + " · " + reason), Link: "/me#students"})
+	if !teaches(course, a.UserID) && status != store.AttemptTerminated {
+		s.notifyCourse(r.Context(), course, a.UserID, store.Notification{Type: "exam", ActorID: a.UserID, Title: title, Body: short(l.Title + " · " + reason), Link: "/me#course=" + course.ID})
 	}
 	if a.Passed {
 		_ = s.store.MarkLessonCompleted(r.Context(), a.UserID, a.CourseID, a.LessonID)

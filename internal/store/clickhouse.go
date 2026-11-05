@@ -253,6 +253,9 @@ var chMigrations = []string{
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS commission_pct Float64 DEFAULT 0", // төлөгдөх үеийн шимтгэл (0 = хуучин)
 	"ALTER TABLE payouts ADD COLUMN IF NOT EXISTS bank_ref String DEFAULT ''",      // Хаан банкаар шилжүүлсэн: transferid
 	"ALTER TABLE payouts ADD COLUMN IF NOT EXISTS journal String DEFAULT ''",       // банкны журналын дугаар
+	"ALTER TABLE users ADD COLUMN IF NOT EXISTS org String DEFAULT ''",             // байгууллагын гэрээ, хөтөлбөрүүд (JSON)
+	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS program_id String DEFAULT ''",    // байгууллагын мэргэжлийн хөтөлбөр
+	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS teachers Array(String)",          // байгууллагын сургалтад холбосон багш нар
 	// Эцэг эхийн зөвшөөрлийн боломжийг хассан: хадгалсан нас, эцэг эхийн нэр, утсыг устгана.
 	"ALTER TABLE users DROP COLUMN IF EXISTS age_group",
 	"ALTER TABLE users DROP COLUMN IF EXISTS guardian_name",
@@ -598,21 +601,22 @@ func (c *ClickHouse) counters(ctx context.Context, entity string, ids []string) 
 // ---- хэрэглэгч ----
 
 const userCols = `id, username, email, password_hash, role, display_name, headline, bio, avatar_url, cover_url,
-	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, phone_verified, phone_pending, rank_hidden, consent_version, consent_at, tokens_after, deleted, plan`
+	subjects, location, links, created_at, storage_extra_bytes, storage_expires_at, google_token, phone, phone_verified, phone_pending, rank_hidden, consent_version, consent_at, tokens_after, deleted, plan, org`
 
 func scanUser(r driver.Rows) (*User, bool, error) {
 	var u User
 	var role string
 	var deleted bool
 	var exp *time.Time
-	var plan string
+	var plan, org string
 	if err := r.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &role, &u.DisplayName, &u.Headline, &u.Bio,
 		&u.AvatarURL, &u.CoverURL, &u.Subjects, &u.Location, &u.Links, &u.CreatedAt, &u.StorageExtraBytes, &exp,
-		&u.GoogleToken, &u.Phone, &u.PhoneVerified, &u.PhonePending, &u.RankHidden, &u.ConsentVersion, &u.ConsentAt, &u.TokensAfter, &deleted, &plan); err != nil {
+		&u.GoogleToken, &u.Phone, &u.PhoneVerified, &u.PhonePending, &u.RankHidden, &u.ConsentVersion, &u.ConsentAt, &u.TokensAfter, &deleted, &plan, &org); err != nil {
 		return nil, false, err
 	}
 	u.Role = Role(role)
 	u.Plan = decodePlan(plan)
+	u.Org = decodeOrg(org)
 	u.StorageExpiresAt = exp
 	u.MeetConnected = u.GoogleToken != ""
 	if u.Subjects == nil {
@@ -628,10 +632,10 @@ func (c *ClickHouse) writeUser(ctx context.Context, u *User, deleted bool) error
 	defer c.forgetUser(u.ID)
 	return c.insert(ctx, "users", []string{"id", "username", "email", "password_hash", "role", "display_name", "headline", "bio",
 		"avatar_url", "cover_url", "subjects", "location", "links", "created_at", "storage_extra_bytes", "storage_expires_at",
-		"google_token", "phone", "phone_verified", "phone_pending", "rank_hidden", "consent_version", "consent_at", "tokens_after", "plan", "ver", "deleted"},
+		"google_token", "phone", "phone_verified", "phone_pending", "rank_hidden", "consent_version", "consent_at", "tokens_after", "plan", "org", "ver", "deleted"},
 		u.ID, u.Username, u.Email, u.PasswordHash, string(u.Role), u.DisplayName, u.Headline, u.Bio,
 		u.AvatarURL, u.CoverURL, nzStrings(u.Subjects), u.Location, nzLinks(u.Links), u.CreatedAt.UTC(), u.StorageExtraBytes,
-		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, u.PhoneVerified, u.PhonePending, u.RankHidden, u.ConsentVersion, nullTime(u.ConsentAt), nullTime(u.TokensAfter), u.Plan.encode(), ver(), deleted)
+		nullTime(u.StorageExpiresAt), u.GoogleToken, u.Phone, u.PhoneVerified, u.PhonePending, u.RankHidden, u.ConsentVersion, nullTime(u.ConsentAt), nullTime(u.TokensAfter), u.Plan.encode(), u.Org.encode(), ver(), deleted)
 }
 
 func (c *ClickHouse) userWhere(ctx context.Context, where string, args ...any) (*User, error) {

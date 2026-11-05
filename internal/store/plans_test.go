@@ -127,3 +127,32 @@ func TestPlanStorage(t *testing.T) {
 		t.Fatalf("Starter: %+v", st)
 	}
 }
+
+// Байгууллага: хянагчийн тогтоосон шимтгэл, файлын сан, хугацаагүй эрх; 0% гэрээ «хуучин захиалга» (21%) болохгүй.
+func TestOrgPlan(t *testing.T) {
+	SetTeacherCommission(21)
+	defer SetTeacherCommission(0)
+	now := time.Now()
+	u := &User{Role: RoleTeacher, CreatedAt: now.AddDate(-2, 0, 0), Org: &Org{Pct: 7.5, StorageMB: 2048}}
+	if id, pct, ok := u.PlanAt(now); id != PlanOrg || pct != 7.5 || !ok || !u.PlanActive(now.AddDate(50, 0, 0)) {
+		t.Fatalf("байгууллагын эрх: %s %v %v", id, pct, ok)
+	}
+	if u.StorageBase(10<<20, now) != 2048<<20 {
+		t.Fatalf("файлын сан: %d", u.StorageBase(10<<20, now))
+	}
+	o := &Order{Amount: 10000, CommissionPct: saleCommissionPct(u, now)}
+	if OrderCommission(o) != 750 {
+		t.Fatalf("7.5%% шимтгэл: %d", OrderCommission(o))
+	}
+	u.Org.Pct = 0
+	o = &Order{Amount: 10000, CommissionPct: saleCommissionPct(u, now)}
+	if OrderCommission(o) != 0 {
+		t.Fatalf("0%% гэрээнд шимтгэл авлаа: %d", OrderCommission(o))
+	}
+	if OrderCommission(&Order{Amount: 10000}) != 2100 { // хуучин захиалга хэвээр
+		t.Fatal("хуучин захиалгын шимтгэл өөрчлөгдлөө")
+	}
+	if decodeOrg(u.Org.encode()) == nil || decodeOrg("") != nil {
+		t.Fatal("org JSON")
+	}
+}

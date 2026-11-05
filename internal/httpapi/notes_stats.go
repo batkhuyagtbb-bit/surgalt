@@ -99,11 +99,11 @@ func (n *noteCounts) add(h store.Highlight) {
 
 // GET /api/me/courses/{id}/notes-stats — багш: суралцагч бүр, хичээл бүрийн тэмдэглэл ба story үзэлт.
 func (s *Server) handleNotesStats(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
-	course, ok := s.ownCourse(w, r, c.UID)
+	course, ok := s.teachCourse(w, r, c.UID)
 	if !ok {
 		return
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -51,6 +52,9 @@ func (s *Server) convRole(ctx context.Context, c auth.Claims, conv *store.Conver
 	if conv.Kind == store.ConvGroup {
 		if c.IsGuest() {
 			return "", false
+		}
+		if co, err := s.store.CourseByID(ctx, conv.CourseID); err == nil && teaches(co, c.UID) { // байгууллагын холбосон багш
+			return store.SenderTeacher, true
 		}
 		ok, err := s.courseMember(ctx, c.UID, conv.CourseID)
 		if err != nil || !ok {
@@ -378,7 +382,7 @@ func (s *Server) handleCourseChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	role := store.SenderVisitor
-	if course.TeacherID == c.UID {
+	if teaches(course, c.UID) {
 		role = store.SenderTeacher
 	} else {
 		member, err := s.courseMember(r.Context(), c.UID, course.ID)
@@ -427,6 +431,10 @@ func (s *Server) handleMyConversations(w http.ResponseWriter, r *http.Request) {
 	if s.storeErr(w, r, err) {
 		return
 	}
+	if sg := s.sharedGroups(r.Context(), c.UID); len(sg) > 0 { // байгууллагын сургалтын бүлэг чатууд
+		convs = append(convs, sg...)
+		sort.SliceStable(convs, func(i, j int) bool { return convs[i].LastMessageAt.After(convs[j].LastMessageAt) })
+	}
 	convs = s.dropHiddenConvs(r.Context(), c.UID, convs)
 	s.knowConvs(c.UID, convs)
 	writeJSON(w, http.StatusOK, convs)
@@ -463,6 +471,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 			if mine, err = s.store.TeacherConversations(gctx, c.UID, 200); err == nil {
 				groups = append(groups, mine...)
 			}
+			groups = append(groups, s.sharedGroups(gctx, c.UID)...)
 		}
 		cancel()
 		if err != nil {

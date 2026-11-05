@@ -191,7 +191,7 @@ func (s *Server) dueFor(r *http.Request, uid string, course *store.Course, l *st
 	case l.Assignment != nil:
 		d = l.Assignment.Due
 	}
-	if course.TeacherID == uid {
+	if teaches(course, uid) {
 		return DueState{StartAt: d.StartAt, At: d.At, Policy: d.Late, Open: true, EntryFee: d.Fee}
 	}
 	lp, fp := s.passes(r, uid, course.ID, l.ID)
@@ -316,7 +316,7 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "энэ хичээл даалгавар биш")
 		return
 	}
-	if course.TeacherID == c.UID {
+	if teaches(course, c.UID) {
 		writeErr(w, http.StatusBadRequest, "багш өөрийн даалгаварт хариу илгээхгүй")
 		return
 	}
@@ -417,8 +417,8 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.store.MarkLessonCompleted(r.Context(), c.UID, course.ID, l.ID)
-	s.notify(r.Context(), &store.Notification{UserID: course.TeacherID, Type: "assignment", ActorID: c.UID, Title: "📎 Даалгаврын хариу ирлээ",
-		Body: sub.UserName + " — «" + l.Title + "»" + map[bool]string{true: " (хоцорсон)", false: ""}[sub.Late], Link: "/t/" + c.Name + "#course=" + course.ID})
+	s.notifyCourse(r.Context(), course, c.UID, store.Notification{Type: "assignment", ActorID: c.UID, Title: "📎 Даалгаврын хариу ирлээ",
+		Body: sub.UserName + " — «" + l.Title + "»" + map[bool]string{true: " (хоцорсон)", false: ""}[sub.Late], Link: "/me#course=" + course.ID})
 	s.courses.Delete(course.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"submission": s.subView(sub), "due": ds})
 }
@@ -428,11 +428,11 @@ const submissionsPage = 200
 
 // handleSubmissions: GET .../submissions?offset= — багшид хариунууд: дүгнээгүй нь эхэнд, дараа нь шинээс.
 func (s *Server) handleSubmissions(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
-	course, ok := s.ownCourse(w, r, c.UID)
+	course, ok := s.teachCourse(w, r, c.UID)
 	if !ok {
 		return
 	}
@@ -464,11 +464,11 @@ func (s *Server) handleSubmissions(w http.ResponseWriter, r *http.Request) {
 
 // handleGrade: PUT .../submissions/{uid} — оноо, тайлбар; суралцагчид мэдэгдэнэ.
 func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
-	course, ok := s.ownCourse(w, r, c.UID)
+	course, ok := s.teachCourse(w, r, c.UID)
 	if !ok {
 		return
 	}

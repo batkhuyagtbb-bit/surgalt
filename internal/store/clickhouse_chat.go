@@ -100,6 +100,13 @@ func (c *ClickHouse) UserGroupConversations(ctx context.Context, userID string, 
 	return c.convsWhere(ctx, "kind = ? AND has(?, course_id)", "ORDER BY last_message_at DESC LIMIT ?", ConvGroup, ids, limit)
 }
 
+func (c *ClickHouse) GroupConversationsByCourses(ctx context.Context, courseIDs []string) ([]Conversation, error) {
+	if len(courseIDs) == 0 {
+		return []Conversation{}, nil
+	}
+	return c.convsWhere(ctx, "kind = ? AND has(?, course_id)", "ORDER BY last_message_at DESC LIMIT 500", ConvGroup, courseIDs)
+}
+
 func (c *ClickHouse) ConversationByID(ctx context.Context, id string) (*Conversation, error) {
 	cs, err := c.convsWhere(ctx, "id = ?", "LIMIT 1", id)
 	if err != nil {

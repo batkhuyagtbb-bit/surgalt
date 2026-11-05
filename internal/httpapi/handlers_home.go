@@ -592,15 +592,15 @@ const studentsLimit = 1000
 
 // handleCourseStudents: GET /api/me/courses/{id}/students?q=&offset=&limit= — нэг сургалтын суралцагчид.
 func (s *Server) handleCourseStudents(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
-	course, ok := s.ownCourse(w, r, c.UID)
+	course, ok := s.teachCourse(w, r, c.UID)
 	if !ok {
 		return
 	}
-	ro, err := s.teacherRoster(r.Context(), c.UID)
+	ro, err := s.teacherRoster(r.Context(), course.TeacherID) // байгууллагын сургалтад эзэмшигчийнх
 	if s.storeErr(w, r, err) {
 		return
 	}

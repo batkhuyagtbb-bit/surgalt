@@ -111,11 +111,11 @@ func sortJournal(out []JournalStudent) {
 
 // handleCourseJournal: GET /api/me/courses/{id}/journal
 func (s *Server) handleCourseJournal(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
-	course, ok := s.ownCourse(w, r, c.UID)
+	course, ok := s.teachCourse(w, r, c.UID)
 	if !ok {
 		return
 	}

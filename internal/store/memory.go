@@ -142,7 +142,7 @@ func (m *Memory) CreateUser(_ context.Context, u *User) error {
 	u.ID, u.CreatedAt, u.Email = m.next(), time.Now(), email
 	u.Subjects, u.Links = cloneStrings(u.Subjects), cloneLinks(u.Links)
 	c := *u
-	c.Subjects, c.Links = cloneStrings(u.Subjects), cloneLinks(u.Links)
+	c.Subjects, c.Links, c.Org = cloneStrings(u.Subjects), cloneLinks(u.Links), u.Org.Clone()
 	m.users[u.ID], m.byEmail[email], m.byUsername[u.Username] = &c, u.ID, u.ID
 	return nil
 }
@@ -153,7 +153,7 @@ func (m *Memory) userLocked(id string) (*User, error) {
 		return nil, ErrNotFound
 	}
 	c := *u
-	c.Subjects, c.Links = cloneStrings(u.Subjects), cloneLinks(u.Links)
+	c.Subjects, c.Links, c.Org = cloneStrings(u.Subjects), cloneLinks(u.Links), u.Org.Clone()
 	return &c, nil
 }
 
@@ -238,6 +238,9 @@ func (m *Memory) TeacherStudentCount(_ context.Context, teacherID string) (int64
 
 func (m *Memory) courseCopyLocked(c *Course) Course {
 	cc := *c
+	if len(c.Teachers) > 0 {
+		cc.Teachers = cloneStrings(c.Teachers)
+	}
 	cc.LessonCount, cc.FreeLessonCount = 0, 0
 	cc.Locked = cc.AccessCode != ""
 	for _, l := range m.lessons[c.ID] {
@@ -261,8 +264,39 @@ func (m *Memory) CreateCourse(_ context.Context, c *Course) error {
 	now := time.Now()
 	c.ID, c.CreatedAt, c.UpdatedAt = m.next(), now, now
 	cc := *c
+	if len(c.Teachers) > 0 {
+		cc.Teachers = cloneStrings(c.Teachers)
+	}
 	m.courses[c.ID] = &cc
 	return nil
+}
+
+func (m *Memory) CoursesTaughtBy(_ context.Context, teacherID string) ([]Course, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := []Course{}
+	for _, c := range m.courses {
+		if slices.Contains(c.Teachers, teacherID) {
+			out = append(out, m.courseCopyLocked(c))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	return out, nil
+}
+
+func (m *Memory) SetCourseOrg(_ context.Context, ownerID, courseID, programID string, teachers []string) (*Course, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cur, ok := m.courses[courseID]
+	if !ok || cur.TeacherID != ownerID {
+		return nil, ErrNotFound
+	}
+	cur.ProgramID, cur.Teachers, cur.UpdatedAt = programID, nil, time.Now()
+	if len(teachers) > 0 {
+		cur.Teachers = cloneStrings(teachers)
+	}
+	cc := m.courseCopyLocked(cur)
+	return &cc, nil
 }
 
 func (m *Memory) UpdateCourse(_ context.Context, c *Course) error {
@@ -1084,6 +1118,19 @@ func (m *Memory) GetOrCreateGroupConversation(_ context.Context, teacherID, cour
 	m.convs[conv.ID], m.convByKey[key] = conv, conv.ID
 	cc := *conv
 	return &cc, nil
+}
+
+func (m *Memory) GroupConversationsByCourses(_ context.Context, courseIDs []string) ([]Conversation, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := []Conversation{}
+	for _, cv := range m.convs {
+		if cv.Kind == ConvGroup && slices.Contains(courseIDs, cv.CourseID) {
+			out = append(out, *cv)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].LastMessageAt.After(out[j].LastMessageAt) })
+	return out, nil
 }
 
 func (m *Memory) UserGroupConversations(_ context.Context, userID string, limit int) ([]Conversation, error) {

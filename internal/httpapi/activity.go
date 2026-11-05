@@ -180,7 +180,7 @@ func (s *Server) handleActivityBeat(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRemindStudent(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
@@ -198,8 +198,11 @@ func (s *Server) handleRemindStudent(w http.ResponseWriter, r *http.Request) {
 	}
 	uid := r.PathValue("uid")
 	course, err := s.store.CourseByID(r.Context(), in.CourseID)
-	if err != nil || course.TeacherID != c.UID {
+	if err != nil || !teaches(course, c.UID) {
 		writeErr(w, http.StatusNotFound, "сургалт олдсонгүй")
+		return
+	}
+	if !s.planOpen(w, r, course.TeacherID) { // байгууллагын сургалтад эрхийг байгууллагаар
 		return
 	}
 	member, err := s.courseMember(r.Context(), uid, course.ID)
@@ -214,7 +217,7 @@ func (s *Server) handleRemindStudent(w http.ResponseWriter, r *http.Request) {
 	}
 	teacher := s.displayName(r.Context(), c.UID, c.Name)
 	s.notify(r.Context(), &store.Notification{UserID: uid, Type: "remind", ActorID: c.UID, Title: "📣 " + teacher + " багшаас сануулга", Body: short(in.Message), Link: "/c/" + course.ID})
-	s.logEvents(r.Context(), []store.ActivityEvent{{UserID: uid, UserName: s.displayName(r.Context(), uid, ""), CourseID: course.ID, TeacherID: c.UID, Type: "teacher_remind", Detail: in.Message}})
+	s.logEvents(r.Context(), []store.ActivityEvent{{UserID: uid, UserName: s.displayName(r.Context(), uid, ""), CourseID: course.ID, TeacherID: course.TeacherID, Type: "teacher_remind", Detail: in.Message}}) // эзэмшигчийн хүрээнд (байгууллагын сургалт)
 	writeJSON(w, http.StatusOK, map[string]any{"sent": true})
 }
 

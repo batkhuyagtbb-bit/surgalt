@@ -100,7 +100,7 @@ func (s *Server) lessonBlocks(ctx context.Context, uid string, f store.ActivityF
 // (явц, үүлэн үг, тодруулга…) үүнийг шалгадаг тул 15 секунд кэшилнэ; хориг/цуцлалт бичигдэхэд шууд шинэчлэгдэнэ
 // (blocksChanged).
 func (s *Server) lessonBlocked(ctx context.Context, uid string, course *store.Course, lessonID string) *LessonBlock {
-	if uid == "" || course.TeacherID == uid {
+	if uid == "" || teaches(course, uid) {
 		return nil
 	}
 	b, _ := s.blocks.GetOrLoad(ctx, uid+"|"+lessonID, func(ctx context.Context) (*LessonBlock, error) {
@@ -142,7 +142,7 @@ func blockedErr(b *LessonBlock) error {
 // handleUnblockStudent: POST /api/me/students/{uid}/unblock {lesson_id?} — багш хоригийг цуцална
 // (lesson_id хоосон бол өөрийн бүх сургалт дахь бүх хоригийг).
 func (s *Server) handleUnblockStudent(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireTeacher(w, r)
+	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
 		return
 	}
@@ -151,20 +151,45 @@ func (s *Server) handleUnblockStudent(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in) // хоосон бие ч болно
 	uid := r.PathValue("uid")
-	courses, err := s.store.CoursesByTeacher(r.Context(), c.UID, false)
+	ctx := r.Context()
+	// Өөрийн сургалтууд (системийн эрхтэй бол) ба байгууллагаас холбосон сургалтууд (эрхийг байгууллагаар).
+	courses, err := s.store.CoursesByTeacher(ctx, c.UID, false)
 	if s.storeErr(w, r, err) {
 		return
 	}
-	hours := map[string]int{}
-	for _, co := range courses {
-		hours[co.ID] = blockMinutes(&co)
+	if until, err := s.planUntil(ctx, c.UID); err == nil && !time.Now().Before(until) {
+		courses = nil
 	}
-	bs := s.lessonBlocks(r.Context(), uid, store.ActivityFilter{TeacherID: c.UID, LessonID: in.LessonID}, func(cid string) int { return hours[cid] })
+	shared, err := s.store.CoursesTaughtBy(ctx, c.UID)
+	if s.storeErr(w, r, err) {
+		return
+	}
+	courses = append(courses, shared...)
+	if len(courses) == 0 && !s.planOpen(w, r, c.UID) { // эрх дууссан, холбосон сургалтгүй
+		return
+	}
+	hours, ownerOf := map[string]int{}, map[string]string{}
+	for _, co := range courses {
+		hours[co.ID], ownerOf[co.ID] = blockMinutes(&co), co.TeacherID
+	}
 	courseOf, lessonOf := map[string]string{}, map[string]store.Lesson{}
 	for _, co := range courses {
-		ls, _ := s.store.LessonsByCourse(r.Context(), co.ID)
+		ls, _ := s.store.LessonsByCourse(ctx, co.ID)
 		for _, l := range ls {
 			courseOf[l.ID], lessonOf[l.ID] = co.ID, l
+		}
+	}
+	// Үйл явдал сургалтын эзэмшигчийн ID-гаар бичигддэг тул эзэмшигч бүрээр уншиж, зөвхөн өөрийн заадаг хичээлийг авна.
+	bs := map[string]LessonBlock{}
+	owners := map[string]bool{}
+	for _, o := range ownerOf {
+		owners[o] = true
+	}
+	for o := range owners {
+		for lid, b := range s.lessonBlocks(ctx, uid, store.ActivityFilter{TeacherID: o, LessonID: in.LessonID}, func(cid string) int { return hours[cid] }) {
+			if _, mine := courseOf[lid]; mine {
+				bs[lid] = b
+			}
 		}
 	}
 	targets := make(map[string]bool, len(bs))
@@ -203,7 +228,7 @@ func (s *Server) handleUnblockStudent(w http.ResponseWriter, r *http.Request) {
 		if lessonOf[lid].Exam != nil {
 			detail = "багш шалгалтыг дахин нээв (+1 оролдлого)"
 		}
-		evs = append(evs, store.ActivityEvent{UserID: uid, UserName: name, CourseID: courseOf[lid], LessonID: lid, TeacherID: c.UID, Type: "teacher_unblock", Detail: detail, At: time.Now()})
+		evs = append(evs, store.ActivityEvent{UserID: uid, UserName: name, CourseID: courseOf[lid], LessonID: lid, TeacherID: ownerOf[courseOf[lid]], Type: "teacher_unblock", Detail: detail, At: time.Now()})
 		if len(targets) == 1 {
 			link = "/c/" + courseOf[lid] + "#l=" + lid
 		}

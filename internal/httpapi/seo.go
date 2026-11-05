@@ -270,7 +270,24 @@ func ldProfile(p PublicProfile, base string) template.JS {
 		person["interactionStatistic"] = map[string]any{"@type": "InteractionCounter",
 			"interactionType": "https://schema.org/FollowAction", "userInteractionCount": t.StudentCount}
 	}
-	page := map[string]any{"@type": "ProfilePage", "@id": url, "url": url, "name": t.DisplayName + " — " + firstNonEmpty(t.Headline, "Багш"),
+	role := "Багш"
+	if p.Org { // байгууллага: Person биш боловсролын байгууллага, багш нар нь ажилтан
+		role = "Байгууллага"
+		person["@type"] = "EducationalOrganization"
+		delete(person, "jobTitle")
+		if loc, ok := person["homeLocation"]; ok {
+			delete(person, "homeLocation")
+			person["location"] = loc
+		}
+		var staff []any
+		for _, s := range p.Staff {
+			staff = append(staff, map[string]any{"@type": "Person", "name": s.DisplayName, "url": base + "/t/" + s.Username})
+		}
+		if len(staff) > 0 {
+			person["employee"] = staff
+		}
+	}
+	page := map[string]any{"@type": "ProfilePage", "@id": url, "url": url, "name": t.DisplayName + " — " + firstNonEmpty(t.Headline, role),
 		"inLanguage": "mn", "mainEntity": map[string]any{"@id": url + "#person"}, "isPartOf": ldWebsiteRef(base)}
 	if p.OGImage != "" {
 		page["primaryImageOfPage"] = p.OGImage

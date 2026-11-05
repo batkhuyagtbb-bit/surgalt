@@ -252,6 +252,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/courses/{id}/enroll", s.handleEnroll)
 	mux.HandleFunc("PUT /api/courses/{id}/lessons/{lid}", s.handleUpdateLesson)
 	mux.HandleFunc("DELETE /api/courses/{id}", s.handleDeleteCourse)
+	mux.HandleFunc("POST /api/courses/{id}/teachers", s.handleAddCourseTeacher)
+	mux.HandleFunc("DELETE /api/courses/{id}/teachers/{uid}", s.handleRemoveCourseTeacher)
 	mux.HandleFunc("DELETE /api/courses/{id}/lessons/{lid}", s.handleDeleteLesson)
 	mux.HandleFunc("PUT /api/courses/{id}/lessons/{lid}/visibility", s.handleLessonVisibility)
 	mux.HandleFunc("PUT /api/courses/{id}/lesson-order", s.handleReorderLessons)
@@ -352,6 +354,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/plans", s.handlePlans)
 	mux.HandleFunc("GET /api/me/plan", s.handleMyPlan)
 	mux.HandleFunc("POST /api/me/plan/purchase", s.handleBuyPlan)
+	mux.HandleFunc("GET /api/me/org", s.handleMyOrg)
+	mux.HandleFunc("PUT /api/me/org/programs", s.handleOrgPrograms)
 
 	// Google Meet
 	mux.HandleFunc("POST /api/me/meet/connect", s.handleMeetConnect)
@@ -412,6 +416,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/admin/teachers", s.handleAdminTeachers)
 	mux.HandleFunc("GET /api/admin/teachers/{id}", s.handleAdminTeacher)
 	mux.HandleFunc("POST /api/admin/teachers/{id}/plan", s.handleAdminGrantPlan)
+	// Байгууллага (org.go): хянагч үүсгэж, шимтгэл, файлын санг тогтооно.
+	mux.HandleFunc("GET /api/admin/orgs", s.handleAdminOrgs)
+	mux.HandleFunc("POST /api/admin/orgs", s.handleAdminCreateOrg)
+	mux.HandleFunc("PUT /api/admin/orgs/{id}", s.handleAdminUpdateOrg)
 	mux.HandleFunc("GET /api/admin/students", s.handleAdminStudents)
 	mux.HandleFunc("GET /api/admin/students/{id}", s.handleAdminStudent)
 	mux.HandleFunc("POST /api/admin/students/{id}/make-teacher", s.handleAdminMakeTeacher)

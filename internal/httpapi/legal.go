@@ -28,12 +28,14 @@ type meView struct {
 	// RankKey — нүүр хуудасны «Идэвхтэй суралцагчид» дээр өөрийн картаа танихад; RankHidden — жагсаалтаас нуусан.
 	RankKey    string `json:"rank_key"`
 	RankHidden bool   `json:"rank_hidden"`
+	// Org — байгууллагын бүртгэл бол гэрээний нөхцөл, мэргэжлийн хөтөлбөрүүд (студи байгууллагын горимд).
+	Org *orgView `json:"org,omitempty"`
 }
 
 func (s *Server) me(u *store.User) meView {
 	return meView{User: u, Phone: u.Phone, ConsentVersion: u.ConsentVersion, ConsentNeeded: u.ConsentVersion != TermsVersion, IsAdmin: s.isAdmin(u),
 		PhoneVerified: u.PhoneVerified, PhonePending: u.PhonePending, PhoneRequired: s.Verify != nil && u.PhoneVerified == "" && u.PhonePending == "",
-		RankKey: s.rankKey(u.ID), RankHidden: u.RankHidden}
+		RankKey: s.rankKey(u.ID), RankHidden: u.RankHidden, Org: viewOrg(u.Org)}
 }
 
 // consentNow — бүртгүүлэх (эсвэл зөвшөөрөх) үед зөвшөөрлийг тэмдэглэнэ.

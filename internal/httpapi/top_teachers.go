@@ -61,7 +61,7 @@ func (s *Server) topTeachers(ctx context.Context) (map[string][]topTeacher, erro
 	rows := make([]row, 0, len(users))
 	for i := range users {
 		u := &users[i]
-		if u.Role != store.RoleTeacher {
+		if u.Role != store.RoleTeacher || u.Org != nil { // байгууллага багшийн жагсаалтад орохгүй
 			continue
 		}
 		rows = append(rows, row{u, ranks[u.ID]})

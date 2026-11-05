@@ -60,6 +60,36 @@ type User struct {
 	GoogleToken   string `json:"-"`
 	MeetConnected bool   `json:"meet_connected"`
 	ProfileViews  int64  `json:"profile_views"`
+	// Org — байгууллагын бүртгэл (хянагч үүсгэнэ; nil бол энгийн хэрэглэгч). Байгууллага нь багшийн бүх боломжтой
+	// (сургалт, данс, файлын сан), харин шимтгэл, файлын сан нь гэрээгээр, системийн эрх (багц) шаардахгүй.
+	Org *Org `json:"-"`
+}
+
+// Org — байгууллагын гэрээний нөхцөл ба мэргэжлийн хөтөлбөрүүд (users.org баганад JSON-оор).
+type Org struct {
+	Pct       float64   `json:"commission_pct"` // борлуулалтын шимтгэл (%)
+	StorageMB int64     `json:"storage_mb"`     // файлын сан
+	Programs  []Program `json:"programs"`
+}
+
+// Program — байгууллагын мэргэжлийн хөтөлбөр: сургалтуудыг бүлэглэнэ (Course.ProgramID).
+type Program struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// ProgramByID — байгууллагын хөтөлбөр (олдохгүй бол nil).
+func (o *Org) ProgramByID(id string) *Program {
+	if o == nil || id == "" {
+		return nil
+	}
+	for i := range o.Programs {
+		if o.Programs[i].ID == id {
+			return &o.Programs[i]
+		}
+	}
+	return nil
 }
 
 // LinkKeys — профайл дээр зөвшөөрөгдсөн гадаад холбоосын төрлүүд (харуулах дарааллаар).
@@ -152,7 +182,12 @@ type Course struct {
 	// BlockHours — (хуучин) хориг хэдэн цаг; BlockMinutes байвал түүнийг ашиглана.
 	BlockHours int `json:"block_hours"`
 	// BlockMinutes — сануулга хэтэрсний дараа хориг хэдэн минутын дараа автоматаар нээгдэх (0 = багш нээтэл).
-	BlockMinutes    int       `json:"block_minutes"`
+	BlockMinutes int `json:"block_minutes"`
+	// ProgramID — байгууллагын сургалтын мэргэжлийн хөтөлбөр (Org.Programs). Хоосон = хөтөлбөргүй.
+	ProgramID string `json:"program_id,omitempty"`
+	// Teachers — байгууллагын сургалтад холбосон багш нар: хичээл оруулж, зохион байгуулна. Сургалт тэдний
+	// профайл дээр гарахгүй — зөвхөн байгууллагын хуудаснаас «хэн заадаг»-аар нь профайл руу холбогдоно.
+	Teachers        []string  `json:"teachers,omitempty"`
 	LessonCount     int       `json:"lesson_count"`
 	FreeLessonCount int       `json:"free_lesson_count"`
 	Views           int64     `json:"views"`
@@ -679,6 +714,10 @@ type Store interface {
 	DeleteCourse(ctx context.Context, teacherID, courseID string) error
 	CourseByID(ctx context.Context, id string) (*Course, error)
 	CoursesByTeacher(ctx context.Context, teacherID string, onlyPublished bool) ([]Course, error)
+	// CoursesTaughtBy — байгууллагаас энэ багшийг холбосон сургалтууд (Course.Teachers).
+	CoursesTaughtBy(ctx context.Context, teacherID string) ([]Course, error)
+	// SetCourseOrg — байгууллага (эзэмшигч) сургалтынхаа хөтөлбөр, холбосон багш нарыг тохируулна.
+	SetCourseOrg(ctx context.Context, ownerID, courseID, programID string, teachers []string) (*Course, error)
 	// PublishedCourses нь хайлтын индексэд: бүх нийтлэгдсэн сургалт (limit хүртэл).
 	PublishedCourses(ctx context.Context, limit int) ([]Course, error)
 	// LessonOutlines нь сургалтуудын хичээлийн гарчиг, бүлэг, хэлбэр (агуулга, блокгүй — хөнгөн).
@@ -753,6 +792,8 @@ type Store interface {
 	GetOrCreateGroupConversation(ctx context.Context, teacherID, courseID, title string) (*Conversation, error)
 	// UserGroupConversations нь хэрэглэгчийн элссэн эсвэл хичээл худалдаж авсан сургалтуудын бүлэг чатууд.
 	UserGroupConversations(ctx context.Context, userID string, limit int) ([]Conversation, error)
+	// GroupConversationsByCourses — сургалтуудын бүлэг чатууд (байгууллагын сургалтад холбосон багшид).
+	GroupConversationsByCourses(ctx context.Context, courseIDs []string) ([]Conversation, error)
 	ConversationByID(ctx context.Context, id string) (*Conversation, error)
 	// AddMessage нь m.TeacherID, m.VisitorKey-г яриагаас бөглөнө.
 	AddMessage(ctx context.Context, m *Message) error

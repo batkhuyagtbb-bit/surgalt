@@ -9,6 +9,10 @@ let me;
 try { me = await api("/api/me"); Auth.set(Auth.token, me); } catch { return; }
 let main = null;
 const teacher = me.role === "teacher";
+// Байгууллага (org.go): me.org — гэрээ, мэргэжлийн хөтөлбөрүүд. filesCourse — сургалтын засварт файл сургалтын
+// эзэмшигчийн санд хуулагдана (байгууллагын сургалтад холбосон багш байгууллагын санд хуулна).
+let filesCourse = "";
+const filesQ = () => (filesCourse ? "&course=" + encodeURIComponent(filesCourse) : "");
 const fmtSize = (b) => b >= 1 << 30 ? (b / (1 << 30)).toFixed(2) + " GB" : b >= 1 << 20 ? (b / (1 << 20)).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
 const initialsOf = (name) => (name || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 const avatar = (u, cls = "avatar-md") => `<div class="avatar ${cls}" style="--h:${hueOfName(u.username)}">${u.avatar_url ? `<img src="${esc(u.avatar_url)}" alt="">` : esc(initialsOf(u.display_name))}</div>`;
@@ -50,6 +54,7 @@ const ICON = {
   back: '<path d="M15 6l-6 6 6 6"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
   trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/>',
+  school: '<path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M9 21v-5h6v5"/><path d="M12 5V2.5h3"/>',
   grip: '<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
   image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
@@ -89,7 +94,7 @@ window.Studio = {
   me: () => me,
   teacher,
   async mount(container, view, arg) {
-    cleanup?.(); cleanup = null;
+    cleanup?.(); cleanup = null; filesCourse = "";
     main = container; mounted = [container, view, arg];
     main.innerHTML = `<div class="loader"></div>`;
     const ps = await loadPlan();
@@ -161,7 +166,7 @@ function planLock(ps) {
 }
 // Дуусахад 7 хоног үлдсэн бол бүх хэсэгт, үнэгүй хугацаанд тойм дээр сануулга.
 function planBanner(ps, view) {
-  if (!ps?.active || !main || view === "wallet") return;
+  if (!ps?.active || ps.org || !main || view === "wallet") return;
   const soon = ps.days_left <= 7, trial = ps.plan === "trial";
   if (!soon && !(trial && (!view || view === "overview"))) return;
   const el = document.createElement("div");
@@ -354,8 +359,11 @@ async function overview() {
    Сургалт бүр нэг "групп". Дотор нь багш хичээлээ мэдээ нийтэлж байгаа мэт бичиж,
    хавсралт нэмж, урсгал (feed) хэлбэрээр харж, тэр дор нь засна. */
 
+// Байгууллага: сургалтын мэргэжлийн хөтөлбөр (me.org.programs).
+const programSelect = (cur = "") => me.org ? `<label>Мэргэжлийн хөтөлбөр<select name="program_id"><option value="">— Хөтөлбөргүй —</option>${me.org.programs.map((p) => `<option value="${esc(p.id)}" ${p.id === cur ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select>${me.org.programs.length ? "" : `<small class="muted">Хөтөлбөрөө «Сургалтууд» хэсгийн «Мэргэжлийн хөтөлбөр» товчоор үүсгэнэ.</small>`}</label>` : "";
 const courseFormHTML = (c = {}) => `
-  <label>Сургалтын нэр<input name="title" required maxlength="200" value="${esc(c.title || "")}" placeholder="ЭЕШ Математик — Бүрэн бэлтгэл"></label>
+  <label>Сургалтын нэр<input name="title" required maxlength="200" value="${esc(c.title || "")}" placeholder="${me.org ? "Програмчлалын үндэс" : "ЭЕШ Математик — Бүрэн бэлтгэл"}"></label>
+  ${programSelect(c.program_id)}
   <label>Тайлбар<textarea name="description" rows="4" placeholder="Энэ сургалтаар юу сурах вэ?">${esc(c.description || "")}</textarea></label>
   <div class="form-row"><label>Багц үнэ (₮)<input name="price" type="number" min="0" step="1000" value="${c.price || 0}"><small class="muted">0 бол хичээл тус бүрээр зарна</small></label>
   <label class="check" style="align-self:center"><input type="checkbox" name="published" ${c.published ? "checked" : ""}> Нийтлэх (профайл дээр харагдана)</label></div>
@@ -375,7 +383,7 @@ const courseFormHTML = (c = {}) => `
   <label class="check"><input type="checkbox" name="certificate" ${c.certificate ? "checked" : ""}><span>${ico("medal", 16)} Сургалтыг дүүргэсэн суралцагчид сертификат олгоно (хайлтад «Сертификаттай» шошго гарна)</span></label>`;
 const courseBody = (f) => ({ title: f.title.value, description: f.description.value, price: +f.price.value || 0, published: f.published.checked, drip: f.drip.checked, unlock_all_paid: f.unlock_all_paid.checked, certificate: f.certificate.checked, camera: f.camera.value,
   max_warnings: f.max_warnings ? +f.max_warnings.value || 3 : undefined, block_minutes: f.block_minutes ? +f.block_minutes.value || 30 : undefined, block_hours: 0,
-  access_code: f.locked ? (f.locked.checked ? f.access_code.value.trim() : "") : undefined });
+  access_code: f.locked ? (f.locked.checked ? f.access_code.value.trim() : "") : undefined, program_id: f.program_id ? f.program_id.value : undefined });
 // Нууц үгтэй сургалт: асаахад санамсаргүй үг санал болгоно, хуулах.
 const genCode = () => { const a = "abcdefghjkmnpqrstuvwxyz23456789"; return Array.from(crypto.getRandomValues(new Uint8Array(6)), (x) => a[x % a.length]).join(""); };
 document.addEventListener("change", (e) => {
@@ -393,22 +401,38 @@ const MODES = [["", "— Заах аргын төрөл —"], ["classroom", "Т
 const kindName = (k) => (FORMATS.find(([v]) => v === k)?.[1] || MODES.find(([v]) => v === k)?.[1] || "");
 const UNLOCKS = [[0, "Шууд (өмнөхийг үзмэгц)"], [1, "1 цагийн дараа"], [24, "1 хоногийн дараа"], [72, "3 хоногийн дараа"], [168, "7 хоногийн дараа"], [336, "14 хоногийн дараа"], [720, "1 сарын дараа"]];
 
+// Сургалтын карт дээрх багш нар (байгууллагын сургалт).
+const teachersLine = (ts) => (ts?.length ? `<small class="g-teachers" title="Заадаг багш">${ico("users", 14)}${ts.map((t) => esc(t.display_name)).join(", ")}</small>` : "");
 async function courses() {
-  const list = await api("/api/me/courses");
+  const all = await api("/api/me/courses?shared=1");
+  const list = all.filter((c) => !c.shared), shared = all.filter((c) => c.shared);
   searchCourses = list;
-  main.innerHTML = `<div class="gp-list-head"><div><h1>Миний сургалтууд</h1><p class="muted">${list.length} сургалт · ${list.filter((c) => c.published).length} нийтлэгдсэн</p></div>
-      <button class="btn btn-gold" id="newCourse">${ico("plus", 18)}Шинэ сургалт үүсгэх</button></div>
-    <div class="group-grid gp-grid">${list.map((c) => `<div class="group-wrap">
+  const card = (c) => `<div class="group-wrap">
       <a class="group" href="#course=${esc(c.id)}" style="--h:${hueOfName(c.title)}"><div class="group-art"><span class="chip">${c.published ? "Нийтлэгдсэн" : "Ноорог"}</span><b>${esc(c.title.trim()[0] || "?")}</b></div>
-      <div class="group-body"><strong>${esc(c.title)}</strong><small>${ico("book", 14)}${c.lesson_count} хичээл · ${c.free_lesson_count} үнэгүй</small><small>${ico("eye", 14)}${c.views || 0} үзэлт · ${money(c.price) === "Үнэгүй" ? "Хичээлээр" : money(c.price)}</small>
-      <span class="btn btn-glass btn-sm" style="margin-top:6px">Удирдах</span></div></a>
-      <button type="button" class="group-del" data-del-course="${esc(c.id)}" data-title="${esc(c.title)}" title="Сургалт устгах" aria-label="«${esc(c.title)}» сургалтыг устгах">${ico("trash", 17)}</button></div>`).join("")}${list.length ? "" : `
-      <button class="group group-new" id="newCourse2">${ico("plus", 26)}<strong>Анхны сургалтаа үүсгэх</strong></button>`}</div>
+      <div class="group-body"><strong>${esc(c.title)}</strong>${c.shared ? `<small class="g-org">${ico("school", 14)}${esc(c.org?.display_name || "Байгууллага")}</small>` : ""}<small>${ico("book", 14)}${c.lesson_count} хичээл · ${c.free_lesson_count} үнэгүй</small><small>${ico("eye", 14)}${c.views || 0} үзэлт · ${money(c.price) === "Үнэгүй" ? "Хичээлээр" : money(c.price)}</small>
+      ${teachersLine(c.teacher_list)}<span class="btn btn-glass btn-sm" style="margin-top:6px">${c.shared ? "Хичээл оруулах" : "Удирдах"}</span></div></a>
+      ${c.shared ? "" : `<button type="button" class="group-del" data-del-course="${esc(c.id)}" data-title="${esc(c.title)}" title="Сургалт устгах" aria-label="«${esc(c.title)}» сургалтыг устгах">${ico("trash", 17)}</button>`}</div>`;
+  const newCard = list.length ? "" : `<button class="group group-new" id="newCourse2">${ico("plus", 26)}<strong>Анхны сургалтаа үүсгэх</strong></button>`;
+  // Байгууллага: мэргэжлийн хөтөлбөр бүрээр бүлэглэнэ (хөтөлбөргүйг сүүлд).
+  let ownHTML = `<div class="group-grid gp-grid">${list.map(card).join("")}${newCard}</div>`;
+  if (me.org && me.org.programs.length && list.length) {
+    const known = new Set(me.org.programs.map((p) => p.id));
+    const groups = [...me.org.programs.map((p) => ({ p, items: list.filter((c) => c.program_id === p.id) })), { p: null, items: list.filter((c) => !known.has(c.program_id)) }].filter((g) => g.items.length);
+    ownHTML = groups.map((g) => `<section class="gp-prog"><h2>${g.p ? esc(g.p.name) : "Хөтөлбөргүй сургалтууд"}<small>${g.items.length} сургалт</small></h2>${g.p?.description ? `<p class="muted small">${esc(g.p.description)}</p>` : ""}
+      <div class="group-grid gp-grid">${g.items.map(card).join("")}</div></section>`).join("");
+  }
+  main.innerHTML = `<div class="gp-list-head"><div><h1>${me.org ? "Сургалтууд" : "Миний сургалтууд"}</h1><p class="muted">${list.length} сургалт · ${list.filter((c) => c.published).length} нийтлэгдсэн${me.org ? ` · ${me.org.programs.length} мэргэжлийн хөтөлбөр` : ""}${shared.length ? ` · байгууллагын ${shared.length}` : ""}</p></div>
+      <div class="gp-list-acts">${me.org ? `<button class="btn btn-glass" id="orgPrograms">${ico("school", 18)}Мэргэжлийн хөтөлбөр</button>` : ""}<button class="btn btn-gold" id="newCourse">${ico("plus", 18)}Шинэ сургалт үүсгэх</button></div></div>
+    <div class="gp-courses">${ownHTML}
+    ${shared.length ? `<section class="gp-prog gp-shared-list"><h2>${ico("school", 18)}Байгууллагаас хуваалцсан сургалтууд<small>${shared.length}</small></h2>
+      <p class="muted small">Эдгээр сургалтад та хичээл оруулж, зохион байгуулна. Үнэ, нийтлэх тохиргоо, орлогыг байгууллага удирдана. Таны профайл дээр харагдахгүй — байгууллагын хуудсанд таны нэр багшаар гарна.</p>
+      <div class="group-grid gp-grid">${shared.map(card).join("")}</div></section>` : ""}</div>
     <div class="modal" id="courseModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
       <h3 class="h3">Шинэ сургалт үүсгэх</h3><form class="form" id="courseForm">${courseFormHTML()}<p class="form-error" role="alert"></p>
       <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Үүсгэх</button></div></form></div></div>`;
   const f = $("#courseForm"), open = () => { SG.openModal($("#courseModal")); f.title.focus(); };
   $("#newCourse").onclick = open; if ($("#newCourse2")) $("#newCourse2").onclick = open;
+  if ($("#orgPrograms")) $("#orgPrograms").onclick = () => orgProgramsModal(courses);
   try { if (sessionStorage.getItem("sg_new_course")) { sessionStorage.removeItem("sg_new_course"); open(); } } catch {}
   f.onsubmit = async (e) => {
     e.preventDefault();
@@ -416,7 +440,7 @@ async function courses() {
     catch (err) { $(".form-error", f).textContent = err.message; }
   };
   // Сургалт устгах: баталгаажуулах цонх. Суралцагчтай сургалтыг сервер устгахгүй (ноорог болгож нуухыг зөвлөнө).
-  $(".gp-grid").addEventListener("click", (e) => {
+  $(".gp-courses").addEventListener("click", (e) => {
     const b = e.target.closest("[data-del-course]"); if (!b) return;
     e.preventDefault();
     const id = b.dataset.delCourse, title = b.dataset.title;
@@ -438,8 +462,70 @@ async function courses() {
   });
 }
 
+// Байгууллага: мэргэжлийн хөтөлбөрүүд (нэр, тайлбар, дараалал). Хассан хөтөлбөрийн сургалтууд «хөтөлбөргүй» болно.
+function orgProgramsModal(after) {
+  const row = (p = {}) => `<div class="prog-row" data-id="${esc(p.id || "")}">
+      <div class="prog-fields"><input class="input" name="pname" maxlength="120" required value="${esc(p.name || "")}" placeholder="Хөтөлбөрийн нэр (ж: Програм хангамжийн инженер)" aria-label="Хөтөлбөрийн нэр">
+      <input class="input" name="pdesc" maxlength="1000" value="${esc(p.description || "")}" placeholder="Товч тайлбар — заавал биш (ж: 4 жил, бакалавр)" aria-label="Тайлбар"></div>
+      <span class="prog-acts"><button type="button" class="icon-btn" data-prog-up aria-label="Дээш" title="Дээш">↑</button><button type="button" class="icon-btn" data-prog-del aria-label="Хасах" title="Хасах">${ico("x", 15)}</button></span></div>`;
+  document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="progModal"><div class="modal-card" style="width:min(640px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+    <h3 class="h3">${ico("school", 18)} Мэргэжлийн хөтөлбөр</h3>
+    <p class="muted small">Сургалтуудаа мэргэжил, хөтөлбөрөөр бүлэглэнэ — байгууллагын профайл дээр хөтөлбөр бүрийн доор сургалтууд нь, сургалт бүрт заадаг багш нь харагдана.</p>
+    <form class="form" id="progForm"><div class="prog-list">${me.org.programs.map(row).join("") || row()}</div>
+      <button type="button" class="btn btn-glass btn-sm" data-prog-add>${ico("plus", 15)}Хөтөлбөр нэмэх</button>
+      <p class="form-error" role="alert"></p>
+      <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`);
+  const m = $("#progModal"), f = $("#progForm", m), listEl = $(".prog-list", m);
+  const close = () => { SG.closeModal(m); setTimeout(() => m.remove(), 300); };
+  SG.openModal(m); $("input", listEl)?.focus();
+  m.addEventListener("click", (e) => {
+    if (e.target === m || e.target.closest("[data-close]")) return close();
+    if (e.target.closest("[data-prog-add]")) { listEl.insertAdjacentHTML("beforeend", row()); $(".prog-row:last-child input", listEl).focus(); return; }
+    const r = e.target.closest(".prog-row"); if (!r) return;
+    if (e.target.closest("[data-prog-del]")) r.remove();
+    if (e.target.closest("[data-prog-up]") && r.previousElementSibling) r.previousElementSibling.before(r);
+  });
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const programs = $$(".prog-row", listEl).map((r) => ({ id: r.dataset.id, name: $("[name=pname]", r).value.trim(), description: $("[name=pdesc]", r).value.trim() })).filter((p) => p.name);
+    try { const o = await api("/api/me/org/programs", { method: "PUT", body: { programs } }); me.org = { ...me.org, ...o }; close(); toast("Хөтөлбөр хадгалагдлаа ✓"); after?.(); }
+    catch (x) { $(".form-error", f).textContent = x.message; }
+  };
+}
+
+// Байгууллага: сургалтад багш холбох (@нэр, имэйл эсвэл профайлын холбоосоор), салгах.
+function courseTeachersModal(c, list, onChange) {
+  const item = (t) => `<div class="item"><a class="avatar avatar-sm" href="/t/${esc(t.username)}" target="_blank" rel="noopener" style="--h:${hueOfName(t.username)}">${t.avatar_url ? `<img src="${esc(t.avatar_url)}" alt="">` : esc(initialsOf(t.display_name))}</a>
+      <span class="grow"><strong>${esc(t.display_name)}</strong><small class="muted">@${esc(t.username)}${t.headline ? " · " + esc(t.headline) : ""}</small></span>
+      <button type="button" class="btn btn-ghost btn-sm" data-unlink="${esc(t.id)}">Салгах</button></div>`;
+  document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="ctModal"><div class="modal-card" style="width:min(560px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+    <h3 class="h3">${ico("users", 18)} Заадаг багш нар</h3>
+    <p class="muted small">Холбосон багш энэ сургалтад хичээл оруулж, дүгнэж, зохион байгуулна. Үнэ, нийтлэх, устгах, орлого — танд. Сургалт багшийн профайлд гарахгүй, таны хуудсанд багшийн нэр профайл руу нь холбоостой харагдана.</p>
+    <form class="ct-add" id="ctForm"><input class="input" name="who" required placeholder="Багшийн @нэр, имэйл эсвэл профайлын холбоос" aria-label="Багш" autocomplete="off" spellcheck="false"><button class="btn btn-gold">${ico("plus", 16)}Холбох</button></form>
+    <p class="form-error" role="alert"></p>
+    <div class="items ct-list"></div></div></div>`);
+  const m = $("#ctModal"), f = $("#ctForm", m), err = $(".form-error", m), box = $(".ct-list", m);
+  const draw = () => { box.innerHTML = list.map(item).join("") || `<p class="muted small" style="margin:0">Одоогоор багш холбоогүй байна.</p>`; };
+  const close = () => { SG.closeModal(m); setTimeout(() => m.remove(), 300); };
+  draw(); SG.openModal(m); f.who.focus();
+  f.onsubmit = async (e) => {
+    e.preventDefault(); err.textContent = "";
+    try { const r = await api(`/api/courses/${c.id}/teachers`, { method: "POST", body: { who: f.who.value.trim() } }); list = r.teacher_list; f.who.value = ""; draw(); onChange(list); toast("Багш холбогдлоо ✓ — мэдэгдэл очлоо"); }
+    catch (x) { err.textContent = x.message; }
+  };
+  m.addEventListener("click", async (e) => {
+    if (e.target === m || e.target.closest("[data-close]")) return close();
+    const b = e.target.closest("[data-unlink]"); if (!b) return;
+    const t = list.find((x) => x.id === b.dataset.unlink);
+    if (!confirm(`${t?.display_name || "Багш"}-ийг энэ сургалтаас салгах уу? Оруулсан хичээлүүд нь сургалтад үлдэнэ.`)) return;
+    b.disabled = true;
+    try { const r = await api(`/api/courses/${c.id}/teachers/${b.dataset.unlink}`, { method: "DELETE" }); list = r.teacher_list; draw(); onChange(list); toast("Салгалаа"); }
+    catch (x) { toast(x.message, true); b.disabled = false; }
+  });
+}
+
 let library = null;
-async function loadLibrary() { library = await api("/api/me/files"); return library; }
+async function loadLibrary() { library = await api("/api/me/files" + (filesCourse ? "?course=" + encodeURIComponent(filesCourse) : "")); return library; }
 
 /* ---------- Хичээлийн блок засварлагч: текст, гарчиг, зураг, дуу, видео, файл, асуулт ---------- */
 const BE = {
@@ -725,7 +811,7 @@ function mountBlockEditor(f, blocks) {
     const m = $(".be-media", el); if (!$(".be-drop", m)) m.innerHTML = beDropHTML(type);
     const bar = $(".progress", m), fill = $("i", bar); bar.hidden = false; fill.style.width = "3%";
     const x = new XMLHttpRequest(), fd = new FormData(); fd.append("file", file);
-    x.open("POST", "/api/me/files?visibility=private"); x.setRequestHeader("Authorization", "Bearer " + Auth.token);
+    x.open("POST", "/api/me/files?visibility=private" + filesQ()); x.setRequestHeader("Authorization", "Bearer " + Auth.token);
     x.upload.onprogress = (e) => { if (e.lengthComputable) fill.style.width = Math.max(3, Math.round(e.loaded / e.total * 100)) + "%"; };
     x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {} bar.hidden = true;
       if (x.status >= 300) return toast(d?.error || "Хуулж чадсангүй", true);
@@ -771,7 +857,7 @@ function mountBlockEditor(f, blocks) {
     if (file.size > BE_LIMIT.image * 1048576) return toast(`Зураг ${BE_LIMIT.image} MB хүртэл`, true);
     const qi = $(".be-qimg", el), bar = $(".progress", qi); if (bar) bar.hidden = false;
     const x = new XMLHttpRequest(), fd = new FormData(); fd.append("file", file);
-    x.open("POST", "/api/me/files?visibility=private"); x.setRequestHeader("Authorization", "Bearer " + Auth.token);
+    x.open("POST", "/api/me/files?visibility=private" + filesQ()); x.setRequestHeader("Authorization", "Bearer " + Auth.token);
     x.upload.onprogress = (e) => { if (bar && e.lengthComputable) $("i", bar).style.width = Math.round(e.loaded / e.total * 100) + "%"; };
     x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {} if (x.status >= 300) return toast(d?.error || "Хуулж чадсангүй", true);
       qi.dataset.url = d.path; qi.dataset.preview = d.url; qi.dataset.x = ""; qi.innerHTML = qimgHTML($(".be-qkind", el).value, d.url, null); library = null; };
@@ -902,7 +988,7 @@ function mountBlockEditor(f, blocks) {
   const PIX = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
   const send = (file) => new Promise((ok, fail) => {
     const x = new XMLHttpRequest(), fd = new FormData(); fd.append("file", file);
-    x.open("POST", "/api/me/files?visibility=private"); x.setRequestHeader("Authorization", "Bearer " + Auth.token);
+    x.open("POST", "/api/me/files?visibility=private" + filesQ()); x.setRequestHeader("Authorization", "Bearer " + Auth.token);
     x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {} if (x.status < 300 && d) ok(d); else fail(new Error(d?.error || "Хуулж чадсангүй")); };
     x.onerror = () => fail(new Error("Сүлжээний алдаа — дахин оролдоно уу")); x.send(fd);
   });
@@ -1128,7 +1214,9 @@ function mountBlockEditor(f, blocks) {
 const blocksSummary = (bs) => bs.filter((b) => b.type === "text" || b.type === "heading").map((b) => b.text.replace(/\*\*|__|==|^[>-]\s|\[([^\]]*)\]\([^)]*\)/gm, "$1")).join("\n").slice(0, 1500);
 
 async function courseEditor(id) {
-  let [{ course: c, lessons, comments: commentCounts = {} }, lib, rosterPage] = await Promise.all([api(`/api/me/courses/${id}`), loadLibrary(), apiList(rosterURL(id)).catch(() => ({ items: [], total: 0 }))]);
+  filesCourse = id; // хичээлийн файл сургалтын эзэмшигчийн санд (байгууллагын сургалтад — байгууллагынх)
+  let [{ course: c, lessons, comments: commentCounts = {}, shared = false, org = null, teacher_list: teacherList = [] }, lib, rosterPage] = await Promise.all([api(`/api/me/courses/${id}`), loadLibrary(), apiList(rosterURL(id)).catch(() => ({ items: [], total: 0 }))]);
+  const orgOwner = !!me.org && !shared; // байгууллага өөрийн сургалтдаа багш холбоно
   // Олон мянган суралцагчтай сургалтад эхний 100-г л ачаална; бусдыг нь цонхонд нэрээр хайна.
   let roster = rosterPage.items, rosterTotal = rosterPage.total;
   const stripSig = (u) => (u && u.startsWith("/files/") ? u.split("?")[0] : u || ""); // гарын үсэгтэй URL-аас query-г хасна
@@ -1318,20 +1406,22 @@ async function courseEditor(id) {
         <div class="gp-cover"><a class="gp-back" href="#courses" aria-label="Сургалтууд руу буцах">${ico("back", 18)}Сургалтууд</a><b>${esc(c.title.trim()[0] || "?")}</b></div>
         <div class="gp-bar">
           <div class="grow gp-info"><h1>${esc(c.title)}</h1>
-            <p class="gp-desc">${c.description ? esc(c.description) : `<span class="muted">Тайлбар нэмээгүй байна — «Тохиргоо»-оос нэмнэ.</span>`}</p>
+            <p class="gp-desc">${c.description ? esc(c.description) : `<span class="muted">${shared ? "Тайлбар нэмээгүй байна." : "Тайлбар нэмээгүй байна — «Тохиргоо»-оос нэмнэ."}</span>`}</p>
+            ${shared ? `<p class="gp-shared">${ico("school", 16)}<span>Байгууллагын сургалт · <b>${esc(org?.display_name || "")}</b> — та хичээл оруулж, дүгнэж, зохион байгуулна. Үнэ, нийтлэх, устгах тохиргоог байгууллага удирдана.</span><button type="button" class="linkish" id="gpLeave">Сургалтаас гарах</button></p>` : ""}
+            ${orgOwner || teacherList.length ? `<p class="gp-teachers">${ico("users", 15)}<span>Заадаг багш: ${teacherList.length ? teacherList.map((t) => `<a href="/t/${esc(t.username)}" target="_blank" rel="noopener">${esc(t.display_name)}</a>`).join(", ") : `<span class="muted">холбоогүй</span>`}</span>${orgOwner ? `<button type="button" class="linkish" id="gpTeachers">${teacherList.length ? "Өөрчлөх" : "Багш холбох"}</button>` : ""}</p>` : ""}
           </div>
           <div class="gp-hside">
             <button type="button" class="gp-roster" id="gpRoster" aria-label="Суралцагчид (${rosterTotal})">
               <span class="gp-avs">${roster.slice(0, 5).map((r) => avatar(r.user, "avatar-sm")).join("") || `<span class="gp-av0">${ico("users", 16)}</span>`}</span>
               <span class="gp-rn"><b>${rosterTotal}</b> суралцагч</span>${ico("chevron", 15)}</button>
             <div class="gp-acts">
-              ${c.published ? `<a class="btn btn-glass btn-sm" href="/c/${esc(c.id)}" target="_blank" rel="noopener">${ico("ext", 16)}Харах</a>` : `<button class="btn btn-gold btn-sm" id="gpPublish">${ico("globe", 16)}Нийтлэх</button>`}
+              ${c.published ? `<a class="btn btn-glass btn-sm" href="/c/${esc(c.id)}" target="_blank" rel="noopener">${ico("ext", 16)}Харах</a>` : shared ? "" : `<button class="btn btn-gold btn-sm" id="gpPublish">${ico("globe", 16)}Нийтлэх</button>`}
               <button class="btn btn-glass btn-sm" id="gpChat" title="Элссэн бүх суралцагчтай нэг дор ярилцана">${ico("chat", 16)}Бүлэг чат</button>
               <a class="btn btn-glass btn-sm" href="#live" title="Google Meet-ээр шууд хичээл товлох">${ico("live", 16)}Шууд хичээл</a>
-              <button class="btn btn-glass btn-sm" id="gpSettings">${ico("gear", 16)}Тохиргоо</button>
+              ${shared ? "" : `<button class="btn btn-glass btn-sm" id="gpSettings">${ico("gear", 16)}Тохиргоо</button>`}
             </div></div>
           <ul class="gp-facts">
-              <li class="${c.published ? "ok" : "draft"}">${ico(c.published ? "globe" : "lock", 15)}${c.published ? "Нийтлэгдсэн · профайл дээр харагдана" : "Ноорог — зөвхөн танд харагдана"}</li>
+              <li class="${c.published ? "ok" : "draft"}">${ico(c.published ? "globe" : "lock", 15)}${c.published ? (shared ? "Нийтлэгдсэн · байгууллагын хуудсанд харагдана" : "Нийтлэгдсэн · профайл дээр харагдана") : shared ? "Ноорог — байгууллага нийтлээгүй байна" : "Ноорог — зөвхөн танд харагдана"}</li>
               <li>${ico("money", 15)}${c.price ? `Багц <b>${money(c.price)}</b>` : "Хичээл тус бүрээр зарна"}</li>
               <li>${ico("clock", 15)}${c.drip ? `<b>Дарааллаар</b> нээгдэнэ${c.unlock_all_paid && c.price ? " · багц төлбөл бүгд шууд" : ""}` : "Бүх хичээл нэг дор нээлттэй"}</li>
               <li>${ico("book", 15)}<b>${lessons.length}</b> хичээл · <b>${free()}</b> үнэгүй</li>
@@ -1712,6 +1802,13 @@ async function courseEditor(id) {
     }
     if (t.closest("#gpSettings")) { SG.openModal($("#gpModal")); return; }
     if (t.closest("#gpRoster")) { SG.openModal($("#gpRosterModal")); return; }
+    if (t.closest("#gpTeachers")) { courseTeachersModal(c, teacherList, (ls) => { teacherList = ls; render(); }); return; }
+    if (t.closest("#gpLeave")) {
+      if (!confirm(`«${c.title}» сургалтаас гарах уу? Оруулсан хичээлүүд сургалтад үлдэнэ, харин та цаашид засах боломжгүй болно.`)) return;
+      try { await api(`/api/courses/${c.id}/teachers/${me.id}`, { method: "DELETE" }); toast("Сургалтаас гарлаа"); location.hash = "courses"; }
+      catch (err) { toast(err.message, true); }
+      return;
+    }
     if (t.closest("#gpChat")) {
       const b = $("#gpChat"); b.disabled = true;
       try { const d = await api(`/api/courses/${c.id}/chat`, { method: "POST" }); Live.reconnect(); window.openRailChat?.(d.conversation.id); }
@@ -2358,7 +2455,7 @@ function liveModal({ start, dur = 60 } = {}) {
       <label>Сэдэв<input name="title" required maxlength="200" placeholder="ЭЕШ давтлага — Логарифм"></label>
       <div class="form-row"><label>Эхлэх цаг<input name="start" type="datetime-local" value="${local}" required></label>
       <label>Үргэлжлэх (мин)<input name="dur" type="number" min="10" max="480" value="${dur}"></label></div>
-      <label>Сургалт (элссэн суралцагчид харна)<select name="course"><option value="">— Ерөнхий —</option>${LIVE.courses.map((c) => `<option value="${c.id}">${esc(c.title)}</option>`).join("")}</select></label>
+      <label>Сургалт (элссэн суралцагчид харна)<select name="course"><option value="">— Ерөнхий —</option>${LIVE.courses.map((c) => `<option value="${c.id}" ${c.shared ? "data-shared" : ""}>${esc(c.title)}${c.shared ? ` · ${esc(c.org?.display_name || "байгууллага")}` : ""}</option>`).join("")}</select></label>
       <div class="form-row"><label>Үнэ (₮, 0 = үнэгүй)<input name="price" type="number" min="0" step="500" value="0"><small class="muted">Төлбөртэй бол зөвхөн худалдаж авсан хүн холбоосыг харна. Сургалттай холбоно.</small></label>
         <label class="check" style="align-self:center"><input type="checkbox" name="members_free"> Сургалтад элссэн суралцагчдад үнэгүй</label></div>
       ${me.meet_connected ? `<p class="muted small" style="margin:0">${ico("live", 14)} Google Meet холбоос автоматаар үүснэ.</p>` : `<div class="ml-row"><label>Meet холбоос<input name="meet_url" inputmode="url" autocomplete="off" placeholder="https://meet.google.com/abc-defg-hij" required></label>
@@ -2368,6 +2465,13 @@ function liveModal({ start, dur = 60 } = {}) {
       <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Товлох</button></div></form></div></div>`);
   const md = $("#lvModal"), f = $("#meetForm", md);
   SG.openModal(md); setTimeout(() => f.title.focus(), 60);
+  // Байгууллагын сургалт: холбосон багш зөвхөн үнэгүй (элссэн суралцагчдад) шууд хичээл товлоно.
+  f.course.onchange = () => {
+    const sh = !!f.course.selectedOptions[0]?.hasAttribute("data-shared");
+    f.price.disabled = f.members_free.disabled = sh;
+    if (sh) { f.price.value = 0; f.members_free.checked = false; }
+    $("small", f.price.parentElement).textContent = sh ? "Байгууллагын сургалт — элссэн суралцагчдад үнэгүй. Төлбөртэйг байгууллага товлоно." : "Төлбөртэй бол зөвхөн худалдаж авсан хүн холбоосыг харна. Сургалттай холбоно.";
+  };
   let stop = null;
   const close = () => { stop?.(); SG.closeModal(md); setTimeout(() => md.remove(), 300); };
   md.addEventListener("click", (ev) => {
@@ -2511,7 +2615,7 @@ function slotInfo(x, meetings) {
 
 /* ---------- Шууд хичээл (Google Meet) ---------- */
 async function live() {
-  const [meetings, list] = await Promise.all([api("/api/me/meetings"), api("/api/me/courses")]);
+  const [meetings, list] = await Promise.all([api("/api/me/meetings"), api("/api/me/courses?shared=1")]);
   const fresh = await api("/api/me"); me = fresh; LIVE.courses = list;
   main.innerHTML = panel(slotsPanel(), 0, "sc-panel") +
     panel(`<div class="panel-head"><h2>${ico("users", 20)}Захиалгууд<i class="ab-n" id="abN"></i></h2><span class="muted small">Нэг нэгээр, сонгож эсвэл бүгдийг нь цуцалж болно</span></div><div id="abBox"><div class="pw-load"><span class="loader"></span></div></div>`, 1) +
@@ -2633,7 +2737,7 @@ document.addEventListener("click", (e) => { const b = e.target.closest("[data-ch
 
 async function students() {
   // Олон мянган суралцагчтай үед эхний 200-г л ачаална; бусдыг нь «Бүх суралцагчид» дээр нэрээр хайна.
-  const [rowsPage, courseList] = await Promise.all([apiList("/api/me/students?limit=200"), api("/api/me/courses")]);
+  const [rowsPage, courseList] = await Promise.all([apiList("/api/me/students?limit=200"), api("/api/me/courses?shared=1")]);
   const rows = rowsPage.items, rowsTotal = rowsPage.total;
   const st = { course: "", days: 30 };
   let data = null, labels = {}, timer = null;
@@ -2751,7 +2855,7 @@ async function students() {
       <header class="anx-head">
         <div class="anx-title"><h2>${ico("chart", 22)}Хяналт ба статистик</h2><p>${course ? esc(course.title) : "Бүх сургалт"} · сүүлийн ${st.days} хоног${t.live ? ` · <span class="an-live">● ${t.live} одоо үзэж байна</span>` : ""}</p></div>
         <div class="anx-tools">
-          <select id="anCourse" aria-label="Сургалт"><option value="">Бүх сургалт</option>${courseList.map((c) => `<option value="${esc(c.id)}" ${c.id === st.course ? "selected" : ""}>${esc(c.title)}</option>`).join("")}</select>
+          <select id="anCourse" aria-label="Сургалт"><option value="">Бүх сургалт</option>${courseList.map((c) => `<option value="${esc(c.id)}" ${c.id === st.course ? "selected" : ""}>${esc(c.title)}${c.shared ? ` · ${esc(c.org?.display_name || "байгууллага")}` : ""}</option>`).join("")}</select>
           <div class="anx-seg" role="group" aria-label="Хугацаа">${[7, 30, 90].map((d) => `<button type="button" data-an-days="${d}" aria-pressed="${d === st.days}">${d} хоног</button>`).join("")}</div>
           <a class="btn btn-glass btn-sm" id="anCsv" href="#" title="Excel-д нээгдэх тайлан">${ico("files", 15)}Excel</a><button class="btn btn-glass btn-sm" id="anPdf" title="Хэвлэх / PDF">${ico("book", 15)}PDF</button>
         </div>
@@ -2937,7 +3041,9 @@ async function wallet() {
   const tg0 = (n) => (n ? money(n) : "0₮");
   const canDraw = a && b.available >= min;
   main.innerHTML = `<div class="wl">
-    ${ps ? `<section class="anx-card sp-box" id="spBox"><div class="anx-card-head"><h3>${ico("gear", 18)}Системийн эрх</h3>${ps.active ? `<span class="chip ${ps.days_left <= 7 ? "chip-amber" : "chip-teal"}">Идэвхтэй</span>` : `<span class="chip chip-coral">Дууссан</span>`}</div>
+    ${ps?.org ? `<section class="anx-card sp-box" id="spBox"><div class="anx-card-head"><h3>${ico("school", 18)}Байгууллагын гэрээ</h3><span class="chip chip-teal">Идэвхтэй</span></div>
+      <div class="sp-now"><span class="sp-ic">${ico("school", 20)}</span><div><b>Гэрээгээр — хугацаагүй</b><small>Борлуулалтын шимтгэл <b>${ps.commission_pct}%</b> · файлын сан <b>${ps.storage_mb >= 1024 ? +(ps.storage_mb / 1024).toFixed(1) + " GB" : ps.storage_mb + " MB"}</b>. Нөхцөлийг surgalt.mn-ийн хянагч тогтооно.</small></div></div></section>`
+    : ps ? `<section class="anx-card sp-box" id="spBox"><div class="anx-card-head"><h3>${ico("gear", 18)}Системийн эрх</h3>${ps.active ? `<span class="chip ${ps.days_left <= 7 ? "chip-amber" : "chip-teal"}">Идэвхтэй</span>` : `<span class="chip chip-coral">Дууссан</span>`}</div>
       ${planNowHTML(ps)}${planCardsHTML(ps)}${planRulesHTML(ps)}</section>` : ""}
     <div class="anx-kpis">
       ${kpi("money", "Татах боломжтой", b.available, `${b.commission ? "шимтгэл хассан · " : ""}доод дүн ${money(min)}`, "wl-avail")}

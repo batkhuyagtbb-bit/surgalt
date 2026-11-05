@@ -61,7 +61,7 @@ func (s *Server) handleUnlockCourse(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "энэ сургалт нууц үггүй")
 		return
 	}
-	if course.TeacherID == c.UID {
+	if teaches(course, c.UID) {
 		writeJSON(w, http.StatusOK, map[string]any{"enrolled": true})
 		return
 	}
