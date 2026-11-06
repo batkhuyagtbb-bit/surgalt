@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"html/template"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -157,12 +158,16 @@ func parseTemplates() *template.Template {
 			}
 			return m
 		},
+		"inlineScript": inlineScript, // CSP-д хэшээр зөвшөөрсөн inline скрипт (csp.go)
 	}
 	return template.Must(template.New("").Funcs(funcs).ParseFS(templateFS, "templates/*.html"))
 }
 
-func staticHandler() http.Handler {
+func staticHandler(minify bool, log *slog.Logger) http.Handler {
 	sub, _ := fs.Sub(staticFS, "static")
+	if minify {
+		sub = newMinFS(sub, log)
+	}
 	fsrv := http.StripPrefix("/static/", http.FileServerFS(sub))
 	gz := &gzStatic{fsys: sub}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

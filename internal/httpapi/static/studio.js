@@ -2108,7 +2108,7 @@ async function files() {
       <p class="muted small">${st.base_plan ? `«${esc(st.base_plan)}» багцад ${esc(st.base_label)}` : `Үнэгүй ${plans.free_label}`}${st.plan_active ? ` + ${esc(String(st.plan_mb >= 1024 ? st.plan_mb / 1024 + "GB" : st.plan_mb + "MB"))} нэмэлт сан (${fmtDate(st.expires_at)} хүртэл)` : ""}.
       Зураг автоматаар <b>WebP</b> болж ${plans.max_image_side}px хүртэл багасна, видео <b>WebM</b>, Word/PowerPoint <b>PDF (3D ном)</b> болно.</p>
       <div class="dropzone" id="drop" tabindex="0"><strong>${ico("upload", 18)} Файлаа энд чирж оруулах эсвэл дарж сонгох</strong><span class="muted small">Видео, PDF, Word, PowerPoint, зураг, аудио</span>
-        <select id="vis" style="width:auto" onclick="event.stopPropagation()"><option value="private">🔒 Хаалттай (төлбөртэй хичээлд)</option><option value="public">🌐 Нээлттэй (профайл зураг г.м)</option></select>
+        <select id="vis" style="width:auto"><option value="private">🔒 Хаалттай (төлбөртэй хичээлд)</option><option value="public">🌐 Нээлттэй (профайл зураг г.м)</option></select>
         <input type="file" id="fileIn" multiple hidden></div>
       <div id="uploads" class="list" style="margin-top:12px"></div>`) +
     panel(`<div class="panel-head"><h2>Миний файлууд</h2><span class="muted small" id="fCount">${lib.files.length} файл</span></div>
@@ -2160,6 +2160,7 @@ async function files() {
 
   // Upload
   const drop = $("#drop"), input = $("#fileIn");
+  $("#vis").addEventListener("click", (e) => e.stopPropagation()); // сонгоход файл сонгох цонх нээгдэхгүй
   drop.onclick = () => input.click();
   drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
   drop.ondragleave = () => drop.classList.remove("over");

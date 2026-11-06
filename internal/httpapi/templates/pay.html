@@ -17,23 +17,11 @@
     <p class="pp-amount">{{money .Order.Amount}}</p>
     <div id="ppState">
     {{if .Paid}}<p class="pp-ok"><b>✓</b> Төлбөр амжилттай төлөгдлөө.<br>Компьютер дээрх хуудас өөрөө нээгдэнэ.</p>
-    {{else}}<button class="btn btn-gold btn-block btn-lg" id="ppPay">Төлөх</button>
+    {{else}}<button class="btn btn-gold btn-block btn-lg" id="ppPay" data-url="/api/orders/{{.Order.ID}}/dev-pay?t={{.Token}}">Төлөх</button>
     <p class="pp-note">Туршилтын горим тул жинхэнэ мөнгө шилжихгүй. Жинхэнэ орчинд банкны апп-аараа QPay QR уншуулж төлнө.</p>{{end}}
     </div>
   </div>
 </main>
-<script>
-(() => {
-  const b = document.getElementById("ppPay"); if (!b) return;
-  b.onclick = async () => {
-    b.disabled = true; b.textContent = "Төлж байна…";
-    try {
-      const r = await fetch("/api/orders/{{.Order.ID}}/dev-pay?t={{.Token}}", { method: "POST" });
-      if (!r.ok) throw new Error();
-      document.getElementById("ppState").innerHTML = '<p class="pp-ok"><b>✓</b> Төлбөр амжилттай төлөгдлөө.<br>Компьютер дээрх хуудас өөрөө нээгдэнэ.</p>';
-    } catch { b.disabled = false; b.textContent = "Дахин оролдох"; }
-  };
-})();
-</script>
+{{inlineScript "pay"}}
 </body>
 </html>

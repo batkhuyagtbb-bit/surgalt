@@ -294,6 +294,24 @@ document.addEventListener("click", (e) => {
   if (m && ((e.target === m && !m.classList.contains("inline")) || e.target.closest("[data-close]"))) closeModal(m);
 });
 addEventListener("keydown", (e) => { if (e.key === "Escape") $$(".modal.open").forEach(closeModal); });
+// «Дахин оролдох» г.м (CSP: inline onclick ажиллахгүй тул data-reload).
+document.addEventListener("click", (e) => { if (e.target instanceof Element && e.target.closest("[data-reload]")) location.reload(); });
+// Баруун товч, хөгжүүлэгчийн хэрэгсэл (F12, Ctrl/Cmd+Shift/Option+I·J·C·K, Ctrl+U) — сэрэмжлүүлэх төдий (жинхэнэ хамгаалалт:
+// серверийн эрх, усан тамга, CSP). Бичих талбарт баруун товч (буулгах, зөв бичих), Ctrl+U (доогуур зураас) ажиллана.
+const editable = (t) => t instanceof Element && !!t.closest("input, textarea, select, [contenteditable]:not([contenteditable=false])");
+document.addEventListener("contextmenu", (e) => { if (!editable(e.target) || e.target.closest("video, audio, .yt-wrap")) e.preventDefault(); });
+addEventListener("keydown", (e) => {
+  const mod = e.ctrlKey || e.metaKey, c = e.code;
+  if (e.key === "F12" || (mod && (e.shiftKey || e.altKey) && ["KeyI", "KeyJ", "KeyC", "KeyK"].includes(c)) || (mod && c === "KeyU" && (e.altKey || !editable(e.target)))) {
+    e.preventDefault(); e.stopPropagation();
+  }
+}, true);
+// HTML embed (/embed-frame, sandbox): хуудас бэлэн болоход агуулгыг нь илгээнэ (srcdoc эх хуудасны CSP-г өвлөдөг тул).
+addEventListener("message", (e) => {
+  if (!e.data || e.data.sgEmbedReady !== 1) return;
+  const f = $$("iframe[data-doc]").find((x) => x.contentWindow === e.source);
+  if (f) e.source.postMessage({ sgEmbed: f.dataset.doc }, "*");
+});
 
 /* ---------- WebSocket: чат + мэдэгдэл (нэг холболт) ---------- */
 const Live = {
@@ -983,21 +1001,21 @@ function extOf(url) {
 // Гадаад видеоны кодолсон ID ("yt:"/"vm:" + урвуу base64url) — жинхэнэ холбоосыг суралцагчид харуулахгүй.
 const unob = (s) => { try { return atob(s.replace(/-/g, "+").replace(/_/g, "/")).split("").reverse().join(""); } catch { return ""; } };
 // YouTube: controls=0 + тунгалаг хамгаалах давхарга + өөрийн удирдлага → лого, гарчиг, "YouTube-д үзэх", хуваалцах дарагдахгүй.
-const ytShieldHTML = (id) => `<div class="yt-wrap" oncontextmenu="return false"><iframe data-yt="${esc(id)}" src="https://www.youtube-nocookie.com/embed/${esc(id)}?rel=0&controls=0&disablekb=1&modestbranding=1&iv_load_policy=3&fs=0&playsinline=1&cc_load_policy=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media" referrerpolicy="strict-origin" tabindex="-1"></iframe>
+const ytShieldHTML = (id) => `<div class="yt-wrap"><iframe data-yt="${esc(id)}" src="https://www.youtube-nocookie.com/embed/${esc(id)}?rel=0&controls=0&disablekb=1&modestbranding=1&iv_load_policy=3&fs=0&playsinline=1&cc_load_policy=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media" referrerpolicy="strict-origin" tabindex="-1"></iframe>
   <div class="yt-cover" style="background-image:url('https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg')"></div>
   <div class="yt-shield" data-yt-toggle title="Тоглуулах / зогсоох"><span class="yt-big">▶</span></div>
   <div class="vg-bar yt-bar"><button type="button" class="vg-play" data-yt-toggle aria-label="Тоглуулах">▶</button><span class="vg-time">0:00 / 0:00</span><span class="vg-prog"><b class="vg-seen"></b><i></i></span><button type="button" class="vg-mute" aria-label="Дуу">🔊</button><button type="button" class="vg-full" aria-label="Бүтэн дэлгэц">⛶</button></div></div>`;
 function mediaHTML(url, title) {
   if (!url) return "";
   if (url.startsWith("yt:")) return ytShieldHTML(unob(url.slice(3)));
-  if (url.startsWith("vm:")) { const id = unob(url.slice(3)); return `<div class="yt-wrap vm" oncontextmenu="return false"><iframe src="https://player.vimeo.com/video/${esc(id)}?title=0&byline=0&portrait=0&dnt=1&pip=0" allow="autoplay; fullscreen" allowfullscreen referrerpolicy="strict-origin"></iframe><div class="vm-shield-top"></div><div class="vm-shield-logo"></div></div>`; }
+  if (url.startsWith("vm:")) { const id = unob(url.slice(3)); return `<div class="yt-wrap vm"><iframe src="https://player.vimeo.com/video/${esc(id)}?title=0&byline=0&portrait=0&dnt=1&pip=0" allow="autoplay; fullscreen" allowfullscreen referrerpolicy="strict-origin"></iframe><div class="vm-shield-top"></div><div class="vm-shield-logo"></div></div>`; }
   const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
   if (yt) return `<iframe data-yt="${yt[1]}" src="https://www.youtube-nocookie.com/embed/${yt[1]}?rel=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
   const vm = url.match(/vimeo\.com\/(\d+)/);
   if (vm) return `<iframe src="https://player.vimeo.com/video/${vm[1]}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
   const ext = extOf(url);
-  if ([".webm", ".mp4", ".mov", ".m4v"].includes(ext)) return `<video src="${esc(url)}" controls playsinline preload="metadata" controlslist="nodownload" disablepictureinpicture oncontextmenu="return false"></video>`;
-  if ([".mp3", ".m4a", ".wav"].includes(ext)) return `<audio src="${esc(url)}" controls controlslist="nodownload" oncontextmenu="return false" style="width:100%"></audio>`;
+  if ([".webm", ".mp4", ".mov", ".m4v"].includes(ext)) return `<video src="${esc(url)}" controls playsinline preload="metadata" controlslist="nodownload" disablepictureinpicture></video>`;
+  if ([".mp3", ".m4a", ".wav"].includes(ext)) return `<audio src="${esc(url)}" controls controlslist="nodownload" style="width:100%"></audio>`;
   if ([".webp", ".jpg", ".jpeg", ".png", ".gif"].includes(ext)) return `<img src="${esc(url)}" alt="">`;
   if (docKind(url)) return docViewHTML(url, title); // PDF, PowerPoint, Word, Excel — хичээл дотор шууд, хамгаалалттай
   return `<div style="padding:24px;text-align:center"><a class="btn btn-gold" href="${esc(url)}" target="_blank" rel="noopener">⬇ Файл татах</a></div>`;
@@ -1078,11 +1096,11 @@ function blockHTML(b) {
       const lk = embedLink(b.text), h = Math.max(80, Math.min(2000, +b.height || 420));
       if (lk?.video) return `<figure class="rb-video"><div class="player">${mediaHTML(lk.src)}</div></figure>`;
       if (lk) return `<figure class="rb-embed rb-embed-link"><iframe src="${esc(lk.src)}" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin" style="height:${h}px" title="Embed"></iframe></figure>`;
-      return `<figure class="rb-embed" data-bid="${esc(b.id || "")}"><iframe sandbox="allow-scripts allow-forms allow-presentation" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" referrerpolicy="no-referrer" style="height:${h}px" srcdoc="${esc(embedDoc(b.text))}" title="Embed"></iframe></figure>`;
+      return `<figure class="rb-embed" data-bid="${esc(b.id || "")}"><iframe sandbox="allow-scripts allow-forms allow-presentation" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" referrerpolicy="no-referrer" style="height:${h}px" src="/embed-frame" data-doc="${esc(embedDoc(b.text))}" title="Embed"></iframe></figure>`;
     }
     case "text": return `<div class="rb-text" data-bid="${esc(b.id || "")}">${b.html || richHTML(b.text)}</div>`; // html: сервер цэвэрлэсэн Word шиг агуулга
     case "image": return `<figure class="rb-fig"><img src="${esc(b.url)}" alt="${esc(b.text || "")}" loading="lazy">${cap}</figure>`;
-    case "audio": return `<figure class="rb-audio" data-bid="${esc(b.id || "")}"><span class="rb-audio-ico">${icon("headphones", 22)}</span><div><b>${esc(b.name || "Дуу бичлэг")}</b><audio src="${esc(b.url)}" controls preload="metadata" controlslist="nodownload" oncontextmenu="return false"></audio></div>${cap}</figure>`;
+    case "audio": return `<figure class="rb-audio" data-bid="${esc(b.id || "")}"><span class="rb-audio-ico">${icon("headphones", 22)}</span><div><b>${esc(b.name || "Дуу бичлэг")}</b><audio src="${esc(b.url)}" controls preload="metadata" controlslist="nodownload"></audio></div>${cap}</figure>`;
     case "video": return `<figure class="rb-video" data-bid="${esc(b.id)}" ${b.parts?.length > 1 ? `data-parts="${esc(JSON.stringify(b.parts))}"` : ""}><div class="player">${mediaHTML(b.url, b.name)}</div>${b.parts?.length > 1 ? `<div class="vparts" aria-label="Видеоны хэсгүүд">${b.parts.map((_, i) => `<button type="button" data-vpart="${i}" class="${i ? "" : "on"}">${i + 1}-р хэсэг</button>`).join("")}<span class="muted small">6 минутын ${b.parts.length} хэсэг · дараалан тоглоно</span></div>` : ""}${cap}</figure>`;
     case "file": {
       const meta = esc([extOf(b.url).slice(1).toUpperCase(), fmtBytes(b.size)].filter(Boolean).join(" · ")) + (b.text ? " · " + esc(b.text) : "");
@@ -1481,7 +1499,7 @@ function lessonMarker(body, base, ctx = {}) {
   const units = () => (body.classList.contains("pre") ? [body] : $$(".rb-text[data-bid]", body));
   const bidOf = (u) => (u === body ? "content" : u.dataset.bid);
   // HTML embed-үүд (sandbox iframe): тодруулгыг postMessage-ээр дамжуулна (EMBED_HL_JS).
-  const frames = () => $$(".rb-embed[data-bid] > iframe[srcdoc]", body);
+  const frames = () => $$(".rb-embed[data-bid] > iframe[data-doc]", body);
   const frameBid = (f) => f.parentElement.dataset.bid;
   // Видео/аудио (мөчөөр), PDF, PowerPoint, Word (хуудас, слайдаар) дээрх тэмдэглэл.
   const medias = () => $$(".rb-video[data-bid], .rb-audio[data-bid], .rb-doc[data-bid]", body);
@@ -2471,7 +2489,12 @@ function runExam({ base, courseId, lessonId, title, data, onClose }) {
 const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/";
 let pdfjs;
 function pdfLib() {
-  pdfjs ||= import(PDFJS + "pdf.min.mjs").then((m) => { m.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.mjs"; return m; });
+  pdfjs ||= import(PDFJS + "pdf.min.mjs").then((m) => {
+    m.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.mjs";
+    // eval-гүй (CSP): фонтын дүрсийг new Function-оор хөрвүүлэхгүй.
+    const src = (x) => (typeof x === "string" || x instanceof URL ? { url: x } : ArrayBuffer.isView(x) || x instanceof ArrayBuffer ? { data: x } : x);
+    return { ...m, getDocument: (x) => m.getDocument({ isEvalSupported: false, ...src(x) }) };
+  });
   return pdfjs;
 }
 // Логоны өнгөнд зохицсон өнгөнүүд (templates.go-гийн brandHues-тэй ижил).
@@ -4362,7 +4385,7 @@ async function homePage() {
   try { h = await meHome(); }
   catch (e) {
     if (e.status === 401) { authNav(); return; } // токен хүчингүй — танилцуулга хуудас руу буцна
-    dash.innerHTML = `<div class="empty">${esc(e.message)} <button class="btn btn-ghost btn-sm" onclick="location.reload()">Дахин оролдох</button></div>`;
+    dash.innerHTML = `<div class="empty">${esc(e.message)} <button class="btn btn-ghost btn-sm" data-reload>Дахин оролдох</button></div>`;
     return;
   }
   const u = h.user; Auth.set(Auth.token, u);
@@ -5330,7 +5353,7 @@ function findCourses() {
     const b = e.target.closest("[data-page]"); if (!b || b.disabled) return;
     st.page = +b.dataset.page; load(); box.scrollIntoView({ behavior: "smooth", block: "start" });
   });
-  $(".find-bar", box).addEventListener("submit", () => { clearTimeout(timer); st.q = input.value.trim(); st.page = 1; load(); });
+  $(".find-bar", box).addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(timer); st.q = input.value.trim(); st.page = 1; load(); });
   $(".find-chips")?.addEventListener("click", (e) => { // түгээмэл хайлт
     const b = e.target.closest("[data-q]"); if (!b) return;
     input.value = b.dataset.q; st.q = b.dataset.q; st.page = 1; load(); input.focus();

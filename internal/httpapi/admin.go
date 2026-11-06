@@ -118,6 +118,7 @@ func (s *Server) pageAdmin(w http.ResponseWriter, r *http.Request) {
 	h.Set("X-Robots-Tag", "noindex, nofollow")
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("X-Frame-Options", "DENY")
+	s.setCSP(w, cspAdmin)
 	if err := s.tmpl.ExecuteTemplate(w, "admin.html", map[string]any{"PublicURL": s.cfg.PublicURL}); err != nil {
 		s.log.Error("template", "err", err, "page", "admin")
 	}

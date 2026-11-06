@@ -291,6 +291,9 @@ func run(log *slog.Logger) error {
 		GoogleSiteVerification: strings.TrimSpace(os.Getenv("GOOGLE_SITE_VERIFICATION")),
 		BingSiteVerification:   strings.TrimSpace(os.Getenv("BING_SITE_VERIFICATION")),
 		FacebookAppID:          strings.TrimSpace(os.Getenv("FACEBOOK_CLIENT_ID")),
+		// Content-Security-Policy: enforce (анхдагч) | report (зөвхөн мэдээлэх) | off. STATIC_MINIFY=0 — JS/CSS-ийг эхээр нь.
+		CSPMode:      env("CSP_MODE", "enforce"),
+		MinifyStatic: os.Getenv("STATIC_MINIFY") != "0",
 	}, st, tokens, hub, fstore, log)
 
 	base := env("PUBLIC_URL", "http://localhost"+env("ADDR", ":8080"))

@@ -28,7 +28,7 @@
     {{if and $nf .Path}}<p class="nf-path"><span class="muted small">Хайсан хаяг:</span> <code>{{.Path}}</code></p>{{end}}
     <div class="nf-cta">
       <a class="btn btn-gold" href="/"><span>Нүүр хуудас</span>{{icon "arrow" 16}}</a>
-      {{if $nf}}<button type="button" class="btn btn-ghost" data-nf-back>Буцах</button>{{else}}<button type="button" class="btn btn-ghost" onclick="location.reload()">Дахин оролдох</button>{{end}}
+      {{if $nf}}<button type="button" class="btn btn-ghost" data-nf-back>Буцах</button>{{else}}<button type="button" class="btn btn-ghost" data-reload>Дахин оролдох</button>{{end}}
     </div>
     {{if $nf}}
     <nav class="nf-links" aria-label="Санал болгох хуудсууд">

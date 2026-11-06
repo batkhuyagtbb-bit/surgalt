@@ -55,6 +55,10 @@ type Config struct {
 	GoogleSiteVerification, BingSiteVerification string
 	// Facebook апп-ын ID (нийтийн утга): хуудсанд fb:app_id — Facebook-ийн хуваалцах шалгагч үүнийг шаарддаг.
 	FacebookAppID string
+	// CSPMode — Content-Security-Policy (csp.go): "" эсвэл "enforce" — хаана, "report" — зөвхөн мэдээлнэ, "off".
+	CSPMode string
+	// MinifyStatic — static JS/CSS-ийг minify хийж өгөх (minify.go).
+	MinifyStatic bool
 }
 
 type Server struct {
@@ -465,9 +469,11 @@ func (s *Server) Handler() http.Handler {
 	// /me — нэвтэрсэн хүний өөрийн хуудас руу шилжүүлнэ (багш: /t/<нэр>, суралцагч: /). Хуучин /studio холбоос ч мөн.
 	mux.HandleFunc("GET /me", s.pageStatic("me"))
 	mux.HandleFunc("GET /studio", s.pageStatic("me"))
-	mux.Handle("GET /static/", staticHandler())
+	mux.Handle("GET /static/", staticHandler(s.cfg.MinifyStatic, s.log))
+	mux.HandleFunc("GET /embed-frame", s.pageEmbedFrame)
+	mux.HandleFunc("POST /api/csp-report", s.handleCSPReport)
 
-	return s.recoverMW(s.logMW(s.limitMW(compressMW(s.notFoundMW(mux)))))
+	return s.recoverMW(s.logMW(s.limitMW(s.cspMW(compressMW(s.notFoundMW(mux))))))
 }
 
 // ---- middleware ----
