@@ -88,8 +88,20 @@ func TestOrganization(t *testing.T) {
 	if plan["org"] != true || plan["active"] != true || plan["commission_pct"].(float64) != 10 {
 		t.Fatalf("байгууллагын эрх: %v", plan)
 	}
-	if code, _ := call(t, srv, "POST", "/api/me/plan/purchase", org, `{"plan":"start"}`); code != http.StatusBadRequest {
-		t.Fatalf("байгууллага багц авлаа: %d", code)
+	if code, _ := call(t, srv, "POST", "/api/me/plan/purchase", org, `{"plan":"month"}`); code != http.StatusBadRequest {
+		t.Fatalf("байгууллагад багшийн багц: %d", code)
+	}
+	// Байгууллагын багц (жил ₮1,000,000): үнэгүй хугацааны араас үргэлжилнэ; шимтгэл хянагчийн тогтоосноор.
+	code, po := call(t, srv, "POST", "/api/me/plan/purchase", org, `{"plan":"org_year"}`)
+	if code != http.StatusCreated || po["order"].(map[string]any)["amount"] != 1000000.0 {
+		t.Fatalf("байгууллагын багц: %d %v", code, po)
+	}
+	if code, _ := call(t, srv, "POST", "/api/orders/"+po["order"].(map[string]any)["id"].(string)+"/dev-pay", org, ""); code != 200 {
+		t.Fatalf("байгууллагын багц төлөх: %d", code)
+	}
+	if _, plan := call(t, srv, "GET", "/api/me/plan", org, ""); plan["plan"] != "trial" || len(plan["upcoming"].([]any)) != 1 || plan["fee_pct"] != 10.0 ||
+		plan["plans"].([]any)[0].(map[string]any)["price"] != 129000.0 {
+		t.Fatalf("байгууллагын багцын төлөв: %v", plan)
 	}
 	// Хянагч нөхцөлийг өөрчилнө.
 	if code, r := call(t, srv, "PUT", "/api/admin/orgs/"+orgID, boss, `{"commission_pct":12.5,"storage_mb":1024}`); code != 200 || r["commission_pct"].(float64) != 12.5 {

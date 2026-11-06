@@ -9,40 +9,65 @@ import (
 )
 
 // ---- Багшийн системийн эрх (багц) ----
-// Шинэ багшид 3 сар үнэгүй (борлуулалтын шимтгэл 21%). Дараа нь профайлын «Данс» хэсгээс QPay-ээр багц авч сунгана.
+// Шинэ багш, байгууллагад 2 сар үнэгүй (багшид файлын сан STORAGE_FREE_MB, анхдагч 100MB). Дараа нь профайлын «Данс»
+// хэсгээс QPay-ээр нэг профайлын багц (сар, хагас жил, бүтэн жил; байгууллагад OrgPlans) авч сунгана. Борлуулалтаас
+// хувь авахгүй — зөвхөн гүйлгээний шимтгэл (багшид TransactionFeePct, байгууллагад Org.Pct) хасагдаж, үлдсэн нь данс руу.
 // Эрх дууссан багш сургалтаа удирдах, шинээр борлуулах боломжгүй (худалдаж авсан суралцагчдын эрх хэвээр).
 
-// Plan — худалдаж авах багц: хугацаа (сар), үнэ, борлуулалтаас авах платформын шимтгэл (%).
+// Plan — худалдаж авах багц: хугацаа (сар), үнэ, борлуулалтаас авах шимтгэл (%).
 type Plan struct {
 	ID        string  `json:"id"`
-	Name      string  `json:"name"`       // Starter
-	Label     string  `json:"label"`      // Эхлэл
+	Name      string  `json:"name"`       // Бүтэн жил
+	Label     string  `json:"label"`      // нэмэлт тайлбар (хуучин багцад: Эхлэл)
 	StorageMB int64   `json:"storage_mb"` // багцад багтсан файлын сан (үнэгүй хэмжээнээс их бол түүнийг орлоно)
 	Months    int     `json:"months"`
 	Price     int64   `json:"price"`
 	Pct       float64 `json:"commission_pct"`
 }
 
-// Title — «Starter (Эхлэл)»: захиалга, мэдэгдэлд.
-func (p Plan) Title() string { return p.Name + " (" + p.Label + ")" }
-
-// Plans — үнийн жагсаалт (хямдаас үнэтэй рүү). ID-г хадгалсан эрх, захиалгад ашигладаг тул солихгүй.
-var Plans = []Plan{
-	{ID: "start", Name: "Starter", Label: "Эхлэл", StorageMB: 300, Months: 3, Price: 69000, Pct: 20},
-	{ID: "standard", Name: "Standard", Label: "Стандарт", StorageMB: 500, Months: 6, Price: 99000, Pct: 16},
-	{ID: "major", Name: "Advanced", Label: "Ахисан түвшин", StorageMB: 1024, Months: 12, Price: 189000, Pct: 12},
-	{ID: "pro", Name: "Enterprise", Label: "Бизнес / Энтерпрайз", StorageMB: 2048, Months: 12, Price: 500000, Pct: 8},
+// Title — «Бүтэн жил», хуучин багцад «Starter (Эхлэл)»: захиалга, мэдэгдэлд.
+func (p Plan) Title() string {
+	if p.Label == "" {
+		return p.Name
+	}
+	return p.Name + " (" + p.Label + ")"
 }
 
-// Үнэгүй хугацааны (болон эрхгүй үеийн) шимтгэл = TEACHER_COMMISSION_PERCENT (анхдагч 21%).
-const (
-	PlanTrial       = "trial" // үнэгүй хугацаа
-	PlanTrialMonths = 3
-	PlanOrg         = "org" // байгууллагын гэрээ (User.Org): шимтгэл, файлын санг хянагч тогтооно
-)
+// TransactionFeePct — гүйлгээний шимтгэл (%): багшийн борлуулалт бүрээс хасагдана (үнэгүй хугацаанд ч). Хувь авахгүй.
+const TransactionFeePct = 2.0
 
-// OrgUntil — байгууллагын эрхийн «дуусах» хугацаа (гэрээгээр, хугацаагүй).
-var OrgUntil = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+// Plans — худалдаалж буй багцууд (хямдаас үнэтэй рүү). ID-г хадгалсан эрх, захиалгад ашигладаг тул солихгүй.
+var Plans = []Plan{
+	{ID: "month", Name: "Сарын", StorageMB: 300, Months: 1, Price: 29900, Pct: TransactionFeePct},
+	{ID: "half", Name: "Хагас жил", StorageMB: 500, Months: 6, Price: 99000, Pct: TransactionFeePct},
+	{ID: "year", Name: "Бүтэн жил", StorageMB: 1024, Months: 12, Price: 159000, Pct: TransactionFeePct},
+}
+
+// OrgFeePct — байгууллагын гүйлгээний шимтгэлийн анхдагч (%): хянагч бүртгэхэд Org.Pct-д тавина, гэрээгээр өөрчилж болно.
+const OrgFeePct = 1.0
+
+// OrgPlans — байгууллагын багцууд (байгууллагын профайлд; холбосон багш, удирдагчид нэмэлт төлбөргүй).
+var OrgPlans = []Plan{
+	{ID: "org_month", Name: "Сарын", Label: "Байгууллага", StorageMB: 2048, Months: 1, Price: 129000, Pct: OrgFeePct},
+	{ID: "org_half", Name: "Хагас жил", Label: "Байгууллага", StorageMB: 5120, Months: 6, Price: 500000, Pct: OrgFeePct},
+	{ID: "org_year", Name: "Бүтэн жил", Label: "Байгууллага", StorageMB: 5120, Months: 12, Price: 1000000, Pct: OrgFeePct},
+}
+
+// legacyPlans — 2026.11 хүртэлх багцууд: худалдаалахгүй, хадгалсан эрх, төлөгдөөгүй захиалгыг таних л зорилготой.
+// Хувь авахгүй журмаар шимтгэл нь гүйлгээний шимтгэлтэй тэнцүү.
+var legacyPlans = []Plan{
+	{ID: "start", Name: "Starter", Label: "Эхлэл", StorageMB: 300, Months: 3, Price: 69000, Pct: TransactionFeePct},
+	{ID: "standard", Name: "Standard", Label: "Стандарт", StorageMB: 500, Months: 6, Price: 99000, Pct: TransactionFeePct},
+	{ID: "major", Name: "Advanced", Label: "Ахисан түвшин", StorageMB: 1024, Months: 12, Price: 189000, Pct: TransactionFeePct},
+	{ID: "pro", Name: "Enterprise", Label: "Бизнес / Энтерпрайз", StorageMB: 2048, Months: 12, Price: 500000, Pct: TransactionFeePct},
+}
+
+// Үнэгүй хугацааны (болон эрхгүй үеийн) шимтгэл = TransactionFeePct. Хуучин захиалга (commission_pct 0) л
+// TEACHER_COMMISSION_PERCENT-ээр тооцогдоно.
+const (
+	PlanTrial       = "trial" // үнэгүй хугацаа (багш, байгууллага)
+	PlanTrialMonths = 2       // PlanTrialShortFrom-оос өмнө бүртгүүлсэн хүнд planTrialMonthsBefore (амласан 3 сар)
+)
 
 func (o *Org) encode() string {
 	if o == nil {
@@ -79,16 +104,50 @@ func (o *Org) Clone() *Org {
 	return &c
 }
 
-// PlanTrialFrom — журам эхэлсэн өдөр: үүнээс өмнө бүртгүүлсэн багшийн үнэгүй 3 сар энэ өдрөөс тоологдоно.
+// PlanTrialFrom — журам эхэлсэн өдөр: үүнээс өмнө бүртгүүлсэн багшийн үнэгүй хугацаа энэ өдрөөс тоологдоно.
 var PlanTrialFrom = time.Date(2026, 11, 3, 0, 0, 0, 0, time.FixedZone("ULAT", 8*3600))
 
+// PlanTrialShortFrom — үнэгүй хугацаа 3 сараас 2 сар болсон өдөр: үүнээс өмнө багш болсон хүнд амласан 3 сар хэвээр.
+var PlanTrialShortFrom = time.Date(2026, 11, 7, 0, 0, 0, 0, time.FixedZone("ULAT", 8*3600))
+
+const planTrialMonthsBefore = 3
+
+// PlanByID — багц (байгууллагын, хуучин багцыг ч таньна: хадгалсан эрх, захиалга).
 func PlanByID(id string) (Plan, bool) {
-	for _, p := range Plans {
+	for _, list := range [][]Plan{Plans, OrgPlans, legacyPlans} {
+		for _, p := range list {
+			if p.ID == id {
+				return p, true
+			}
+		}
+	}
+	return Plan{}, false
+}
+
+// PlansFor — хэрэглэгчид худалдаалж буй багцууд: байгууллагад OrgPlans, багшид Plans.
+func PlansFor(u *User) []Plan {
+	if u != nil && u.Org != nil {
+		return OrgPlans
+	}
+	return Plans
+}
+
+// PlanOnSale — u-д худалдаалж буй багц (худалдан авах, хянагч олгоход).
+func PlanOnSale(u *User, id string) (Plan, bool) {
+	for _, p := range PlansFor(u) {
 		if p.ID == id {
 			return p, true
 		}
 	}
 	return Plan{}, false
+}
+
+// FeePct — хэрэглэгчийн гүйлгээний шимтгэл: байгууллагад хянагчийн тогтоосон (Org.Pct), багшид TransactionFeePct.
+func (u *User) FeePct() float64 {
+	if u.Org != nil {
+		return u.Org.Pct
+	}
+	return TransactionFeePct
 }
 
 // PlanTerm — «3 сар», «1 жил».
@@ -136,47 +195,51 @@ func (u *User) TrialUntil() time.Time {
 	if u.Plan.TrialFrom != nil {
 		from = *u.Plan.TrialFrom
 	}
+	months := PlanTrialMonths
+	if from.Before(PlanTrialShortFrom) {
+		months = planTrialMonthsBefore
+	}
 	if from.Before(PlanTrialFrom) {
 		from = PlanTrialFrom
 	}
-	return from.AddDate(0, PlanTrialMonths, 0)
+	return from.AddDate(0, months, 0)
 }
 
 // PlanAt — t үеийн эрх: багцын ID (эсвэл PlanTrial), шимтгэлийн хувь, эрхтэй эсэх.
+// Байгууллагын шимтгэл багцаас үл хамааран хянагчийн тогтоосон Org.Pct.
 func (u *User) PlanAt(t time.Time) (string, float64, bool) {
-	if u.Org != nil { // байгууллага: хянагчийн тогтоосон шимтгэл, хугацаагүй
-		return PlanOrg, u.Org.Pct, true
-	}
 	for _, p := range u.Plan.Periods {
 		if !t.Before(p.From) && t.Before(p.Until) {
 			if pl, ok := PlanByID(p.Plan); ok {
+				if u.Org != nil {
+					return pl.ID, u.Org.Pct, true
+				}
 				return pl.ID, pl.Pct, true
 			}
 		}
 	}
 	if t.Before(u.TrialUntil()) {
-		return PlanTrial, teacherCommission, true
+		return PlanTrial, u.FeePct(), true
 	}
-	return "", teacherCommission, false
+	return "", u.FeePct(), false
 }
 
-// PlanStorageBytes — t үеийн идэвхтэй багцад багтсан файлын сан (үнэгүй хугацаа, эрхгүй үед 0).
+// PlanStorageBytes — t үеийн идэвхтэй багцад багтсан файлын сан (үнэгүй хугацаа, эрхгүй үед 0); байгууллагад
+// хянагчийн гэрээгээр тогтоосон сантай (Org.StorageMB) харьцуулж ихийг нь.
 func (u *User) PlanStorageBytes(t time.Time) int64 {
-	if u.Org != nil {
-		return u.Org.StorageMB << 20
-	}
+	var b int64
 	id, _, ok := u.PlanAt(t)
 	if pl, found := PlanByID(id); ok && found {
-		return pl.StorageMB << 20
+		b = pl.StorageMB << 20
 	}
-	return 0
+	if u.Org != nil {
+		b = max(b, u.Org.StorageMB<<20)
+	}
+	return b
 }
 
 // PlanUntil — эрх дуусах хугацаа (үнэгүй хугацаа, дараалсан бүх багцыг оруулаад). Ирээдүйд завсар үүсдэггүй.
 func (u *User) PlanUntil() time.Time {
-	if u.Org != nil {
-		return OrgUntil
-	}
 	end := u.TrialUntil()
 	for _, p := range u.Plan.Periods {
 		if p.Until.After(end) {
@@ -186,7 +249,7 @@ func (u *User) PlanUntil() time.Time {
 	return end
 }
 
-// PlanActive — системийн эрхтэй эсэх (зөвхөн багшид хамаарна).
+// PlanActive — системийн эрхтэй эсэх (багш, байгууллагад хамаарна).
 func (u *User) PlanActive(now time.Time) bool {
 	return u.Role != RoleTeacher || now.Before(u.PlanUntil())
 }
@@ -204,7 +267,7 @@ func (u *User) AddPlan(pl Plan, order string, now time.Time) PlanPeriod {
 	case !ok:
 		np = PlanPeriod{Plan: pl.ID, From: now, Until: now.AddDate(0, pl.Months, 0), Order: order}
 		u.Plan.Periods = append(u.Plan.Periods, np)
-	case pl.Pct < pct:
+	case pl.Pct < pct && u.Org == nil: // байгууллагын шимтгэл багцаас үл хамаарна — араас нь
 		end := now.AddDate(0, pl.Months, 0)
 		if cur == PlanTrial {
 			end = end.Add(u.TrialUntil().Sub(now))
@@ -276,10 +339,10 @@ func OrderCommission(o *Order) int64 {
 	return int64(math.Round(float64(o.Amount) * o.CommissionRate() / 100))
 }
 
-// saleCommissionPct — багшийн одоогийн шимтгэл (эрхгүй бол үнэгүй хугацааных).
+// saleCommissionPct — багшийн одоогийн шимтгэл (үнэгүй хугацаанд, эрхгүй үед гүйлгээний шимтгэл).
 func saleCommissionPct(teacher *User, now time.Time) float64 {
 	if teacher == nil {
-		return teacherCommission
+		return TransactionFeePct
 	}
 	_, pct, _ := teacher.PlanAt(now)
 	if pct <= 0 {

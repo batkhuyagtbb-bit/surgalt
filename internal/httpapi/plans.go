@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -71,17 +72,15 @@ func planName(id string) string {
 	if id == store.PlanTrial {
 		return "Үнэгүй хугацаа"
 	}
-	if id == store.PlanOrg {
-		return "Байгууллагын гэрээ"
-	}
 	if p, ok := store.PlanByID(id); ok {
 		return p.Name
 	}
 	return ""
 }
 
-func planCatalog() map[string]any {
-	return map[string]any{"plans": store.Plans, "trial_months": store.PlanTrialMonths, "trial_pct": store.TeacherCommission()}
+// planCatalog — u-д худалдаалж буй багцууд ба гүйлгээний шимтгэл (fee_pct; trial_pct — хуучин нэр).
+func planCatalog(u *store.User) map[string]any {
+	return map[string]any{"plans": store.PlansFor(u), "trial_months": store.PlanTrialMonths, "trial_pct": u.FeePct(), "fee_pct": u.FeePct()}
 }
 
 // planStatus — багшийн эрхийн төлөв (Данс хэсэг, студийн хаалт, сануулгын мөрөнд).
@@ -99,19 +98,21 @@ func planStatus(u *store.User, now time.Time) map[string]any {
 			upcoming = append(upcoming, planPeriodView{Plan: p.Plan, Name: pl.Name, Pct: pl.Pct, From: p.From, Until: p.Until})
 		}
 	}
-	st := planCatalog()
+	st := planCatalog(u)
 	st["plan"], st["name"], st["commission_pct"], st["active"] = id, planName(id), pct, active
 	st["until"], st["days_left"], st["trial_until"], st["upcoming"] = until, days, u.TrialUntil(), upcoming
-	if u.Org != nil { // байгууллага: хянагчийн тогтоосон шимтгэл, файлын сан — багц авахгүй
+	if u.Org != nil { // байгууллага: байгууллагын багц, хянагчийн тогтоосон шимтгэл, гэрээний файлын сан
 		st["org"], st["storage_mb"] = true, u.Org.StorageMB
 	}
 	return st
 }
 
-// handlePlans: GET /api/plans — үнийн жагсаалт (нээлттэй).
+// handlePlans: GET /api/plans — үнийн жагсаалт (нээлттэй): багш, байгууллагын багц.
 func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=300")
-	writeJSON(w, http.StatusOK, planCatalog())
+	st := planCatalog(&store.User{})
+	st["org_plans"], st["org_pct"] = store.OrgPlans, store.OrgFeePct
+	writeJSON(w, http.StatusOK, st)
 }
 
 // handleMyPlan: GET /api/me/plan — багшийн эрх (эрх дууссан ч харна).
@@ -139,13 +140,13 @@ func (s *Server) handleBuyPlan(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	p, ok := store.PlanByID(in.Plan)
-	if !ok {
-		writeErr(w, http.StatusBadRequest, "ийм багц байхгүй")
+	u, err := s.store.UserByID(r.Context(), c.UID)
+	if s.storeErr(w, r, err) {
 		return
 	}
-	if _, isOrg := s.orgOf(r.Context(), c.UID); isOrg {
-		writeErr(w, http.StatusBadRequest, "байгууллагын эрх гэрээгээр — багц авах шаардлагагүй")
+	p, ok := store.PlanOnSale(u, in.Plan) // байгууллагад зөвхөн байгууллагын багц
+	if !ok {
+		writeErr(w, http.StatusBadRequest, "ийм багц байхгүй")
 		return
 	}
 	o, err := s.store.CreatePlanOrder(r.Context(), c.UID, p)
@@ -178,20 +179,25 @@ func (s *Server) handleAdminGrantPlan(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	p, ok := store.PlanByID(in.Plan)
-	if !ok {
-		writeErr(w, http.StatusBadRequest, "ийм багц байхгүй")
-		return
-	}
+	var p store.Plan
 	u, err := s.store.UpdateUser(r.Context(), r.PathValue("id"), func(x *store.User) error {
 		if x.Role != store.RoleTeacher {
 			return errNotTeacher
 		}
+		pl, ok := store.PlanOnSale(x, in.Plan) // байгууллагад байгууллагын багц
+		if !ok {
+			return errNoPlan
+		}
+		p = pl
 		x.AddPlan(p, "", time.Now())
 		return nil
 	})
 	if errors.Is(err, errNotTeacher) {
 		writeErr(w, http.StatusConflict, "энэ хэрэглэгч багш биш")
+		return
+	}
+	if errors.Is(err, errNoPlan) {
+		writeErr(w, http.StatusBadRequest, "ийм багц байхгүй")
 		return
 	}
 	if s.storeErr(w, r, err) {
@@ -206,9 +212,12 @@ func (s *Server) handleAdminGrantPlan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, planStatus(u, time.Now()))
 }
 
-var errNotTeacher = errors.New("багш биш")
+var (
+	errNotTeacher = errors.New("багш биш")
+	errNoPlan     = errors.New("ийм багц байхгүй")
+)
 
-// planLoop — эрх дуусахаас 7 ба 1 хоногийн өмнө, дуусахад багшид нэг удаа мэдэгдэнэ.
+// planLoop — эрх дуусахаас 7 ба 1 хоногийн өмнө, дуусахад, дараа нь 4 долоо хоног долоо хоног бүр багшид нэг удаа мэдэгдэнэ.
 func (s *Server) planLoop(ctx context.Context) {
 	first := time.NewTimer(2 * time.Minute)
 	defer first.Stop()
@@ -269,6 +278,9 @@ func planNotice(u *store.User, now time.Time) (*store.Notification, string) {
 			return nil, "" // удаан хугацаанд эрхгүй — дахин сануулахгүй
 		}
 		stage = "0"
+		if w := int(-left / (7 * 24 * time.Hour)); w >= 1 {
+			stage = "w" + strconv.Itoa(w) // дууссанаас хойш долоо хоног бүр төлбөр сануулна
+		}
 	case left <= 24*time.Hour:
 		stage = "1"
 	case left <= 7*24*time.Hour:
@@ -282,7 +294,7 @@ func planNotice(u *store.User, now time.Time) (*store.Notification, string) {
 	}
 	what := "Системийн эрх"
 	if id, _, _ := u.PlanAt(until.Add(-time.Second)); id == store.PlanTrial {
-		what = "Үнэгүй 3 сар"
+		what = "Үнэгүй хугацаа"
 	}
 	date := until.In(mnLoc).Format("2006.01.02")
 	n := &store.Notification{UserID: u.ID, Type: NotifPlan, Count: 1, Link: "/me#wallet"}
@@ -291,8 +303,11 @@ func planNotice(u *store.User, now time.Time) (*store.Notification, string) {
 		n.Title, n.Body = "⏳ "+what+" 7 хоногийн дараа дуусна", date+"-нд дуусна. «Данс» хэсгээс багц авч сунгаарай — сургалтаа тасралтгүй удирдана."
 	case "1":
 		n.Title, n.Body = "⚠️ "+what+" маргааш дуусна", date+"-нд дуусна. Сунгаагүй бол сургалт удирдах, шинээр борлуулах боломж хаагдана."
-	default:
+	case "0":
 		n.Title, n.Body = "⛔ "+what+" дууслаа", "Сургалт удирдах, шинээр борлуулах боломж хаагдлаа. «Данс» хэсгээс багц авч сунгана уу. Худалдаж авсан суралцагчдын эрх хэвээр."
+	default:
+		n.Title = "💳 Системийн эрхийн төлбөрөө төлнө үү"
+		n.Body = date + "-нд дууссан тул сургалт удирдах, шинээр борлуулах боломж хаалттай байна. «Данс» хэсгээс багц сонгоод QPay-ээр төлмөгц шууд нээгдэнэ."
 	}
 	return n, key
 }

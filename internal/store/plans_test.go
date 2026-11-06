@@ -5,64 +5,59 @@ import (
 	"time"
 )
 
-// Үнэгүй 3 сар → эрт авсан багцад үлдэгдэл нэмэгдэнэ; дээд багц шууд эхэлж, доод нь араас; эрхгүй бол одооноос.
+// Үнэгүй 2 сар (гүйлгээний шимтгэл 2%) → үнэгүй хугацаанд авсан багц түүний араас эхэлнэ (хоног алдагдахгүй); дараагийн
+// багц араас; эрхгүй бол одооноос. Хуучин багцыг таньна (хадгалсан эрх), гэхдээ худалдаалахгүй.
 func TestAddPlan(t *testing.T) {
-	defer func(v time.Time) { PlanTrialFrom = v }(PlanTrialFrom)
-	SetTeacherCommission(21) // үнэгүй хугацааны шимтгэл (TEACHER_COMMISSION_PERCENT)
+	defer func(v, w time.Time) { PlanTrialFrom, PlanTrialShortFrom = v, w }(PlanTrialFrom, PlanTrialShortFrom)
+	SetTeacherCommission(21) // хуучин захиалгын шимтгэл (TEACHER_COMMISSION_PERCENT) — үнэгүй хугацаанд хамаарахгүй
 	defer SetTeacherCommission(0)
 	t0 := time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)
-	PlanTrialFrom = t0.AddDate(-1, 0, 0)
+	PlanTrialFrom, PlanTrialShortFrom = t0.AddDate(-1, 0, 0), t0.AddDate(-1, 0, 0)
 	u := &User{Role: RoleTeacher, CreatedAt: t0}
 	day := 24 * time.Hour
-	start, _ := PlanByID("start")
-	pro, _ := PlanByID("pro")
-	std, _ := PlanByID("standard")
+	month, _ := PlanByID("month")
+	half, _ := PlanByID("half")
+	year, _ := PlanByID("year")
+	trialEnd := t0.AddDate(0, PlanTrialMonths, 0)
 
-	if id, pct, ok := u.PlanAt(t0.Add(10 * day)); id != PlanTrial || pct != 21 || !ok || !u.PlanUntil().Equal(t0.AddDate(0, 3, 0)) {
+	if id, pct, ok := u.PlanAt(t0.Add(10 * day)); id != PlanTrial || pct != TransactionFeePct || !ok || !u.PlanUntil().Equal(trialEnd) {
 		t.Fatalf("үнэгүй хугацаа: %s %v %v %v", id, pct, ok, u.PlanUntil())
 	}
-	// 30 дахь өдөр Эхлэл (3 сар): шууд 20%, үнэгүй хугацааны үлдсэн 2 сар орчим нэмэгдэнэ.
+	// 30 дахь өдөр бүтэн жил: үнэгүй хугацаа дуусахад эхэлнэ.
 	now := t0.Add(30 * day)
-	p := u.AddPlan(start, "o1", now)
-	if !p.From.Equal(now) || !p.Until.Equal(now.AddDate(0, 3, 0).Add(t0.AddDate(0, 3, 0).Sub(now))) {
-		t.Fatalf("Эхлэл: %+v", p)
+	p := u.AddPlan(year, "o1", now)
+	if !p.From.Equal(trialEnd) || !p.Until.Equal(trialEnd.AddDate(1, 0, 0)) {
+		t.Fatalf("бүтэн жил үнэгүй хугацааны араас: %+v", p)
 	}
-	if id, pct, _ := u.PlanAt(now.Add(day)); id != "start" || pct != 20 {
-		t.Fatalf("Эхлэлийн шимтгэл: %s %v", id, pct)
+	if id, _, _ := u.PlanAt(now.Add(day)); id != PlanTrial {
+		t.Fatalf("үнэгүй хугацаа үргэлжилнэ: %s", id)
 	}
-	end1 := p.Until
-	// Эхлэл дээр Pro (дээд): одооноос Pro, Эхлэлийн үлдэгдэл Pro-гийн дараа.
-	now2 := now.Add(10 * day)
-	pp := u.AddPlan(pro, "o2", now2)
-	if !pp.From.Equal(now2) || !pp.Until.Equal(now2.AddDate(1, 0, 0)) {
-		t.Fatalf("Pro: %+v", pp)
+	if id, pct, _ := u.PlanAt(trialEnd.Add(day)); id != "year" || pct != TransactionFeePct {
+		t.Fatalf("бүтэн жилийн шимтгэл: %s %v", id, pct)
 	}
-	if id, pct, _ := u.PlanAt(now2.Add(day)); id != "pro" || pct != 8 {
-		t.Fatalf("Pro шимтгэл: %s %v", id, pct)
+	// Дээр нь хагас жил: бүтэн жилийн араас.
+	h := u.AddPlan(half, "o2", now.Add(day))
+	if !h.From.Equal(p.Until) || !h.Until.Equal(p.Until.AddDate(0, 6, 0)) || !u.PlanUntil().Equal(h.Until) {
+		t.Fatalf("хагас жил араас: %+v", h)
 	}
-	wantEnd := pp.Until.Add(end1.Sub(now2))
-	if !u.PlanUntil().Equal(wantEnd) {
-		t.Fatalf("Эхлэлийн үлдэгдэл хадгалагдах: %v != %v (%+v)", u.PlanUntil(), wantEnd, u.Plan.Periods)
-	}
-	if id, _, _ := u.PlanAt(pp.Until.Add(day)); id != "start" {
-		t.Fatalf("Pro дууссаны дараа Эхлэлийн үлдэгдэл: %s", id)
-	}
-	// Pro дээр Standart (доод): одоогийн эрх дуусахад эхэлнэ.
-	ps := u.AddPlan(std, "o3", now2.Add(day))
-	if !ps.From.Equal(wantEnd) || !ps.Until.Equal(wantEnd.AddDate(0, 6, 0)) {
-		t.Fatalf("Standart араас: %+v", ps)
-	}
-	if id, _, _ := u.PlanAt(now2.Add(2 * day)); id != "pro" {
-		t.Fatalf("доод багц одоогийнхыг солихгүй: %s", id)
-	}
-	// Бүх эрх дууссаны дараа авбал одооноос.
-	late := ps.Until.Add(40 * day)
-	if _, _, ok := u.PlanAt(late); ok || u.PlanActive(late) {
+	// Бүх эрх дууссаны дараа сарын багц одооноос.
+	late := h.Until.Add(40 * day)
+	if _, pct, ok := u.PlanAt(late); ok || u.PlanActive(late) || pct != TransactionFeePct {
 		t.Fatal("эрх дууссан байх ёстой")
 	}
-	pl := u.AddPlan(start, "o4", late)
-	if !pl.From.Equal(late) || !u.PlanActive(late.Add(day)) {
-		t.Fatalf("дууссаны дараа: %+v", pl)
+	m := u.AddPlan(month, "o3", late)
+	if !m.From.Equal(late) || !m.Until.Equal(late.AddDate(0, 1, 0)) || !u.PlanActive(late.Add(day)) {
+		t.Fatalf("дууссаны дараа: %+v", m)
+	}
+	// Үнэ: сар 29,900, хагас жил 99,000, бүтэн жил 159,000; хуучин багц таньна, худалдаалахгүй, хувь авахгүй.
+	if len(Plans) != 3 || Plans[0].Price != 29900 || Plans[1].Price != 99000 || Plans[2].Price != 159000 {
+		t.Fatalf("үнийн жагсаалт: %+v", Plans)
+	}
+	if pl, ok := PlanByID("pro"); !ok || pl.Pct != TransactionFeePct {
+		t.Fatalf("хуучин багц: %+v %v", pl, ok)
+	}
+	if _, ok := PlanOnSale(nil, "pro"); ok {
+		t.Fatal("хуучин багц худалдаалахгүй")
 	}
 	// Хадгалах/унших
 	got := decodePlan(u.Plan.encode())
@@ -71,6 +66,21 @@ func TestAddPlan(t *testing.T) {
 	}
 	if (&User{Role: RoleStudent}).PlanActive(late) != true {
 		t.Fatal("суралцагчид хамаарахгүй")
+	}
+}
+
+// Үнэгүй хугацаа: шинэ багшид 2 сар; PlanTrialShortFrom-оос өмнө багш болсон хүнд амласан 3 сар хэвээр.
+func TestTrialLength(t *testing.T) {
+	defer func(v, w time.Time) { PlanTrialFrom, PlanTrialShortFrom = v, w }(PlanTrialFrom, PlanTrialShortFrom)
+	cut := time.Date(2027, 3, 1, 0, 0, 0, 0, time.UTC)
+	PlanTrialFrom, PlanTrialShortFrom = cut.AddDate(-1, 0, 0), cut
+	old := &User{Role: RoleTeacher, CreatedAt: cut.Add(-time.Hour)}
+	if !old.TrialUntil().Equal(old.CreatedAt.AddDate(0, 3, 0)) {
+		t.Fatalf("өмнө бүртгүүлсэн багш 3 сар: %v", old.TrialUntil())
+	}
+	nw := &User{Role: RoleTeacher, CreatedAt: cut.Add(time.Hour)}
+	if PlanTrialMonths != 2 || !nw.TrialUntil().Equal(nw.CreatedAt.AddDate(0, 2, 0)) {
+		t.Fatalf("шинэ багш 2 сар: %v", nw.TrialUntil())
 	}
 }
 
@@ -93,6 +103,11 @@ func TestOrderCommission(t *testing.T) {
 			t.Fatalf("%+v: %d != %d", c.o, got, c.want)
 		}
 	}
+	// Шинэ журам: үнэгүй хугацаанд, багцтай үед гүйлгээний шимтгэл 2%.
+	trial := &User{Role: RoleTeacher, CreatedAt: time.Now()}
+	if got := OrderCommission(&Order{Kind: OrderKindCourse, Amount: 10000, CommissionPct: saleCommissionPct(trial, time.Now())}); got != 200 {
+		t.Fatalf("гүйлгээний шимтгэл 2%%: %d", got)
+	}
 	b := balanceOf([]Order{{Amount: 10000}, {Amount: 10000, CommissionPct: 8}}, nil)
 	if b.Commission != 2900 || b.Net != 17100 || b.CommissionPct != 14.5 {
 		t.Fatalf("холимог үлдэгдэл: %+v", b)
@@ -104,41 +119,68 @@ func TestPlanStorage(t *testing.T) {
 	SetTeacherCommission(21)
 	defer SetTeacherCommission(0)
 	now := time.Now()
-	free := int64(300 << 20)
+	free := int64(100 << 20)
 	u := &User{Role: RoleTeacher, CreatedAt: now}
 	u.Plan.TrialFrom = &now
 	if q := u.StorageQuota(free, now); q != free {
 		t.Fatalf("үнэгүй хугацаанд: %d", q)
 	}
-	adv, _ := PlanByID("major")
-	u.AddPlan(adv, "o1", now)
+	u.Plan.Periods = []PlanPeriod{{Plan: "year", From: now.Add(-time.Hour), Until: now.AddDate(1, 0, 0)}}
 	if q := u.StorageQuota(free, now); q != 1024<<20 {
-		t.Fatalf("Advanced: %d", q)
+		t.Fatalf("бүтэн жил: %d", q)
 	}
 	exp := now.Add(24 * time.Hour)
 	u.StorageExtraBytes, u.StorageExpiresAt = 500<<20, &exp
 	if q := u.StorageQuota(free, now); q != (1024+500)<<20 {
-		t.Fatalf("Advanced + нэмэлт 500MB: %d", q)
+		t.Fatalf("бүтэн жил + нэмэлт 500MB: %d", q)
 	}
 	if q := u.StorageQuota(free, u.PlanUntil().Add(time.Hour)); q != free {
 		t.Fatalf("эрх, нэмэлт дууссаны дараа: %d", q)
 	}
-	if st, _ := PlanByID("start"); st.StorageMB != 300 || st.Title() != "Starter (Эхлэл)" {
-		t.Fatalf("Starter: %+v", st)
+	if m, _ := PlanByID("month"); m.StorageMB != 300 || m.Title() != "Сарын" {
+		t.Fatalf("сарын багц: %+v", m)
+	}
+	if h, _ := PlanByID("half"); h.StorageMB != 500 || h.Months != 6 {
+		t.Fatalf("хагас жил: %+v", h)
+	}
+	if st, _ := PlanByID("start"); st.Title() != "Starter (Эхлэл)" {
+		t.Fatalf("хуучин багцын нэр: %+v", st)
 	}
 }
 
-// Байгууллага: хянагчийн тогтоосон шимтгэл, файлын сан, хугацаагүй эрх; 0% гэрээ «хуучин захиалга» (21%) болохгүй.
+// Байгууллага: үнэгүй хугацаатай (хянагчийн тогтоосон шимтгэл), дараа нь байгууллагын багц; гэрээний сан багцынхаас их
+// бол түүнийг орлоно; 0% гэрээ «хуучин захиалга» (21%) болохгүй.
 func TestOrgPlan(t *testing.T) {
 	SetTeacherCommission(21)
 	defer SetTeacherCommission(0)
+	defer func(v, w time.Time) { PlanTrialFrom, PlanTrialShortFrom = v, w }(PlanTrialFrom, PlanTrialShortFrom)
 	now := time.Now()
-	u := &User{Role: RoleTeacher, CreatedAt: now.AddDate(-2, 0, 0), Org: &Org{Pct: 7.5, StorageMB: 2048}}
-	if id, pct, ok := u.PlanAt(now); id != PlanOrg || pct != 7.5 || !ok || !u.PlanActive(now.AddDate(50, 0, 0)) {
-		t.Fatalf("байгууллагын эрх: %s %v %v", id, pct, ok)
+	PlanTrialFrom, PlanTrialShortFrom = now.AddDate(-1, 0, 0), now.AddDate(-1, 0, 0)
+	u := &User{Role: RoleTeacher, CreatedAt: now, Org: &Org{Pct: 7.5, StorageMB: 3000}}
+	if id, pct, ok := u.PlanAt(now); id != PlanTrial || pct != 7.5 || !ok || !u.PlanUntil().Equal(now.AddDate(0, PlanTrialMonths, 0)) {
+		t.Fatalf("байгууллагын үнэгүй хугацаа: %s %v %v %v", id, pct, ok, u.PlanUntil())
 	}
-	if u.StorageBase(10<<20, now) != 2048<<20 {
-		t.Fatalf("файлын сан: %d", u.StorageBase(10<<20, now))
+	if u.StorageBase(10<<20, now) != 3000<<20 {
+		t.Fatalf("гэрээний сан: %d", u.StorageBase(10<<20, now))
+	}
+	// Байгууллагад зөвхөн байгууллагын багц: сар 129,000 (2GB), хагас жил 500,000 (5GB), жил 1,000,000 (5GB).
+	if _, ok := PlanOnSale(u, "year"); ok {
+		t.Fatal("байгууллагад багшийн багц худалдахгүй")
+	}
+	yr, ok := PlanOnSale(u, "org_year")
+	if !ok || yr.Price != 1000000 || yr.StorageMB != 5120 || len(PlansFor(u)) != 3 || PlansFor(u)[0].Price != 129000 || PlansFor(u)[1].Price != 500000 {
+		t.Fatalf("байгууллагын багц: %+v %v", yr, PlansFor(u))
+	}
+	late := u.PlanUntil().Add(24 * time.Hour)
+	if _, _, ok := u.PlanAt(late); ok || u.PlanActive(late) {
+		t.Fatal("үнэгүй хугацааны дараа эрхгүй")
+	}
+	p := u.AddPlan(yr, "o1", now.Add(time.Hour)) // үнэгүй хугацааны араас
+	if !p.From.Equal(u.TrialUntil()) || !u.PlanActive(late) {
+		t.Fatalf("жилийн багц араас: %+v", p)
+	}
+	if id, pct, _ := u.PlanAt(late); id != "org_year" || pct != 7.5 || u.StorageBase(10<<20, late) != 5120<<20 {
+		t.Fatalf("багцын үе: %s %v %d", id, pct, u.StorageBase(10<<20, late))
 	}
 	o := &Order{Amount: 10000, CommissionPct: saleCommissionPct(u, now)}
 	if OrderCommission(o) != 750 {

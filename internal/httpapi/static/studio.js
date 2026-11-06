@@ -108,7 +108,9 @@ window.Studio = {
   },
 };
 
-/* ---------- Системийн эрх (багц): «Данс»-аас QPay-ээр сунгана; дууссан бол студи хаагдана ---------- */
+/* ---------- Системийн эрх (багц): «Данс»-аас QPay-ээр сунгана; дууссан бол студи хаагдана.
+   Борлуулалтаас хувь авахгүй — зөвхөн гүйлгээний шимтгэл (fee_pct: багшид 2%, байгууллагад гэрээгээр). Байгууллагад
+   байгууллагын багц (ps.org). ---------- */
 let planSt = null;
 async function loadPlan(force) {
   if (!teacher) return null;
@@ -120,24 +122,31 @@ const planDate = (s) => { const d = new Date(s); return `${d.getFullYear()}.${St
 const goWallet = () => { const t = document.querySelector('.pf-tab[data-tab="wallet"]'); if (t) t.click(); else location.hash = "wallet"; };
 function planNowHTML(ps) {
   const what = ps.plan === "trial" ? "Үнэгүй хугацаа" : ps.active ? `«${esc(ps.name)}» багц` : "Системийн эрх дууссан";
-  const when = ps.active ? `${planDate(ps.until)} хүртэл · <b>${ps.days_left}</b> хоног үлдсэн · шимтгэл ${ps.commission_pct}%` : `${planDate(ps.until)}-нд дууссан`;
+  const when = ps.active ? `${planDate(ps.until)} хүртэл · <b>${ps.days_left}</b> хоног үлдсэн · гүйлгээний шимтгэл ${ps.commission_pct}%` : `${planDate(ps.until)}-нд дууссан`;
   const next = ps.upcoming.length ? `<small>Дараа нь: ${ps.upcoming.map((u) => `${esc(u.name)} (${planDate(u.from)} – ${planDate(u.until)})`).join(", ")}</small>` : "";
   return `<div class="sp-now${!ps.active ? " off" : ps.days_left <= 7 ? " warn" : ""}"><span class="sp-ic">${ico(ps.active ? "clock" : "lock", 20)}</span><div><b>${what}</b><small>${when}</small>${next}</div></div>`;
 }
 function planCardsHTML(ps) {
+  const monthly = ps.plans.find((p) => p.months === 1), per = (p) => p.price / p.months, fee = ps.fee_pct ?? ps.trial_pct;
+  // «Хамгийн ашигтай» — сард ногдох үнэ нь ганцаараа хамгийн бага багц (тэнцүү бол тэмдэглэхгүй).
+  const low = Math.min(...ps.plans.map(per)), best = ps.plans.filter((p) => per(p) === low).length === 1 ? ps.plans.find((p) => per(p) === low) : null;
   return `<div class="sp-grid">${ps.plans.map((p) => {
     const cur = ps.active && ps.plan === p.id;
-    return `<article class="sp-card${cur ? " cur" : ""}">${cur ? `<span class="sp-tag">Одоогийн</span>` : ""}
+    // Сарын багцтай харьцуулсан хэмнэлт (хагас жил −45%, бүтэн жил −56%).
+    const save = monthly && p.months > 1 ? Math.round((1 - p.price / p.months / monthly.price) * 100) : 0;
+    const tag = cur ? `<span class="sp-tag">Одоогийн</span>` : p === best && p !== monthly ? `<span class="sp-tag sp-best">Хамгийн ашигтай</span>` : "";
+    return `<article class="sp-card${cur ? " cur" : ""}">${tag}
       <h4>${esc(p.name)}</h4>${p.label ? `<span class="sp-label">${esc(p.label)}</span>` : ""}<span class="sp-term">${planTerm(p.months)}</span>
-      <p class="sp-price"><b>${money(p.price)}</b><small>сард ≈ ${money(Math.round(p.price / p.months))}</small></p>
+      <p class="sp-price"><b>${money(p.price)}</b><small>${p.months === 1 ? "сар бүр сунгана" : `сард ≈ ${money(Math.round(p.price / p.months))}`}${save > 0 ? ` · <span class="sp-save">${save}% хэмнэлт</span>` : ""}</small></p>
       <p class="sp-store">${ico("folder", 15)}<b>${p.storage_mb >= 1024 ? p.storage_mb / 1024 + "GB" : p.storage_mb + "MB"}</b> файлын сан</p>
-      <p class="sp-pct"><b>${p.commission_pct}%</b><small>борлуулалтын шимтгэл</small></p>
+      <p class="sp-pct"><b>Хувь авахгүй</b><small>зөвхөн гүйлгээний шимтгэл ${fee}%</small></p>
       <button type="button" class="btn ${cur ? "btn-ghost" : "btn-gold"} btn-block" data-plan-buy="${esc(p.id)}">${cur ? "Сунгах" : "Авах"}</button></article>`;
   }).join("")}</div>`;
 }
 const planRulesHTML = (ps) => `<ul class="sp-rules">
-  <li>Шинэ багшид эхний ${ps.trial_months} сар үнэгүй, энэ хугацаанд борлуулалтын шимтгэл ${ps.trial_pct}%.</li>
-  <li>Сунгавал хугацаа нэмэгдэнэ. Шимтгэл багатай багц авбал шууд эхэлж, одоогийн багцын үлдсэн хоног араас нь үргэлжилнэ.</li>
+  <li>${ps.org ? "Байгууллагад" : "Шинэ багшид"} эхний ${ps.trial_months} сар үнэгүй.</li>
+  <li>Борлуулалтаас хувь авахгүй — зөвхөн гүйлгээний шимтгэл ${ps.fee_pct ?? ps.trial_pct}% хасагдаж, үлдсэн нь таны данс руу шилжинэ (үнэгүй хугацаанд ч).</li>
+  <li>${ps.org ? "Багц байгууллагын профайлд — холбосон багш нар, удирдагчид нэмэлт төлбөргүй." : "Багц нэг профайлд."} Сунгавал одоогийн эрхийн араас үргэлжилнэ — үнэгүй хугацаанд авсан ч хоног алдагдахгүй.</li>
   <li>Эрх дуусвал сургалт удирдах, шинээр борлуулах боломж хаагдана. Худалдаж авсан суралцагчдын эрх, таны орлого хэвээр — «Данс»-аас татна.</li></ul>`;
 function bindPlanBuy(root, after) {
   root.addEventListener("click", async (e) => {
@@ -166,12 +175,12 @@ function planLock(ps) {
 }
 // Дуусахад 7 хоног үлдсэн бол бүх хэсэгт, үнэгүй хугацаанд тойм дээр сануулга.
 function planBanner(ps, view) {
-  if (!ps?.active || ps.org || !main || view === "wallet") return;
+  if (!ps?.active || !main || view === "wallet") return;
   const soon = ps.days_left <= 7, trial = ps.plan === "trial";
   if (!soon && !(trial && (!view || view === "overview"))) return;
   const el = document.createElement("div");
   el.className = "sp-banner" + (soon ? " warn" : "");
-  el.innerHTML = `${ico(soon ? "clock" : "money", 18)}<span>${trial ? `Үнэгүй хугацаа — <b>${ps.days_left}</b> хоног үлдсэн (${planDate(ps.until)} хүртэл) · шимтгэл ${ps.commission_pct}%. Багц авбал шимтгэл 8–20% болно.`
+  el.innerHTML = `${ico(soon ? "clock" : "money", 18)}<span>${trial ? `Үнэгүй хугацаа — <b>${ps.days_left}</b> хоног үлдсэн (${planDate(ps.until)} хүртэл). Борлуулалтаас хувь авахгүй, гүйлгээний шимтгэл ${ps.fee_pct ?? ps.commission_pct}%.`
     : `«${esc(ps.name)}» багц <b>${ps.days_left}</b> хоногийн дараа дуусна (${planDate(ps.until)}).`}</span><button type="button" class="btn btn-gold btn-sm">${trial ? "Багц сонгох" : "Сунгах"}</button>`;
   $("button", el).onclick = goWallet;
   main.prepend(el);
@@ -3041,9 +3050,7 @@ async function wallet() {
   const tg0 = (n) => (n ? money(n) : "0₮");
   const canDraw = a && b.available >= min;
   main.innerHTML = `<div class="wl">
-    ${ps?.org ? `<section class="anx-card sp-box" id="spBox"><div class="anx-card-head"><h3>${ico("school", 18)}Байгууллагын гэрээ</h3><span class="chip chip-teal">Идэвхтэй</span></div>
-      <div class="sp-now"><span class="sp-ic">${ico("school", 20)}</span><div><b>Гэрээгээр — хугацаагүй</b><small>Борлуулалтын шимтгэл <b>${ps.commission_pct}%</b> · файлын сан <b>${ps.storage_mb >= 1024 ? +(ps.storage_mb / 1024).toFixed(1) + " GB" : ps.storage_mb + " MB"}</b>. Нөхцөлийг surgalt.mn-ийн хянагч тогтооно.</small></div></div></section>`
-    : ps ? `<section class="anx-card sp-box" id="spBox"><div class="anx-card-head"><h3>${ico("gear", 18)}Системийн эрх</h3>${ps.active ? `<span class="chip ${ps.days_left <= 7 ? "chip-amber" : "chip-teal"}">Идэвхтэй</span>` : `<span class="chip chip-coral">Дууссан</span>`}</div>
+    ${ps ? `<section class="anx-card sp-box" id="spBox"><div class="anx-card-head"><h3>${ps.org ? `${ico("school", 18)}Байгууллагын эрх` : `${ico("gear", 18)}Системийн эрх`}</h3>${ps.active ? `<span class="chip ${ps.days_left <= 7 ? "chip-amber" : "chip-teal"}">Идэвхтэй</span>` : `<span class="chip chip-coral">Дууссан</span>`}</div>
       ${planNowHTML(ps)}${planCardsHTML(ps)}${planRulesHTML(ps)}</section>` : ""}
     <div class="anx-kpis">
       ${kpi("money", "Татах боломжтой", b.available, `${b.commission ? "шимтгэл хассан · " : ""}доод дүн ${money(min)}`, "wl-avail")}

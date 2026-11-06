@@ -29,6 +29,7 @@ func buy(t *testing.T, call2 func(method, path, tok, body string) (int, map[stri
 
 // Багшийн данс: орлого үлдэгдэлд орно, данс холбоогүй бол татахгүй, үлдэгдлээс илүүг татахгүй, давхар татахгүй;
 // хянагч шилжүүлсэн/татгалзсан гэж тэмдэглэнэ (татгалзсан дүн үлдэгдэлд буцна); статистик эх сурвалж, хичээл, бүлгээр задарна.
+// Үлдэгдлээс гүйлгээний шимтгэл 2% хасагдана (13,000 − 260 = 12,740).
 func TestTeacherPayoutFlow(t *testing.T) {
 	srv, _ := newTestServerWith(t, func(c *Config) { c.AdminEmails = []string{"boss@x.mn"} })
 	defer srv.Close()
@@ -50,7 +51,7 @@ func TestTeacherPayoutFlow(t *testing.T) {
 	}
 	_, p := c2("GET", "/api/me/payout", tt, "")
 	bal := p["balance"].(map[string]any)
-	if bal["earned"].(float64) != 13000 || bal["available"].(float64) != 13000 || p["account"] != nil {
+	if bal["earned"].(float64) != 13000 || bal["commission"].(float64) != 260 || bal["available"].(float64) != 12740 || p["account"] != nil {
 		t.Fatalf("үлдэгдэл: %v", p)
 	}
 	if _, op := c2("GET", "/api/me/payout", other, ""); op["balance"].(map[string]any)["earned"].(float64) != 0 {
@@ -83,7 +84,7 @@ func TestTeacherPayoutFlow(t *testing.T) {
 		t.Fatalf("татах: %d %v", code, w1)
 	}
 	code, w2 := c2("POST", "/api/me/payout/withdraw", tt, `{"amount":0}`) // үлдсэн бүгд
-	if code != http.StatusCreated || w2["amount"].(float64) != 8000 {
+	if code != http.StatusCreated || w2["amount"].(float64) != 7740 {
 		t.Fatalf("бүх үлдэгдэл: %d %v", code, w2)
 	}
 	if code, _ := c2("POST", "/api/me/payout/withdraw", tt, `{"amount":0}`); code != http.StatusBadRequest {
@@ -114,7 +115,7 @@ func TestTeacherPayoutFlow(t *testing.T) {
 	}
 	_, p = c2("GET", "/api/me/payout", tt, "")
 	bal = p["balance"].(map[string]any)
-	if bal["paid"].(float64) != 5000 || bal["pending"].(float64) != 0 || bal["available"].(float64) != 8000 {
+	if bal["paid"].(float64) != 5000 || bal["pending"].(float64) != 0 || bal["available"].(float64) != 7740 {
 		t.Fatalf("шийдвэрийн дараах үлдэгдэл: %v", bal)
 	}
 	_, ns := c2("GET", "/api/me/notifications", tt, "")
@@ -191,7 +192,7 @@ func TestAutoPayout(t *testing.T) {
 		t.Fatal("доод дүнд хүрээгүй үед татахгүй")
 	}
 	sell(inst.ID, 2000)
-	if ps, _ := st.Payouts(ctx, inst.ID, "", 10); len(ps) != 1 || ps[0].Amount != 2500 || !ps[0].Auto {
+	if ps, _ := st.Payouts(ctx, inst.ID, "", 10); len(ps) != 1 || ps[0].Amount != 2450 || !ps[0].Auto { // 2,500 − гүйлгээний шимтгэл 2%
 		t.Fatalf("шууд татах: %+v", ps)
 	}
 
@@ -209,7 +210,7 @@ func TestAutoPayout(t *testing.T) {
 	s.runAutoPayouts(ctx, now)
 	sell(mon.ID, 3000)
 	s.runAutoPayouts(ctx, now.Add(time.Minute))
-	if ps, _ := st.Payouts(ctx, mon.ID, "", 10); len(ps) != 1 || ps[0].Amount != 5000 {
+	if ps, _ := st.Payouts(ctx, mon.ID, "", 10); len(ps) != 1 || ps[0].Amount != 4900 {
 		t.Fatalf("сард нэг л удаа: %+v", ps)
 	}
 }

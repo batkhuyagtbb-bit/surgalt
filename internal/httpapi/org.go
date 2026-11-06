@@ -405,6 +405,11 @@ type adminOrgRow struct {
 	Teachers  int           `json:"teachers"`
 	Managers  []adminPerson `json:"managers"`
 	CreatedAt time.Time     `json:"created_at"`
+	// Системийн эрх: үнэгүй хугацаа эсвэл байгууллагын багц, дуусах огноо.
+	Plan       string    `json:"plan"`
+	PlanName   string    `json:"plan_name"`
+	PlanUntil  time.Time `json:"plan_until"`
+	PlanActive bool      `json:"plan_active"`
 }
 
 func (s *Server) adminOrgRow(ctx context.Context, u *store.User, courses []store.Course) adminOrgRow {
@@ -413,6 +418,8 @@ func (s *Server) adminOrgRow(ctx context.Context, u *store.User, courses []store
 	if row.Login == false && orgPlaceholderEmail(u.Email) {
 		row.Email = ""
 	}
+	row.Plan, _, row.PlanActive = u.PlanAt(time.Now())
+	row.PlanName, row.PlanUntil = planName(row.Plan), u.PlanUntil()
 	row.UsedBytes, _ = s.files.Usage(u.ID)
 	teachers := map[string]bool{}
 	for _, c := range courses {
@@ -468,7 +475,7 @@ func (s *Server) handleAdminOrgs(w http.ResponseWriter, r *http.Request) {
 			rows = append(rows, s.adminOrgRow(ctx, &users[i], courses))
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"orgs": rows, "default_pct": store.TeacherCommission(), "free_mb": s.cfg.StorageFreeMB})
+	writeJSON(w, http.StatusOK, map[string]any{"orgs": rows, "default_pct": store.OrgFeePct, "free_mb": s.cfg.StorageFreeMB})
 }
 
 // handleAdminUserSearch: GET /api/admin/users?q= — удирдагч сонгоход хэрэглэгч хайх (нэр, @нэр, имэйл; байгууллагаас бусад).

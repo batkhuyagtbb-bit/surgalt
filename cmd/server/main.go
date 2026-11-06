@@ -273,7 +273,7 @@ func run(log *slog.Logger) error {
 		LogRequests:   envBool("LOG_REQUESTS"),
 		RateLimitRPS:  envFloat("RATE_LIMIT_RPS", 30),
 		RateBurst:     envFloat("RATE_BURST", 60),
-		StorageFreeMB: envInt("STORAGE_FREE_MB", 300),
+		StorageFreeMB: envInt("STORAGE_FREE_MB", 100),
 		StoragePlans:  parsePlans(env("STORAGE_PLANS", "300:5000,500:8000,1024:14000,2048:25000,5120:55000")),
 		ContactEmail:  os.Getenv("CONTACT_EMAIL"),
 		AdminEmails:   emailList(os.Getenv("ADMIN_EMAILS")),

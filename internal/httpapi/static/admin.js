@@ -298,7 +298,7 @@ const pickerHTML = (ph) => `<div class="us-pick"><input type="search" data-us ma
 const personChip = (p, del) => `<span class="us-chip">${avatar(p.name, p.avatar_url)}<span><b>${esc(p.name || p.username)}</b><small>@${esc(p.username)}</small></span>${del ? `<button type="button" class="adm-x" data-${del}="${esc(p.id)}" aria-label="Хасах">✕</button>` : ""}</span>`;
 
 VIEWS.orgs = {
-  title: "Байгууллага", sub: "Сургууль, сургалтын төв: тусдаа профайл үүсгэж удирдах хүнийг холбоно; шимтгэл, файлын санг гэрээгээр тогтооно",
+  title: "Байгууллага", sub: "Сургууль, сургалтын төв: тусдаа профайл үүсгэж удирдах хүнийг холбоно; үнэгүй хугацааны дараа байгууллагын багц авна",
   async render(tools, el, live) {
     const d = await api("/api/admin/orgs");
     if (!live()) return;
@@ -309,25 +309,26 @@ VIEWS.orgs = {
       <form class="exp-form org-form" id="orgF">
         <label>Байгууллагын нэр<input name="name" maxlength="80" required placeholder="Жишээ: Шинжлэх ухааны их сургууль"></label>
         <label>Профайлын нэр (surgalt.mn/t/…)<input name="username" maxlength="32" required placeholder="muis" autocapitalize="off" spellcheck="false"></label>
-        <label>Борлуулалтын шимтгэл (%)<input name="commission_pct" type="number" min="0" max="100" step="0.5" value="${esc(d.default_pct)}" required></label>
+        <label>Гүйлгээний шимтгэл (%)<input name="commission_pct" type="number" min="0" max="100" step="0.5" value="${esc(d.default_pct)}" required></label>
         <div class="wide org-mgr-field"><span>Удирдах хүн</span><div id="orgMgr">${pickerHTML("Нэр, @нэр эсвэл имэйлээр хайх…")}<div class="us-sel"></div></div></div>
-        <label>Файлын сан (MB)<input name="storage_mb" type="number" min="0" max="1048576" step="1" value="2048" required></label>
+        <label>Гэрээний файлын сан (MB, 0 — багцынх)<input name="storage_mb" type="number" min="0" max="1048576" step="1" value="0" required></label>
         <details class="wide org-login"><summary>Байгууллагад тусдаа нэвтрэх имэйл, нууц үг өгөх (заавал биш)</summary>
           <div class="exp-form" style="margin-top:8px"><label>Нэвтрэх имэйл<input name="email" type="email" maxlength="120" placeholder="info@school.mn"></label>
           <label>Нууц үг<input name="password" type="text" minlength="6" maxlength="72" autocomplete="new-password" placeholder="6+ тэмдэгт"></label></div></details>
         <button class="btn btn-gold">${ic("school", 16)} Бүртгэх</button>
       </form>
-      <p class="muted small">Шимтгэл нь байгууллагын борлуулалт бүрээс авах платформын хувь (энгийн багшийнх ${esc(d.default_pct)}%, үнэгүй файлын сан ${mbLabel(d.free_mb)}). Байгууллага багц худалдаж авахгүй — хугацаагүй.</p>
+      <p class="muted small">Гүйлгээний шимтгэл байгууллагын борлуулалт бүрээс хасагдаж, үлдсэн нь дансанд шилжинэ (анхдагч ${esc(d.default_pct)}%). Эхний 2 сар үнэгүй (файлын сан ${mbLabel(d.free_mb)}), дараа нь байгууллага «Данс»-аас багц авна: сар ₮129,000 (2GB), хагас жил ₮500,000 (5GB), жил ₮1,000,000 (5GB). Гэрээний сан багцынхаас их бол түүнийг орлоно; гэрээгээр төлсөн бол «Засах» → «Эрх олгох».</p>
     </section>
     <div class="adm-table-wrap"><table class="adm-table" id="oTable"><thead><tr>
-      <th data-sort="name" data-type="text">Байгууллага</th><th>Удирдагч</th><th data-sort="commission_pct">Шимтгэл</th><th data-sort="storage_mb">Файлын сан</th>
+      <th data-sort="name" data-type="text">Байгууллага</th><th>Удирдагч</th><th data-sort="plan_until" data-type="text">Эрх</th><th data-sort="commission_pct">Шимтгэл</th><th data-sort="storage_mb">Файлын сан</th>
       <th data-sort="programs">Хөтөлбөр</th><th data-sort="courses">Сургалт</th><th data-sort="teachers">Багш</th><th data-sort="created_at" data-type="text">Бүртгэсэн</th><th></th>
     </tr></thead><tbody></tbody></table></div>`;
     const row = (o) => `<tr data-org="${esc(o.id)}">
       <td><span class="adm-person">${avatar(o.name, o.avatar_url)}<span><b>${esc(o.name || o.username)}</b><small>@${esc(o.username)}${o.login ? " · " + esc(o.email) : ""}</small></span></span></td>
       <td>${o.managers.length ? o.managers.map((m) => `<span class="who"><b>${esc(m.name || m.username)}</b><small>@${esc(m.username)}</small></span>`).join("") : `<span class="chip chip-coral">Удирдагчгүй</span>`}</td>
+      <td>${planChip(o)}<small>${dd(o.plan_until)}${o.plan_active ? " хүртэл" : "-нд дууссан"}</small></td>
       <td class="n"><b>${o.commission_pct}%</b></td>
-      <td class="n">${mbLabel(o.storage_mb)}<small>${bytes(o.used_bytes)} ашигласан</small></td>
+      <td class="n">${o.storage_mb ? mbLabel(o.storage_mb) : "Багцынх"}<small>${bytes(o.used_bytes)} ашигласан</small></td>
       <td class="n">${num(o.programs)}</td><td class="n">${num(o.courses)}<small>${num(o.courses_published)} нийтэлсэн</small></td><td class="n">${num(o.teachers)}</td><td>${dd(o.created_at)}</td>
       <td class="org-acts"><button type="button" class="btn btn-ghost btn-sm" data-org-edit="${esc(o.id)}">Засах</button> <a class="btn btn-ghost btn-sm" href="/t/${esc(o.username)}" target="_blank" rel="noopener" title="Профайл">${ic("ext", 14)}</a></td></tr>`;
     const tbl = sortable($("#oTable"), all, row, ["created_at", -1]);
@@ -360,17 +361,20 @@ function openOrg(o, done) {
   const body = drawer(o.name, "");
   const draw = () => {
     body.innerHTML = `
-    <div class="dr-head">${avatar(o.name, o.avatar_url)}<div><b>${esc(o.name)}</b><small>@${esc(o.username)} · ${num(o.courses)} сургалт · ${num(o.teachers)} багш · ${bytes(o.used_bytes)} / ${mbLabel(o.storage_mb)}</small></div>
+    <div class="dr-head">${avatar(o.name, o.avatar_url)}<div><b>${esc(o.name)}</b><small>@${esc(o.username)} · ${num(o.courses)} сургалт · ${num(o.teachers)} багш · ${bytes(o.used_bytes)} ашигласан${o.storage_mb ? " / гэрээ " + mbLabel(o.storage_mb) : ""}</small></div>
       <a class="btn btn-ghost btn-sm" href="/t/${esc(o.username)}" target="_blank" rel="noopener">${ic("ext", 15)} Профайл</a></div>
     <section class="adm-card"><header><h3>Мэдээлэл ба гэрээ</h3></header>
       <form class="exp-form" id="orgEd">
         <label>Байгууллагын нэр<input name="name" maxlength="80" required value="${esc(o.name)}"></label>
         <label>Профайлын нэр (surgalt.mn/t/…)<input name="username" maxlength="32" required value="${esc(o.username)}" autocapitalize="off" spellcheck="false"></label>
-        <label>Борлуулалтын шимтгэл (%)<input name="commission_pct" type="number" min="0" max="100" step="0.5" value="${esc(o.commission_pct)}" required></label>
-        <label>Файлын сан (MB)<input name="storage_mb" type="number" min="0" max="1048576" step="1" value="${esc(o.storage_mb)}" required></label>
+        <label>Гүйлгээний шимтгэл (%)<input name="commission_pct" type="number" min="0" max="100" step="0.5" value="${esc(o.commission_pct)}" required></label>
+        <label>Гэрээний файлын сан (MB, 0 — багцынх)<input name="storage_mb" type="number" min="0" max="1048576" step="1" value="${esc(o.storage_mb)}" required></label>
         <button class="btn btn-gold">Хадгалах</button>
       </form>
       <p class="muted small">Профайлын нэрийг солибол хуучин холбоос, хэвлэсэн QR ажиллахгүй болно.</p></section>
+    <section class="adm-card"><header><h3>Системийн эрх</h3><span class="muted small">${planChip(o)} ${dd(o.plan_until)}${o.plan_active ? " хүртэл" : "-нд дууссан"}</span></header>
+      <form class="exp-form" id="orgPlan"><label>Гэрээгээр төлсөн бол эрх олгох<select name="plan">${ORG_PLAN_OPTS}</select></label><button class="btn btn-ghost">Эрх олгох</button></form>
+      <p class="muted small">Олгосон хугацаа одоогийн эрхийн араас үргэлжилнэ; байгууллагад мэдэгдэл очно.</p></section>
     <section class="adm-card"><header><h3>Удирдагчид</h3><span class="muted small">Өөрийн бүртгэлээр нэвтэрч байгууллага руу шилжинэ. Хассан хүний нээлттэй эрх шууд хаагдана.</span></header>
       <div class="us-sel" id="orgMgrs">${o.managers.map((m) => personChip(m, "mgr-del")).join("") || `<p class="muted small" style="margin:0">Удирдагч алга</p>`}</div>
       <div id="orgMgrAdd" style="margin-top:10px">${pickerHTML("Удирдагч нэмэх — нэр, @нэр эсвэл имэйл…")}</div></section>
@@ -383,6 +387,14 @@ function openOrg(o, done) {
       try {
         const r = await api(`/api/admin/orgs/${encodeURIComponent(o.id)}`, { method: "PUT", body: { name: f.name.value.trim(), username: f.username.value.trim().toLowerCase(), commission_pct: +f.commission_pct.value, storage_mb: Math.round(+f.storage_mb.value) } });
         Object.assign(o, r); done(r); toast("Хадгаллаа ✓"); $("#admDrawerTitle").textContent = o.name; draw();
+      } catch (x) { toast(x.message, true); b.disabled = false; }
+    });
+    $("#orgPlan", body).addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const b = $("button", e.target); b.disabled = true;
+      try {
+        const r = await api(`/api/admin/teachers/${encodeURIComponent(o.id)}/plan`, { method: "POST", body: { plan: e.target.plan.value } });
+        Object.assign(o, { plan: r.plan, plan_name: r.name, plan_until: r.until, plan_active: r.active }); done(o); toast("Эрх олголоо ✓"); draw();
       } catch (x) { toast(x.message, true); b.disabled = false; }
     });
     userPicker($("#orgMgrAdd .us-pick", body), async (u) => {
@@ -409,7 +421,8 @@ function openOrg(o, done) {
 }
 
 // Системийн эрх (plans.go): шошго ба олгох сонголт.
-const PLAN_OPTS = [["start", "Starter (Эхлэл) · 3 сар"], ["standard", "Standard (Стандарт) · 6 сар"], ["major", "Advanced (Ахисан түвшин) · 1 жил"], ["pro", "Enterprise (Бизнес / Энтерпрайз) · 1 жил"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+const PLAN_OPTS = [["month", "Сарын · 1 сар"], ["half", "Хагас жил · 6 сар"], ["year", "Бүтэн жил · 1 жил"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+const ORG_PLAN_OPTS = [["org_month", "Сарын · 1 сар · 2GB"], ["org_half", "Хагас жил · 6 сар · 5GB"], ["org_year", "Бүтэн жил · 1 жил · 5GB"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
 const planChip = (t) => `<span class="chip ${!t.plan_active ? "chip-coral" : t.plan === "trial" ? "chip-amber" : "chip-teal"}">${t.plan_active ? esc(t.plan_name) : "Дууссан"}</span>`;
 
 async function openTeacher(id) {
@@ -599,7 +612,7 @@ VIEWS.finance = {
       ${kpi("Орлого", tg(R.income), `борлуулалт ${tg(R.sales)} · багтаамж ${tg(R.storage)} · багц ${tg(R.plans)} · хураамж ${tg(R.fees)}`, "good")}
       ${kpi("Зарлага", tg(R.outgo), `багшид ${tg(R.payouts)} · зардал ${tg(R.expenses)}`, "bad")}
       ${kpi("Цэвэр", tg(R.net), `сүүлийн ${state.months} сард`, R.net < 0 ? "bad" : "")}
-      ${kpi("Багшид өгөх үлдэгдэл", tg(A.owed), `шимтгэл ${d.commission_pct}% хассан · хүсэлт гаргасан ${tg(A.pending)}`, A.pending ? "warn" : "")}
+      ${kpi("Багшид өгөх үлдэгдэл", tg(A.owed), `шимтгэл хассан · хүсэлт гаргасан ${tg(A.pending)}`, A.pending ? "warn" : "")}
       ${kpi("Платформын ашиг", tg(A.profit), `шимтгэл ${tg(A.commission)} + хураамж ${tg(A.fees)} + багтаамж + багц − зардал`)}
       ${kpi("Данс дахь мөнгө", tg(A.cash), "нийт орлого − шилжүүлсэн − зардал")}
     </section>

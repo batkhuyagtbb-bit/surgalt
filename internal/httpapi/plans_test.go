@@ -31,22 +31,22 @@ func newPlanServer(t *testing.T) (*httptest.Server, *Server, store.Store) {
 	return srv, s, st
 }
 
-// Үнэгүй 3 сар (21%) → дуусахад студи, шинэ борлуулалт хаагдана (өмнө элссэн суралцагч, орлого татах нь хэвээр)
-// → «Данс»-аас Pro авахад нээгдэж, шинэ борлуулалт 8%-иар тооцогдоно; хянагч багц олгоно.
+// Үнэгүй 2 сар (гүйлгээний шимтгэл 2%) → дуусахад студи, шинэ борлуулалт хаагдана (өмнө элссэн суралцагч, орлого татах нь
+// хэвээр) → «Данс»-аас бүтэн жил авахад нээгдэнэ, хувь авахгүй (2%); хуучин багц худалдаалахгүй; хянагч багц олгоно.
 func TestTeacherPlans(t *testing.T) {
-	defer func(v time.Time) { store.PlanTrialFrom = v }(store.PlanTrialFrom)
-	store.PlanTrialFrom = time.Now().AddDate(-1, 0, 0)
-	store.SetTeacherCommission(21) // TEACHER_COMMISSION_PERCENT — үнэгүй хугацааны шимтгэл
+	defer func(v, w time.Time) { store.PlanTrialFrom, store.PlanTrialShortFrom = v, w }(store.PlanTrialFrom, store.PlanTrialShortFrom)
+	store.PlanTrialFrom, store.PlanTrialShortFrom = time.Now().AddDate(-1, 0, 0), time.Now().AddDate(-1, 0, 0)
+	store.SetTeacherCommission(21) // TEACHER_COMMISSION_PERCENT — зөвхөн хуучин захиалгад
 	defer store.SetTeacherCommission(0)
 	srv, s, st := newPlanServer(t)
 	ctx := context.Background()
 	tt, tid := register(t, srv, "teach", "teacher")
 
 	_, p := call(t, srv, "GET", "/api/me/plan", tt, "")
-	if p["plan"] != store.PlanTrial || p["active"] != true || p["commission_pct"] != 21.0 || p["days_left"].(float64) < 89 {
-		t.Fatalf("шинэ багш үнэгүй 3 сар: %v", p)
+	if p["plan"] != store.PlanTrial || p["active"] != true || p["commission_pct"] != 2.0 || p["trial_months"] != 2.0 || p["days_left"].(float64) < 58 || p["days_left"].(float64) > 63 {
+		t.Fatalf("шинэ багш үнэгүй 2 сар: %v", p)
 	}
-	if code, c := call(t, srv, "GET", "/api/plans", "", ""); code != 200 || len(c["plans"].([]any)) != 4 {
+	if code, c := call(t, srv, "GET", "/api/plans", "", ""); code != 200 || len(c["plans"].([]any)) != 3 {
 		t.Fatalf("үнийн жагсаалт: %d %v", code, c)
 	}
 	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Курс","price":10000,"published":true}`)
@@ -54,7 +54,7 @@ func TestTeacherPlans(t *testing.T) {
 	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","content":"x"}`)
 	lid := l["id"].(string)
 
-	// Үнэгүй хугацаанд зарсан: 21%
+	// Үнэгүй хугацаанд зарсан: 2%
 	s1, _ := register(t, srv, "stud1", "student")
 	_, d := call(t, srv, "POST", "/api/courses/"+cid+"/enroll", s1, "")
 	oid := d["order"].(map[string]any)["id"].(string)
@@ -63,7 +63,7 @@ func TestTeacherPlans(t *testing.T) {
 	}
 
 	// Үнэгүй хугацааг дуусгана (2 хоногийн өмнө дууссан).
-	if _, err := st.UpdateUser(ctx, tid, func(u *store.User) error { u.CreatedAt = time.Now().AddDate(0, -3, -2); return nil }); err != nil {
+	if _, err := st.UpdateUser(ctx, tid, func(u *store.User) error { u.CreatedAt = time.Now().AddDate(0, -store.PlanTrialMonths, -2); return nil }); err != nil {
 		t.Fatal(err)
 	}
 	s.planEnds.Delete(tid)
@@ -96,12 +96,14 @@ func TestTeacherPlans(t *testing.T) {
 		t.Fatalf("дууссан сануулга нэг удаа: %d %v", n, ns)
 	}
 
-	// Pro авах: QPay (демо) → эрх нээгдэнэ, мэдэгдэл.
-	if code, _ := call(t, srv, "POST", "/api/me/plan/purchase", tt, `{"plan":"gold"}`); code != 400 {
-		t.Fatalf("байхгүй багц: %d", code)
+	// Бүтэн жил авах: QPay (демо) → эрх нээгдэнэ, мэдэгдэл. Байхгүй, хуучин багц худалдаалахгүй.
+	for _, id := range []string{"gold", "pro"} {
+		if code, _ := call(t, srv, "POST", "/api/me/plan/purchase", tt, `{"plan":"`+id+`"}`); code != 400 {
+			t.Fatalf("%s багц: %d", id, code)
+		}
 	}
-	code, d = call(t, srv, "POST", "/api/me/plan/purchase", tt, `{"plan":"pro"}`)
-	if pm := d["payment"].(map[string]any); code != 201 || d["order"].(map[string]any)["amount"] != 500000.0 || pm["provider"] != "demo" || pm["amount"] != 500000.0 || pm["fee"] != 0.0 {
+	code, d = call(t, srv, "POST", "/api/me/plan/purchase", tt, `{"plan":"year"}`)
+	if pm := d["payment"].(map[string]any); code != 201 || d["order"].(map[string]any)["amount"] != 159000.0 || pm["provider"] != "demo" || pm["amount"] != 159000.0 || pm["fee"] != 0.0 {
 		t.Fatalf("багц худалдах: %d %v", code, d)
 	}
 	poid := d["order"].(map[string]any)["id"].(string)
@@ -109,14 +111,14 @@ func TestTeacherPlans(t *testing.T) {
 		t.Fatalf("багц төлөх: %d", code)
 	}
 	_, p = call(t, srv, "GET", "/api/me/plan", tt, "")
-	if p["plan"] != "pro" || p["active"] != true || p["commission_pct"] != 8.0 || p["days_left"].(float64) < 364 {
-		t.Fatalf("Pro: %v", p)
+	if p["plan"] != "year" || p["active"] != true || p["commission_pct"] != 2.0 || p["days_left"].(float64) < 364 {
+		t.Fatalf("бүтэн жил: %v", p)
 	}
-	// Enterprise багцад 2GB файлын сан (үнэгүй 10MB-ийг орлоно); нэр, мэдэгдэлд «Enterprise (Бизнес / Энтерпрайз)».
-	if _, sq := call(t, srv, "GET", "/api/me/storage", tt, ""); p["name"] != "Enterprise" || sq["quota"] != float64(2048<<20) || sq["base_plan"] != "Enterprise" || sq["base_label"] != "2GB" {
+	// Бүтэн жилд 1GB файлын сан (үнэгүй 10MB-ийг орлоно); нэр, мэдэгдэлд «Бүтэн жил».
+	if _, sq := call(t, srv, "GET", "/api/me/storage", tt, ""); p["name"] != "Бүтэн жил" || sq["quota"] != float64(1024<<20) || sq["base_plan"] != "Бүтэн жил" || sq["base_label"] != "1GB" {
 		t.Fatalf("багцын файлын сан: %v %v", p["name"], sq)
 	}
-	if _, ns := callList(t, srv, "GET", "/api/me/notifications", tt); countTitle(ns, "сунгагдлаа") != 1 || !strings.Contains(fmt.Sprint(ns), "Enterprise (Бизнес / Энтерпрайз)") {
+	if _, ns := callList(t, srv, "GET", "/api/me/notifications", tt); countTitle(ns, "сунгагдлаа") != 1 || !strings.Contains(fmt.Sprint(ns), "Бүтэн жил") {
 		t.Fatalf("мэдэгдэлд багцын нэр: %v", ns)
 	}
 	if code, _ := call(t, srv, "POST", "/api/courses", tt, `{"title":"Шинэ","price":0}`); code != 201 {
@@ -126,12 +128,12 @@ func TestTeacherPlans(t *testing.T) {
 		t.Fatalf("сунгасан мэдэгдэл: %v", ns)
 	}
 
-	// Pro-гийн үед зарсан: 8%. Үлдэгдэл: 10000×21% + 10000×8% = 2900.
+	// Бүтэн жилийн үед зарсан: 2%. Үлдэгдэл: 10000×2% + 10000×2% = 400.
 	_, d = call(t, srv, "POST", "/api/courses/"+cid+"/enroll", s2, "")
 	oid2 := d["order"].(map[string]any)["id"].(string)
 	call(t, srv, "POST", "/api/orders/"+oid2+"/dev-pay", s2, "")
 	_, pay := call(t, srv, "GET", "/api/me/payout", tt, "")
-	if b := pay["balance"].(map[string]any); b["earned"] != 20000.0 || b["commission"] != 2900.0 || b["net"] != 17100.0 {
+	if b := pay["balance"].(map[string]any); b["earned"] != 20000.0 || b["commission"] != 400.0 || b["net"] != 19600.0 {
 		t.Fatalf("шимтгэл борлуулалт бүрээр: %v", b)
 	}
 	// Багцын төлбөр багшийн орлого, худалдан авалтын түүхэнд орохгүй.
@@ -142,16 +144,16 @@ func TestTeacherPlans(t *testing.T) {
 	// Хянагч багц олгоно; багш биш хүнд олгохгүй.
 	boss, _ := register(t, srv, "boss", "student")
 	_, sid := register(t, srv, "stud3", "student")
-	if code, _ := call(t, srv, "POST", "/api/admin/teachers/"+sid+"/plan", boss, `{"plan":"major"}`); code != http.StatusConflict {
+	if code, _ := call(t, srv, "POST", "/api/admin/teachers/"+sid+"/plan", boss, `{"plan":"half"}`); code != http.StatusConflict {
 		t.Fatalf("суралцагчид олгохгүй: %d", code)
 	}
-	if code, _ := call(t, srv, "POST", "/api/admin/teachers/"+tid+"/plan", tt, `{"plan":"major"}`); code != http.StatusForbidden {
+	if code, _ := call(t, srv, "POST", "/api/admin/teachers/"+tid+"/plan", tt, `{"plan":"half"}`); code != http.StatusForbidden {
 		t.Fatalf("зөвхөн хянагч: %d", code)
 	}
 	before := p["until"].(string)
-	code, g := call(t, srv, "POST", "/api/admin/teachers/"+tid+"/plan", boss, `{"plan":"major"}`)
-	if code != 200 || g["plan"] != "pro" || g["until"].(string) <= before || len(g["upcoming"].([]any)) != 1 {
-		t.Fatalf("олгосон Major Pro-гийн араас: %d %v", code, g)
+	code, g := call(t, srv, "POST", "/api/admin/teachers/"+tid+"/plan", boss, `{"plan":"half"}`)
+	if code != 200 || g["plan"] != "year" || g["until"].(string) <= before || len(g["upcoming"].([]any)) != 1 {
+		t.Fatalf("олгосон хагас жил бүтэн жилийн араас: %d %v", code, g)
 	}
 }
 
@@ -165,14 +167,14 @@ func countTitle(items []any, sub string) int {
 	return n
 }
 
-// Сануулга: 7 хоног, 1 хоног, дууссан — тус бүр нэг удаа.
+// Сануулга: 7 хоног, 1 хоног, дууссан, дараа нь долоо хоног бүр төлбөр нэхэх (4 хүртэл) — тус бүр нэг удаа.
 func TestPlanNotice(t *testing.T) {
 	now := time.Now()
-	u := &store.User{Role: store.RoleTeacher, CreatedAt: now.AddDate(0, -3, 5)} // 5 хоногийн дараа дуусна
-	defer func(v time.Time) { store.PlanTrialFrom = v }(store.PlanTrialFrom)
-	store.PlanTrialFrom = now.AddDate(-1, 0, 0)
+	u := &store.User{Role: store.RoleTeacher, CreatedAt: now.AddDate(0, -store.PlanTrialMonths, 5)} // 5 хоногийн дараа дуусна
+	defer func(v, w time.Time) { store.PlanTrialFrom, store.PlanTrialShortFrom = v, w }(store.PlanTrialFrom, store.PlanTrialShortFrom)
+	store.PlanTrialFrom, store.PlanTrialShortFrom = now.AddDate(-1, 0, 0), now.AddDate(-1, 0, 0)
 	n, key := planNotice(u, now)
-	if n == nil || !strings.HasSuffix(key, ":7") || !strings.Contains(n.Title, "Үнэгүй 3 сар") {
+	if n == nil || !strings.HasSuffix(key, ":7") || !strings.Contains(n.Title, "Үнэгүй хугацаа") {
 		t.Fatalf("7 хоногийн сануулга: %v %q", n, key)
 	}
 	u.Plan.Notice = key
@@ -187,5 +189,15 @@ func TestPlanNotice(t *testing.T) {
 	}
 	if n, _ := planNotice(u, now.AddDate(0, -2, 0)); n != nil {
 		t.Fatal("эрт сануулахгүй")
+	}
+	end := u.PlanUntil()
+	if n, key := planNotice(u, end.Add(8*24*time.Hour)); n == nil || !strings.HasSuffix(key, ":w1") || !strings.Contains(n.Title, "төлнө үү") {
+		t.Fatalf("1 долоо хоногийн дараа төлбөр нэхэх: %v %q", n, key)
+	}
+	if _, key := planNotice(u, end.Add(29*24*time.Hour)); !strings.HasSuffix(key, ":w4") {
+		t.Fatalf("4 дэх долоо хоног: %q", key)
+	}
+	if n, _ := planNotice(u, end.Add(35*24*time.Hour)); n != nil {
+		t.Fatal("30 хоногоос хойш сануулахгүй")
 	}
 }

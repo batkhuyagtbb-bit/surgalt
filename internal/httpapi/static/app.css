@@ -4728,9 +4728,8 @@ a.np-item:active{background:var(--line)}
 .sp-now.warn .sp-ic{background:var(--surface);color:var(--amber)}
 .sp-now.off{border-color:var(--coral);background:var(--coral-soft)}
 .sp-now.off .sp-ic{background:var(--surface);color:var(--coral)}
-.sp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-@media (max-width:1100px){.sp-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:480px){.sp-grid{grid-template-columns:minmax(0,1fr)}}
+.sp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.sp-grid{grid-template-columns:minmax(0,1fr)}}
 .sp-card{position:relative;display:flex;flex-direction:column;gap:2px;min-width:0;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface);transition:border-color .2s,box-shadow .2s,transform .2s var(--ease)}
 .sp-card:hover{border-color:var(--line-2);box-shadow:var(--shadow);transform:translateY(-2px)}
 .sp-card.cur{padding:15px;border:2px solid var(--brand)}
@@ -4738,6 +4737,8 @@ a.np-item:active{background:var(--line)}
 .sp-label{color:var(--brand);font-size:.84rem;font-weight:700}
 .sp-term{color:var(--muted);font-size:.86rem;font-weight:600}
 .sp-tag{position:absolute;top:12px;right:12px;padding:2px 8px;border-radius:999px;background:var(--brand);color:var(--on-brand);font-size:.72rem;font-weight:700}
+.sp-tag.sp-best{background:var(--teal)}
+.sp-save{color:var(--teal);font-weight:700}
 .sp-price,.sp-pct{display:grid;margin:8px 0 0}
 .sp-price b{font-size:1.45rem;letter-spacing:-.01em}
 .sp-price small,.sp-pct small{color:var(--muted);font-size:.8rem}
