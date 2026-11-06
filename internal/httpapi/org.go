@@ -700,6 +700,7 @@ func (s *Server) handleAdminUpdateOrg(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.planEnds.Delete(u.ID)
+	s.hub.SendUsers([]string{u.ID}, map[string]any{"type": "plan_changed"}) // гэрээт ↔ багцтай болбол студи шинэчлэгдэнэ
 	s.invalidateTeacher(r, u.ID, u.Username)
 	for _, m := range u.Org.Managers {
 		s.managed.Delete(m)

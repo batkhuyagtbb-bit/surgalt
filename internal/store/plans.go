@@ -43,8 +43,13 @@ var Plans = []Plan{
 	{ID: "year", Name: "Бүтэн жил", StorageMB: 1024, Months: 12, Price: 159000, Pct: TransactionFeePct},
 }
 
-// OrgFeePct — байгууллагын гүйлгээний шимтгэлийн анхдагч (%): хянагч бүртгэхэд Org.Pct-д тавина, гэрээгээр өөрчилж болно.
+// OrgFeePct — байгууллагын гүйлгээний шимтгэлийн анхдагч (%): хянагч бүртгэхэд Org.Pct-д тавина. Хянагч өөр хувь
+// тогтоовол гэрээт байгууллага (Org.Contract) болно.
 const OrgFeePct = 1.0
+
+// Contract — гэрээт байгууллага: хянагч анхдагчаас (OrgFeePct) өөр шимтгэл тогтоосон — багц авахгүй, эрх хугацаагүй,
+// нөхцөлийг хянагч гэрээгээр тогтооно.
+func (o *Org) Contract() bool { return o != nil && o.Pct != OrgFeePct }
 
 // OrgPlans — байгууллагын багцууд (байгууллагын профайлд; холбосон багш, удирдагчид нэмэлт төлбөргүй).
 var OrgPlans = []Plan{
@@ -65,8 +70,9 @@ var legacyPlans = []Plan{
 // Үнэгүй хугацааны (болон эрхгүй үеийн) шимтгэл = TransactionFeePct. Хуучин захиалга (commission_pct 0) л
 // TEACHER_COMMISSION_PERCENT-ээр тооцогдоно.
 const (
-	PlanTrial       = "trial" // үнэгүй хугацаа (багш, байгууллага)
-	PlanTrialMonths = 2       // PlanTrialShortFrom-оос өмнө бүртгүүлсэн хүнд planTrialMonthsBefore (амласан 3 сар)
+	PlanTrial       = "trial"    // үнэгүй хугацаа (багш, байгууллага)
+	PlanContract    = "contract" // гэрээт байгууллага (Org.Contract): хугацаагүй
+	PlanTrialMonths = 2          // PlanTrialShortFrom-оос өмнө бүртгүүлсэн хүнд planTrialMonthsBefore (амласан 3 сар)
 )
 
 func (o *Org) encode() string {
@@ -124,12 +130,18 @@ func PlanByID(id string) (Plan, bool) {
 	return Plan{}, false
 }
 
-// PlansFor — хэрэглэгчид худалдаалж буй багцууд: байгууллагад OrgPlans, багшид Plans.
+// ContractUntil — гэрээт байгууллагын эрхийн «дуусах» хугацаа (хугацаагүй).
+var ContractUntil = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+
+// PlansFor — хэрэглэгчид худалдаалж буй багцууд: байгууллагад OrgPlans, гэрээт байгууллагад байхгүй, багшид Plans.
 func PlansFor(u *User) []Plan {
-	if u != nil && u.Org != nil {
-		return OrgPlans
+	switch {
+	case u == nil || u.Org == nil:
+		return Plans
+	case u.Org.Contract():
+		return []Plan{}
 	}
-	return Plans
+	return OrgPlans
 }
 
 // PlanOnSale — u-д худалдаалж буй багц (худалдан авах, хянагч олгоход).
@@ -208,6 +220,9 @@ func (u *User) TrialUntil() time.Time {
 // PlanAt — t үеийн эрх: багцын ID (эсвэл PlanTrial), шимтгэлийн хувь, эрхтэй эсэх.
 // Байгууллагын шимтгэл багцаас үл хамааран хянагчийн тогтоосон Org.Pct.
 func (u *User) PlanAt(t time.Time) (string, float64, bool) {
+	if u.Org.Contract() {
+		return PlanContract, u.Org.Pct, true
+	}
 	for _, p := range u.Plan.Periods {
 		if !t.Before(p.From) && t.Before(p.Until) {
 			if pl, ok := PlanByID(p.Plan); ok {
@@ -240,6 +255,9 @@ func (u *User) PlanStorageBytes(t time.Time) int64 {
 
 // PlanUntil — эрх дуусах хугацаа (үнэгүй хугацаа, дараалсан бүх багцыг оруулаад). Ирээдүйд завсар үүсдэггүй.
 func (u *User) PlanUntil() time.Time {
+	if u.Org.Contract() {
+		return ContractUntil
+	}
 	end := u.TrialUntil()
 	for _, p := range u.Plan.Periods {
 		if p.Until.After(end) {

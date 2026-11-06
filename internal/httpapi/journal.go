@@ -47,6 +47,7 @@ type JournalCell struct {
 	Viewed    bool         `json:"viewed,omitempty"`
 	Done      bool         `json:"done,omitempty"`
 	Disq      bool         `json:"disq,omitempty"`
+	Improved  bool         `json:"improved,omitempty"` // дахин судалж оноо сайжирсан (rank.go lessonPoints)
 	QuizOK    int          `json:"q_ok,omitempty"`
 	QuizN     int          `json:"q_n,omitempty"`
 	Active    int          `json:"active,omitempty"` // секунд
@@ -276,7 +277,7 @@ func (s *Server) buildJournal(ctx context.Context, course *store.Course) (*journ
 		sum := 0
 		for _, lr := range ranks {
 			cl := cell(uid, lr.LessonID)
-			cl.Points, cl.Viewed, cl.Done, cl.Disq = lr.Points, true, lr.Completed, lr.Disqualified
+			cl.Points, cl.Viewed, cl.Done, cl.Disq, cl.Improved = lr.Points, true, lr.Completed, lr.Disqualified, lr.Improved
 			cl.QuizOK, cl.QuizN, cl.Active, cl.Total, cl.Sessions = lr.QuizCorrect, lr.QuizTotal, lr.ActiveSec, lr.TotalSec, lr.Sessions
 			cl.Video, cl.HasVideo, cl.Reflected, cl.Tabs, cl.Reasons, cl.Last = lr.VideoPct, lr.HasVideo, lr.Reflected, lr.TabSwitches, lr.Reasons, lr.LastAt
 			if lr.Completed {

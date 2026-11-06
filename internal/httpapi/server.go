@@ -58,6 +58,9 @@ type Config struct {
 }
 
 type Server struct {
+	// Давтах сануулга (review.go): сүүлд илгээсэн өдөр (процесс дотор; давхардлыг store.ClaimReviews хамгаална).
+	reviewMu     sync.Mutex
+	reviewDay    string
 	cfg          Config
 	store        store.Store
 	tokens       *auth.Signer
@@ -194,6 +197,7 @@ func (s *Server) Background(ctx context.Context) {
 	go s.notifyLoop(ctx)
 	go s.payoutLoop(ctx)
 	go s.planLoop(ctx)
+	go s.reviewLoop(ctx)
 }
 
 func (s *Server) Handler() http.Handler {

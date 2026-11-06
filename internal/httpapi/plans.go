@@ -72,6 +72,9 @@ func planName(id string) string {
 	if id == store.PlanTrial {
 		return "Үнэгүй хугацаа"
 	}
+	if id == store.PlanContract {
+		return "Байгууллагын гэрээ"
+	}
 	if p, ok := store.PlanByID(id); ok {
 		return p.Name
 	}
@@ -102,7 +105,7 @@ func planStatus(u *store.User, now time.Time) map[string]any {
 	st["plan"], st["name"], st["commission_pct"], st["active"] = id, planName(id), pct, active
 	st["until"], st["days_left"], st["trial_until"], st["upcoming"] = until, days, u.TrialUntil(), upcoming
 	if u.Org != nil { // байгууллага: байгууллагын багц, хянагчийн тогтоосон шимтгэл, гэрээний файлын сан
-		st["org"], st["storage_mb"] = true, u.Org.StorageMB
+		st["org"], st["storage_mb"], st["contract"] = true, u.Org.StorageMB, u.Org.Contract()
 	}
 	return st
 }
@@ -142,6 +145,10 @@ func (s *Server) handleBuyPlan(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := s.store.UserByID(r.Context(), c.UID)
 	if s.storeErr(w, r, err) {
+		return
+	}
+	if u.Org.Contract() {
+		writeErr(w, http.StatusBadRequest, "гэрээт байгууллага — эрх гэрээгээр, багц авах шаардлагагүй")
 		return
 	}
 	p, ok := store.PlanOnSale(u, in.Plan) // байгууллагад зөвхөн байгууллагын багц

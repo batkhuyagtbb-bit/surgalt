@@ -845,7 +845,7 @@ function bell() {
   let items = [], tab = "all", limit = 12, floor = getSeen(), loaded = false, hasOlder = false, busy = false;
   // Мэдэгдэл бүрийн дүрс: гарчгийн эхний emoji-оос, эс бөгөөс төрлөөс; өнгө нь төрлөөр (чат — цэнхэр, мөнгө — ногоон г.м.).
   const N_EMOJI = { "💬": "chat", "↩": "chat", "👥": "users", "📅": "cal", "❌": "cal", "🏦": "money", "💰": "money", "✅": "check", "⚠️": "alert", "⚠": "alert", "🚩": "alert", "⛔": "lock", "🔓": "lock", "🔒": "lock", "🔑": "lock", "📹": "live", "📣": "bell", "📞": "phone", "📎": "clip", "💾": "files", "🎓": "courses", "📚": "book", "👀": "eye", "👁": "eye", "📝": "exam", "🏆": "medal", "🎖": "medal", "🛒": "card", "💳": "card" };
-  const N_TYPE = { message: "chat", comment: "chat", reply: "chat", booking: "cal", payout: "money", purchase: "card", enroll: "courses", profile_view: "eye", course_view: "eye", lesson_view: "play", phone_view: "phone", storage: "files", report: "alert", violation: "alert", account: "shield", blocked: "lock", unblock: "lock", assignment: "clip", grade: "check", exam: "exam", remind: "bell", rank: "medal" };
+  const N_TYPE = { message: "chat", comment: "chat", reply: "chat", booking: "cal", payout: "money", purchase: "card", enroll: "courses", profile_view: "eye", course_view: "eye", lesson_view: "play", phone_view: "phone", storage: "files", report: "alert", violation: "alert", account: "shield", blocked: "lock", unblock: "lock", assignment: "clip", grade: "check", exam: "exam", remind: "bell", rank: "medal", review: "book" };
   const TONE = { chat: "blue", users: "blue", money: "green", card: "green", check: "green", phone: "green", courses: "violet", medal: "violet", exam: "violet", book: "violet", cal: "orange", bell: "orange", alert: "red", lock: "red", live: "red", clip: "teal", files: "teal", play: "teal", eye: "gray", shield: "gray" };
   const kind = (n) => {
     const t = (n.title || "").trim(), m = /^(\p{Extended_Pictographic}️?|↩)\s*/u.exec(t);
@@ -4455,7 +4455,7 @@ async function homePage() {
           <td><b>${dur(l.active_sec)}</b>${l.total_sec ? `<small>${pct(l.active_sec, l.total_sec)}% идэвхтэй${l.tab_switches ? ` · ${l.tab_switches} таб` : ""}</small>` : ""}</td>
           <td>${l.quiz_total ? `<b>${l.quiz_correct}/${l.quiz_total}</b>${bar(pct(l.quiz_correct, l.quiz_total), l.quiz_correct === l.quiz_total ? "ok" : "")}` : `<span class="muted">—</span>`}</td>
           <td>${l.has_video ? `<b>${l.video_pct}%</b>${bar(l.video_pct, l.video_pct >= 90 ? "ok" : "")}` : `<span class="muted">—</span>`}</td>
-          <td><span class="st-pts ${l.disqualified ? "bad" : l.points >= 75 ? "ok" : ""}" title="${esc((l.reasons || []).join(", "))}"><b>${l.disqualified ? "0" : "+" + l.points}</b><small>${l.disqualified ? "тооцогдоогүй" : "оноо"}</small></span></td></tr>`;
+          <td><span class="st-pts ${l.disqualified ? "bad" : l.points >= 75 ? "ok" : ""}" title="${esc((l.reasons || []).join(", "))}"><b>${l.disqualified ? "0" : "+" + l.points}</b><small>${l.disqualified ? "тооцогдоогүй · дахин судал" : l.improved ? "оноо · ↻ сайжирсан" : "оноо"}</small></span></td></tr>`;
     const group = (g) => { const id = g.c.course_id, on = openSet.has(id), rk = g.c.rank || {};
       return `<div class="st-course ${on ? "open" : ""}" data-cid="${esc(id)}">
         <button type="button" class="st-ch" aria-expanded="${on}" aria-controls="stc-${esc(id)}">
@@ -4607,8 +4607,8 @@ async function coursePage() {
       if (!r) { b?.remove(); return; }
       if (!b) { b = document.createElement("span"); b.className = "lesson-rank"; $(".lesson-title", li)?.append(b); }
       b.className = "lesson-rank " + (r.disqualified ? "disq" : r.points >= 75 ? "high" : "");
-      b.title = (r.disqualified ? "Хуулах оролдлоготой тул оноо тооцогдоогүй" : "Нэгдсэн цолд нэмсэн оноо") + ((r.reasons || []).length ? ": " + r.reasons.join(", ") : "");
-      b.textContent = r.disqualified ? "⛔ Тооцогдоогүй" : `+${r.points} оноо`;
+      b.title = (r.disqualified ? "Хуулах оролдлоготой тул оноо тооцогдоогүй — дахин шударга судалбал тооцогдоно" : r.improved ? "Дахин судалж сайжруулсан оноо" : "Нэгдсэн цолд нэмсэн оноо") + ((r.reasons || []).length ? ": " + r.reasons.join(", ") : "");
+      b.textContent = r.disqualified ? "⛔ Тооцогдоогүй" : `+${r.points} оноо${r.improved ? " ↻" : ""}`;
     });
     if (a.rank && bar) {
       let rl = $("#courseRank");

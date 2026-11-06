@@ -148,16 +148,16 @@ func TestPlanStorage(t *testing.T) {
 	}
 }
 
-// Байгууллага: үнэгүй хугацаатай (хянагчийн тогтоосон шимтгэл), дараа нь байгууллагын багц; гэрээний сан багцынхаас их
-// бол түүнийг орлоно; 0% гэрээ «хуучин захиалга» (21%) болохгүй.
+// Байгууллага (анхдагч 1%): үнэгүй хугацаатай, дараа нь байгууллагын багц; гэрээний сан багцынхаас их бол түүнийг орлоно.
+// Хянагч өөр шимтгэл тавьсан бол гэрээт: багц авахгүй, хугацаагүй; 0% гэрээ «хуучин захиалга» (21%) болохгүй.
 func TestOrgPlan(t *testing.T) {
 	SetTeacherCommission(21)
 	defer SetTeacherCommission(0)
 	defer func(v, w time.Time) { PlanTrialFrom, PlanTrialShortFrom = v, w }(PlanTrialFrom, PlanTrialShortFrom)
 	now := time.Now()
 	PlanTrialFrom, PlanTrialShortFrom = now.AddDate(-1, 0, 0), now.AddDate(-1, 0, 0)
-	u := &User{Role: RoleTeacher, CreatedAt: now, Org: &Org{Pct: 7.5, StorageMB: 3000}}
-	if id, pct, ok := u.PlanAt(now); id != PlanTrial || pct != 7.5 || !ok || !u.PlanUntil().Equal(now.AddDate(0, PlanTrialMonths, 0)) {
+	u := &User{Role: RoleTeacher, CreatedAt: now, Org: &Org{Pct: OrgFeePct, StorageMB: 3000}}
+	if id, pct, ok := u.PlanAt(now); id != PlanTrial || pct != OrgFeePct || u.Org.Contract() || !ok || !u.PlanUntil().Equal(now.AddDate(0, PlanTrialMonths, 0)) {
 		t.Fatalf("байгууллагын үнэгүй хугацаа: %s %v %v %v", id, pct, ok, u.PlanUntil())
 	}
 	if u.StorageBase(10<<20, now) != 3000<<20 {
@@ -179,10 +179,22 @@ func TestOrgPlan(t *testing.T) {
 	if !p.From.Equal(u.TrialUntil()) || !u.PlanActive(late) {
 		t.Fatalf("жилийн багц араас: %+v", p)
 	}
-	if id, pct, _ := u.PlanAt(late); id != "org_year" || pct != 7.5 || u.StorageBase(10<<20, late) != 5120<<20 {
+	if id, pct, _ := u.PlanAt(late); id != "org_year" || pct != OrgFeePct || u.StorageBase(10<<20, late) != 5120<<20 {
 		t.Fatalf("багцын үе: %s %v %d", id, pct, u.StorageBase(10<<20, late))
 	}
 	o := &Order{Amount: 10000, CommissionPct: saleCommissionPct(u, now)}
+	if OrderCommission(o) != 100 {
+		t.Fatalf("1%% шимтгэл: %d", OrderCommission(o))
+	}
+	// Гэрээт (7.5%): багц авахгүй, хугацаагүй, гэрээний сан.
+	u.Org.Pct = 7.5
+	if id, pct, ok := u.PlanAt(late.AddDate(5, 0, 0)); id != PlanContract || pct != 7.5 || !ok || !u.PlanUntil().Equal(ContractUntil) || len(PlansFor(u)) != 0 {
+		t.Fatalf("гэрээт байгууллага: %s %v %v", id, pct, ok)
+	}
+	if u.StorageBase(10<<20, now) != 3000<<20 {
+		t.Fatalf("гэрээт байгууллагын сан: %d", u.StorageBase(10<<20, now))
+	}
+	o = &Order{Amount: 10000, CommissionPct: saleCommissionPct(u, now)}
 	if OrderCommission(o) != 750 {
 		t.Fatalf("7.5%% шимтгэл: %d", OrderCommission(o))
 	}

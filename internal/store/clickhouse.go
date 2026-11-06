@@ -348,6 +348,9 @@ var chTables = []chTable{
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, course_id)`},
 	{"chat_hides", `(user_id String, conversation_id String, at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, conversation_id)`},
+	// Давтах сануулга (reviews.go): (суралцагч, хичээл, үе шат) нэг л удаа.
+	{"review_reminders", `(user_id String, lesson_id String, stage Int32, course_id String, sent_at ` + tsType + `, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, lesson_id, stage) TTL toDateTime(sent_at) + INTERVAL 120 DAY`},
 	{"course_unlocks", `(user_id String, course_id String, code_hash String, at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, course_id)`},
 	{"lesson_access", `(user_id String, lesson_id String, course_id String, teacher_id String,

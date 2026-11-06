@@ -110,7 +110,7 @@ window.Studio = {
 
 /* ---------- Системийн эрх (багц): «Данс»-аас QPay-ээр сунгана; дууссан бол студи хаагдана.
    Борлуулалтаас хувь авахгүй — зөвхөн гүйлгээний шимтгэл (fee_pct: багшид 2%, байгууллагад гэрээгээр). Байгууллагад
-   байгууллагын багц (ps.org). ---------- */
+   байгууллагын багц (ps.org); гэрээт байгууллагад (ps.contract — хянагч өөр шимтгэл тавьсан) багц харуулахгүй. ---------- */
 let planSt = null;
 async function loadPlan(force) {
   if (!teacher) return null;
@@ -175,7 +175,7 @@ function planLock(ps) {
 }
 // Дуусахад 7 хоног үлдсэн бол бүх хэсэгт, үнэгүй хугацаанд тойм дээр сануулга.
 function planBanner(ps, view) {
-  if (!ps?.active || !main || view === "wallet") return;
+  if (!ps?.active || ps.contract || !main || view === "wallet") return;
   const soon = ps.days_left <= 7, trial = ps.plan === "trial";
   if (!soon && !(trial && (!view || view === "overview"))) return;
   const el = document.createElement("div");
@@ -1554,7 +1554,7 @@ async function courseEditor(id) {
   const jrCellModal = (uid, lid) => {
     const s = jr.students.find((x) => x.user_id === uid), l = jr.lessons.find((x) => x.id === lid), x = jr.cells[uid]?.[lid] || {};
     const rows = [];
-    rows.push(["Төлөв", x.disq ? "⛔ Хуулах оролдлого — оноо тооцогдоогүй" : x.done ? "✓ Дууссан" : x.viewed ? "Үзэж байна" : "Үзээгүй"]);
+    rows.push(["Төлөв", (x.disq ? "⛔ Хуулах оролдлого — оноо тооцогдоогүй" : x.done ? "✓ Дууссан" : x.viewed ? "Үзэж байна" : "Үзээгүй") + (x.improved ? " · ↻ дахин судалж сайжруулсан" : "")]);
     if (x.viewed) rows.push(["Нэгдсэн цолд нэмсэн оноо", x.disq ? "0" : "+" + x.pts]);
     if (x.viewed) rows.push(["Идэвхтэй хугацаа", `${dur2(x.active)}${x.total ? ` (нийт ${dur2(x.total)}, ${x.sessions || 0} удаа)` : ""}`]);
     if (x.q_n) rows.push(["Асуулга", `${x.q_ok}/${x.q_n} зөв`]);
@@ -3050,7 +3050,9 @@ async function wallet() {
   const tg0 = (n) => (n ? money(n) : "0₮");
   const canDraw = a && b.available >= min;
   main.innerHTML = `<div class="wl">
-    ${ps ? `<section class="anx-card sp-box" id="spBox"><div class="anx-card-head"><h3>${ps.org ? `${ico("school", 18)}Байгууллагын эрх` : `${ico("gear", 18)}Системийн эрх`}</h3>${ps.active ? `<span class="chip ${ps.days_left <= 7 ? "chip-amber" : "chip-teal"}">Идэвхтэй</span>` : `<span class="chip chip-coral">Дууссан</span>`}</div>
+    ${ps?.contract ? `<section class="anx-card sp-box" id="spBox"><div class="anx-card-head"><h3>${ico("school", 18)}Байгууллагын гэрээ</h3><span class="chip chip-teal">Идэвхтэй</span></div>
+      <div class="sp-now"><span class="sp-ic">${ico("school", 20)}</span><div><b>Гэрээгээр — хугацаагүй</b><small>Гүйлгээний шимтгэл <b>${ps.commission_pct}%</b> · файлын сан <b>${ps.storage_mb >= 1024 ? +(ps.storage_mb / 1024).toFixed(1) + " GB" : ps.storage_mb + " MB"}</b>. Нөхцөлийг surgalt.mn-ийн хянагч тогтооно.</small></div></div></section>`
+    : ps ? `<section class="anx-card sp-box" id="spBox"><div class="anx-card-head"><h3>${ps.org ? `${ico("school", 18)}Байгууллагын эрх` : `${ico("gear", 18)}Системийн эрх`}</h3>${ps.active ? `<span class="chip ${ps.days_left <= 7 ? "chip-amber" : "chip-teal"}">Идэвхтэй</span>` : `<span class="chip chip-coral">Дууссан</span>`}</div>
       ${planNowHTML(ps)}${planCardsHTML(ps)}${planRulesHTML(ps)}</section>` : ""}
     <div class="anx-kpis">
       ${kpi("money", "Татах боломжтой", b.available, `${b.commission ? "шимтгэл хассан · " : ""}доод дүн ${money(min)}`, "wl-avail")}

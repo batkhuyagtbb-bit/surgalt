@@ -29,6 +29,11 @@ func (m *Memory) DeleteUserData(_ context.Context, uid string) error {
 			delete(m.chatHides, k)
 		}
 	}
+	for k := range m.reviews {
+		if strings.HasPrefix(k, uid+"|") {
+			delete(m.reviews, k)
+		}
+	}
 	for k := range m.unlocks {
 		if k[0] == uid {
 			delete(m.unlocks, k)

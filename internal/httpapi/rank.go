@@ -14,7 +14,8 @@ import (
 // хичээлийг дуусгавал бүлгийн, сургалтын бүх хичээлийг дуусгавал сургалтын интеграцын нэмэлт оноо
 // авна. Сургалтын оноо = хичээлүүдийн оноо + интеграц → сургалтын цол; бүх сургалтын нийлбэр → нэгдсэн цол.
 // Хуулах оролдлого (copy, screenshot, print, devtools, download, утас) эсвэл автоматаар зогсоосон
-// хичээлийн оноо тооцогдохгүй бөгөөд тухайн бүлэг, сургалтын интеграцын нэмэлтийг хаана.
+// хичээлийн оноо тооцогдохгүй бөгөөд тухайн бүлэг, сургалтын интеграцын нэмэлтийг хаана. Хичээлийг дахин (шударга)
+// судалбал хамгийн сайн оролдлогоор нь дахин тооцно (lessonPoints).
 
 // LessonRank — нэг хичээлийн нэгдсэн цолд нэмэх оноо (хичээлд цол олгохгүй).
 type LessonRank struct {
@@ -37,6 +38,8 @@ type LessonRank struct {
 	Reflected   bool       `json:"reflected"`
 	TabSwitches int        `json:"tab_switches"`
 	LastAt      *time.Time `json:"last_at,omitempty"`
+	Attempts    int        `json:"attempts,omitempty"` // судалсан оролдлого (restudyGap, хуулах оролдлогоор тусгаарлана)
+	Improved    bool       `json:"improved,omitempty"` // дахин судалж оноо сайжирсан (хамгийн сайн оролдлогоор)
 }
 
 // RankInfo — нэгдсэн цол.
@@ -143,10 +146,93 @@ func RankFor(points int) RankInfo {
 	return ri
 }
 
-// lessonPoints — нэг хичээлийн нотолгоог нэгтгэж нэгдсэн цолд нэмэх 0-100 оноо гаргана (цол биш).
+// restudyGap — үүнээс удаан завсарлаад эргэж ирвэл хичээлийг дахин судалсан шинэ оролдлого гэж үзнэ.
+const restudyGap = 6 * time.Hour
+
+// lessonPoints — нэг хичээлийн нэгдсэн цолд нэмэх 0-100 оноо: хамгийн сайн оролдлогоор. Тооцогдоогүй (хуулах
+// оролдлоготой) эсвэл оноо бага хичээлийг дахин судалбал ахиц дахин бичигдэнэ. Нэр дэвшигч: бүх сесс нийлбэрээр
+// (идэвхтэй хугацаа хуримтлагдана), сүүлийн хуулах оролдлогын дараах сессүүд, оролдлого тус бүр (restudyGap-аас удаан
+// завсарлага эсвэл хуулах оролдлогын дараа шинээр эхэлнэ). Хичээлийн явц (дууссан, асуулга, дүгнэлт, видео) хуримтлагдана.
+// Дахин судалсанд тооцогдохын тулд оролдлого бодитой байх ёстой: идэвхтэй хугацаа нь хичээлийн шаардлагад (ActiveMin),
+// шаардлагагүй бол бүх идэвхтэй хугацааны талд (дор хаяж 1 минут) хүрсэн байна — хичээлийг богино нээгээд оноо авахгүй.
+func lessonPoints(l *store.Lesson, p *store.LessonProgress, sessions []*store.StudySession, reflected bool, videoCoverage int, hasVideo bool) LessonRank {
+	best := attemptPoints(l, p, sessions, reflected, videoCoverage, hasVideo)
+	if len(sessions) == 0 {
+		return best
+	}
+	ss := append([]*store.StudySession(nil), sessions...)
+	sort.SliceStable(ss, func(i, j int) bool { return ss[i].StartedAt.Before(ss[j].StartedAt) })
+	cheated := func(s *store.StudySession) bool {
+		for _, k := range cheatEvents {
+			if s.Counts[k] > 0 {
+				return true
+			}
+		}
+		return false
+	}
+	var cands [][]*store.StudySession
+	last := -1
+	for i, s := range ss {
+		if cheated(s) {
+			last = i
+		}
+	}
+	if last >= 0 && last+1 < len(ss) {
+		cands = append(cands, ss[last+1:])
+	}
+	attempts, start := 0, 0
+	for i := 1; i <= len(ss); i++ {
+		if i < len(ss) && !cheated(ss[i-1]) && ss[i].StartedAt.Sub(ss[i-1].LastAt) <= restudyGap {
+			continue
+		}
+		attempts++
+		if start > 0 || i < len(ss) { // бүх сессээс ялгаатай бол
+			cands = append(cands, ss[start:i])
+		}
+		start = i
+	}
+	allActive := 0
+	for _, s := range ss {
+		allActive += s.ActiveSec
+	}
+	minSec := l.ActiveMin * 60
+	if minSec == 0 {
+		minSec = max(60, allActive/2)
+	}
+	improved := false
+	for _, c := range cands {
+		active := 0
+		for _, s := range c {
+			active += s.ActiveSec
+		}
+		if active < minSec {
+			continue
+		}
+		lr := attemptPoints(l, p, c, reflected, videoCoverage, hasVideo)
+		if lr.Points > best.Points || (lr.Points == best.Points && best.Disqualified && !lr.Disqualified) {
+			best, improved = lr, true
+		}
+	}
+	for _, s := range ss {
+		if best.LastAt == nil || s.LastAt.After(*best.LastAt) {
+			t := s.LastAt
+			best.LastAt = &t
+		}
+	}
+	best.Attempts, best.Improved = attempts, improved
+	switch {
+	case improved && last >= 0:
+		best.Reasons = append(best.Reasons, "дахин шударга судалж засварласан")
+	case improved:
+		best.Reasons = append(best.Reasons, "дахин судалж сайжруулсан")
+	}
+	return best
+}
+
+// attemptPoints — нэг оролдлогын (сессүүдийн) нотолгоог нэгтгэж 0-100 оноо гаргана (цол биш).
 // Үзсэн 5, дууссан 10, идэвхтэй хугацаа 30, дүгнэлт 15 — үргэлж; асуулга 30, видео 10 — байвал.
 // Таб солилт бүр −5 (дээд тал нь −30). Хуулах оролдлого → 0, оноо тооцогдохгүй.
-func lessonPoints(l *store.Lesson, p *store.LessonProgress, sessions []*store.StudySession, reflected bool, videoCoverage int, hasVideo bool) LessonRank {
+func attemptPoints(l *store.Lesson, p *store.LessonProgress, sessions []*store.StudySession, reflected bool, videoCoverage int, hasVideo bool) LessonRank {
 	lr := LessonRank{LessonID: l.ID, Title: l.Title, HasVideo: hasVideo, VideoPct: videoCoverage, Reflected: reflected}
 	if p == nil && len(sessions) == 0 {
 		return lr
@@ -175,7 +261,7 @@ func lessonPoints(l *store.Lesson, p *store.LessonProgress, sessions []*store.St
 	}
 	if cheats > 0 {
 		lr.Disqualified = true
-		lr.Reasons = append(lr.Reasons, "хуулах оролдлого / хориг")
+		lr.Reasons = append(lr.Reasons, "хуулах оролдлого / хориг", "дахин шударга судалбал оноо тооцогдоно")
 		return lr
 	}
 	earned, possible := 0.0, 0.0

@@ -532,6 +532,9 @@ func (c *ClickHouse) SaveQuizResult(ctx context.Context, userID, courseID, lesso
 	if p.Quiz == nil {
 		p.Quiz = map[string]bool{}
 	}
+	if p.Quiz[blockID] && !correct {
+		return nil // дахин судлахад зөв хариулсныг буруугаар дарахгүй (ахиц зөвхөн сайжирна)
+	}
 	p.Quiz[blockID] = correct
 	return c.writeProgress(ctx, userID, courseID, p)
 }

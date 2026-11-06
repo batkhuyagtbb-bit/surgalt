@@ -3184,3 +3184,37 @@ func TestCourseJournal(t *testing.T) {
 		t.Fatalf("үзээгүй хичээлд нүд байх ёсгүй: %v", row[lid2])
 	}
 }
+
+// Дахин судлах: тооцогдоогүй (хуулах оролдлоготой) эсвэл таб солилт ихтэй хичээлийг дахин бодитой судалбал хамгийн сайн
+// оролдлогоор тооцно; богино нээлт тооцогдохгүй; хуваан судалсан идэвхтэй хугацаа хуримтлагдана.
+func TestRestudyImprovesLesson(t *testing.T) {
+	day := 24 * time.Hour
+	t0 := time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC)
+	l := &store.Lesson{ID: "l1", Title: "Нэг", ActiveMin: 10, Blocks: []store.Block{{ID: "q001", Type: "quiz", Quiz: &store.Quiz{Question: "?"}}, {ID: "v001", Type: "video", URL: "/files/x/private/a.mp4"}}}
+	full := &store.LessonProgress{LessonID: "l1", ViewedAt: t0, CompletedAt: &t0, Quiz: map[string]bool{"q001": true}, QuizDoneAt: &t0}
+	sess := func(at time.Time, active int, counts map[string]int) *store.StudySession {
+		return &store.StudySession{LessonID: "l1", Kind: "lesson", StartedAt: at, LastAt: at.Add(time.Duration(active) * time.Second), ActiveSec: active, Counts: counts}
+	}
+	cheat := sess(t0, 700, map[string]int{"copy": 1})
+	// Хуулах оролдлогын дараа дараагийн өдөр бүтэн, шударга судалсан → тооцогдоно.
+	lr := lessonPoints(l, full, []*store.StudySession{cheat, sess(t0.Add(day), 700, map[string]int{})}, true, 100, true)
+	if lr.Disqualified || lr.Points != 100 || !lr.Improved || lr.Attempts != 2 || !strings.Contains(strings.Join(lr.Reasons, ","), "засварласан") {
+		t.Fatalf("дахин шударга судалсан: %+v", lr)
+	}
+	// Богино нээлт (идэвхтэй хугацаа хүрээгүй) — тооцогдоогүй хэвээр.
+	if lr := lessonPoints(l, full, []*store.StudySession{cheat, sess(t0.Add(day), 100, map[string]int{})}, true, 100, true); !lr.Disqualified || lr.Points != 0 {
+		t.Fatalf("богино нээлт тооцогдох ёсгүй: %+v", lr)
+	}
+	// Таб солилт ихтэй оролдлого (−30) → дахин цэвэр судалбал 100.
+	tabby := sess(t0, 700, map[string]int{"tab_switch": 6})
+	if lr := lessonPoints(l, full, []*store.StudySession{tabby}, true, 100, true); lr.Points != 70 {
+		t.Fatalf("таб солилт −30: %+v", lr)
+	}
+	if lr := lessonPoints(l, full, []*store.StudySession{tabby, sess(t0.Add(2*day), 650, map[string]int{})}, true, 100, true); lr.Points != 100 || !lr.Improved {
+		t.Fatalf("дахин цэвэр судалсан: %+v", lr)
+	}
+	// Хоёр өдөр хуваан судалсан (350+350 сек): нийлбэрээр бүтэн, «сайжруулсан» биш.
+	if lr := lessonPoints(l, full, []*store.StudySession{sess(t0, 350, map[string]int{}), sess(t0.Add(day), 350, map[string]int{})}, true, 100, true); lr.Points != 100 || lr.Improved || lr.Attempts != 2 {
+		t.Fatalf("хуваан судалсан: %+v", lr)
+	}
+}

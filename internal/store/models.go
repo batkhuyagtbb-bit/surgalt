@@ -637,6 +637,7 @@ type Store interface {
 	CourseUnlockStore
 	ChatHideStore
 	CloudStore
+	ReviewStore
 	BoardStore
 	AdminStore
 	CreateUser(ctx context.Context, u *User) error
@@ -745,7 +746,8 @@ type Store interface {
 	DeleteLesson(ctx context.Context, courseID, lessonID string) error
 	// ReorderLessons нь хичээлүүдийн дараалал (1..n) ба бүлгийг нэг дор шинэчилнэ. items нь сургалтын бүх хичээлийг агуулна.
 	ReorderLessons(ctx context.Context, courseID string, items []LessonOrder) error
-	// SaveQuizResult нь суралцагчийн асуултын сүүлийн хариултыг (зөв/буруу) явцад хадгална.
+	// SaveQuizResult нь суралцагчийн асуултын хариултыг (зөв/буруу) явцад хадгална; нэгэнт зөв бол дахин буруу
+	// хариулсан ч зөв хэвээр (дахин судлахад ахиц зөвхөн сайжирна).
 	SaveQuizResult(ctx context.Context, userID, courseID, lessonID, blockID string, correct bool) error
 	// Явц: MarkLessonViewed идемпотент (анхны үзэлтийн цаг хадгална), MarkLessonCompleted дууссаныг тэмдэглэнэ.
 	MarkLessonViewed(ctx context.Context, userID, courseID, lessonID string) error

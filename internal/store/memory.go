@@ -24,6 +24,7 @@ type Memory struct {
 	pending     map[[2]string]string // (user,course) -> order id
 	enrollments map[[2]string]time.Time
 	chatHides   map[[2]string]time.Time // (user, conversation) -> «устгасан» мөч (chat_hides.go)
+	reviews     map[string]bool         // user|lesson|stage — давтах сануулга илгээсэн (reviews.go)
 	convs       map[string]*Conversation
 	convByKey   map[string]string // teacherID|visitorKey
 	messages    map[string][]*Message
@@ -1347,7 +1348,7 @@ func (m *Memory) SaveQuizResult(_ context.Context, userID, courseID, lessonID, b
 	if p.Quiz == nil {
 		p.Quiz = map[string]bool{}
 	}
-	p.Quiz[blockID] = correct
+	p.Quiz[blockID] = p.Quiz[blockID] || correct // зөв хариулсныг дахин судлахад буруу хариулт дарахгүй
 	return nil
 }
 

@@ -74,7 +74,7 @@ func TestOrganization(t *testing.T) {
 		t.Fatalf("байгууллагын жагсаалт: %v", list)
 	}
 
-	// Байгууллага өөрөө нэвтэрнэ: /api/me-д гэрээний нөхцөл, эрх нь хугацаагүй, багц авахгүй.
+	// Байгууллага өөрөө нэвтэрнэ: /api/me-д гэрээний нөхцөл; шимтгэл анхдагчаас (1%) өөр — гэрээт: хугацаагүй, багц авахгүй.
 	code, login := call(t, srv, "POST", "/api/auth/login", "", `{"email":"info@muis.mn","password":"secret12"}`)
 	if code != 200 {
 		t.Fatalf("байгууллага нэвтрэх: %d %v", code, login)
@@ -85,13 +85,20 @@ func TestOrganization(t *testing.T) {
 		t.Fatalf("/api/me байгууллага: %v", me)
 	}
 	_, plan := call(t, srv, "GET", "/api/me/plan", org, "")
-	if plan["org"] != true || plan["active"] != true || plan["commission_pct"].(float64) != 10 {
-		t.Fatalf("байгууллагын эрх: %v", plan)
+	if plan["org"] != true || plan["contract"] != true || plan["plan"] != "contract" || plan["active"] != true || plan["commission_pct"].(float64) != 10 || len(plan["plans"].([]any)) != 0 {
+		t.Fatalf("гэрээт байгууллагын эрх: %v", plan)
+	}
+	if code, _ := call(t, srv, "POST", "/api/me/plan/purchase", org, `{"plan":"org_year"}`); code != http.StatusBadRequest {
+		t.Fatalf("гэрээт байгууллага багц авлаа: %d", code)
+	}
+	// Шимтгэлийг анхдагч (1%) болговол багцын журам: үнэгүй хугацаа, байгууллагын багц.
+	if code, r := call(t, srv, "PUT", "/api/admin/orgs/"+orgID, boss, `{"commission_pct":1,"storage_mb":500}`); code != 200 || r["plan"] != "trial" {
+		t.Fatalf("анхдагч шимтгэл: %d %v", code, r)
 	}
 	if code, _ := call(t, srv, "POST", "/api/me/plan/purchase", org, `{"plan":"month"}`); code != http.StatusBadRequest {
 		t.Fatalf("байгууллагад багшийн багц: %d", code)
 	}
-	// Байгууллагын багц (жил ₮1,000,000): үнэгүй хугацааны араас үргэлжилнэ; шимтгэл хянагчийн тогтоосноор.
+	// Байгууллагын багц (жил ₮1,000,000): үнэгүй хугацааны араас үргэлжилнэ.
 	code, po := call(t, srv, "POST", "/api/me/plan/purchase", org, `{"plan":"org_year"}`)
 	if code != http.StatusCreated || po["order"].(map[string]any)["amount"] != 1000000.0 {
 		t.Fatalf("байгууллагын багц: %d %v", code, po)
@@ -99,7 +106,7 @@ func TestOrganization(t *testing.T) {
 	if code, _ := call(t, srv, "POST", "/api/orders/"+po["order"].(map[string]any)["id"].(string)+"/dev-pay", org, ""); code != 200 {
 		t.Fatalf("байгууллагын багц төлөх: %d", code)
 	}
-	if _, plan := call(t, srv, "GET", "/api/me/plan", org, ""); plan["plan"] != "trial" || len(plan["upcoming"].([]any)) != 1 || plan["fee_pct"] != 10.0 ||
+	if _, plan := call(t, srv, "GET", "/api/me/plan", org, ""); plan["plan"] != "trial" || len(plan["upcoming"].([]any)) != 1 || plan["fee_pct"] != 1.0 || plan["contract"] != false ||
 		plan["plans"].([]any)[0].(map[string]any)["price"] != 129000.0 {
 		t.Fatalf("байгууллагын багцын төлөв: %v", plan)
 	}

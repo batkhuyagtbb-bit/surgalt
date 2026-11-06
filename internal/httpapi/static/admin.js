@@ -317,7 +317,7 @@ VIEWS.orgs = {
           <label>Нууц үг<input name="password" type="text" minlength="6" maxlength="72" autocomplete="new-password" placeholder="6+ тэмдэгт"></label></div></details>
         <button class="btn btn-gold">${ic("school", 16)} Бүртгэх</button>
       </form>
-      <p class="muted small">Гүйлгээний шимтгэл байгууллагын борлуулалт бүрээс хасагдаж, үлдсэн нь дансанд шилжинэ (анхдагч ${esc(d.default_pct)}%). Эхний 2 сар үнэгүй (файлын сан ${mbLabel(d.free_mb)}), дараа нь байгууллага «Данс»-аас багц авна: сар ₮129,000 (2GB), хагас жил ₮500,000 (5GB), жил ₮1,000,000 (5GB). Гэрээний сан багцынхаас их бол түүнийг орлоно; гэрээгээр төлсөн бол «Засах» → «Эрх олгох».</p>
+      <p class="muted small">Гүйлгээний шимтгэл байгууллагын борлуулалт бүрээс хасагдаж, үлдсэн нь дансанд шилжинэ (анхдагч ${esc(d.default_pct)}%). Эхний 2 сар үнэгүй (файлын сан ${mbLabel(d.free_mb)}), дараа нь байгууллага «Данс»-аас багц авна: сар ₮129,000 (2GB), хагас жил ₮500,000 (5GB), жил ₮1,000,000 (5GB). Гэрээний сан багцынхаас их бол түүнийг орлоно; гэрээгээр төлсөн бол «Засах» → «Эрх олгох». Шимтгэлийг ${esc(d.default_pct)}%-аас өөр болговол <b>гэрээт байгууллага</b> болно: багц харагдахгүй, эрх хугацаагүй.</p>
     </section>
     <div class="adm-table-wrap"><table class="adm-table" id="oTable"><thead><tr>
       <th data-sort="name" data-type="text">Байгууллага</th><th>Удирдагч</th><th data-sort="plan_until" data-type="text">Эрх</th><th data-sort="commission_pct">Шимтгэл</th><th data-sort="storage_mb">Файлын сан</th>
@@ -326,7 +326,7 @@ VIEWS.orgs = {
     const row = (o) => `<tr data-org="${esc(o.id)}">
       <td><span class="adm-person">${avatar(o.name, o.avatar_url)}<span><b>${esc(o.name || o.username)}</b><small>@${esc(o.username)}${o.login ? " · " + esc(o.email) : ""}</small></span></span></td>
       <td>${o.managers.length ? o.managers.map((m) => `<span class="who"><b>${esc(m.name || m.username)}</b><small>@${esc(m.username)}</small></span>`).join("") : `<span class="chip chip-coral">Удирдагчгүй</span>`}</td>
-      <td>${planChip(o)}<small>${dd(o.plan_until)}${o.plan_active ? " хүртэл" : "-нд дууссан"}</small></td>
+      <td>${planChip(o)}<small>${orgUntil(o)}</small></td>
       <td class="n"><b>${o.commission_pct}%</b></td>
       <td class="n">${o.storage_mb ? mbLabel(o.storage_mb) : "Багцынх"}<small>${bytes(o.used_bytes)} ашигласан</small></td>
       <td class="n">${num(o.programs)}</td><td class="n">${num(o.courses)}<small>${num(o.courses_published)} нийтэлсэн</small></td><td class="n">${num(o.teachers)}</td><td>${dd(o.created_at)}</td>
@@ -372,9 +372,9 @@ function openOrg(o, done) {
         <button class="btn btn-gold">Хадгалах</button>
       </form>
       <p class="muted small">Профайлын нэрийг солибол хуучин холбоос, хэвлэсэн QR ажиллахгүй болно.</p></section>
-    <section class="adm-card"><header><h3>Системийн эрх</h3><span class="muted small">${planChip(o)} ${dd(o.plan_until)}${o.plan_active ? " хүртэл" : "-нд дууссан"}</span></header>
-      <form class="exp-form" id="orgPlan"><label>Гэрээгээр төлсөн бол эрх олгох<select name="plan">${ORG_PLAN_OPTS}</select></label><button class="btn btn-ghost">Эрх олгох</button></form>
-      <p class="muted small">Олгосон хугацаа одоогийн эрхийн араас үргэлжилнэ; байгууллагад мэдэгдэл очно.</p></section>
+    <section class="adm-card"><header><h3>Системийн эрх</h3><span class="muted small">${planChip(o)} ${orgUntil(o)}</span></header>
+      ${o.plan === "contract" ? `<p class="muted small">Гэрээт байгууллага (шимтгэл анхдагчаас өөр) — багц авахгүй, эрх хугацаагүй. Шимтгэлийг анхдагч болговол үнэгүй хугацаа, байгууллагын багцын журамд шилжинэ.</p>` : `<form class="exp-form" id="orgPlan"><label>Гэрээгээр төлсөн бол эрх олгох<select name="plan">${ORG_PLAN_OPTS}</select></label><button class="btn btn-ghost">Эрх олгох</button></form>
+      <p class="muted small">Олгосон хугацаа одоогийн эрхийн араас үргэлжилнэ; байгууллагад мэдэгдэл очно.</p>`}</section>
     <section class="adm-card"><header><h3>Удирдагчид</h3><span class="muted small">Өөрийн бүртгэлээр нэвтэрч байгууллага руу шилжинэ. Хассан хүний нээлттэй эрх шууд хаагдана.</span></header>
       <div class="us-sel" id="orgMgrs">${o.managers.map((m) => personChip(m, "mgr-del")).join("") || `<p class="muted small" style="margin:0">Удирдагч алга</p>`}</div>
       <div id="orgMgrAdd" style="margin-top:10px">${pickerHTML("Удирдагч нэмэх — нэр, @нэр эсвэл имэйл…")}</div></section>
@@ -389,7 +389,7 @@ function openOrg(o, done) {
         Object.assign(o, r); done(r); toast("Хадгаллаа ✓"); $("#admDrawerTitle").textContent = o.name; draw();
       } catch (x) { toast(x.message, true); b.disabled = false; }
     });
-    $("#orgPlan", body).addEventListener("submit", async (e) => {
+    $("#orgPlan", body)?.addEventListener("submit", async (e) => {
       e.preventDefault();
       const b = $("button", e.target); b.disabled = true;
       try {
@@ -422,6 +422,7 @@ function openOrg(o, done) {
 
 // Системийн эрх (plans.go): шошго ба олгох сонголт.
 const PLAN_OPTS = [["month", "Сарын · 1 сар"], ["half", "Хагас жил · 6 сар"], ["year", "Бүтэн жил · 1 жил"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+const orgUntil = (o) => (o.plan === "contract" ? "хугацаагүй" : `${dd(o.plan_until)}${o.plan_active ? " хүртэл" : "-нд дууссан"}`);
 const ORG_PLAN_OPTS = [["org_month", "Сарын · 1 сар · 2GB"], ["org_half", "Хагас жил · 6 сар · 5GB"], ["org_year", "Бүтэн жил · 1 жил · 5GB"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
 const planChip = (t) => `<span class="chip ${!t.plan_active ? "chip-coral" : t.plan === "trial" ? "chip-amber" : "chip-teal"}">${t.plan_active ? esc(t.plan_name) : "Дууссан"}</span>`;
 
