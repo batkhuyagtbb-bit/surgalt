@@ -1128,11 +1128,14 @@ input[type=search],.side-search,.rail-search,.composer-input{border-radius:999px
 .nav.scrolled{box-shadow:var(--shadow-sm)}
 @media print{ .nav,.chat-fab,.chat-panel,.toast-stack,.curtain,.aurora{display:none!important} body{background:#fff} }
 /* ---- Хөтөлбөр бүтээгч: бүлэг шууд бичих, хичээл чирж зөөх ---- */
-.view-tabs{display:flex;gap:6px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;width:max-content;max-width:100%}
-.view-tabs button{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:8px 16px;border-radius:999px;font:700 .9rem var(--sans);color:var(--muted);cursor:pointer}
+.view-tabs{display:flex;gap:6px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;width:max-content;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.view-tabs::-webkit-scrollbar{display:none}
+.view-tabs button{flex:none;display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:8px 16px;border-radius:999px;font:700 .9rem var(--sans);color:var(--muted);cursor:pointer}
 .view-tabs button[aria-selected="true"]{background:var(--brand);color:#fff}
-.ol{display:grid;gap:12px}
-.ol-sec{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow-sm);overflow:clip} /* clip: дотор нь sticky самбар ажиллана */
+@media (max-width:420px){.view-tabs button{padding:8px 11px}}
+/* minmax(0,1fr): урт гарчигтай хичээл бүлэг, жагсаалтыг хүрээнээс гаргахгүй */
+.ol{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.ol-sec{min-width:0;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow-sm);overflow:clip} /* clip: дотор нь sticky самбар ажиллана */
 .ol-sec-head{display:flex;align-items:center;gap:10px;padding:10px 12px;background:linear-gradient(90deg,rgba(31,60,143,.07),transparent 70%);border-bottom:1px solid var(--line)}
 .ol-sec-head .lg-num{width:32px;height:32px;border-radius:9px;font-size:.85rem}
 .ol-sec-head small{white-space:nowrap}
@@ -1140,14 +1143,14 @@ input[type=search],.side-search,.rail-search,.composer-input{border-radius:999px
 .ol-sec-name:hover{border-color:var(--line)}
 .ol-sec-name:focus{outline:none;border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px rgba(31,60,143,.12)}
 .ol-sec-name::placeholder{color:var(--muted);font-weight:600}
-.ol-list{list-style:none;margin:0;padding:8px;display:grid;gap:6px;min-height:52px}
+.ol-list{list-style:none;margin:0;padding:8px;display:grid;grid-template-columns:minmax(0,1fr);gap:6px;min-height:52px}
 .ol-list:empty::before{content:"Хичээлээ энд чирж оруулна уу";display:grid;place-items:center;min-height:52px;border:2px dashed var(--line-2);border-radius:12px;color:var(--muted);font-weight:600;font-size:.9rem}
 .ol-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
 .ol-row:hover{border-color:var(--brand)}
 .ol-row.editing{display:block;padding:12px}
 .ol-num{font:800 .95rem var(--sans);color:var(--muted);width:2em;flex:none}
 .ol-title{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-.ol-title strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ol-title strong{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
 .ol-title small{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .ol-handle{flex:none;display:grid;place-items:center;width:34px;height:38px;border:0;border-radius:9px;background:none;color:var(--muted);cursor:grab;touch-action:none}
 .ol-handle:hover,.ol-handle:focus-visible{background:rgba(31,60,143,.08);color:var(--brand)}
