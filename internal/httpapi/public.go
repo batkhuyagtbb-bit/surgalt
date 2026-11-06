@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -526,7 +527,53 @@ func (s *Server) notFoundMW(mux *http.ServeMux) http.Handler {
 }
 
 func (s *Server) pageHome(w http.ResponseWriter, r *http.Request) {
-	s.pageStatic("home")(w, r)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	data := map[string]any{"PublicURL": s.cfg.PublicURL, "Contact": s.cfg.ContactEmail, "Pricing": s.homePricing()}
+	if err := s.tmpl.ExecuteTemplate(w, "home.html", data); err != nil {
+		s.log.Error("template", "err", err, "page", "home")
+	}
+}
+
+// pricePlan — нүүрний «Үнэ» хэсгийн нэг багц.
+type pricePlan struct {
+	Name, Term, Storage string
+	Price, PerMonth     int64
+	Save                int  // сарын багцтай харьцуулсан хэмнэлт (%)
+	Best                bool // сард ногдох үнэ нь ганцаараа хамгийн бага
+}
+
+// homePricing — багш, байгууллагын багц (store.Plans, store.OrgPlans), үнэгүй хугацаа, шимтгэл: нүүрэнд үнэ өөрчлөгдөхөд
+// дагаж шинэчлэгдэнэ.
+func (s *Server) homePricing() map[string]any {
+	conv := func(ps []store.Plan) []pricePlan {
+		var monthly int64
+		low, lowN := int64(0), 0
+		for _, p := range ps {
+			per := p.Price / int64(p.Months)
+			if p.Months == 1 {
+				monthly = p.Price
+			}
+			switch {
+			case lowN == 0 || per < low:
+				low, lowN = per, 1
+			case per == low:
+				lowN++
+			}
+		}
+		out := make([]pricePlan, 0, len(ps))
+		for _, p := range ps {
+			pp := pricePlan{Name: p.Name, Term: store.PlanTerm(p.Months), Storage: sizeLabel(p.StorageMB), Price: p.Price, PerMonth: p.Price / int64(p.Months)}
+			if monthly > 0 && p.Months > 1 {
+				pp.Save = int(math.Round((1 - float64(pp.PerMonth)/float64(monthly)) * 100))
+			}
+			pp.Best = p.Months > 1 && pp.PerMonth == low && lowN == 1
+			out = append(out, pp)
+		}
+		return out
+	}
+	return map[string]any{"Teacher": conv(store.Plans), "Org": conv(store.OrgPlans), "TrialMonths": store.PlanTrialMonths,
+		"TeacherFee": store.TransactionFeePct, "OrgFee": store.OrgFeePct, "BuyerFee": s.cfg.ServiceFeePct, "FreeMB": sizeLabel(s.cfg.StorageFreeMB)}
 }
 
 // pageIntro — танилцуулгын кино интро (static/intro2.html, бие даасан хуудас: template-гүй, JS template literal хэвээр).

@@ -4993,3 +4993,29 @@ a.np-item:active{background:var(--line)}
 .pf-cover-hint{position:absolute;left:50%;top:50%;z-index:2;transform:translate(-50%,-50%);max-width:calc(100% - 32px);padding:9px 16px;border-radius:999px;background:rgba(15,23,42,.62);color:#fff;font-weight:700;font-size:.9rem;text-align:center;pointer-events:none}
 .pf-cover-hint[hidden]{display:none}
 .pf-cover-save{background:var(--accent);color:#1b1305}
+/* ---- Нүүрний «Үнэ» хэсэг (home.html #pricing): багш, байгууллагын багц ---- */
+.pr{position:relative;max-width:1240px;margin:clamp(28px,5vw,64px) auto;padding:0 clamp(16px,3vw,32px);scroll-margin-top:64px}
+.pr-groups{display:grid;gap:18px}
+.pr-group{display:grid;gap:14px;padding:clamp(16px,2.4vw,24px);border:1px solid var(--line);border-radius:20px;background:var(--surface);box-shadow:var(--shadow-sm)}
+.pr-ghead{display:flex;align-items:center;gap:12px}
+.pr-ghead h3{margin:0;font-size:1.2rem;font-weight:800}
+.pr-ghead p{margin:2px 0 0;color:var(--muted);font-size:.9rem}
+.pr-gic{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:12px;background:var(--brand-soft);color:var(--brand)}
+.pr-gic.org{background:var(--teal-soft);color:var(--teal)}
+.pr-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.pr-grid{grid-template-columns:minmax(0,1fr)}}
+.pr-card{position:relative;display:flex;flex-direction:column;gap:2px;min-width:0;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.pr-card.best{padding:15px;border:2px solid var(--teal)}
+.pr-card h4{margin:0;font-size:1.05rem}
+.pr-term{color:var(--muted);font-size:.86rem;font-weight:600}
+.pr-tag{position:absolute;top:12px;right:12px;padding:2px 8px;border-radius:999px;background:var(--teal);color:#fff;font-size:.72rem;font-weight:700}
+.pr-price{display:grid;margin:8px 0 0}
+.pr-price b{font-size:1.45rem;letter-spacing:-.01em}
+.pr-price small{color:var(--muted);font-size:.8rem}
+.pr-save{color:var(--teal);font-weight:700}
+.pr-store{display:flex;align-items:center;gap:6px;margin:8px 0 0;color:var(--muted);font-size:.84rem}
+.pr-store svg{color:var(--brand)}.pr-store b{color:var(--text)}
+.pr-cta{justify-self:start;margin:0}
+.pr-notes{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 20px;margin:18px 0 0;padding:0;list-style:none;font-size:.88rem;font-weight:600;color:var(--text-2)}
+.pr-notes li{display:inline-flex;align-items:center;gap:6px}
+.pr-notes svg{flex:none;color:var(--teal)}
