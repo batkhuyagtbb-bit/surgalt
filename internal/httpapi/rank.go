@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"math"
+	"slices"
 	"sort"
 	"time"
 
@@ -149,6 +150,9 @@ func RankFor(points int) RankInfo {
 // restudyGap — үүнээс удаан завсарлаад эргэж ирвэл хичээлийг дахин судалсан шинэ оролдлого гэж үзнэ.
 const restudyGap = 6 * time.Hour
 
+// redeemSec — зөрчлийн дараа дахин судалсан идэвхтэй хугацаа үүнд хүрвэл зөрчлийг уучилна (lessonPoints).
+const redeemSec = 10 * 60
+
 // lessonPoints — нэг хичээлийн нэгдсэн цолд нэмэх 0-100 оноо: хамгийн сайн оролдлогоор. Тооцогдоогүй (хуулах
 // оролдлоготой) эсвэл оноо бага хичээлийг дахин судалбал ахиц дахин бичигдэнэ. Нэр дэвшигч: бүх сесс нийлбэрээр
 // (идэвхтэй хугацаа хуримтлагдана), сүүлийн хуулах оролдлогын дараах сессүүд, оролдлого тус бүр (restudyGap-аас удаан
@@ -200,6 +204,34 @@ func lessonPoints(l *store.Lesson, p *store.LessonProgress, sessions []*store.St
 		minSec = max(60, allActive/2)
 	}
 	improved := false
+	// Зөрчлийн (хуулах оролдлого, хичээлээс гарч автоматаар зогссон) дараа дахин бодитой судалбал (redeemSec, хичээлийн
+	// шаардлага түүнээс бага бол шаардлагаар) зөрчлийг уучилж бүх сессээр тооцно: өмнө нь цонхондоо судалсан идэвхтэй
+	// хугацаа үрэгдэхгүй, таб солилтын хасалт үлдэнэ. Өмнө нь дахин судалгаа дангаараа бүтэн шаардлагад (ихэвчлэн 60 мин)
+	// хүрэх ёстой байсан тул хаагдсан хичээлийг дахин судалсан суралцагчид бараг тооцогддоггүй байв.
+	if last >= 0 && last+1 < len(ss) {
+		after := 0
+		for _, s := range ss[last+1:] {
+			after += s.ActiveSec
+		}
+		if after >= min(redeemSec, minSec) {
+			all := make([]*store.StudySession, len(ss))
+			for i, s := range ss {
+				if all[i] = s; cheated(s) {
+					c := *s
+					c.Counts = map[string]int{}
+					for k, v := range s.Counts {
+						if !slices.Contains(cheatEvents, k) {
+							c.Counts[k] = v
+						}
+					}
+					all[i] = &c
+				}
+			}
+			if lr := attemptPoints(l, p, all, reflected, videoCoverage, hasVideo); lr.Points > best.Points {
+				best, improved = lr, true
+			}
+		}
+	}
 	for _, c := range cands {
 		active := 0
 		for _, s := range c {
@@ -261,7 +293,7 @@ func attemptPoints(l *store.Lesson, p *store.LessonProgress, sessions []*store.S
 	}
 	if cheats > 0 {
 		lr.Disqualified = true
-		lr.Reasons = append(lr.Reasons, "хуулах оролдлого / хориг", "дахин шударга судалбал оноо тооцогдоно")
+		lr.Reasons = append(lr.Reasons, "зөрчил (хуулах оролдлого / хичээлээс гарч зогссон)", "дахин 10+ минут шударга судалбал оноо тооцогдоно")
 		return lr
 	}
 	earned, possible := 0.0, 0.0
@@ -515,7 +547,7 @@ func diagnose(ranks []LessonRank, ri RankInfo) []string {
 	}
 	type tip struct{ key, text string }
 	tips := []tip{
-		{"хуулах оролдлого / хориг", "хуулах, зураг авах оролдлого бүү хий — тийм хичээлийн оноо тооцогдохгүй, интеграцын нэмэлтийг хаана"},
+		{"зөрчил (хуулах оролдлого / хичээлээс гарч зогссон)", "хуулах, зураг авах, хичээлээс гарах зөрчил бүү гарга — тийм хичээлийн оноо тооцогдохгүй, интеграцын нэмэлтийг хаана; хичээлээ дахин 10+ минут шударга судалбал оноо нь тооцогдоно"},
 		{"асуулга дутуу", "хичээл доторх асуултуудад бүгдэд нь зөв хариул (+30 оноо/хичээл)"},
 		{"идэвхтэй хугацаа дутуу", "хичээлээ идэвхтэй, дуустал үз (+30 оноо/хичээл)"},
 		{"идэвхгүй хугацаа их", "хичээл үзэхдээ өөр цонх руу бүү шилж, анхаарлаа төвлөрүүл (+30 хүртэл)"},

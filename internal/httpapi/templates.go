@@ -129,6 +129,19 @@ func icon(name string, size ...int) template.HTML {
 		`" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` + iconPaths[name] + `</svg>`)
 }
 
+// splitWords — «.split» гарчгийг серверт үгээр хуваана (app.js splitText-тэй ижил бүтэц, data-split="1"-тэй хамт):
+// JS ажилласны дараа DOM солигдож, хуудас зурагдсаны дараа мөр үсрэхгүй.
+func splitWords(s string) template.HTML {
+	var b strings.Builder
+	for i, w := range strings.Fields(s) {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(`<span class="w"><span style="--i:` + strconv.Itoa(i) + `">` + template.HTMLEscapeString(w) + `</span></span>`)
+	}
+	return template.HTML(b.String())
+}
+
 func parseTemplates() *template.Template {
 	funcs := template.FuncMap{
 		"money": money, "initials": initials, "hue": hue, "icon": icon, "v": func() string { return assetVersion }, "terms": func() string { return TermsVersion },
@@ -159,6 +172,7 @@ func parseTemplates() *template.Template {
 			return m
 		},
 		"inlineScript": inlineScript, // CSP-д хэшээр зөвшөөрсөн inline скрипт (csp.go)
+		"splitWords":   splitWords,
 	}
 	return template.Must(template.New("").Funcs(funcs).ParseFS(templateFS, "templates/*.html"))
 }

@@ -320,9 +320,14 @@ const drawFx = () => {
 // ---- film grain ----
 const gr = $("#grain").getContext("2d"), gimg = gr.createImageData(320, 180);
 const drawGrain = () => { const b = gimg.data; for (let i = 0; i < b.length; i += 4) { const v = Math.random() * 255; b[i] = b[i + 1] = b[i + 2] = v; b[i + 3] = 255; } gr.putImageData(gimg, 0, 0); };
-let frameN = 0;
-const loop = () => { drawFx(); if (frameN++ % 3 === 0 && !reduced) drawGrain(); requestAnimationFrame(loop); };
-drawGrain(); loop();
+// Нүүрэнд суулгасан үед (embed) тоосонцор, grain-ийг зөвхөн кино тоглож байхад зурна — зогссон кино (зурагт хуудас,
+// хулгана холдсон) секунд тутам 60 кадр зурж гар утсыг гацаадаг байсан. Бие даасан /intro2 хуудсанд үргэлж хөдөлнө.
+const embedded = document.documentElement.classList.contains("embed");
+let frameN = 0, looping = false;
+const active = () => !embedded || (!tl.paused() && tl.progress() < 1);
+const loop = () => { drawFx(); if (frameN++ % 3 === 0 && !reduced) drawGrain(); if (active()) requestAnimationFrame(loop); else looping = false; };
+const wake = () => { if (!looping) { looping = true; requestAnimationFrame(loop); } };
+drawGrain(); drawFx(); if (!embedded) wake();
 
 // ---- камер: зорилтыг тойрон эргэлдэх (dist — ойртох, rx/ry — эргэлт) ----
 const cam = { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, dist: -900 };
@@ -400,7 +405,7 @@ const focus = (sel, t) => tl.to(sel, { filter: "blur(0px)", opacity: 1, duration
 const sweep = (sel, t, d = .9) => tl.to(sel, { backgroundSize: "100% 100%", duration: d, ease: "power2.inOut" }, t);
 
 gsap.set(".card", { xPercent: -50, yPercent: -50, x: 0, y: 0 }); // төвлөрөл GSAP-д (x/y анимейшн дарж бичихгүй)
-const tl = gsap.timeline({ paused: true, onUpdate: () => syncUI() });
+const tl = gsap.timeline({ paused: true, onUpdate: () => { syncUI(); wake(); } });
 window.__intro = tl;
 
 // ===== S0 Нээлт: лого гэрлээс угсрагдана (0–6) =====

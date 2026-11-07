@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -26,15 +27,22 @@ type oauthState struct {
 	Next     string `json:"n"`
 }
 
-func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
+// providers — идэвхтэй OAuth үйлчилгээнүүд (нэр, шошго, эхлэх хаяг). "short" — товчны нэр (app.js loginPage-тэй ижил);
+// нэвтрэх хуудас (login.html) товчнуудыг серверт урьдчилан зурна — JS хожуу нэмж маягтыг доош түлхэхгүй.
+func (s *Server) providers() []map[string]string {
 	out := []map[string]string{}
 	if s.OAuth != nil {
+		short := map[string]string{"google": "Google", "facebook": "Facebook", "microsoft": "Microsoft", "instagram": "Instagram"}
 		for _, p := range s.OAuth.List() {
-			out = append(out, map[string]string{"name": p.Name, "label": p.Label, "url": "/auth/" + p.Name + "/start"})
+			out = append(out, map[string]string{"name": p.Name, "label": p.Label, "url": "/auth/" + p.Name + "/start", "short": cmp.Or(short[p.Name], p.Label)})
 		}
 	}
+	return out
+}
+
+func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=300")
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, s.providers())
 }
 
 func safeNext(n string) string {

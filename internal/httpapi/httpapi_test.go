@@ -3213,6 +3213,17 @@ func TestRestudyImprovesLesson(t *testing.T) {
 	if lr := lessonPoints(l, full, []*store.StudySession{tabby, sess(t0.Add(2*day), 650, map[string]int{})}, true, 100, true); lr.Points != 100 || !lr.Improved {
 		t.Fatalf("дахин цэвэр судалсан: %+v", lr)
 	}
+	// 60 минутын хичээлийг 50 мин судалж байгаад 3 удаа гарч автоматаар зогссон (auto_block) → дахин 12 мин судалбал
+	// зөрчил уучлагдаж бүх сессээр (62 мин) тооцогдоно, таб солилтын хасалт (−15) үлдэнэ; 5 мин бол тооцогдохгүй.
+	l60 := &store.Lesson{ID: "l1", Title: "Нэг", ActiveMin: 60, Blocks: l.Blocks}
+	blocked := sess(t0, 3000, map[string]int{"tab_switch": 3, "auto_block": 1})
+	lr = lessonPoints(l60, full, []*store.StudySession{blocked, sess(t0.Add(time.Hour), 720, map[string]int{})}, true, 100, true)
+	if lr.Disqualified || lr.Points != 85 || !lr.Improved || lr.ActiveSec != 3720 || !strings.Contains(strings.Join(lr.Reasons, ","), "засварласан") {
+		t.Fatalf("хаагдсаны дараа дахин судалсан: %+v", lr)
+	}
+	if lr := lessonPoints(l60, full, []*store.StudySession{blocked, sess(t0.Add(time.Hour), 300, map[string]int{})}, true, 100, true); !lr.Disqualified || lr.Points != 0 {
+		t.Fatalf("5 минутын дахин нээлт тооцогдох ёсгүй: %+v", lr)
+	}
 	// Хоёр өдөр хуваан судалсан (350+350 сек): нийлбэрээр бүтэн, «сайжруулсан» биш.
 	if lr := lessonPoints(l, full, []*store.StudySession{sess(t0, 350, map[string]int{}), sess(t0.Add(day), 350, map[string]int{})}, true, 100, true); lr.Points != 100 || lr.Improved || lr.Attempts != 2 {
 		t.Fatalf("хуваан судалсан: %+v", lr)

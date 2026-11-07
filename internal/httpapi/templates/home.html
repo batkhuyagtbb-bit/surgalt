@@ -7,7 +7,7 @@
     <div class="home-copy">
       <div class="home-intro landing">
         <p class="eyebrow shine">Багш, суралцагчдын платформ</p>
-        <h1 class="home-title display split">Сур, сур, бас дахин сур</h1>
+        <h1 class="home-title display split" data-split="1">{{splitWords "Сур, сур, бас дахин сур"}}</h1>
         <p class="lead">Хичээл үзэх биш, ойлгож сурах газар.</p>
         <p class="home-sub">Сургалт, ном, шууд хичээл нэг дор — суралцагч хяналттай орчинд ойлгож сурна, багш мэдлэгээрээ орлого олно.</p>
       </div>
@@ -35,7 +35,8 @@
       <ul class="home-trust landing" aria-label="Давуу тал"><li>{{icon "check" 16}}Бүртгэл үнэгүй</li><li>{{icon "qr" 16}}QPay-ээр төлнө</li><li>{{icon "shield" 16}}Хяналттай орчин</li></ul>
     </div>
       <figure class="home-film landing" aria-label="Surgalt.mn танилцуулга кино">
-        <div class="hf-frame"><iframe src="/intro2?embed=1" title="Surgalt.mn танилцуулга" loading="lazy" allow="autoplay; fullscreen" allowfullscreen></iframe></div>
+        {{/* Кино (iframe)-г app.js homeFilm хэрэгтэй үед л үүсгэнэ — түүнээс өмнө ижил харагдах зурагт хуудас */}}
+        <div class="hf-frame" data-src="/intro2?embed=1"><button type="button" class="hf-poster" aria-label="Танилцуулга кино үзэх"><b>Surgalt<em>.mn</em></b><span>Хичээл үзэх биш, ойлгож сурах газар.</span><i>▶ Интро үзэх</i></button></div>
         <figcaption>1.5 минутын танилцуулга · дуутай үзээрэй</figcaption>
       </figure>
     </div>

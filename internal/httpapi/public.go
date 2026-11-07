@@ -592,7 +592,7 @@ func (s *Server) pageStatic(name string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "public, max-age=60")
-		if err := s.tmpl.ExecuteTemplate(w, name+".html", map[string]any{"PublicURL": s.cfg.PublicURL, "Contact": s.cfg.ContactEmail}); err != nil {
+		if err := s.tmpl.ExecuteTemplate(w, name+".html", map[string]any{"PublicURL": s.cfg.PublicURL, "Contact": s.cfg.ContactEmail, "Providers": s.providers()}); err != nil {
 			s.log.Error("template", "err", err, "page", name)
 		}
 	}

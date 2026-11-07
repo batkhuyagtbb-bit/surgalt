@@ -628,7 +628,8 @@ function cleanPaste(html) {
   const doc = new DOMParser().parseFromString(html, "text/html"), out = document.createElement("div");
   const walk = (src, dst, pre) => {
     for (const n of src.childNodes) {
-      if (n.nodeType === 3) { dst.append(pre ? n.nodeValue : n.nodeValue.replace(/[\r\n\t ]+/g, " ")); continue; }
+      // вэб хуудас үгсийг &nbsp;-ээр холбодог — энгийн зай болгоно (эс бөгөөс мөр хугарахгүй, засварлагчаас гарна)
+      if (n.nodeType === 3) { dst.append(pre ? n.nodeValue : n.nodeValue.replace(/[\r\n\t  ]+/g, " ")); continue; }
       if (n.nodeType !== 1 || RT_SKIP.test(n.tagName)) continue;
       const tag = RT_TAGS[n.tagName];
       if (!tag) { walk(n, dst, pre); continue; }
@@ -1554,7 +1555,7 @@ async function courseEditor(id) {
   const jrCellModal = (uid, lid) => {
     const s = jr.students.find((x) => x.user_id === uid), l = jr.lessons.find((x) => x.id === lid), x = jr.cells[uid]?.[lid] || {};
     const rows = [];
-    rows.push(["Төлөв", (x.disq ? "⛔ Хуулах оролдлого — оноо тооцогдоогүй" : x.done ? "✓ Дууссан" : x.viewed ? "Үзэж байна" : "Үзээгүй") + (x.improved ? " · ↻ дахин судалж сайжруулсан" : "")]);
+    rows.push(["Төлөв", (x.disq ? "⛔ Зөрчилтэй (хуулах оролдлого / хичээлээс гарч зогссон) — оноо тооцогдоогүй · дахин 10+ мин судалбал тооцогдоно" : x.done ? "✓ Дууссан" : x.viewed ? "Үзэж байна" : "Үзээгүй") + (x.improved ? " · ↻ дахин судалж сайжруулсан" : "")]);
     if (x.viewed) rows.push(["Нэгдсэн цолд нэмсэн оноо", x.disq ? "0" : "+" + x.pts]);
     if (x.viewed) rows.push(["Идэвхтэй хугацаа", `${dur2(x.active)}${x.total ? ` (нийт ${dur2(x.total)}, ${x.sessions || 0} удаа)` : ""}`]);
     if (x.q_n) rows.push(["Асуулга", `${x.q_ok}/${x.q_n} зөв`]);
@@ -1579,7 +1580,7 @@ async function courseEditor(id) {
         <div class="an-tile"><small>Дундаж оноо</small><b>${s.avg || "—"}</b></div>
         <div class="an-tile"><small>Идэвхтэй</small><b>${dur2(s.active)}</b>${s.last ? `<span class="muted small">сүүлд ${fmtDate(s.last)}</span>` : ""}</div></div>
       <table class="tbl"><thead><tr><th>Хичээл</th><th>Төлөв</th><th>Оноо / дүн</th></tr></thead><tbody>${jr.lessons.map((l) => { const x = row[l.id], [t, k] = jrCell(l, x);
-        return `<tr><td>${String(l.position).padStart(2, "0")} · ${esc(l.title)}</td><td>${!x ? `<span class="muted">Үзээгүй</span>` : x.disq ? "⛔ Хуулах оролдлого" : x.done || x.exam?.passed ? "✓ Дууссан" : x.asg ? "Илгээсэн" : "Үзэж байна"}</td><td><span class="jr-c ${k}">${t || "—"}</span></td></tr>`; }).join("")}</tbody></table>`);
+        return `<tr><td>${String(l.position).padStart(2, "0")} · ${esc(l.title)}</td><td>${!x ? `<span class="muted">Үзээгүй</span>` : x.disq ? "⛔ Зөрчилтэй" : x.done || x.exam?.passed ? "✓ Дууссан" : x.asg ? "Илгээсэн" : "Үзэж байна"}</td><td><span class="jr-c ${k}">${t || "—"}</span></td></tr>`; }).join("")}</tbody></table>`);
   };
   const jrModal = (html, w = 640) => {
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="jrModal"><div class="modal-card" style="width:min(${w}px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}</div></div>`);
@@ -2947,7 +2948,7 @@ async function students() {
         <div class="an-tile learn"><small>Суралцсан оноо</small><b>${x.learn_score}%</b></div>
         <div class="an-tile"><small>Тогтмол байдал</small><b>${x.streak_days}</b><span class="muted small">дараалсан өдөр · ${x.active_days} нийт өдөр</span></div>
         <div class="an-tile ${x.rank?.cheated ? "warn" : "learn"}"><small>Нэгдсэн цол</small><b>${esc(x.rank?.name || "Шинэ цэрэг")} ${esc(x.rank?.insignia || "")}</b><span class="muted small">${x.rank?.points || 0} оноо${x.rank?.integration?.bonus ? ` (интеграц +${x.rank.integration.bonus})` : ""}${x.rank?.next ? ` · дараагийнх ${x.rank.next}` : ""}${x.rank?.cheated ? ` · ⛔ ${x.rank.cheated} хичээл тооцогдоогүй` : ""}</span></div></div>
-      ${x.lesson_ranks?.length ? `<h4>Нэгдсэн цолд нэмсэн оноо — хичээл бүрээр</h4><p class="muted small" style="margin:0 0 8px">Цолыг хичээл бүрт биш, бүх хичээлийг нэгтгэж олгоно. Хичээл бүр 0-100 оноо нэмнэ (дууссан, идэвхтэй хугацаа, асуулга, дүгнэлт, видео; таб солилт хасна). Бүлэг, сургалтын бүх хичээлийг дуусгавал интеграцын нэмэлт оноо${x.rank?.integration ? ` — одоо +${x.rank.integration.bonus || 0} (${x.rank.integration.sections || 0}/${x.rank.integration.sections_all || 0} бүлэг, ${x.rank.integration.courses || 0}/${x.rank.integration.courses_all || 0} сургалт бүтэн)` : ""}. Хуулах оролдлоготой хичээлийн оноо тооцогдохгүй.</p>
+      ${x.lesson_ranks?.length ? `<h4>Нэгдсэн цолд нэмсэн оноо — хичээл бүрээр</h4><p class="muted small" style="margin:0 0 8px">Цолыг хичээл бүрт биш, бүх хичээлийг нэгтгэж олгоно. Хичээл бүр 0-100 оноо нэмнэ (дууссан, идэвхтэй хугацаа, асуулга, дүгнэлт, видео; таб солилт хасна). Бүлэг, сургалтын бүх хичээлийг дуусгавал интеграцын нэмэлт оноо${x.rank?.integration ? ` — одоо +${x.rank.integration.bonus || 0} (${x.rank.integration.sections || 0}/${x.rank.integration.sections_all || 0} бүлэг, ${x.rank.integration.courses || 0}/${x.rank.integration.courses_all || 0} сургалт бүтэн)` : ""}. Зөрчилтэй (хуулах оролдлого, хичээлээс гарч зогссон) хичээлийн оноо тооцогдохгүй — дахин 10+ минут судалбал тооцогдоно.</p>
         ${x.rank?.tips?.length ? `<ul class="muted small" style="margin:0 0 8px 18px">${x.rank.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
         <table class="tbl"><thead><tr><th>Хичээл</th><th>Нэмсэн оноо</th><th>Үндэслэл</th></tr></thead><tbody>${x.lesson_ranks.map((r) => `<tr class="${r.disqualified ? "an-wrongq" : ""}"><td>${esc(r.title)}</td><td>${r.disqualified ? "⛔ тооцогдоогүй" : "+" + r.points}</td><td class="muted small">${(r.reasons || []).map(esc).join(", ")}</td></tr>`).join("")}</tbody></table>` : ""}
       ${chart(d.daily)}

@@ -91,19 +91,41 @@ function heroStars() {
   }
 }
 
-// Нүүрний танилцуулга кино (intro2, iframe): бүдэг харагдаж, хулгана авчрахад тодорч тоглоно, холдоход зогсоно.
-// Кино дотор дарж үзэж байвал (iframe focus) холдсон ч үргэлжилнэ. Hover-гүй (мэдрэгчтэй) төхөөрөмжид энгийн хэвээр.
+// Нүүрний танилцуулга кино (intro2, iframe): хуудас ачаалахад биш (intro2 + GSAP гар утсыг хэдэн секунд гацаадаг) —
+// компьютерт хэрэглэгч хулгана хөдөлгөх, гүйлгэх, товч дарахад, мэдрэгчтэй төхөөрөмжид зурагт хуудсыг дарахад л үүсгэнэ.
+// Компьютерт бүдэг харагдаж, хулгана авчрахад тодорч тоглоно, холдоход зогсоно; кино дотор дарж үзэж байвал (iframe focus)
+// холдсон ч үргэлжилнэ.
 function homeFilm() {
-  const fig = $(".home-film"), fr = fig && $("iframe", fig);
-  if (!fr || !matchMedia("(hover: hover)").matches) return;
+  const fig = $(".home-film"), box = fig && $(".hf-frame", fig);
+  if (!box?.dataset.src) return;
+  let fr = null, over = false, tapped = false;
+  const win = () => { try { return fr?.contentWindow; } catch { return null; } };
+  const load = () => {
+    if (fr) return;
+    fr = document.createElement("iframe");
+    Object.assign(fr, { src: box.dataset.src, title: "Surgalt.mn танилцуулга", allow: "autoplay; fullscreen", allowFullscreen: true });
+    fr.addEventListener("load", () => { box.classList.remove("wait"); box.classList.add("loaded"); if (over || tapped) win()?.__introPlay?.(); }, { once: true });
+    box.prepend(fr);
+  };
+  $(".hf-poster", box)?.addEventListener("click", () => { tapped = true; fig.classList.add("is-on"); if (!fr) box.classList.add("wait"); load(); win()?.__introPlay?.(); });
+  if (!matchMedia("(hover: hover)").matches) return;
+  const warm = () => { load(); for (const t of ["pointermove", "scroll", "keydown"]) removeEventListener(t, warm); };
+  for (const t of ["pointermove", "scroll", "keydown"]) addEventListener(t, warm, { passive: true });
   fig.classList.add("hover-play");
-  const win = () => { try { return fr.contentWindow; } catch { return null; } };
-  let over = false;
-  const off = () => { fig.classList.remove("is-on"); win()?.__introPause?.(); };
-  fig.addEventListener("mouseenter", () => { over = true; fig.classList.add("is-on"); win()?.__introPlay?.(); });
+  const off = () => { tapped = false; fig.classList.remove("is-on"); win()?.__introPause?.(); };
+  fig.addEventListener("mouseenter", () => { over = true; load(); fig.classList.add("is-on"); win()?.__introPlay?.(); });
   fig.addEventListener("mouseleave", () => { over = false; if (document.activeElement !== fr) off(); });
   // кино дотор дарж үзсэний дараа хуудасны өөр газар дарвал бүдгэрч зогсоно (iframe доторх дарал энд ирэхгүй)
   document.addEventListener("pointerdown", (e) => { if (!over && !fig.contains(e.target) && fig.classList.contains("is-on")) off(); });
+}
+
+// SVG хөдөлгөөн (SMIL animateMotion — нүүрний «Багш ⇄ surgalt.mn ⇄ Суралцагч» схем): дэлгэцэнд харагдахгүй үед
+// зогсооно — эс бөгөөс хуудас кадр тутам дахин зурагдаж (layout 60/с) CPU-г байнга ачаалдаг байсан.
+function smilPause() {
+  const svgs = $$("svg").filter((v) => v.querySelector("animateMotion, animate, animateTransform"));
+  if (!svgs.length || !window.IntersectionObserver) return;
+  const io = new IntersectionObserver((es) => es.forEach((e) => (e.isIntersecting && !reduce ? e.target.unpauseAnimations() : e.target.pauseAnimations())));
+  svgs.forEach((v) => { v.pauseAnimations(); io.observe(v); });
 }
 
 // Сайтын хандалт (хянагчийн самбарын өдөр/7 хоног/сарын статистик): хуудас бүр нэг удаа, хөтчийн санамсаргүй ID-гаар.
@@ -4630,7 +4652,7 @@ async function coursePage() {
       if (!r) { b?.remove(); return; }
       if (!b) { b = document.createElement("span"); b.className = "lesson-rank"; $(".lesson-title", li)?.append(b); }
       b.className = "lesson-rank " + (r.disqualified ? "disq" : r.points >= 75 ? "high" : "");
-      b.title = (r.disqualified ? "Хуулах оролдлоготой тул оноо тооцогдоогүй — дахин шударга судалбал тооцогдоно" : r.improved ? "Дахин судалж сайжруулсан оноо" : "Нэгдсэн цолд нэмсэн оноо") + ((r.reasons || []).length ? ": " + r.reasons.join(", ") : "");
+      b.title = (r.disqualified ? "Зөрчилтэй (хуулах оролдлого эсвэл хичээлээс гарч зогссон) тул оноо тооцогдоогүй — дахин 10+ минут шударга судалбал тооцогдоно" : r.improved ? "Дахин судалж сайжруулсан оноо" : "Нэгдсэн цолд нэмсэн оноо") + ((r.reasons || []).length ? ": " + r.reasons.join(", ") : "");
       b.textContent = r.disqualified ? "⛔ Тооцогдоогүй" : `+${r.points} оноо${r.improved ? " ↻" : ""}`;
     });
     if (a.rank && bar) {
@@ -5439,7 +5461,8 @@ function loginPage() {
     note.hidden = false;
     $("[data-copy-link]", note).onclick = (ev) => navigator.clipboard?.writeText(url).then(() => (ev.target.textContent = "Хуулагдлаа ✓"), () => prompt("Холбоосыг хуулна уу:", url));
   });
-  let providers = [];
+  // Серверт урьдчилан зурсан товчнуудаас (login.html) — эхний sync() тэдгээрийг арилгаж маягтыг үсрүүлэхгүй.
+  let providers = $$(".btn-social[data-p]", social).map((a) => ({ name: a.dataset.p, label: a.dataset.label, url: a.getAttribute("href") }));
   api("/api/auth/providers", { token: null }).then((ps) => { providers = ps; sync(); }).catch(() => sync());
   if (role) $$(".tab")[1].click(); else sync();
   const done = (d) => { Auth.set(d.token, d.user); location.href = next(d.user); };
@@ -6065,18 +6088,27 @@ if (new URLSearchParams(location.search).has("deleted")) { // бүртгэлээ
 }
 if (page === "reset") resetPage();
 animateIcons();
+smilPause();
 siteHit();
 if (page === "home" && !document.documentElement.classList.contains("authed")) { heroStars(); homeFilm(); }
-// 3D дэвсгэр (Three.js): нүүрэнд зөвхөн зочинд, нэвтрэх хуудсанд — хуудас ачаалагдсаны дараа сул үед.
-if ((page === "home" && !document.documentElement.classList.contains("authed")) || page === "login") {
-  (window.requestIdleCallback || ((f) => setTimeout(f, 400)))(() => {
-    const s = document.createElement("script"), v = document.querySelector('script[src*="/static/app.js"]')?.src.split("v=")[1] || "";
-    s.src = "/static/herofx.js?v=" + v; s.async = true; document.head.append(s);
-  }, { timeout: 1500 });
+// 3D дэвсгэр (Three.js, ~600KB): нүүрэнд зөвхөн зочинд, нэвтрэх хуудсанд; зөвхөн том дэлгэцтэй, хулганатай төхөөрөмжид
+// (гар утсанд татах, зурах нь хэт хүнд). Хэрэглэгч хулгана хөдөлгөх, гүйлгэх, товч дарсны дараа сул үед ачаална —
+// хуудасны эхний ачааллыг (CPU) булаахгүй.
+if (((page === "home" && !document.documentElement.classList.contains("authed")) || page === "login") &&
+  matchMedia("(min-width: 900px) and (hover: hover)").matches && !navigator.connection?.saveData) {
+  const evs = ["pointermove", "scroll", "keydown"];
+  const go = () => {
+    evs.forEach((t) => removeEventListener(t, go));
+    (window.requestIdleCallback || ((f) => setTimeout(f, 200)))(() => {
+      const s = document.createElement("script"), v = document.querySelector('script[src*="/static/app.js"]')?.src.split("v=")[1] || "";
+      s.src = "/static/herofx.js?v=" + v; s.async = true; document.head.append(s);
+    }, { timeout: 1500 });
+  };
+  evs.forEach((t) => addEventListener(t, go, { passive: true }));
 }
-// Хуудас угсрагдаж (фонт, эхний зурлага) дууссаны дараа зөөлөн гаргана — салж нийлэх нь харагдахгүй.
+// Нэвтэрсэн хэрэглэгчийн хуудас угсрагдаж (фонт, эхний зурлага) дууссаны дараа зөөлөн гаргана — салж нийлэх нь харагдахгүй (зочинд нуугдаагүй).
 Promise.race([document.fonts?.ready || Promise.resolve(), new Promise((r) => setTimeout(r, 600))])
-  .then(() => requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove("pre"))));
+  .then(() => requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove("booting"))));
 })();
 
 /* ---------- Хөдөлгөөнт дүрс (AnimateIcons · Lucide, MIT, өөрийн серверээс): ----------

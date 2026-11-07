@@ -24,7 +24,7 @@
         </a>
         {{if .D.Teachers}}<div class="org-teachers reveal"><span class="muted small">Заадаг багш:</span>{{range .D.Teachers}}
           <a class="org-teacher" href="/t/{{.Username}}"><span class="avatar avatar-xs" style="--h:{{hue .Username}}">{{if .AvatarURL}}<img src="{{.AvatarURL}}" alt="" loading="lazy">{{else}}{{initials .DisplayName}}{{end}}</span>{{.DisplayName}}</a>{{end}}</div>{{end}}
-        <h1 class="display split">{{$c.Title}}</h1>
+        <h1 class="display split" data-split="1">{{splitWords $c.Title}}</h1>
         <p class="lead reveal pre">{{$c.Description}}</p>
         <div class="hero-cta reveal">
           <button class="btn btn-gold btn-lg magnetic" id="buyBtn">{{if $c.Locked}}🔑 Нууц үгээр нээх{{else if $c.Price}}Бүх хичээл багцаар · {{money $c.Price}}{{else if gt $paid 0}}Хичээлүүдийг сонгох ↓{{else}}Үнэгүй элсэх{{end}}</button>

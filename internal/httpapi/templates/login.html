@@ -15,8 +15,9 @@
       </div>
     </div>
     <div class="role-chosen" id="roleChosen" hidden><span></span><button type="button" data-role-change>Солих</button></div>
-    <div class="social" id="social"></div>
-    <div class="divider"><span>эсвэл имэйлээр</span></div>
+    {{/* Товчнууд серверт урьдчилан (app.js дүрсийг нь нэмж, role/next-ийг холбоосонд оруулна) — хожуу нэмэгдэж маягт үсрэхгүй */}}
+    <div class="social" id="social">{{range .Providers}}<a class="btn btn-social" href="{{.url}}" data-p="{{.name}}" data-label="{{.label}}"><svg width="20" height="20" aria-hidden="true"></svg><span>{{.short}}-ээр үргэлжлүүлэх</span></a>{{end}}</div>
+    <div class="divider"{{if not .Providers}} hidden{{end}}><span>эсвэл имэйлээр</span></div>
     <form id="loginForm" class="form">
       <label>Имэйл<input type="email" name="email" required autocomplete="email"></label>
       <label>Нууц үг<span class="pw"><input type="password" name="password" required minlength="6" autocomplete="current-password"><button type="button" class="pw-eye" data-pw-toggle aria-label="Нууц үг харуулах">{{icon "eye"}}</button></span></label>

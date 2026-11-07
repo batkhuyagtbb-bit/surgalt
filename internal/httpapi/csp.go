@@ -23,8 +23,9 @@ import (
 // inlineScripts — загварт {{inlineScript "нэр"}}-ээр орно; хэш нь яг энэ текстээс тооцогдох тул хэзээ ч зөрөхгүй.
 // Загварын утга (хуудасны нэр г.м)-ыг энд биш, HTML атрибутаас уншина.
 var inlineScripts = map[string]string{
-	// Угсрагдаж дуустал нууж (app.js зөөлөн гаргана), нэвтэрсэн бол чатын самбарын зайг хуудас зурагдахаас өмнө бэлдэнэ.
-	"boot": `document.documentElement.classList.add("pre");try{if(localStorage.getItem("sg_token")){var h=document.documentElement;h.classList.add("authed");if(localStorage.getItem("sg_user")&&["home","profile","course","me"].indexOf(h.getAttribute("data-pg"))>=0){h.classList.add("has-rail","rail-boot");if(localStorage.getItem("sg_rail_collapsed")==="1")h.classList.add("rail-collapsed")}}}catch(e){}`,
+	// Нэвтэрсэн хэрэглэгчид: цэс, чатын самбар JS-ээр солигдох тул угсрагдаж дуустал нууна (app.js зөөлөн гаргана),
+	// самбарын зайг хуудас зурагдахаас өмнө бэлдэнэ. Зочинд серверийн HTML бэлэн — нуухгүй, шууд харагдана.
+	"boot": `try{if(localStorage.getItem("sg_token")){var h=document.documentElement;h.classList.add("authed","booting");if(localStorage.getItem("sg_user")&&["home","profile","course","me"].indexOf(h.getAttribute("data-pg"))>=0){h.classList.add("has-rail","rail-boot");if(localStorage.getItem("sg_rail_collapsed")==="1")h.classList.add("rail-collapsed")}}}catch(e){}`,
 	// Утсан дээрх туршилтын төлбөр (pay.html): хаяг нь товчны data-url-д.
 	"pay": `(function(){var b=document.getElementById("ppPay");if(!b)return;b.onclick=async function(){b.disabled=true;b.textContent="Төлж байна…";try{var r=await fetch(b.dataset.url,{method:"POST"});if(!r.ok)throw new Error();document.getElementById("ppState").innerHTML='<p class="pp-ok"><b>✓</b> Төлбөр амжилттай төлөгдлөө.<br>Компьютер дээрх хуудас өөрөө нээгдэнэ.</p>'}catch(e){b.disabled=false;b.textContent="Дахин оролдох"}}})();`,
 }
