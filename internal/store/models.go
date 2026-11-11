@@ -132,6 +132,24 @@ type Notification struct {
 }
 
 // Meeting нь Google Meet-ээр явагдах шууд хичээл/уулзалт.
+// Share — багш хооронд хуваалцалт: FromID багш ToID багшид сургалтаа (LessonID хоосон) эсвэл нэг хичээлээ (шалгалт,
+// даалгавар ч хичээл) ShareView (харах, өөрийн сургалтад хадгалах) эсвэл ShareEdit (хамт хөгжүүлэх — Course.Teachers-т
+// орно, зөвхөн сургалтаар) эрхээр өгнө.
+type Share struct {
+	ID        string    `json:"id"`
+	FromID    string    `json:"from_id"`
+	ToID      string    `json:"to_id"`
+	CourseID  string    `json:"course_id"`
+	LessonID  string    `json:"lesson_id,omitempty"`
+	Mode      string    `json:"mode"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+const (
+	ShareView = "view"
+	ShareEdit = "edit"
+)
+
 type Meeting struct {
 	ID          string    `json:"id"`
 	TeacherID   string    `json:"teacher_id"`
@@ -691,6 +709,12 @@ type Store interface {
 	// Meetings нь from-оос хойшхи уулзалтууд (courseID хоосон бол багшийн бүх).
 	Meetings(ctx context.Context, teacherID, courseID string, from time.Time, limit int) ([]Meeting, error)
 	DeleteMeeting(ctx context.Context, id string) error
+	// Багш хооронд хуваалцалт (lesson_share.go): CreateShare ID, CreatedAt тавина.
+	CreateShare(ctx context.Context, sh *Share) error
+	ShareByID(ctx context.Context, id string) (*Share, error)
+	SharesTo(ctx context.Context, toID string) ([]Share, error)          // надад хуваалцсан (шинэ нь эхэндээ)
+	SharesOfCourse(ctx context.Context, courseID string) ([]Share, error) // сургалтын (эзэмшигчид)
+	DeleteShare(ctx context.Context, id string) error
 	// SetMeetingURL — Meet холбоосыг гараар тавих (meet.new-ээс хуулсан).
 	SetMeetingURL(ctx context.Context, id, url string) error
 	// Цаг захиалга (slots.go): багшийн сул цагууд ба тэдгээрийн захиалга.

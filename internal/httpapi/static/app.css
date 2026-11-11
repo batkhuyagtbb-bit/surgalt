@@ -5022,3 +5022,18 @@ a.np-item:active{background:var(--line)}
 
 /* Хичээл хуваалцах код (студи: хуваалцах / импортлох цонх) */
 .share-code{width:100%;margin:4px 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);font:500 .8rem/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;resize:vertical}
+
+/* Бүх цонх (modal) баруун талаас гулсаж гарна — дэлгэцийн бүтэн өндрөөр, утсанд бүтэн өргөнөөр */
+.modal{display:flex;justify-content:flex-end;align-items:stretch;padding:0}
+.modal-card,.modal .modal-card{height:100%;max-height:100vh;max-height:100dvh;border-radius:var(--radius-lg) 0 0 var(--radius-lg);box-shadow:-30px 0 80px -30px rgba(18,24,41,.5);transform:translateX(60px);transition:transform .45s var(--spring)}
+.modal.open .modal-card{transform:none}
+@media (max-width:600px){.modal-card,.modal .modal-card{width:100%!important;border-radius:0}}
+/* Багш хооронд хуваалцах */
+.share-rows{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.share-rows li{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.share-rows .grow{flex:1;min-width:0;display:grid}.share-rows .grow b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.share-rows small{font-size:.78rem}
+.share-h{margin:18px 0 6px;font:800 .95rem var(--sans);display:flex;align-items:center;gap:8px}
+.share-seg{margin:4px 0 8px}.share-hint{margin:0 0 10px}
+.shared-view{margin:12px 0;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.ol-sec-vis{margin-left:4px}
+.del-list{margin:8px 0 10px;padding-left:20px;display:grid;gap:3px;font-size:.9rem}

@@ -31,6 +31,7 @@ type Memory struct {
 	identities  map[string]string // provider:subject -> user id
 	applied     map[string]bool   // хэрэгжсэн багтаамжийн захиалга
 	meetings    []*Meeting
+	shares      []*Share
 	slots       map[string]*Slot              // цаг захиалга
 	reports     map[string]*Report            // чатын мэдүүлэг
 	blocks      map[[2]string]bool            // (яриа, хориглосон тал)

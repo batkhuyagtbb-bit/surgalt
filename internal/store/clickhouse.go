@@ -457,6 +457,10 @@ var chTables = []chTable{
 	// Хянагчийн самбар: сайтын хуудас нээлт (хөтчөөс; 400 хоног) ба платформын зардлын бүртгэл (admin.go).
 	{"site_hits", `(at ` + tsType + `, visitor_id String, user_id String, path String, referrer String, device String)
 	ENGINE = MergeTree ORDER BY at TTL toDateTime(at) + INTERVAL 400 DAY`},
+	// Багш хооронд хуваалцалт (lesson_share.go).
+	{"shares", `(id String, from_id String, to_id String, course_id String, lesson_id String, mode String,
+		created_at ` + tsType + `, ver UInt64, deleted Bool DEFAULT false)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
 	{"admin_expenses", `(id String, date ` + tsType + `, category String, amount Int64, note String, created_by String,
 		created_at ` + tsType + `, ver UInt64, deleted Bool DEFAULT false)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY id`},
