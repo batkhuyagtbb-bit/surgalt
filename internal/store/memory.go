@@ -948,6 +948,19 @@ func (m *Memory) SetLessonHidden(_ context.Context, courseID, lessonID string, h
 	return ErrNotFound
 }
 
+func (m *Memory) SetSectionHidden(_ context.Context, courseID, section string, hidden bool) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, cur := range m.lessons[courseID] {
+		if cur.Section == section && cur.Hidden != hidden {
+			cur.Hidden = hidden
+			n++
+		}
+	}
+	return n, nil
+}
+
 func (m *Memory) DeleteLesson(_ context.Context, courseID, lessonID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

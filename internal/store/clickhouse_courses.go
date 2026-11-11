@@ -392,6 +392,30 @@ func (c *ClickHouse) SetLessonHidden(ctx context.Context, courseID, lessonID str
 	return c.writeLesson(ctx, cur, false)
 }
 
+func (c *ClickHouse) SetSectionHidden(ctx context.Context, courseID, section string, hidden bool) (int, error) {
+	unlock, err := c.lock(ctx, "lessons:"+courseID)
+	if err != nil {
+		return 0, err
+	}
+	defer unlock()
+	cur, err := c.LessonsByCourse(ctx, courseID)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for i := range cur {
+		if cur[i].Section != section || cur[i].Hidden == hidden {
+			continue
+		}
+		cur[i].Hidden = hidden
+		if err := c.writeLesson(ctx, &cur[i], false); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}
+
 func (c *ClickHouse) DeleteLesson(ctx context.Context, courseID, lessonID string) error {
 	unlock, err := c.lock(ctx, "lessons:"+courseID)
 	if err != nil {

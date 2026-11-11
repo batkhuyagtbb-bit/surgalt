@@ -348,6 +348,11 @@ func (s *Server) handleCreateLesson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	l := lessonFromInput(in, course.ID)
+	if !l.Hidden { // хаалттай модульд нэмсэн хичээл ч хаалттай — модуль бүхэлдээ хамт нээгдэж/хаагдана
+		if ls, err := s.store.LessonsByCourse(r.Context(), course.ID); err == nil && sectionClosed(ls, l.Section, nil) {
+			l.Hidden = true
+		}
+	}
 	if err := s.store.CreateLesson(r.Context(), l); s.storeErr(w, r, err) {
 		return
 	}
@@ -374,8 +379,18 @@ func (s *Server) handleUpdateLesson(w http.ResponseWriter, r *http.Request) {
 	}
 	l := lessonFromInput(in, course.ID)
 	l.ID = r.PathValue("lid")
+	before, _ := s.store.LessonsByCourse(r.Context(), course.ID)
 	if err := s.store.UpdateLesson(r.Context(), l); s.storeErr(w, r, err) {
 		return
+	}
+	// Бүлгийг нь сольж хаалттай модуль руу оруулсан бол хамт хаагдана.
+	if after, err := s.store.LessonsByCourse(r.Context(), course.ID); err == nil && before != nil {
+		if err := s.hideMovedIntoClosed(r, course.ID, before, after); s.storeErr(w, r, err) {
+			return
+		}
+		if cur, err := s.store.LessonByID(r.Context(), course.ID, l.ID); err == nil {
+			l.Hidden = cur.Hidden
+		}
 	}
 	s.courseEdited(r.Context(), course)
 	writeJSON(w, http.StatusOK, l)
@@ -408,6 +423,7 @@ func (s *Server) handleReorderLessons(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	before, _ := s.store.LessonsByCourse(r.Context(), course.ID)
 	if err := s.store.ReorderLessons(r.Context(), course.ID, in.Items); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, http.StatusBadRequest, "хичээлийн жагсаалт таарахгүй байна — хуудсаа сэргээнэ үү")
@@ -415,6 +431,12 @@ func (s *Server) handleReorderLessons(w http.ResponseWriter, r *http.Request) {
 		}
 		s.storeErr(w, r, err)
 		return
+	}
+	// Нээлттэй хичээлийг хаалттай модуль руу чирж оруулбал хамт хаагдана.
+	if after, err := s.store.LessonsByCourse(r.Context(), course.ID); err == nil && before != nil {
+		if err := s.hideMovedIntoClosed(r, course.ID, before, after); s.storeErr(w, r, err) {
+			return
+		}
 	}
 	s.courseEdited(r.Context(), course)
 	lessons, err := s.store.LessonsByCourse(r.Context(), course.ID)

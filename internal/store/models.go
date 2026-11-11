@@ -778,6 +778,8 @@ type Store interface {
 	UpdateLesson(ctx context.Context, l *Lesson) error
 	// SetLessonHidden — хичээлийг суралцагчдад нээх (false) / хаах (true).
 	SetLessonHidden(ctx context.Context, courseID, lessonID string, hidden bool) error
+	// SetSectionHidden — бүлгийн (модулийн) БҮХ хичээлийг нэг түгжээн дор хамт нээх/хаах; өөрчлөгдсөн тоог буцаана.
+	SetSectionHidden(ctx context.Context, courseID, section string, hidden bool) (int, error)
 	// DeleteLesson нь хичээлийг устгана (явц, худалдан авалтын түүх хэвээр үлдэнэ).
 	DeleteLesson(ctx context.Context, courseID, lessonID string) error
 	// ReorderLessons нь хичээлүүдийн дараалал (1..n) ба бүлгийг нэг дор шинэчилнэ. items нь сургалтын бүх хичээлийг агуулна.

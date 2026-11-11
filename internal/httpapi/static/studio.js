@@ -1462,7 +1462,7 @@ async function courseEditor(id) {
           <span class="lg-num">${String(i + 1).padStart(2, "0")}</span>
           <input class="ol-sec-name" value="${esc(g.name)}" maxlength="80" placeholder="${g.name || !g.items.length ? "Бүлгийн нэрээ бичнэ үү…" : "Бүлэггүй хичээлүүд — нэр бичвэл бүлэг болно"}" aria-label="Бүлгийн нэр">
           <small class="muted">${g.items.length} хичээл${g.items.some((l) => l.hidden) ? ` · <b class="ol-hidden-n">${g.items.filter((l) => l.hidden).length} хаалттай</b>` : ""}</small>
-          ${g.items.length ? `<label class="ol-vis ol-sec-vis ${g.items.every((l) => l.hidden) ? "off" : ""}" title="${g.items.every((l) => l.hidden) ? "Бүлэг хаалттай — бүх хичээл нь суралцагчдад харагдахгүй. Нээвэл бүгд нээгдэнэ." : "Бүлэг нээлттэй. Хаавал бүх хичээл нь хаагдана (бэлтгэж байна)."}"><input type="checkbox" data-sec-vis ${g.items.every((l) => l.hidden) ? "" : "checked"} aria-label="Бүлгийг нээх/хаах"><i class="switch"></i></label>` : ""}
+          ${g.items.length ? `<label class="ol-vis ol-sec-vis ${g.items.every((l) => l.hidden) ? "off" : ""}" title="${g.items.every((l) => l.hidden) ? "Модуль хаалттай — бүх хичээл нь суралцагчдад харагдахгүй. Шинээр нэмсэн, зөөж оруулсан хичээл ч хаалттай. Нээвэл бүгд хамт нээгдэнэ." : "Модуль нээлттэй. Хаавал бүх хичээл нь хамт хаагдана."}"><input type="checkbox" data-sec-vis ${g.items.every((l) => l.hidden) ? "" : "checked"} aria-label="Бүлгийг нээх/хаах"><i class="switch"></i></label>` : ""}
           <button type="button" class="btn btn-glass btn-sm" data-sec-add>${ico("plus", 15)}Хичээл</button>
           ${g.name ? `<button type="button" class="icon-btn" data-sec-del aria-label="Бүлгийг задлах" title="Бүлгийг задлах (хичээлүүд үлдэнэ)">${ico("x", 16)}</button>` : ""}</header>
         <ol class="ol-list">${g.items.map((l) => rowHTML(l, ++n)).join("")}</ol></section>`).join("")}</div>
@@ -1987,11 +1987,13 @@ async function courseEditor(id) {
   };
   const onChange = async (e) => {
     const sv = e.target.closest("[data-sec-vis]");
-    if (sv) { // бүлгийн бүх хичээлийг нэг дор нээх/хаах
-      const sec = sv.closest(".ol-sec"), hidden = !sv.checked, ids = $(":scope > .ol-list > .ol-row", sec).map((x) => x.dataset.lid);
+    if (sv) { // модулийн бүх хичээлийг нэг дор (сервер нэг түгжээн дор) хамт нээх/хаах
+      const sec = sv.closest(".ol-sec"), hidden = !sv.checked;
       sv.disabled = true;
-      try { await Promise.all(ids.map((id) => api(`/api/courses/${c.id}/lessons/${id}/visibility`, { method: "PUT", body: { hidden } }))); toast(hidden ? "Бүлэг хаагдлаа — хичээлүүд нь суралцагчдад харагдахгүй" : "Бүлэг нээгдлээ ✓"); }
-      catch (x) { toast(x.message, true); }
+      try {
+        const r = await api(`/api/courses/${c.id}/section-visibility`, { method: "PUT", body: { section: sec.dataset.sec || "", hidden } });
+        toast(hidden ? `Модуль хаагдлаа — ${r.changed} хичээл суралцагчдад харагдахгүй` : `Модуль нээгдлээ ✓ — ${r.changed} хичээл нээгдэв`);
+      } catch (x) { toast(x.message, true); }
       return reload();
     }
     const vis = e.target.closest("[data-vis]");
