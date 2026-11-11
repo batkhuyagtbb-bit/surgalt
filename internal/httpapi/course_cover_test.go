@@ -18,7 +18,7 @@ func TestCourseCover(t *testing.T) {
 		t.Fatalf("зурагтай үүсгэх: %d %v", code, c)
 	}
 	cid := c["id"].(string)
-	if code, _ := call(t, srv, "PUT", "/api/courses/"+cid, tt, `{"title":"Физик","price":0,"published":true,"cover":"t99"}`); code != 400 {
+	if code, _ := call(t, srv, "PUT", "/api/courses/"+cid, tt, `{"title":"Физик","price":0,"published":true,"cover":"t999"}`); code != 400 {
 		t.Fatalf("буруу загвар: %d", code)
 	}
 	if _, u := call(t, srv, "PUT", "/api/courses/"+cid, tt, `{"title":"Физик 2","price":0,"published":true}`); u["cover"] != "t04" {
@@ -71,7 +71,7 @@ func TestProfileCoverTemplate(t *testing.T) {
 	if code != 200 || me["cover_url"] != "/static/covers/t13.svg" {
 		t.Fatalf("загвар нүүр зураг: %d %v", code, me)
 	}
-	if code, _ := call(t, srv, "PUT", "/api/me/profile", tt, `{"display_name":"Б. Багш","cover_url":"/static/covers/t99.svg"}`); code != 400 {
+	if code, _ := call(t, srv, "PUT", "/api/me/profile", tt, `{"display_name":"Б. Багш","cover_url":"/static/covers/t777.svg"}`); code != 400 {
 		t.Fatalf("буруу загвар: %d", code)
 	}
 	if code, _ := call(t, srv, "PUT", "/api/me/profile", tt, `{"display_name":"Б. Багш","cover_url":"/static/app.css"}`); code != 400 {

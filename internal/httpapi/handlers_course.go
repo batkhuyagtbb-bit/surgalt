@@ -230,7 +230,7 @@ type lessonInput struct {
 }
 
 // coverRe — толгойн зургийн загварын ID (/static/covers/t01.svg … t20.svg).
-var coverRe = regexp.MustCompile(`^t(0[1-9]|1[0-9]|20)$`)
+var coverRe = regexp.MustCompile(`^t(0[1-9]|[1-9][0-9]|1[01][0-9]|120)$`) // t01–t100 (салбар бүр), t101–t120 (хөдөлгөөнт)
 
 // maxDescWords — сургалтын товч тайлбарын дээд үгийн тоо (карт, нийтийн хуудасны толгойд багтахуйц).
 const maxDescWords = 50

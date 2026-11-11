@@ -302,6 +302,33 @@ function ripples() {
   }, { passive: true });
 }
 
+/* ---------- Толгойн зургийн загвар сонгох (сургалт, профайл) ---------- */
+let coverIndex = null;
+async function coverPicker({ title, lead, current = "", allowNone = false, hue = 222, onPick }) {
+  coverIndex = coverIndex || await fetch("/static/covers/index.json").then((r) => r.json()).catch(() => ({}));
+  const all = Object.entries(coverIndex).map(([id, v]) => ({ id, n: typeof v === "string" ? v : v.n, c: typeof v === "string" ? "" : v.c }));
+  const cats = [...new Set(all.map((x) => x.c).filter(Boolean))];
+  $("#coverPickModal")?.remove();
+  document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="coverPickModal"><div class="modal-card" style="width:min(820px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${icon("x", 18)}</button>
+    <h3>${esc(title)}</h3><p class="muted small">${esc(lead)}</p>
+    <input class="cv-search" type="search" placeholder="Хайх: физик, абстракт, хөдөлгөөнт…" aria-label="Загвар хайх">
+    <div class="cv-cats"><button type="button" class="cv-cat on" data-cat="">Бүгд <small>${all.length}</small></button>${cats.map((c) => `<button type="button" class="cv-cat" data-cat="${esc(c)}">${esc(c)} <small>${all.filter((x) => x.c === c).length}</small></button>`).join("")}</div>
+    <div class="cv-grid">${allowNone ? `<button type="button" class="cv-opt cv-none ${current ? "" : "on"}" data-cv="" data-cat="" data-n="градиент" style="--h:${hue}"><span>Градиент (зураггүй)</span></button>` : ""}${all.map((x) => `<button type="button" class="cv-opt ${current === x.id ? "on" : ""}" data-cv="${x.id}" data-cat="${esc(x.c)}" data-n="${esc((x.n + " " + x.c).toLowerCase())}"><img src="/static/covers/${x.id}.svg" alt="" loading="lazy" decoding="async"><span>${esc(x.n)}${x.c === "Хөдөлгөөнт" ? " ▶" : ""}</span></button>`).join("")}</div></div></div>`);
+  const m = $("#coverPickModal"); openModal(m);
+  const close = () => { closeModal(m); setTimeout(() => m.remove(), 300); };
+  let cat = "";
+  const filter = () => { const q = $(".cv-search", m).value.trim().toLowerCase(); $$(".cv-opt", m).forEach((o) => (o.hidden = (cat && o.dataset.cat !== cat && o.dataset.cv !== "") || (q && !o.dataset.n.includes(q)))); };
+  $(".cv-search", m).addEventListener("input", filter);
+  m.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-close]") || e.target === m) return close();
+    const cb = e.target.closest("[data-cat]:not(.cv-opt)"); if (cb) { cat = cb.dataset.cat; $$(".cv-cat", m).forEach((x) => x.classList.toggle("on", x === cb)); return filter(); }
+    const o = e.target.closest("[data-cv]"); if (!o) return;
+    $$(".cv-opt", m).forEach((x) => x.classList.toggle("on", x === o)); o.disabled = true;
+    try { await onPick(o.dataset.cv); close(); } catch (x) { toast(x.message, true); o.disabled = false; }
+  });
+  $(".cv-search", m).focus();
+}
+
 /* ---------- modal ---------- */
 // Нээгдэх агшинд эцгийнх нь «зөөлөн гарах» анимейшнийг (stacking context үүсгэдэг) зогсооно — цонх бусад хэсгийн доор дарагдахгүй.
 function openModal(el) { if (!el) return; el.parentElement?.closest(".fade-in")?.classList.remove("fade-in"); el.classList.add("open"); el.setAttribute("aria-hidden", "false"); }
@@ -4162,28 +4189,15 @@ function profileOwner(root, h) {
     } finally { root.classList.remove("uploading"); URL.revokeObjectURL(preview); }
   });
 
-  // «Загвараас сонгох»: сургалтын толгойн зургийн 20 загвар (/static/covers) нүүр зураг болно — байрлал тохируулах шаардлагагүй.
-  $$("[data-cover-template]").forEach((b) => b.addEventListener("click", async () => {
-    const names = await fetch("/static/covers/index.json").then((r) => r.json()).catch(() => ({}));
-    const ids = Object.keys(names).length ? Object.keys(names) : Array.from({ length: 20 }, (_, i) => "t" + String(i + 1).padStart(2, "0"));
+  // «Загвараас сонгох»: сургалтын толгойн зургийн загварууд (/static/covers) нүүр зураг болно — байрлал тохируулах шаардлагагүй.
+  $$("[data-cover-template]").forEach((b) => b.addEventListener("click", () => {
     const cur = $("img.pf-cover-img", $("#pfCover"))?.getAttribute("src") || "";
-    $("#coverTplModal")?.remove();
-    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="coverTplModal"><div class="modal-card" style="width:min(720px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${icon("x", 18)}</button>
-      <h3>Нүүр зургийн загвар</h3><p class="muted small">Сургалтын толгойн зургийн 20 загвар — профайлын нүүр зураг болгоно. Өөрийн зураг оруулахыг хүсвэл «Нүүр зураг солих».</p>
-      <div class="cv-grid">${ids.map((id) => `<button type="button" class="cv-opt ${cur === "/static/covers/" + id + ".svg" ? "on" : ""}" data-cv="${id}" style="--cv:url(/static/covers/${id}.svg)"><span>${esc(names[id] || id)}</span></button>`).join("")}</div></div></div>`);
-    const m = $("#coverTplModal"); openModal(m);
-    const close = () => { closeModal(m); setTimeout(() => m.remove(), 300); };
-    m.addEventListener("click", async (e) => {
-      if (e.target.closest("[data-close]") || e.target === m) return close();
-      const o = e.target.closest("[data-cv]"); if (!o) return;
-      $$(".cv-opt", m).forEach((x) => x.classList.toggle("on", x === o));
-      const src = "/static/covers/" + o.dataset.cv + ".svg", box = $("#pfCover");
-      try {
-        await save({ cover_url: src });
-        $("img.pf-cover-img", box)?.remove(); box.insertAdjacentHTML("afterbegin", `<img class="pf-cover-img" src="${esc(src)}" alt="" style="object-position:50% 50%">`);
-        toast("Нүүр зураг солигдлоо ✓"); close();
-      } catch (x) { toast(x.message, true); }
-    });
+    coverPicker({ title: "Нүүр зургийн загвар", lead: "120 загвар (салбар бүрээр, 20 хөдөлгөөнт) — профайлын нүүр зураг болгоно. Өөрийн зураг оруулахыг хүсвэл «Нүүр зураг солих».", current: cur.startsWith("/static/covers/") ? cur.slice(15, -4) : "", onPick: async (id) => {
+      const src = "/static/covers/" + id + ".svg", box = $("#pfCover");
+      await save({ cover_url: src });
+      $("img.pf-cover-img", box)?.remove(); box.insertAdjacentHTML("afterbegin", `<img class="pf-cover-img" src="${esc(src)}" alt="" style="object-position:50% 50%">`);
+      toast("Нүүр зураг солигдлоо ✓");
+    } });
   }));
 
   // «Профайл засах»: мэдээлэл, профайлын холбоос, зөвлөмж — бүгд нэг цонхонд (тусдаа «Тохиргоо» хэсэг байхгүй).
@@ -5782,7 +5796,7 @@ function mountA11y() {
 // Бүх хуудсанд (зүүн доод буланд); iframe дотор (хичээлд суулгасан хуудас) давхардуулахгүй.
 if (window.self === window.top) mountA11y();
 
-window.SG = { THREAD_EVENTS, panelIn, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, apiList, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
+window.SG = { coverPicker, THREAD_EVENTS, panelIn, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, apiList, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх
