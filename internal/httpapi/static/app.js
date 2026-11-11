@@ -5387,50 +5387,32 @@ function findCourses() {
 function loginPage() {
   const q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.slice(1));
   const err = $("#authError");
-  // Багш студи рүү, суралцагч бүх зүйл нь байрлах нүүр хуудас руу очно.
-  const home = (u) => (u?.role === "teacher" ? (u.username ? "/t/" + u.username : "/me") : "/");
+  // Нэвтэрсний дараа өөрийн студи руу.
+  const home = (u) => (u?.username ? "/t/" + u.username : "/me");
   const next = (u) => { const n = h.get("next") || q.get("next") || home(u); return n.startsWith("/") && !n.startsWith("//") && !n.startsWith("/\\") ? n : home(u); };
   // OAuth-оос буцаж ирсэн
-  $$(".rc-ico[data-i]").forEach((e) => (e.innerHTML = icon(e.dataset.i, 30)));
-  const roleStep = $("#roleStep"), roleChosen = $("#roleChosen"), tabs = $(".tabs"), lf = $("#loginForm"), rf = $("#registerForm");
+  const tabs = $(".tabs"), lf = $("#loginForm"), rf = $("#registerForm");
   if (h.get("token")) {
-    const tok = h.get("token"), ask = h.get("ask") === "role";
+    const tok = h.get("token");
     history.replaceState(null, "", location.pathname);
-    api("/api/me", { token: tok }).then((u) => {
-      Auth.set(tok, u);
-      if (!ask) return location.replace(next(u));
-      // Google/Facebook-ээр шинээр орсон: багш уу, суралцагч уу гэдгийг асуугаад тохирох хэсэг рүү.
-      tabs.hidden = true; lf.hidden = true; $("#social").hidden = true; $(".divider").hidden = true; $(".auth-legal").hidden = true;
-      $(".role-q b", roleStep).textContent = `Тавтай морил${u.display_name ? ", " + u.display_name.split(" ")[0] : ""}! Та хэн бэ?`;
-      roleStep.hidden = false;
-      roleStep.onclick = async (e) => {
-        const c = e.target.closest("[data-role]"); if (!c) return;
-        $$(".role-card", roleStep).forEach((x) => { x.disabled = true; x.classList.toggle("on", x === c); });
-        try { const d = await api("/api/me/role", { method: "POST", body: { role: c.dataset.role }, token: tok }); Auth.set(d.token, d.user); location.replace(home(d.user)); }
-        catch (x) { err.textContent = x.message; $$(".role-card", roleStep).forEach((y) => (y.disabled = false)); }
-      };
-    }).catch((e) => (err.textContent = e.message));
+    api("/api/me", { token: tok }).then((u) => { Auth.set(tok, u); location.replace(next(u)); }).catch((e) => (err.textContent = e.message));
     return;
   }
   if (h.get("error")) err.textContent = h.get("error");
-  // Бүртгүүлэх: эхлээд багш уу, суралцагч уу гэдгийг сонгуулна; нэвтрэхэд төрөл асуухгүй.
-  let role = ["teacher", "student"].includes(q.get("role")) ? q.get("role") : "", tab = "login", forgotOn = false;
+  // Багш/суралцагч гэж ялгахгүй: бүртгүүлсэн хүн бүр багш болно (?role=teacher → «Бүртгүүлэх» таб нээнэ).
+  const role = "teacher";
+  let tab = "login", forgotOn = false;
   const sync = () => {
     if (forgotOn) return; // «Нууц үгээ мартсан» нээлттэй үед (жишээ нь /login#forgot) товчнууд ачаалагдсаны дараа хаагдахгүй
-    const reg = tab === "register", needRole = reg && !role;
-    roleStep.hidden = !needRole; roleChosen.hidden = !reg || !role;
-    if (role) $("span", roleChosen).innerHTML = `${icon(role === "teacher" ? "teacher" : "courses", 18)}<b>${role === "teacher" ? "Багш" : "Суралцагч"}</b>аар бүртгүүлж байна`;
-    $$(".role-card", roleStep).forEach((c) => { const on = c.dataset.role === role; c.classList.toggle("on", on); c.setAttribute("aria-checked", on); });
-    lf.hidden = reg; rf.hidden = !reg || needRole; $("#forgotForm").hidden = true;
-    $("#social").hidden = needRole; $(".divider").hidden = needRole || !providers.length;
+    const reg = tab === "register";
+    lf.hidden = reg; rf.hidden = !reg; $("#forgotForm").hidden = true;
+    $("#social").hidden = false; $(".divider").hidden = !providers.length;
     renderSocial(providers);
   };
   $$(".tab").forEach((t) => t.addEventListener("click", () => {
     $$(".tab").forEach((x) => x.classList.toggle("active", x === t));
     tabs.dataset.active = tab = t.dataset.tab; err.textContent = ""; sync();
   }));
-  roleStep.addEventListener("click", (e) => { const c = e.target.closest("[data-role]"); if (!c || h.get("token")) return; role = c.dataset.role; sync(); (rf.email || rf).focus?.(); });
-  roleChosen.addEventListener("click", (e) => { if (e.target.closest("[data-role-change]")) { role = ""; sync(); } });
   // Нэвтрэх товчны таних тэмдгүүд (үйлчилгээ тус бүрийн албан ёсны өнгөөр).
   const GOOGLE_G = `<svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#EA4335" d="M24 9.500c3.540 0 6.710 1.220 9.210 3.600l6.850-6.850C35.900 2.380 30.470 0 24 0 14.620 0 6.510 5.380 2.560 13.220l7.980 6.190C12.430 13.720 17.740 9.500 24 9.500z"/><path fill="#4285F4" d="M46.980 24.550c0-1.570-.150-3.090-.380-4.550H24v9.020h12.940c-.580 2.960-2.260 5.480-4.780 7.180l7.730 6c4.510-4.180 7.090-10.360 7.090-17.650z"/><path fill="#FBBC05" d="M10.530 28.590c-.480-1.450-.760-2.990-.760-4.590s.270-3.140.760-4.590l-7.980-6.190C.920 16.460 0 20.120 0 24c0 3.880.920 7.540 2.560 10.780l7.970-6.190z"/><path fill="#34A853" d="M24 48c6.480 0 11.930-2.130 15.890-5.810l-7.730-6c-2.150 1.450-4.920 2.300-8.160 2.300-6.260 0-11.570-4.220-13.470-9.910l-7.980 6.190C6.510 42.620 14.620 48 24 48z"/></svg>`;
   const FACEBOOK_F = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#1877F2"/><path fill="#fff" d="M16.500 15.500l.500-3.500h-3.300V9.800c0-1 .500-1.900 2-1.900H17V5c-.300 0-1.300-.200-2.500-.200-2.600 0-4.200 1.600-4.200 4.400V12H7.500v3.500h2.800V24h3.400v-8.500z"/></svg>`;
@@ -5442,7 +5424,7 @@ function loginPage() {
   // товчийг дарахад алдааны хуудас биш, жинхэнэ хөтөчөөр нээх заавар гаргана.
   const inApp = /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Messenger/i.test(navigator.userAgent);
   const renderSocial = (ps) => {
-    const nx = h.get("next") || q.get("next") || "", rl = tab === "register" ? role : ""; // нэвтрэх: шинэ хэрэглэгчээс дараа нь асууна
+    const nx = h.get("next") || q.get("next") || "", rl = role;
     social.innerHTML = ps.map((p) => {
       const [ic, name] = icons[p.name] || [`<span class="social-ico" style="background:#555">•</span>`, p.label];
       const u = `${p.url}?${new URLSearchParams({ ...(rl ? { role: rl } : {}), ...(nx ? { next: nx } : {}) })}`;
@@ -5464,7 +5446,7 @@ function loginPage() {
   // Серверт урьдчилан зурсан товчнуудаас (login.html) — эхний sync() тэдгээрийг арилгаж маягтыг үсрүүлэхгүй.
   let providers = $$(".btn-social[data-p]", social).map((a) => ({ name: a.dataset.p, label: a.dataset.label, url: a.getAttribute("href") }));
   api("/api/auth/providers", { token: null }).then((ps) => { providers = ps; sync(); }).catch(() => sync());
-  if (role) $$(".tab")[1].click(); else sync();
+  if (q.get("role") || q.get("tab") === "register") $(".tab")[1].click(); else sync();
   const done = (d) => { Auth.set(d.token, d.user); location.href = next(d.user); };
   lf.addEventListener("submit", async (e) => {
     e.preventDefault(); err.textContent = "";
@@ -5483,7 +5465,7 @@ function loginPage() {
   const showForgot = (on) => {
     ff.hidden = !on; tabs.hidden = on; err.textContent = ""; forgotOn = on;
     if (!on) { sync(); return; }
-    lf.hidden = true; rf.hidden = true; roleStep.hidden = true; roleChosen.hidden = true; $("#social").hidden = true; $(".divider").hidden = true;
+    lf.hidden = true; rf.hidden = true; $("#social").hidden = true; $(".divider").hidden = true;
     ff.email.value = lf.email.value; (fgMode === "phone" ? ff.phone : ff.email).focus();
     newCaptcha();
   };
@@ -5548,7 +5530,6 @@ function loginPage() {
   rf.addEventListener("submit", async (e) => {
     e.preventDefault(); err.textContent = "";
     if (!checkMatch()) { err.textContent = "Нууц үг таарахгүй байна"; rf.password2.focus(); return; }
-    if (!role) { err.textContent = "Эхлээд багш уу, суралцагч уу гэдгээ сонгоно уу"; return sync(); }
     const body = { email: rf.email.value, password: rf.password.value, role, accept_terms: rf.accept.checked };
     try { done(await api("/api/auth/register", { method: "POST", body, token: null })); } catch (x) { err.textContent = x.message; }
   });
@@ -5617,7 +5598,7 @@ function resetPage() {
     try {
       const d = await api("/api/auth/reset", { method: "POST", body: { token: tok, password: f.password.value }, token: null });
       Auth.set(d.token, d.user); toast("Нууц үг солигдлоо ✓");
-      setTimeout(() => (location.href = d.user.role === "teacher" && d.user.username ? "/t/" + d.user.username : "/"), 600);
+      setTimeout(() => (location.href = d.user.username ? "/t/" + d.user.username : "/me"), 600);
     } catch (x) { err.innerHTML = `${esc(x.message)} <a href="/login#forgot">Дахин хүсэлт илгээх</a>`; b.disabled = false; }
   });
 }
@@ -5779,8 +5760,8 @@ splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх
   const u = Auth.user, h = location.hash;
   if (!Auth.token) location.replace("/login?next=" + encodeURIComponent("/me" + h));
-  else if (u?.role === "teacher" && u.username) location.replace("/t/" + u.username + h);
-  else api("/api/me").then((me) => { Auth.set(Auth.token, me); location.replace(me.role === "teacher" ? "/t/" + me.username + h : "/" + h); }).catch(() => location.replace("/login"));
+  else if (u?.username) location.replace("/t/" + u.username + h);
+  else api("/api/me").then((me) => { Auth.set(Auth.token, me); location.replace("/t/" + me.username + h); }).catch(() => location.replace("/login"));
 }
 // Интро (Three.js робот): анх орох үед нэг удаа, эсвэл ?intro=1. WebGL байхгүй, хөдөлгөөн багасгах тохиргоотой бол гарахгүй.
 if (page === "home") {

@@ -95,30 +95,6 @@ func TestMediaNotesAndStories(t *testing.T) {
 	}
 }
 
-// Шинэ хэрэглэгч (Google-ээр «Нэвтрэх»-ээс орсон) багш эсвэл суралцагч болохоо сонгоно; агуулгатай багш суралцагч болохгүй.
-func TestSetRole(t *testing.T) {
-	srv, _ := newTestServer(t)
-	defer srv.Close()
-	tok, _ := register(t, srv, "newbie", "student")
-	if code, _ := call(t, srv, "POST", "/api/me/role", tok, `{"role":"admin"}`); code != 400 {
-		t.Fatalf("буруу төрөл: %d", code)
-	}
-	code, r := call(t, srv, "POST", "/api/me/role", tok, `{"role":"teacher"}`)
-	if code != 200 || r["user"].(map[string]any)["role"] != "teacher" || r["token"] == "" {
-		t.Fatalf("багш болох: %d %v", code, r)
-	}
-	tt := r["token"].(string)
-	if code, _ := call(t, srv, "POST", "/api/courses", tt, `{"title":"Анхны сургалт","price":0}`); code != 201 && code != 200 {
-		t.Fatalf("шинэ токеноор багшийн эрх: %d", code)
-	}
-	if code, _ := call(t, srv, "POST", "/api/me/role", tt, `{"role":"student"}`); code != 409 {
-		t.Fatalf("сургалттай багш суралцагч болох ёсгүй: %d", code)
-	}
-	if code, _ := call(t, srv, "POST", "/api/me/role", "", `{"role":"teacher"}`); code != 401 {
-		t.Fatalf("нэвтрээгүй: %d", code)
-	}
-}
-
 // Кирилл нэртэй хувийн файлын гарын үсэгтэй холбоос: IIS кодчилолыг өөрчилж дамжуулсан ч (жижиг үсгийн %xx,
 // давхар кодлолт) нээгдэнэ; буруу гарын үсэг татгалзагдана.
 func TestSignedFileEncodings(t *testing.T) {

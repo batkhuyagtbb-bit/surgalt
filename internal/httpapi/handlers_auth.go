@@ -35,7 +35,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		Username    string `json:"username"`
 		Email       string `json:"email"`
 		Password    string `json:"password"`
-		Role        string `json:"role"`
+		Role        string `json:"role"` // хуучин клиентүүд илгээж болно — үл тоомсорлоно (бүртгэл бүр багш)
 		DisplayName string `json:"display_name"`
 		AcceptTerms bool   `json:"accept_terms"` // нөхцөл, нууцлалын бодлогыг зөвшөөрсөн (заавал)
 	}
@@ -60,10 +60,8 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "үйлчилгээний нөхцөл, нууцлалын бодлогыг зөвшөөрнө үү")
 		return
 	}
-	role := store.RoleStudent
-	if in.Role == string(store.RoleTeacher) {
-		role = store.RoleTeacher
-	}
+	// Төрөл сонгуулахгүй: бүртгэл бүр багш (суралцах эрх нь хэвээр).
+	role := store.RoleTeacher
 	base := in.Username
 	if auto {
 		base = usernameBase(oauth.Identity{Email: in.Email})
@@ -120,6 +118,28 @@ func (s *Server) issue(w http.ResponseWriter, status int, u *store.User) {
 	writeJSON(w, status, authResp{Token: tok, User: s.me(u)})
 }
 
+// asTeacher: нэвтэрсэн хүн бүр багшийн эрхээр орно — хуучин «суралцагч» бүртгэлийг нэвтрэх үед нь багш болгоно
+// (сурсан хичээл, худалдан авалт хэвээр; студи, файлын сан нэмэгдэнэ). Алдаа гарвал хуучин төрлөөр нь нэвтрүүлнэ.
+func (s *Server) asTeacher(r *http.Request, u *store.User) *store.User {
+	if u.Role != store.RoleStudent {
+		return u
+	}
+	now := time.Now()
+	nu, err := s.store.UpdateUser(r.Context(), u.ID, func(x *store.User) error {
+		x.Role = store.RoleTeacher
+		if x.Plan.TrialFrom == nil { // үнэгүй хугацаа багш болсон өдрөөс (admin_role.go-тэй ижил)
+			x.Plan.TrialFrom = &now
+		}
+		return nil
+	})
+	if err != nil {
+		s.log.Error("суралцагчийг багш болгох", "err", err, "user", u.ID)
+		return u
+	}
+	s.onUserCreated(nu)
+	return nu
+}
+
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !s.authLim.Allow(s.clientIP(r)) {
 		writeErr(w, http.StatusTooManyRequests, "хэт олон оролдлого")
@@ -149,7 +169,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnauthorized, "имэйл эсвэл нууц үг буруу")
 		return
 	}
-	s.issue(w, http.StatusOK, u)
+	s.issue(w, http.StatusOK, s.asTeacher(r, u))
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
@@ -347,62 +367,6 @@ func (s *Server) handleUpdateUsername(w http.ResponseWriter, r *http.Request) {
 }
 
 // onUserCreated: багш бол түүний файлын сангийн хавтсыг үүсгэнэ.
-// roleChangeWindow — шинэ хэрэглэгч бүртгэлийнхээ төрлийг (багш / суралцагч) сонгох хугацаа.
-const roleChangeWindow = 24 * time.Hour
-
-// handleSetRole: POST /api/me/role {"role":"teacher"|"student"} — Google/Facebook-ээр шинээр орсон (төрлөө
-// сонгоогүй) хэрэглэгч багш эсвэл суралцагч болохоо сонгоно. Зөвхөн бүртгүүлснээс хойш 24 цагт; сургалт, ном
-// оруулсан багш суралцагч болохгүй. Шинэ токен буцаана (токенд төрөл бичигддэг).
-func (s *Server) handleSetRole(w http.ResponseWriter, r *http.Request) {
-	c, ok := s.requireUser(w, r)
-	if !ok {
-		return
-	}
-	var in struct {
-		Role string `json:"role"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	role := store.Role(in.Role)
-	if role != store.RoleTeacher && role != store.RoleStudent {
-		writeErr(w, http.StatusBadRequest, "төрөл буруу")
-		return
-	}
-	u, err := s.store.UserByID(r.Context(), c.UID)
-	if s.storeErr(w, r, err) {
-		return
-	}
-	if u.Role == role {
-		s.issue(w, http.StatusOK, u)
-		return
-	}
-	if time.Since(u.CreatedAt) > roleChangeWindow {
-		writeErr(w, http.StatusConflict, "бүртгэлийн төрлийг зөвхөн шинээр бүртгүүлэхдээ сонгоно")
-		return
-	}
-	if u.Role == store.RoleTeacher {
-		cs, err := s.store.CoursesByTeacher(r.Context(), u.ID, false)
-		if s.storeErr(w, r, err) {
-			return
-		}
-		bs, err := s.store.BooksByTeacher(r.Context(), u.ID, false)
-		if s.storeErr(w, r, err) {
-			return
-		}
-		if len(cs) > 0 || len(bs) > 0 {
-			writeErr(w, http.StatusConflict, "сургалт, ном оруулсан тул суралцагч болох боломжгүй")
-			return
-		}
-	}
-	u, err = s.store.UpdateUser(r.Context(), u.ID, func(x *store.User) error { x.Role = role; return nil })
-	if s.storeErr(w, r, err) {
-		return
-	}
-	s.onUserCreated(u)
-	s.issue(w, http.StatusOK, u)
-}
-
 func (s *Server) onUserCreated(u *store.User) {
 	if u.Role == store.RoleTeacher {
 		if err := s.files.EnsureTeacherDir(u.ID); err != nil {

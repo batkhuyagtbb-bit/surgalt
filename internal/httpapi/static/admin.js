@@ -197,7 +197,7 @@ VIEWS.overview = {
 
     <h2 class="adm-h">Хэрэглэгч ба орлого</h2>
     <section class="kp-grid">
-      ${kpi("Нийт хэрэглэгч", num(U.total), `${num(U.teacher || 0)} багш · ${num(U.student || 0)} суралцагч`)}
+      ${kpi("Нийт хэрэглэгч", num(U.total), "")}
       ${kpi("Шинэ бүртгэл", num(U.today || 0) + " <small>өнөөдөр</small>", `7 хоногт ${num(U.week || 0)} · 30 хоногт ${num(U.month || 0)}`)}
       ${kpi("Орлого (өнөөдөр)", tg(I.today.total), `7 хоногт ${tg(I.week.total)} · 30 хоногт ${tg(I.month.total)}`, "good")}
       ${kpi("Нийт орлого", tg(I.all.total), `${num(I.all.count)} гүйлгээ · хураамж ${tg(I.fees?.total)} · хүлээгдэж буй ${num(I.pending.count)}`)}
@@ -480,67 +480,6 @@ async function openTeacher(id) {
     $$(".dr-tabs button", body).forEach((x) => x.classList.toggle("on", x === b));
     $(".dr-pane", body).innerHTML = panes[b.dataset.tab];
   });
-}
-
-/* ---------- Суралцагчид ---------- */
-VIEWS.students = {
-  title: "Суралцагчид", sub: "Бүх суралцагч, элсэлт ба зарцуулсан дүн — мөрөн дээр дарж дэлгэрэнгүйг харна",
-  async render(tools, el, live) {
-    tools.innerHTML = seg("sf", [["all", "Бүгд"], ["paying", "Төлбөр төлсөн"], ["enrolled", "Элссэн"], ["idle", "Элсээгүй"]], "all") +
-      `<label class="adm-search">${ic("search", 16)}<input type="search" placeholder="Нэр, имэйл, @нэр" aria-label="Суралцагч хайх"></label>`;
-    const d = await api("/api/admin/students");
-    if (!live()) return;
-    const all = d.students, month = Date.now() - 30 * 864e5;
-    const paying = all.filter((s) => s.spent > 0);
-    el.innerHTML = `
-    <section class="kp-grid">
-      ${kpi("Нийт суралцагч", num(all.length), `30 хоногт ${num(all.filter((s) => new Date(s.created_at) >= month).length)} шинэ`)}
-      ${kpi("Элссэн", num(all.filter((s) => s.courses || s.lessons).length), `${pct(all.filter((s) => s.courses || s.lessons).length, all.length)}% нь сургалтад элссэн`)}
-      ${kpi("Төлбөр төлсөн", num(paying.length), `${pct(paying.length, all.length)}% нь худалдан авалт хийсэн`, "good")}
-      ${kpi("Нийт зарцуулсан", tg(paying.reduce((n, s) => n + s.spent, 0)), paying.length ? `нэг хүнд дунджаар ${tg(Math.round(paying.reduce((n, s) => n + s.spent, 0) / paying.length))}` : "")}
-    </section>
-    <div class="adm-table-wrap"><table class="adm-table" id="sTable"><thead><tr>
-      <th data-sort="name" data-type="text">Суралцагч</th><th data-sort="courses">Сургалт</th><th data-sort="lessons">Хичээл</th><th data-sort="teachers">Багш</th>
-      <th data-sort="orders">Худалдан авалт</th><th data-sort="spent">Зарцуулсан</th><th data-sort="last_paid_at" data-type="text">Сүүлд төлсөн</th><th data-sort="created_at" data-type="text">Бүртгүүлсэн</th>
-    </tr></thead><tbody></tbody></table></div>`;
-    const row = (s) => `<tr data-student="${esc(s.id)}" tabindex="0">
-      <td><span class="adm-person">${avatar(s.name || s.username)}<span><b>${esc(s.name || s.username)}</b><small>@${esc(s.username)}${s.email ? " · " + esc(s.email) : ""}</small></span></span></td>
-      <td class="n">${num(s.courses)}</td><td class="n">${num(s.lessons)}</td><td class="n">${num(s.teachers)}</td><td class="n">${num(s.orders)}</td>
-      <td class="n"><b>${tg(s.spent)}</b></td><td>${s.last_paid_at ? dd(s.last_paid_at) : "—"}</td><td>${dd(s.created_at)}</td></tr>`;
-    const tbl = sortable($("#sTable"), all, row);
-    let f = "all", q = "";
-    const apply = () => tbl.set(all.filter((s) => (f === "all" || (f === "paying" && s.spent > 0) || (f === "enrolled" && (s.courses || s.lessons)) || (f === "idle" && !s.courses && !s.lessons))
-      && (!q || `${s.name} ${s.username} ${s.email}`.toLowerCase().includes(q))));
-    tools.onclick = ((e) => { const b = e.target.closest("[data-seg=sf] button"); if (!b) return; f = b.dataset.val; $$("[data-seg=sf] button", tools).forEach((x) => x.classList.toggle("on", x === b)); apply(); });
-    $("input", tools).addEventListener("input", (e) => { q = e.target.value.trim().toLowerCase(); apply(); });
-  },
-};
-
-async function openStudent(id) {
-  const body = drawer("Суралцагч", `<div class="adm-loading"><i></i><i></i><i></i></div>`);
-  let d; try { d = await api("/api/admin/students/" + encodeURIComponent(id)); } catch (x) { body.innerHTML = empty(x.message); return; }
-  const s = d.student;
-  $("#admDrawerTitle").textContent = s.name || s.username;
-  body.innerHTML = `
-    <div class="dr-head">${avatar(s.name || s.username)}<div><b>${esc(s.name || s.username)}</b><small>@${esc(s.username)} · ${esc(s.email || "имэйлгүй")}${d.profile.phone ? " · " + esc(d.profile.phone) : ""}</small><small>Бүртгүүлсэн ${dt(s.created_at)}</small></div></div>
-    <section class="kp-grid small">
-      ${kpi("Сургалт", num(s.courses), `${num(s.lessons)} хичээл тусад нь`)}
-      ${kpi("Багш", num(s.teachers))}
-      ${kpi("Зарцуулсан", tg(s.spent), `${num(s.orders)} худалдан авалт`, "good")}
-    </section>
-    <div class="dr-acts"><button type="button" class="btn btn-gold btn-sm" data-make-teacher>🎓 Багш болгох</button><small>Суралцсан түүх, элсэлт хэвээр үлдэж, багшийн студи, профайл нээгдэнэ.</small></div>
-    <h3 class="dr-h">Элсэлт</h3>
-    ${d.enrollments.length ? `<div class="adm-table-wrap"><table class="adm-table mini"><thead><tr><th>Сургалт</th><th>Багш</th><th>Огноо</th></tr></thead><tbody>${d.enrollments.map((e) =>
-      `<tr><td><a class="link" href="/c/${esc(e.course_id)}" target="_blank" rel="noopener">${esc(e.course || "—")}</a><small>${e.lesson ? "Нэг хичээл" : "Бүтэн сургалт"}</small></td><td>${who(e.teacher)}</td><td>${dd(e.at)}</td></tr>`).join("")}</tbody></table></div>` : empty("Элсэлт алга")}
-    <h3 class="dr-h">Захиалга, төлбөр</h3>
-    ${d.orders.length ? `<div class="adm-table-wrap"><table class="adm-table mini"><thead><tr><th>Огноо</th><th>Юу</th><th>Багш</th><th>Дүн</th><th>Төлөв</th></tr></thead><tbody>${d.orders.map((o) =>
-      `<tr><td>${dt(o.paid_at || o.created_at)}</td><td>${esc(o.title || "—")}<small>${esc(o.kind_label)}</small></td><td>${who(o.teacher)}</td><td class="n"><b>${tg(o.amount)}</b></td><td>${chip(o.status)}</td></tr>`).join("")}</tbody></table></div>` : empty("Захиалга алга")}`;
-  $("[data-make-teacher]", body).onclick = async (e) => {
-    if (!confirm(`«${s.name || s.username}»-г багш болгох уу?\nТэр сургалт, ном нийтэлж, суралцагчидтай ажиллах боломжтой болно.`)) return;
-    const b = e.currentTarget; b.disabled = true;
-    try { await api(`/api/admin/students/${encodeURIComponent(id)}/make-teacher`, { method: "POST" }); toast("Багш болголоо ✓"); route(); openTeacher(id); }
-    catch (x) { toast(x.message, true); b.disabled = false; }
-  };
 }
 
 /* ---------- Гүйлгээ ---------- */
@@ -839,7 +778,7 @@ function init() {
     if (e.target.closest("[data-close]")) { closeDrawer(); return; }
     if (e.target.closest("a, button, input, select, label")) return;
     const t = e.target.closest("[data-teacher]"), s = e.target.closest("[data-student]");
-    if (t) openTeacher(t.dataset.teacher); else if (s) openStudent(s.dataset.student);
+    if (t) openTeacher(t.dataset.teacher); else if (s) openTeacher(s.dataset.student);
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeDrawer();

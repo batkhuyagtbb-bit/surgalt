@@ -97,28 +97,3 @@ func TestBookReadOrDownload(t *testing.T) {
 	}
 }
 
-// Хянагч суралцагчийг багш болгоно: хуучин токеноор ч багшийн API ажиллана.
-func TestAdminMakeTeacher(t *testing.T) {
-	srv, _ := newTestServerWith(t, func(c *Config) { c.AdminEmails = []string{"boss@x.mn"} })
-	defer srv.Close()
-	boss, _ := register(t, srv, "boss", "student")
-	s1, sid := register(t, srv, "learner", "student")
-	if code, _ := call(t, srv, "GET", "/api/me/books", s1, ""); code != http.StatusForbidden {
-		t.Fatalf("суралцагч багшийн API: %d", code)
-	}
-	if code, _ := call(t, srv, "POST", "/api/admin/students/"+sid+"/make-teacher", s1, ""); code != http.StatusForbidden && code != http.StatusUnauthorized {
-		t.Fatalf("хянагч биш: %d", code)
-	}
-	if code, r := call(t, srv, "POST", "/api/admin/students/"+sid+"/make-teacher", boss, ""); code != 200 || r["role"] != "teacher" {
-		t.Fatalf("багш болгох: %d %v", code, r)
-	}
-	if code, _ := call(t, srv, "POST", "/api/admin/students/"+sid+"/make-teacher", boss, ""); code != http.StatusConflict {
-		t.Fatalf("дахин: %d", code)
-	}
-	if code, _ := call(t, srv, "GET", "/api/me/books", s1, ""); code != 200 {
-		t.Fatalf("хуучин токеноор багшийн API: %d", code)
-	}
-	if code, r := call(t, srv, "POST", "/api/courses", s1, `{"title":"Шинэ багшийн сургалт","price":0}`); code != 201 && code != 200 {
-		t.Fatalf("шинэ багш сургалт үүсгэх: %d %v", code, r)
-	}
-}

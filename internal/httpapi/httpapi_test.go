@@ -36,7 +36,8 @@ func newTestStore(t *testing.T) store.Store {
 	t.Helper()
 	dsn := os.Getenv("SURGALT_TEST_CLICKHOUSE_DSN")
 	if dsn == "" {
-		return store.NewMemory()
+		testStore = store.NewMemory()
+		return testStore
 	}
 	u, err := url.Parse(dsn)
 	if err != nil {
@@ -122,8 +123,7 @@ func TestPurchaseFlow(t *testing.T) {
 	_, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Төлбөртэй"}`)
 	lid := l["id"].(string)
 
-	_, sr := call(t, srv, "POST", "/api/auth/register", "", `{"username":"stud","email":"s@x.mn","password":"password1","accept_terms":true}`)
-	st := sr["token"].(string)
+	st, _ := register(t, srv, "stud", "student")
 	if code, _ := call(t, srv, "GET", "/api/courses/"+cid+"/lessons/"+lid, st, ""); code != http.StatusPaymentRequired {
 		t.Fatalf("402 хүлээсэн, %d", code)
 	}
@@ -184,7 +184,12 @@ func register(t *testing.T, srv *httptest.Server, username, role string) (token,
 	if code != http.StatusCreated {
 		t.Fatalf("бүртгэл %s: %d %v", username, code, r)
 	}
-	return r["token"].(string), r["user"].(map[string]any)["id"].(string)
+	u := r["user"].(map[string]any)
+	id, token = u["id"].(string), r["token"].(string)
+	if tk := asRole(t, id, u["username"].(string), role); tk != "" {
+		token = tk
+	}
+	return token, id
 }
 
 // Нүүр хуудасны самбар: элссэн сургалт, дангаар авсан хичээл, төлөгдөөгүй захиалга,

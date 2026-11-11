@@ -29,8 +29,8 @@
       <div class="find-chips landing" aria-label="Түгээмэл хайлт" hidden><span class="muted small">Түгээмэл:</span>
         <button type="button" data-q="Математик">Математик</button><button type="button" data-q="ЭЕШ">ЭЕШ</button><button type="button" data-q="Англи хэл">Англи хэл</button><button type="button" data-q="Геометр">Геометр</button><button type="button" data-q="Логик">Логик</button></div>
       <div class="home-cta landing">
-        <a class="btn btn-gold btn-lg" href="/login?role=teacher">Багшаар эхлэх</a>
-        <a class="btn btn-glass btn-lg" href="/login">Суралцагчаар нэвтрэх</a>
+        <a class="btn btn-gold btn-lg" href="/login?tab=register">Үнэгүй эхлэх</a>
+        <a class="btn btn-glass btn-lg" href="/login">Нэвтрэх</a>
       </div>
       <ul class="home-trust landing" aria-label="Давуу тал"><li>{{icon "check" 16}}Бүртгэл үнэгүй</li><li>{{icon "qr" 16}}QPay-ээр төлнө</li><li>{{icon "shield" 16}}Хяналттай орчин</li></ul>
     </div>
@@ -192,7 +192,7 @@
             <p class="pr-store">{{icon "layers" 15}}<b>{{.Storage}}</b> файлын сан</p>
           </article>{{end}}
         </div>
-        <a class="btn btn-gold pr-cta" href="/login?role=teacher" data-auth-hide>Багшаар үнэгүй эхлэх</a>
+        <a class="btn btn-gold pr-cta" href="/login?tab=register" data-auth-hide>Үнэгүй эхлэх</a>
       </div>
       <div class="pr-group">
         <div class="pr-ghead"><span class="pr-gic org">{{icon "users" 20}}</span><div><h3>Байгууллага</h3><p>Сургууль, сургалтын төв: олон багш, мэргэжлийн хөтөлбөр, удирдагч · гүйлгээний шимтгэл <b>{{.OrgFee}}%</b> · үнэ суралцагч (хүүхдийн) тооноос хамаарна</p></div></div>
@@ -248,7 +248,7 @@
 </main>
 <footer class="footer footer-x">
   <div class="fx-brand"><a class="fx-logo" href="/">surgalt<b>.mn</b></a><p>Сур, сур, бас дахин сур — багш, суралцагчдын платформ.</p>{{with .Contact}}<a href="mailto:{{.}}">{{.}}</a>{{end}}</div>
-  <nav class="fx-col" aria-label="Бүртгэл"><b>Бүртгэл</b><a href="/login" data-auth-hide>Нэвтрэх</a><a href="/#pricing">Үнэ</a><a href="/login?role=teacher" data-auth-hide>Багшаар бүртгүүлэх</a><a href="/me" data-auth-show hidden>Миний хуудас</a></nav>
+  <nav class="fx-col" aria-label="Бүртгэл"><b>Бүртгэл</b><a href="/login" data-auth-hide>Нэвтрэх</a><a href="/#pricing">Үнэ</a><a href="/login?tab=register" data-auth-hide>Бүртгүүлэх</a><a href="/me" data-auth-show hidden>Миний хуудас</a></nav>
   <nav class="fx-col" aria-label="Хууль"><b>Хууль</b><a href="/privacy">Нууцлалын бодлого</a><a href="/terms">Үйлчилгээний нөхцөл</a></nav>
   <p class="fx-copy">© 2026 surgalt.mn · Бүх эрх хуулиар хамгаалагдсан</p>
 </footer>

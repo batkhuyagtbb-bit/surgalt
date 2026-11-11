@@ -174,5 +174,5 @@ func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {
 	s.alive.Delete(u.ID)
 	s.notify(ctx, &store.Notification{UserID: u.ID, Type: NotifAccount, Link: "/privacy#my-data",
 		Title: "🔒 Нууц үг тань солигдлоо", Body: "Бусад төхөөрөмж дээрх нэвтрэлт хаагдлаа. Хэрэв та биш бол бидэнтэй яаралтай холбогдоно уу."})
-	s.issue(w, http.StatusOK, u)
+	s.issue(w, http.StatusOK, s.asTeacher(r, u))
 }

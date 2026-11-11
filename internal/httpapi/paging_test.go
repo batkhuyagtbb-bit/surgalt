@@ -25,7 +25,11 @@ func registerFrom(t *testing.T, srvURL, username, role string, n int) (string, s
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("бүртгэл %s: %d %v", username, res.StatusCode, r)
 	}
-	return r["token"].(string), r["user"].(map[string]any)["id"].(string)
+	u, tok := r["user"].(map[string]any), r["token"].(string)
+	if tk := asRole(t, u["id"].(string), u["username"].(string), role); tk != "" {
+		tok = tk
+	}
+	return tok, u["id"].(string)
 }
 
 // listCall — хуудасласан жагсаалт: массив бие + X-Total-Count толгой.

@@ -7,15 +7,7 @@
       <button class="tab" data-tab="register" role="tab">Бүртгүүлэх</button>
       <span class="tab-ink"></span>
     </div>
-    <div class="role-step" id="roleStep" hidden>
-      <p class="role-q" id="roleQ"><b>Та хэн бэ?</b><small>Сонголтоос хамаарч таны хэсэг шууд бэлэн болно</small></p>
-      <div class="role-cards" role="radiogroup" aria-labelledby="roleQ">
-        <button type="button" class="role-card" data-role="student" role="radio" aria-checked="false"><span class="rc-ico" data-i="courses" aria-hidden="true"></span><b>Суралцагч</b><small>Хичээл үзэж, даалгавар, шалгалт өгч, цол ахиулна</small></button>
-        <button type="button" class="role-card" data-role="teacher" role="radio" aria-checked="false"><span class="rc-ico" data-i="teacher" aria-hidden="true"></span><b>Багш</b><small>Сургалт, ном оруулж, ангиа удирдаж орлого олно</small></button>
-      </div>
-    </div>
-    <div class="role-chosen" id="roleChosen" hidden><span></span><button type="button" data-role-change>Солих</button></div>
-    {{/* Товчнууд серверт урьдчилан (app.js дүрсийг нь нэмж, role/next-ийг холбоосонд оруулна) — хожуу нэмэгдэж маягт үсрэхгүй */}}
+    {{/* Багш/суралцагч гэж ялгахгүй — бүртгүүлсэн хүн бүр багш (суралцах эрхтэй). Товчнууд серверт урьдчилан (app.js дүрсийг нь нэмж, role/next-ийг холбоосонд оруулна) — хожуу нэмэгдэж маягт үсрэхгүй */}}
     <div class="social" id="social">{{range .Providers}}<a class="btn btn-social" href="{{.url}}" data-p="{{.name}}" data-label="{{.label}}"><svg width="20" height="20" aria-hidden="true"></svg><span>{{.short}}-ээр үргэлжлүүлэх</span></a>{{end}}</div>
     <div class="divider"{{if not .Providers}} hidden{{end}}><span>эсвэл имэйлээр</span></div>
     <form id="loginForm" class="form">

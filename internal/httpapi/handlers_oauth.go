@@ -94,11 +94,8 @@ func (s *Server) handleOAuthStart(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login#error="+url.QueryEscape("Facebook доторх хөтөч Google-ээр нэвтрэхийг зөвшөөрдөггүй. «⋯» → «Хөтчөөр нээх»-ийг дарж Chrome/Safari-д нээнэ үү, эсвэл Facebook, имэйлээр нэвтэрнэ үү."), http.StatusFound)
 		return
 	}
-	// role: «Бүртгүүлэх»-ээс сонгосон төрөл; хоосон бол («Нэвтрэх»-ээс) шинэ хэрэглэгчээс дараа нь асууна.
-	st := oauthState{State: randHex(16), Next: safeNext(r.URL.Query().Get("next"))}
-	if rl := r.URL.Query().Get("role"); rl == string(store.RoleTeacher) || rl == string(store.RoleStudent) {
-		st.Role = rl
-	}
+	// Төрөл асуухгүй: шинэ хэрэглэгч бүр багшаар бүртгэгдэнэ.
+	st := oauthState{State: randHex(16), Next: safeNext(r.URL.Query().Get("next")), Role: string(store.RoleTeacher)}
 	opts := []oauth2.AuthCodeOption{}
 	if p.PKCE {
 		st.Verifier = oauth2.GenerateVerifier()
@@ -154,23 +151,20 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		fail(p.Label + "-аас мэдээлэл авч чадсангүй")
 		return
 	}
-	u, created, err := s.loginWithIdentity(ctx, id, store.Role(st.Role))
+	u, _, err := s.loginWithIdentity(ctx, id, store.Role(st.Role))
 	if err != nil {
 		s.log.Error("oauth login", "provider", p.Name, "err", err)
 		fail("Бүртгэл үүсгэж чадсангүй")
 		return
 	}
+	u = s.asTeacher(r, u)
 	jwt, err := s.tokens.SignUser(u.ID, string(u.Role), u.Username)
 	if err != nil {
 		fail("Токен үүсгэж чадсангүй")
 		return
 	}
 	// Токеныг URL fragment-ээр дамжуулна: сервер лог, Referer-т үлдэхгүй.
-	ask := ""
-	if created && st.Role == "" {
-		ask = "&ask=role" // шинэ хэрэглэгч: багш уу, суралцагч уу гэдгийг асууна
-	}
-	http.Redirect(w, r, "/login#token="+url.QueryEscape(jwt)+"&next="+url.QueryEscape(st.Next)+ask, http.StatusFound)
+	http.Redirect(w, r, "/login#token="+url.QueryEscape(jwt)+"&next="+url.QueryEscape(st.Next), http.StatusFound)
 }
 
 var nonUser = regexp.MustCompile(`[^a-z0-9_]+`)
@@ -229,9 +223,6 @@ func (s *Server) loginWithIdentity(ctx context.Context, id oauth.Identity, role 
 			uname = base + "_" + randHex(2)
 		}
 		u = &store.User{Username: uname, Email: email, Role: role, DisplayName: name, AvatarURL: avatar}
-		if u.Role == "" { // «Нэвтрэх»-ээс шинээр орсон: эхлээд суралцагч, дараа нь төрлөө сонгоно (handleSetRole)
-			u.Role = store.RoleStudent
-		}
 		err := s.store.CreateUser(ctx, u)
 		if err == nil {
 			break

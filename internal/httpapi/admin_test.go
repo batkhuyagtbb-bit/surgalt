@@ -87,7 +87,7 @@ func TestAdminPanel(t *testing.T) {
 	if ov.Traffic.Today.Views != 3 || ov.Traffic.Today.Unique != 2 {
 		t.Fatalf("өнөөдрийн хандалт: %+v", ov.Traffic.Today)
 	}
-	for _, p := range []string{"/api/admin/teachers", "/api/admin/students", "/api/admin/transactions?status=all", "/api/admin/finance"} {
+	for _, p := range []string{"/api/admin/teachers", "/api/admin/transactions?status=all", "/api/admin/finance"} {
 		if r := do("GET", p, "", nil); r.StatusCode != 200 {
 			t.Fatalf("%s: %d", p, r.StatusCode)
 		}
