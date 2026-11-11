@@ -518,13 +518,15 @@ func (c *ClickHouse) SetUserRankLevel(ctx context.Context, userID string, level 
 
 // ---- даалгаврын хариу ----
 
-const subCols = `id, user_id, user_name, course_id, lesson_id, teacher_id, text, files, submitted_at, late, score, feedback, graded_at, links, rubric`
+const subCols = `id, user_id, user_name, course_id, lesson_id, teacher_id, text, files, submitted_at, late, score, feedback, graded_at, links, rubric, tab_switches, html`
 
 func scanSub(r driver.Rows) (Submission, error) {
 	var s Submission
 	var score *int32
 	var rubric string
-	err := r.Scan(&s.ID, &s.UserID, &s.UserName, &s.CourseID, &s.LessonID, &s.TeacherID, &s.Text, &s.Files, &s.SubmittedAt, &s.Late, &score, &s.Feedback, &s.GradedAt, &s.Links, &rubric)
+	var tabs int32
+	err := r.Scan(&s.ID, &s.UserID, &s.UserName, &s.CourseID, &s.LessonID, &s.TeacherID, &s.Text, &s.Files, &s.SubmittedAt, &s.Late, &score, &s.Feedback, &s.GradedAt, &s.Links, &rubric, &tabs, &s.HTML)
+	s.TabSwitches = int(tabs)
 	if rubric != "" {
 		_ = json.Unmarshal([]byte(rubric), &s.Rubric)
 	}
@@ -560,8 +562,8 @@ func (c *ClickHouse) writeSub(ctx context.Context, s *Submission) error {
 		rubric = string(b)
 	}
 	return c.insert(ctx, "submissions", []string{"id", "user_id", "user_name", "course_id", "lesson_id", "teacher_id", "text", "files",
-		"submitted_at", "late", "score", "feedback", "graded_at", "ver", "links", "rubric"},
-		s.ID, s.UserID, s.UserName, s.CourseID, s.LessonID, s.TeacherID, s.Text, files, s.SubmittedAt.UTC(), s.Late, score, s.Feedback, nullTime(s.GradedAt), ver(), links, rubric)
+		"submitted_at", "late", "score", "feedback", "graded_at", "ver", "links", "rubric", "tab_switches", "html"},
+		s.ID, s.UserID, s.UserName, s.CourseID, s.LessonID, s.TeacherID, s.Text, files, s.SubmittedAt.UTC(), s.Late, score, s.Feedback, nullTime(s.GradedAt), ver(), links, rubric, int32(s.TabSwitches), s.HTML)
 }
 
 func (c *ClickHouse) subsWhere(ctx context.Context, where string, args ...any) ([]Submission, error) {

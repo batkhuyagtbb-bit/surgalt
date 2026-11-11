@@ -5073,3 +5073,17 @@ iframe.cv-img{border:0;pointer-events:auto}.gp-cover iframe.cv-img{pointer-event
 .hero-course.has-cv .hero-cta .btn-glass{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.38);color:#fff;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .hero-course.has-cv .hero-card{background:rgba(255,255,255,.93);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-self:end}
 @media (max-width:860px){.hero-course.has-cv .hero-inner{min-height:0;grid-template-columns:1fr;padding:18px;gap:18px}.hero-course.has-cv .hero-inner::before{content:"";display:block;height:clamp(120px,32vw,200px)}}
+
+/* Даалгаврын хариу: үгийн тоолуур, холбоосоор илгээх аргачлал */
+.asg-wc{display:block;margin-top:4px;font-size:.8rem}.asg-wc.ok{color:var(--ok,#15803d);font-weight:700}
+.asg-howto{margin:8px 0 12px;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}.asg-howto summary{cursor:pointer;font-weight:700}.asg-howto ol{margin:8px 0 0;padding-left:20px;display:grid;gap:4px;font-size:.9rem}
+.an-warn{color:#b45309;font-weight:700}
+.pe-check{display:grid;gap:4px}.pe-check span{font-weight:700}
+
+/* Даалгаврын хариуны текст засварлагч (зураг, файл оруулахгүй) */
+.rt-ans-wrap{border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.rt-ans-bar{display:flex;flex-wrap:wrap;gap:2px;padding:6px 8px;border-bottom:1px solid var(--line);background:var(--bg-2,rgba(0,0,0,.03))}
+.rt-ans-bar button{min-width:32px;height:30px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--text);font:700 .9rem var(--sans);cursor:pointer}.rt-ans-bar button:hover{background:rgba(0,0,0,.07)}
+.rt-ans{min-height:220px;max-height:60vh;overflow:auto;padding:12px 14px;outline:0;font-size:1rem;line-height:1.6}.rt-ans:empty::before{content:attr(data-placeholder);color:var(--muted)}
+.rt-ans h2{font-size:1.25rem;margin:.6em 0 .3em}.rt-ans blockquote{margin:.5em 0;padding:.3em .9em;border-left:3px solid var(--accent);color:var(--text-2)}.rt-ans ul,.rt-ans ol{padding-left:1.4em}
+.sub-html{margin:6px 0}

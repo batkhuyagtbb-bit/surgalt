@@ -123,6 +123,9 @@ func validateAssignment(a *store.Assignment) string {
 		return "үнэлэх арга буруу"
 	}
 	a.AllowFiles = false // хариу зөвхөн текст ба холбоосоор — файл илгээхгүй
+	if a.Words < 0 || a.Words > 5000 {
+		return "үгийн баримжаа 0-5000"
+	}
 	return validateDue(&a.Due)
 }
 
@@ -269,7 +272,7 @@ func (s *Server) subView(sub *store.Submission) map[string]any {
 		links = []string{}
 	}
 	out := map[string]any{"user_id": sub.UserID, "user_name": sub.UserName, "text": sub.Text, "files": urls, "links": links,
-		"submitted_at": sub.SubmittedAt, "late": sub.Late, "feedback": sub.Feedback, "graded_at": sub.GradedAt}
+		"submitted_at": sub.SubmittedAt, "late": sub.Late, "tab_switches": sub.TabSwitches, "html": sub.HTML, "feedback": sub.Feedback, "graded_at": sub.GradedAt}
 	if sub.Score != nil {
 		out["score"] = *sub.Score
 	}
@@ -381,13 +384,23 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		var in struct {
-			Text  string   `json:"text"`
-			Links []string `json:"links"`
+			Text        string   `json:"text"`
+			Links       []string `json:"links"`
+			TabSwitches int      `json:"tab_switches"` // хариу бичих явцад таб сольсон тоо (хөтчөөс)
+			HTML        string   `json:"html"`         // текст засварлагчийн HTML (цэвэрлэгдэнэ; Text нь түүнээс гарна)
 		}
 		if !decode(w, r, &in) {
 			return
 		}
-		sub.Text, rawLinks = in.Text, in.Links
+		sub.Text, rawLinks, sub.TabSwitches = in.Text, in.Links, max(0, min(in.TabSwitches, 1000))
+		if strings.TrimSpace(in.HTML) != "" {
+			if len(in.HTML) > 120_000 {
+				writeErr(w, http.StatusBadRequest, "хариу хэт урт")
+				return
+			}
+			out, text, _ := sanitizeRich(in.HTML, "") // зураг, файл оруулахгүй — зөвхөн текстийн хэлбэржүүлэлт
+			sub.HTML, sub.Text = out, strings.TrimSpace(text)
+		}
 	}
 	for _, u := range rawLinks {
 		u = strings.TrimSpace(u)
@@ -412,6 +425,13 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	if utf8.RuneCountInString(sub.Text) > 20_000 {
 		writeErr(w, http.StatusBadRequest, "хариу хэт урт (20,000 тэмдэгт)")
 		return
+	}
+	// Хариуг нэг л удаа илгээнэ — багш «дахин илгээх»-ийг зөвшөөрсөн бол шинэчилнэ.
+	if !l.Assignment.Resubmit {
+		if _, err := s.store.SubmissionFor(r.Context(), c.UID, l.ID); err == nil {
+			writeErr(w, http.StatusConflict, "хариуг нэг л удаа илгээнэ — аль хэдийн илгээсэн байна")
+			return
+		}
 	}
 	if err := s.store.SaveSubmission(r.Context(), sub); s.storeErr(w, r, err) {
 		return

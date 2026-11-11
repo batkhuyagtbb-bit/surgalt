@@ -1986,7 +1986,7 @@ func TestAssignmentAndDueFlow(t *testing.T) {
 	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+e1["id"].(string)+"/exam/start", tt, ""); code != 200 && code != 201 {
 		t.Fatal("багшид хаалттай шалгалт ч нээлттэй")
 	}
-	_, lb := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Ирээдүй","is_free":true,"assignment":{"due":{"at":"`+future+`","late":"closed"}}}`)
+	_, lb := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Ирээдүй","is_free":true,"assignment":{"resubmit":true,"due":{"at":"`+future+`","late":"closed"}}}`)
 	if code, r := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+lb["id"].(string)+"/submit", s1, `{"text":"цагтаа"}`); code != 200 || r["submission"].(map[string]any)["late"] != false {
 		t.Fatalf("цагтаа илгээсэн: %d %v", code, r)
 	}

@@ -254,7 +254,9 @@ var chMigrations = []string{
 	"ALTER TABLE orders ADD COLUMN IF NOT EXISTS commission_pct Float64 DEFAULT 0", // төлөгдөх үеийн шимтгэл (0 = хуучин)
 	"ALTER TABLE payouts ADD COLUMN IF NOT EXISTS bank_ref String DEFAULT ''",      // Хаан банкаар шилжүүлсэн: transferid
 	"ALTER TABLE payouts ADD COLUMN IF NOT EXISTS journal String DEFAULT ''",
-	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS cover String DEFAULT ''", // толгойн зургийн загвар (t01–t20)       // банкны журналын дугаар
+	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS cover String DEFAULT ''", // толгойн зургийн загвар (t01–t20)
+	"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS tab_switches Int32 DEFAULT 0", // даалгаврын хариу бичихэд таб сольсон тоо
+	"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS html String DEFAULT ''",        // текст засварлагчийн хариу (цэвэрлэсэн HTML)       // банкны журналын дугаар
 	"ALTER TABLE users ADD COLUMN IF NOT EXISTS org String DEFAULT ''",             // байгууллагын гэрээ, хөтөлбөрүүд (JSON)
 	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS program_id String DEFAULT ''",    // байгууллагын мэргэжлийн хөтөлбөр
 	"ALTER TABLE courses ADD COLUMN IF NOT EXISTS teachers Array(String)",          // байгууллагын сургалтад холбосон багш нар

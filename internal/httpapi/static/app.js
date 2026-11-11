@@ -2429,12 +2429,15 @@ async function assignmentCard(box, { courseId, lessonId }) {
     card.innerHTML = `<h3>${icon("clip", 20)} Даалгавар</h3>
       <ul class="exam-facts">${due.start_at ? `<li>▶ Эхлэх: <b>${fmtDate(due.start_at)}</b></li>` : ""}${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : "<li>📅 Хугацаагүй</li>"}<li>🎯 ${a.grading === "rubric" ? `Рубрикаар · <b>${a.max_score}</b> оноо` : `Дээд оноо: <b>${a.max_score || 100}</b>`}</li>${due.entry_fee ? `<li>💳 Төлбөр: <b>${money(due.entry_fee)}</b>${due.paid ? " ✓" : ""}</li>` : ""}<li>✍️ Хариу: текст ба холбоос</li></ul>
       ${dueNotice(due)}
-      ${sub ? `<div class="sub-mine"><b>Таны хариу</b> <small class="muted">${fmtDate(sub.submitted_at)}${sub.late ? " · хоцорсон" : ""}</small>${sub.text ? `<p>${esc(sub.text)}</p>` : ""}${sub.links?.length ? `<p>${sub.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 60))}</a>`).join("<br>")}</p>` : ""}${sub.files?.length ? `<p>${sub.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${icon("doc", 14)} ${esc(f.name)}</a>`).join(" · ")}</p>` : ""}
+      ${sub ? `<div class="sub-mine"><b>Таны хариу</b> <small class="muted">${fmtDate(sub.submitted_at)}${sub.late ? " · хоцорсон" : ""}</small>${sub.html ? `<div class="rb-text sub-html">${sub.html}</div>` : sub.text ? `<p>${esc(sub.text)}</p>` : ""}${sub.links?.length ? `<p>${sub.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 60))}</a>`).join("<br>")}</p>` : ""}${sub.files?.length ? `<p>${sub.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${icon("doc", 14)} ${esc(f.name)}</a>`).join(" · ")}</p>` : ""}
         ${sub.score !== undefined ? `<div class="sub-score">✅ Дүн: <b>${sub.score}/${a.max_score || 100}</b>${a.grading === "rubric" ? rubricViewHTML(a.rubric, sub.rubric || {}) : ""}${sub.feedback ? `<p class="sub-fb"><b>Багшийн тайлбар:</b> ${esc(sub.feedback)}</p>` : ""}</div>` : `<p class="muted small">Багш хараахан дүгнээгүй байна — дүгнэмэгц энд автоматаар гарч ирнэ.</p>`}</div>` : ""}
       ${a.grading === "rubric" && sub?.score === undefined ? `<details class="asg-rubric" open><summary>Үнэлэх шалгуур (рубрик) · ${a.max_score} оноо</summary>${rubricViewHTML(a.rubric)}</details>` : ""}
       ${due.closed || due.not_started ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж даалгавраа илгээх</button>`
-        : `<form class="sub-form"><label>${sub ? "Хариугаа шинэчлэх" : "Хариу"}<textarea name="text" rows="5" maxlength="20000" placeholder="Хариугаа энд бичнэ үү…">${esc(sub?.text || "")}</textarea></label>
-          <label>Холбоос (Google Docs, GitHub, видео… мөр тус бүрд нэг, 5 хүртэл)<textarea name="links" rows="2" placeholder="https://…">${esc((sub?.links || []).join("\n"))}</textarea></label>
+        : sub && !a.resubmit ? `<p class="muted small">✅ Хариу илгээгдсэн — энэ даалгаварт хариуг нэг л удаа илгээнэ.</p>`
+        : `<form class="sub-form" data-words="${a.words || 500}"><label>${sub ? "Хариугаа шинэчлэх" : "Хариу"}<div class="rt-ans-wrap"><div class="rt-ans-bar" role="toolbar" aria-label="Хэлбэржүүлэх">${[["bold", "<b>B</b>", "Тод"], ["italic", "<i>I</i>", "Налуу"], ["underline", "<u>U</u>", "Доогуур зураас"], ["strikeThrough", "<s>S</s>", "Дундуур зураас"], ["h2", "H", "Гарчиг"], ["insertUnorderedList", "•", "Жагсаалт"], ["insertOrderedList", "1.", "Дугаарласан"], ["quote", "❝", "Ишлэл"], ["link", "🔗", "Холбоос"], ["removeFormat", "✕", "Хэлбэржүүлэлт арилгах"]].map(([c, l, t]) => `<button type="button" data-rt="${c}" title="${t}" aria-label="${t}">${l}</button>`).join("")}</div>
+            <div class="rt-ans rb-text" contenteditable="true" data-placeholder="Хариугаа өөрөө бичнэ үү (хуулж буулгах боломжгүй)…">${sub?.html || (sub?.text ? esc(sub.text).replace(/\n/g, "<br>") : "")}</div></div><small class="asg-wc muted" aria-live="polite"></small></label>
+          <details class="asg-howto"><summary>🔗 Бүтээлч ажлаа холбоосоор илгээх аргачлал</summary><ol><li><b>Canva, Google Docs/Slides/Sheets, Figma:</b> «Хуваалцах» → «Холбоостой хүн бүр үзэх боломжтой» болгоод холбоосыг хуулна.</li><li><b>Видео:</b> YouTube-д «Unlisted» (жагсаалтад оруулахгүй) эсвэл Google Drive-д байршуулж хуваалцах холбоосыг авна.</li><li><b>Код:</b> GitHub repository/Gist-ийн холбоос.</li><li>Холбоосоо доорх талбарт мөр тус бүрд нэгийг буулгана (5 хүртэл). Илгээхийн өмнө холбоосоо өөр хөтчөөр нээж, багш үзэх боломжтой эсэхийг шалгаарай.</li></ol></details>
+          <label>Холбоос (мөр тус бүрд нэг, 5 хүртэл)<textarea name="links" rows="2" placeholder="https://…">${esc((sub?.links || []).join("\n"))}</textarea></label>
           <p class="form-error" role="alert"></p><button class="btn btn-gold">${sub ? "Дахин илгээх" : "Илгээх"}</button></form>`}`;
     bindLatePay(card, base, "Даалгаврын төлбөр", draw);
     if (!card._live) { // багш дүгнэмэгц дүн, рубрик автоматаар орж ирнэ
@@ -2442,11 +2445,27 @@ async function assignmentCard(box, { courseId, lessonId }) {
       Live.on(card._live);
     }
     const f = $(".sub-form", card);
+    if (f) { // өөрөө бичих: хуулж буулгах, чирж оруулахыг хориглоно; үгийн тоолуур; таб солихыг тоолно
+      const ta = $(".rt-ans", f), wc = $(".asg-wc", f), target = +f.dataset.words || 500;
+      $(".rt-ans-bar", f).addEventListener("click", (e) => { // энгийн хэлбэржүүлэлт (зураг, файл оруулахгүй)
+        const b = e.target.closest("[data-rt]"); if (!b) return; e.preventDefault(); ta.focus(); const c = b.dataset.rt;
+        if (c === "h2") document.execCommand("formatBlock", false, document.queryCommandValue("formatBlock") === "h2" ? "p" : "h2");
+        else if (c === "quote") document.execCommand("formatBlock", false, document.queryCommandValue("formatBlock") === "blockquote" ? "p" : "blockquote");
+        else if (c === "link") { const u = prompt("Холбоос (https://…)"); if (u && /^https?:\/\//.test(u.trim())) document.execCommand("createLink", false, u.trim()); }
+        else document.execCommand(c, false, null);
+        count();
+      });
+      const count = () => { const n = (ta.innerText.trim().match(/\S+/g) || []).length; wc.textContent = `${n} / ~${target} үг${n < target * .6 ? " — багадаа " + Math.round(target * .6) + " үг бичихийг зөвлөж байна" : n > target * 1.5 ? " — хэт урт, товчилно уу" : " ✓"}`; wc.classList.toggle("ok", n >= target * .6 && n <= target * 1.5); };
+      ["paste", "drop"].forEach((ev) => ta.addEventListener(ev, (e) => { e.preventDefault(); toast("Хариугаа өөрөө бичнэ үү — хуулж буулгах боломжгүй", true); }));
+      ta.addEventListener("input", count); count();
+      f._tabs = 0; const onVis = () => { if (document.hidden && f.isConnected) { f._tabs++; toast(`Таб/цонх солилоо — ${f._tabs} удаа тэмдэглэгдлээ (багшид харагдана)`, true); } else if (!f.isConnected) document.removeEventListener("visibilitychange", onVis); };
+      document.addEventListener("visibilitychange", onVis);
+    }
     if (f) f.onsubmit = async (e) => {
       e.preventDefault();
       const err = $(".form-error", f), b = $("button", f); err.textContent = ""; b.disabled = true;
       try {
-        await api(`${base}/submit`, { method: "POST", body: { text: f.text.value, links: f.links.value.split(/[\n,\s]+/).filter(Boolean) } });
+        await api(`${base}/submit`, { method: "POST", body: { text: $(".rt-ans", f).innerText, html: $(".rt-ans", f).innerHTML, links: f.links.value.split(/[\n,\s]+/).filter(Boolean), tab_switches: f._tabs || 0 } });
         toast("✓ Даалгавар илгээгдлээ"); celebrate?.(); await draw(); document.dispatchEvent(new CustomEvent("sg:quiz-mastered"));
       } catch (x) { err.textContent = x.message; } finally { b.disabled = false; }
     };

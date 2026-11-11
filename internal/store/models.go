@@ -357,6 +357,10 @@ type Assignment struct {
 	Due        Due  `json:"due"`
 	MaxScore   int  `json:"max_score"`   // дээд оноо (анхдагч 100; рубрикт мөр бүрийн хамгийн их онооны нийлбэр)
 	AllowFiles bool `json:"allow_files"` // файл хавсаргахыг зөвшөөрөх
+	// Words — хариуны үгийн баримжаа (0 = анхдагч 500): суралцагчид тоолуураар харагдана, хатуу хязгаар биш.
+	Words int `json:"words,omitempty"`
+	// Resubmit — дахин илгээхийг зөвшөөрөх; false бол хариуг нэг л удаа илгээнэ.
+	Resubmit bool `json:"resubmit"`
 	// Grading — үнэлэх арга: "" = тоогоор (0..MaxScore), "rubric" = рубрикаар (шалгуур × түвшин).
 	Grading string  `json:"grading,omitempty"`
 	Rubric  *Rubric `json:"rubric,omitempty"`
@@ -434,10 +438,14 @@ type Submission struct {
 	LessonID    string     `json:"lesson_id"`
 	TeacherID   string     `json:"teacher_id"`
 	Text        string     `json:"text"`
+	// HTML — текст засварлагчаар бичсэн хариу (сервер цэвэрлэсэн; Text нь түүний цэвэр текст).
+	HTML        string     `json:"html,omitempty"`
 	Files       []string   `json:"files"` // багшийн сан дахь /files/... замууд
 	Links       []string   `json:"links"` // суралцагчийн илгээсэн холбоосууд (Google Docs, GitHub, видео г.м)
 	SubmittedAt time.Time  `json:"submitted_at"`
 	Late        bool       `json:"late"`
+	// TabSwitches — хариу бичих явцад таб/цонх сольсон тоо (суралцагчийн хөтчөөс; багшид харагдана).
+	TabSwitches int        `json:"tab_switches"`
 	Score       *int       `json:"score,omitempty"`
 	Feedback    string     `json:"feedback,omitempty"`
 	GradedAt    *time.Time `json:"graded_at,omitempty"`
@@ -717,6 +725,8 @@ type Store interface {
 	SharesTo(ctx context.Context, toID string) ([]Share, error)          // надад хуваалцсан (шинэ нь эхэндээ)
 	SharesOfCourse(ctx context.Context, courseID string) ([]Share, error) // сургалтын (эзэмшигчид)
 	DeleteShare(ctx context.Context, id string) error
+	// SubmissionFor — суралцагчийн тухайн даалгаврын хариу (байхгүй бол ErrNotFound).
+	SubmissionFor(ctx context.Context, userID, lessonID string) (*Submission, error)
 	// SetMeetingURL — Meet холбоосыг гараар тавих (meet.new-ээс хуулсан).
 	SetMeetingURL(ctx context.Context, id, url string) error
 	// Цаг захиалга (slots.go): багшийн сул цагууд ба тэдгээрийн захиалга.
