@@ -4221,7 +4221,7 @@ function profileOwner(root, h) {
   // «Загвараас сонгох»: сургалтын толгойн зургийн загварууд (/static/covers) нүүр зураг болно — байрлал тохируулах шаардлагагүй.
   $$("[data-cover-template]").forEach((b) => b.addEventListener("click", () => {
     const cur = $("img.pf-cover-img", $("#pfCover"))?.getAttribute("src") || "";
-    coverPicker({ title: "Нүүр зургийн загвар", lead: "120 загвар (салбар бүрээр, 20 хөдөлгөөнт) — профайлын нүүр зураг болгоно. Өөрийн зураг оруулахыг хүсвэл «Нүүр зураг солих».", current: cur.startsWith("/static/covers/") ? cur.slice(15, -4) : "", onPick: async (id) => {
+    coverPicker({ title: "Толгойн зураг", lead: "120 загвар (салбар бүрээр, 20 хөдөлгөөнт) — профайлын толгойн зураг болгоно. Өөрийн зураг оруулахыг хүсвэл «Нүүр зураг солих».", current: cur.startsWith("/static/covers/") ? cur.slice(15, -4) : "", onPick: async (id) => {
       const src = "/static/covers/" + id + ".svg", box = $("#pfCover");
       await save({ cover_url: src });
       $("img.pf-cover-img", box)?.remove(); box.insertAdjacentHTML("afterbegin", `<img class="pf-cover-img" src="${esc(src)}" alt="" style="object-position:50% 50%">`);
