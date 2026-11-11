@@ -317,7 +317,7 @@ func (m *Memory) UpdateCourse(_ context.Context, c *Course) error {
 	cur.Title, cur.Description, cur.Price, cur.Published, cur.UpdatedAt = c.Title, c.Description, c.Price, c.Published, time.Now()
 	cur.Drip, cur.UnlockAllPaid, cur.Camera, cur.Certificate = c.Drip, c.UnlockAllPaid, c.Camera, c.Certificate
 	cur.MaxWarnings, cur.BlockHours, cur.BlockMinutes = c.MaxWarnings, c.BlockHours, c.BlockMinutes
-	cur.AccessCode = c.AccessCode
+	cur.AccessCode, cur.Cover = c.AccessCode, c.Cover
 	*c = m.courseCopyLocked(cur)
 	return nil
 }

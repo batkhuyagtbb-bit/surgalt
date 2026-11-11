@@ -194,6 +194,8 @@ type Course struct {
 	Drip bool `json:"drip"`
 	// UnlockAllPaid: багцын төлбөр төлсөн суралцагчид дарааллаас үл хамааран бүгд нээлттэй.
 	UnlockAllPaid bool `json:"unlock_all_paid"`
+	// Cover — толгойн зургийн загвар (t01–t20: /static/covers/<id>.svg — шинжлэх ухаан, абстракт); "" = өнгөт градиент.
+	Cover string `json:"cover"`
 	// Camera — камертай анхаарлын хяналт: off | optional | required.
 	Camera string `json:"camera"`
 	// Certificate — сургалтыг дүүргэсэн суралцагчид сертификат олгоно (хайлтад шошго болно).

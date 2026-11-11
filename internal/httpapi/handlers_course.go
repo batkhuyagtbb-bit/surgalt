@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"regexp"
 	"context"
 	"errors"
 	"fmt"
@@ -31,6 +32,8 @@ type courseInput struct {
 	BlockMinutes  int    `json:"block_minutes"`   // хэтэрвэл хэдэн минутын дараа автоматаар нээгдэх (0 = анхдагч 30 мин, -1 = багш нээтэл)
 	// AccessCode — нууц үгтэй сургалт ("" = нууц үггүй); ирээгүй (nil) бол одоогийнхоо хэвээр.
 	AccessCode *string `json:"access_code"`
+	// Cover — толгойн зургийн загвар (t01–t20, "" = градиент); ирээгүй (nil) бол одоогийнх хэвээр.
+	Cover *string `json:"cover"`
 	// ProgramID — байгууллагын мэргэжлийн хөтөлбөр ("" = хөтөлбөргүй); ирээгүй (nil) бол хэвээр.
 	ProgramID *string `json:"program_id"`
 }
@@ -70,6 +73,9 @@ func (in *courseInput) validate() string {
 			return "нууц үг 4-64 тэмдэгт"
 		}
 		in.AccessCode = &code
+	}
+	if in.Cover != nil && *in.Cover != "" && !coverRe.MatchString(*in.Cover) {
+		return "толгойн зургийн загвар буруу"
 	}
 	switch in.Camera {
 	case "":
@@ -132,6 +138,9 @@ func (s *Server) handleCreateCourse(w http.ResponseWriter, r *http.Request) {
 	if in.AccessCode != nil {
 		course.AccessCode, course.Locked = *in.AccessCode, *in.AccessCode != ""
 	}
+	if in.Cover != nil {
+		course.Cover = *in.Cover
+	}
 	if err := s.store.CreateCourse(r.Context(), course); s.storeErr(w, r, err) {
 		return
 	}
@@ -158,6 +167,11 @@ func (s *Server) handleUpdateCourse(w http.ResponseWriter, r *http.Request) {
 		course.AccessCode = *in.AccessCode
 	} else if cur, err := s.store.CourseByID(r.Context(), course.ID); err == nil && cur.TeacherID == c.UID {
 		course.AccessCode = cur.AccessCode // «Нийтлэх» г.м хэсэгчилсэн хадгалалт нууц үгийг арилгахгүй
+	}
+	if in.Cover != nil {
+		course.Cover = *in.Cover
+	} else if cur, err := s.store.CourseByID(r.Context(), course.ID); err == nil {
+		course.Cover = cur.Cover // хэсэгчилсэн хадгалалт зургийг арилгахгүй
 	}
 	program, ok := s.courseProgram(w, r, c.UID, in.ProgramID)
 	if !ok {
@@ -212,6 +226,9 @@ type lessonInput struct {
 	Discussion   bool              `json:"discussion"`     // хэлэлцүүлэгтэй (лайк, сэтгэгдэл)
 	UnlockRule   string            `json:"unlock_rule"`    // дараалалд нээгдэх нөхцөл (store.UnlockRules)
 }
+
+// coverRe — толгойн зургийн загварын ID (/static/covers/t01.svg … t20.svg).
+var coverRe = regexp.MustCompile(`^t(0[1-9]|1[0-9]|20)$`)
 
 const maxUnlockHours = 24 * 365
 

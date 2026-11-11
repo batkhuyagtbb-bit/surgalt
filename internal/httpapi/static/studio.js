@@ -417,7 +417,7 @@ async function courses() {
   const list = all.filter((c) => !c.shared), shared = all.filter((c) => c.shared), incoming = (sh.shares || []).filter((x) => x.mode === "view");
   searchCourses = list;
   const card = (c) => `<div class="group-wrap">
-      <a class="group" href="#course=${esc(c.id)}" style="--h:${hueOfName(c.title)}"><div class="group-art"><span class="chip">${c.published ? "Нийтлэгдсэн" : "Ноорог"}</span><b>${esc(c.title.trim()[0] || "?")}</b></div>
+      <a class="group" href="#course=${esc(c.id)}" style="--h:${hueOfName(c.title)}"><div class="group-art${c.cover ? " has-cv" : ""}"${c.cover ? ` style="--cv:url(/static/covers/${esc(c.cover)}.svg)"` : ""}><span class="chip">${c.published ? "Нийтлэгдсэн" : "Ноорог"}</span><b>${esc(c.title.trim()[0] || "?")}</b></div>
       <div class="group-body"><strong>${esc(c.title)}</strong>${c.shared ? `<small class="g-org">${ico("users", 14)}${esc(c.org?.display_name || "Хамтрагч")}</small>` : ""}<small>${ico("book", 14)}${c.lesson_count} хичээл · ${c.free_lesson_count} үнэгүй</small><small>${ico("eye", 14)}${c.views || 0} үзэлт · ${money(c.price) === "Үнэгүй" ? "Хичээлээр" : money(c.price)}</small>
       ${teachersLine(c.teacher_list)}<span class="btn btn-glass btn-sm" style="margin-top:6px">${c.shared ? "Хичээл оруулах" : "Удирдах"}</span></div></a>
       ${c.shared ? "" : `<button type="button" class="group-del" data-del-course="${esc(c.id)}" data-title="${esc(c.title)}" title="Сургалт устгах" aria-label="«${esc(c.title)}» сургалтыг устгах">${ico("trash", 17)}</button>`}</div>`;
@@ -1459,7 +1459,7 @@ async function courseEditor(id) {
   };
   const render = () => {
     main.innerHTML = `<section class="gp-head" style="--h:${hueOfName(c.title)}">
-        <div class="gp-cover"><a class="gp-back" href="#courses" aria-label="Сургалтууд руу буцах">${ico("back", 18)}Сургалтууд</a><b>${esc(c.title.trim()[0] || "?")}</b></div>
+        <div class="gp-cover${c.cover ? " has-cv" : ""}"${c.cover ? ` style="--cv:url(/static/covers/${esc(c.cover)}.svg)"` : ""}><a class="gp-back" href="#courses" aria-label="Сургалтууд руу буцах">${ico("back", 18)}Сургалтууд</a><b>${esc(c.title.trim()[0] || "?")}</b>${shared ? "" : `<button type="button" class="gp-cover-btn" data-cover-pick title="20 загвараас сонгоно">${ico("edit", 14)}Толгойн зураг</button>`}</div>
         <div class="gp-bar">
           <div class="grow gp-info"><h1>${esc(c.title)}</h1>
             <p class="gp-desc">${c.description ? esc(c.description) : `<span class="muted">${shared ? "Тайлбар нэмээгүй байна." : "Тайлбар нэмээгүй байна — «Тохиргоо»-оос нэмнэ."}</span>`}</p>
@@ -1730,6 +1730,24 @@ async function courseEditor(id) {
     });
   };
   const saveCourse = async (body) => { c = { ...c, ...(await api(`/api/courses/${c.id}`, { method: "PUT", body })) }; searchCourses = null; };
+  const courseBody = (extra) => ({ title: c.title, description: c.description, price: c.price, published: !!c.published, drip: !!c.drip, unlock_all_paid: !!c.unlock_all_paid, certificate: !!c.certificate, camera: c.camera || "optional", max_warnings: c.max_warnings || 0, block_hours: c.block_hours || 0, block_minutes: c.block_minutes || 0, ...extra });
+  // Толгойн зургийн загвар: 20 шинжлэх ухаан/абстракт SVG (/static/covers) эсвэл өнгөт градиент.
+  const coverPicker = async () => {
+    const names = await fetch("/static/covers/index.json").then((x) => x.json()).catch(() => ({}));
+    const ids = Object.keys(names).length ? Object.keys(names) : Array.from({ length: 20 }, (_, i) => "t" + String(i + 1).padStart(2, "0"));
+    $("#coverModal")?.remove();
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="coverModal"><div class="modal-card" style="width:min(720px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
+      <h3>${ico("edit", 20)} Толгойн зураг</h3><p class="muted small">Сургалтын хуудас, картын толгойд харагдана. 20 загвараас сонгоно уу.</p>
+      <div class="cv-grid"><button type="button" class="cv-opt cv-none ${c.cover ? "" : "on"}" data-cv="" style="--h:${hueOfName(c.title)}"><span>Градиент (зураггүй)</span></button>${ids.map((id) => `<button type="button" class="cv-opt ${c.cover === id ? "on" : ""}" data-cv="${id}" style="--cv:url(/static/covers/${id}.svg)"><span>${esc(names[id] || id)}</span></button>`).join("")}</div></div></div>`);
+    const m = $("#coverModal"); SG.openModal(m);
+    const close = () => { SG.closeModal(m); setTimeout(() => m.remove(), 300); };
+    m.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-close]") || e.target === m) return close();
+      const o = e.target.closest("[data-cv]"); if (!o) return;
+      $$(".cv-opt", m).forEach((x) => x.classList.toggle("on", x === o));
+      try { await saveCourse(courseBody({ cover: o.dataset.cv })); toast(o.dataset.cv ? "Толгойн зураг солигдлоо ✓" : "Градиент болгов ✓"); close(); render(); } catch (x) { toast(x.message, true); }
+    });
+  };
   const lessonBody = (f, l) => {
     const isFree = f.mode.value === "free";
     const blocks = f._be.collect();
@@ -1919,6 +1937,7 @@ async function courseEditor(id) {
     if (t.closest("[data-cancel]")) return render();
     if (t.closest("[data-share-post]") && l) return shareDialog(l);
     if (t.closest("#gpShare")) return shareDialog(null);
+    if (t.closest("[data-cover-pick]")) return coverPicker();
     if (t.closest("[data-lesson-settings]") && l) {
       const f = $("#lsForm"); f.dataset.lsLid = l.id; f.innerHTML = lessonSettingsHTML(l);
       SG.openModal($("#lsModal")); return;

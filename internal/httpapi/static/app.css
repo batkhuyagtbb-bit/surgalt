@@ -5037,3 +5037,15 @@ a.np-item:active{background:var(--line)}
 .shared-view{margin:12px 0;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
 .ol-sec-vis{margin-left:4px}
 .del-list{margin:8px 0 10px;padding-left:20px;display:grid;gap:3px;font-size:.9rem}
+
+/* Сургалтын толгойн зургийн загвар (t01–t20, /static/covers) */
+.gp-cover.has-cv{background:var(--cv) center/cover no-repeat}.gp-cover.has-cv::before{display:none}.gp-cover.has-cv b{opacity:0}
+.gp-cover-btn{position:absolute;right:12px;bottom:12px;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:0;border-radius:999px;background:rgba(255,255,255,.92);color:var(--text);font:700 .78rem var(--sans);cursor:pointer;box-shadow:var(--shadow)}
+.group-art.has-cv{background:var(--cv) center/cover no-repeat}.group-art.has-cv b{display:none}
+.course-cover{grid-column:1/-1;height:clamp(150px,22vw,280px);border-radius:24px;background:var(--cv) center/cover no-repeat;box-shadow:var(--shadow-lg)}
+.hero-course.has-cv .hero-inner{align-items:start}
+.cv-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px}
+.cv-opt{position:relative;aspect-ratio:16/5;border:3px solid transparent;border-radius:14px;overflow:hidden;cursor:pointer;background:var(--cv) center/cover no-repeat;padding:0}
+.cv-none{background:linear-gradient(135deg,hsl(var(--h,222) 62% 33%),hsl(var(--h,222) 68% 21%))}
+.cv-opt.on{border-color:var(--accent)}.cv-opt span{position:absolute;left:8px;bottom:8px;padding:3px 9px;border-radius:999px;background:rgba(15,23,42,.6);color:#fff;font:700 .72rem var(--sans)}
+@media (max-width:520px){.cv-grid{grid-template-columns:1fr}}
