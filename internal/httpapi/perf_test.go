@@ -60,7 +60,7 @@ func TestCompression(t *testing.T) {
 	// JSON (1KB-аас том) шахагдана.
 	_, tr := call(t, srv, "POST", "/api/auth/register", "", `{"username":"gzt","email":"g@x.mn","password":"password1","role":"teacher","accept_terms":true}`)
 	tt := tr["token"].(string)
-	desc := strings.Repeat("Сургалтын тайлбар. ", 120)
+	desc := strings.Repeat("Сургалтын тайлбар дэлгэрэнгүй_урт_үгтэй_нэмэлт_мөр. ", 16) // 48 үг, 1KB-аас хэтэрнэ (дээд 50 үг)
 	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Курс","description":"`+desc+`","published":true}`)
 	cid := c["id"].(string)
 	res, body := getRaw(t, srv.URL+"/api/courses/"+cid, "gzip")
