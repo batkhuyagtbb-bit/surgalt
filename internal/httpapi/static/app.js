@@ -302,18 +302,37 @@ function ripples() {
   }, { passive: true });
 }
 
+/* ---------- Толгойн зураг: төрөл, харагдац (handlers_course.go coverOK-той ижил дүрэм) ---------- */
+const COVER_RE = /^t(0[1-9]|[1-9][0-9]|1[01][0-9]|120)$/;
+const coverKind = (c) => (!c ? "" : COVER_RE.test(c) ? "tpl" : c.startsWith("embed:") ? "embed" : "img");
+// coverHTML: толгойд оруулах элемент (зураг эсвэл sandbox iframe); embed нь холбоос бол шууд iframe src, HTML бол /embed-frame.
+function coverHTML(c, lazy) {
+  const k = coverKind(c); if (!k) return "";
+  if (k !== "embed") return `<img class="cv-img" src="${esc(k === "tpl" ? "/static/covers/" + c + ".svg" : c)}" alt="" referrerpolicy="no-referrer"${lazy ? ' loading="lazy"' : ""}>`;
+  const t = c.slice(6).trim(), l = embedLink(t);
+  if (l) return `<iframe class="cv-img" src="${esc(l.src)}" sandbox="allow-scripts allow-same-origin allow-presentation" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" referrerpolicy="no-referrer" loading="lazy" title="Embed"></iframe>`;
+  return `<iframe class="cv-img" sandbox="allow-scripts allow-forms allow-presentation" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" referrerpolicy="no-referrer" loading="lazy" src="/embed-frame" data-doc="${esc(embedDoc(t))}" title="Embed"></iframe>`;
+}
+// Нийтийн сургалтын хуудас: embed толгойг JS-ээр угсарна (course.html data-cv-embed).
+$$("[data-cv-embed]").forEach((el) => { el.innerHTML = coverHTML("embed:" + el.dataset.cvEmbed); });
+
 /* ---------- Толгойн зургийн загвар сонгох (сургалт, профайл) ---------- */
 let coverIndex = null;
-async function coverPicker({ title, lead, current = "", allowNone = false, hue = 222, onPick }) {
+async function coverPicker({ title, lead, current = "", allowNone = false, hue = 222, sources = false, onPick }) {
   coverIndex = coverIndex || await fetch("/static/covers/index.json").then((r) => r.json()).catch(() => ({}));
   const all = Object.entries(coverIndex).map(([id, v]) => ({ id, n: typeof v === "string" ? v : v.n, c: typeof v === "string" ? "" : v.c }));
   const cats = [...new Set(all.map((x) => x.c).filter(Boolean))];
   $("#coverPickModal")?.remove();
   document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="coverPickModal"><div class="modal-card" style="width:min(820px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${icon("x", 18)}</button>
     <h3>${esc(title)}</h3><p class="muted small">${esc(lead)}</p>
+    ${sources ? `<div class="cv-tabs" role="tablist"><button type="button" class="cv-tab on" data-src="tpl" role="tab">${icon("layers", 15)}Загвар</button><button type="button" class="cv-tab" data-src="file" role="tab">${icon("upload", 15)}Компьютерээс</button><button type="button" class="cv-tab" data-src="url" role="tab">${icon("link", 15)}Холбоос</button><button type="button" class="cv-tab" data-src="embed" role="tab">${icon("ext", 15)}Embed</button></div>
+    <div class="cv-pane" data-pane="file" hidden><p class="muted small">Зураг (JPG, PNG, WebP…) компьютерээсээ оруулна — автоматаар WebP болж багасна, нээлттэй файлын санд хадгалагдана. Зөвлөмж: 1600×500 орчим, өргөн зураг.</p><input type="file" accept="image/*" class="cv-file"><p class="form-error" aria-live="polite"></p></div>
+    <div class="cv-pane" data-pane="url" hidden><form class="form cv-url-form"><label>Зургийн холбоос (https://…)<input name="url" type="url" required placeholder="https://example.com/cover.jpg" maxlength="2000"></label><div class="dr-acts"><button class="btn btn-gold btn-sm">Тавих</button></div><p class="form-error" aria-live="polite"></p></form></div>
+    <div class="cv-pane" data-pane="embed" hidden><form class="form cv-embed-form"><label>Embed код эсвэл холбоос<textarea name="embed" rows="5" required maxlength="20000" placeholder="YouTube/Vimeo холбоос, Canva, Google Slides… эсвэл &lt;iframe …&gt; код"></textarea></label><p class="muted small">Суралцагчид хамгаалагдсан (sandbox) хүрээнд харагдана — хичээлийн HTML embed хэсэгтэй ижил.</p><div class="dr-acts"><button class="btn btn-gold btn-sm">Тавих</button></div><p class="form-error" aria-live="polite"></p></form></div>` : ""}
+    <div class="cv-pane" data-pane="tpl">
     <input class="cv-search" type="search" placeholder="Хайх: физик, абстракт, хөдөлгөөнт…" aria-label="Загвар хайх">
     <div class="cv-cats"><button type="button" class="cv-cat on" data-cat="">Бүгд <small>${all.length}</small></button>${cats.map((c) => `<button type="button" class="cv-cat" data-cat="${esc(c)}">${esc(c)} <small>${all.filter((x) => x.c === c).length}</small></button>`).join("")}</div>
-    <div class="cv-grid">${allowNone ? `<button type="button" class="cv-opt cv-none ${current ? "" : "on"}" data-cv="" data-cat="" data-n="градиент" style="--h:${hue}"><span>Градиент (зураггүй)</span></button>` : ""}${all.map((x) => `<button type="button" class="cv-opt ${current === x.id ? "on" : ""}" data-cv="${x.id}" data-cat="${esc(x.c)}" data-n="${esc((x.n + " " + x.c).toLowerCase())}"><img src="/static/covers/${x.id}.svg" alt="" loading="lazy" decoding="async"><span>${esc(x.n)}${x.c === "Хөдөлгөөнт" ? " ▶" : ""}</span></button>`).join("")}</div></div></div>`);
+    <div class="cv-grid">${allowNone ? `<button type="button" class="cv-opt cv-none ${current ? "" : "on"}" data-cv="" data-cat="" data-n="градиент" style="--h:${hue}"><span>Градиент (зураггүй)</span></button>` : ""}${all.map((x) => `<button type="button" class="cv-opt ${current === x.id ? "on" : ""}" data-cv="${x.id}" data-cat="${esc(x.c)}" data-n="${esc((x.n + " " + x.c).toLowerCase())}"><img src="/static/covers/${x.id}.svg" alt="" loading="lazy" decoding="async"><span>${esc(x.n)}${x.c === "Хөдөлгөөнт" ? " ▶" : ""}</span></button>`).join("")}</div></div></div></div>`);
   const m = $("#coverPickModal"); openModal(m);
   const close = () => { closeModal(m); setTimeout(() => m.remove(), 300); };
   let cat = "";
@@ -327,6 +346,16 @@ async function coverPicker({ title, lead, current = "", allowNone = false, hue =
     try { await onPick(o.dataset.cv); close(); } catch (x) { toast(x.message, true); o.disabled = false; }
   });
   $(".cv-search", m).focus();
+  if (!sources) return;
+  const pick = async (v, btn, errEl) => { if (btn) btn.disabled = true; if (errEl) errEl.textContent = ""; try { await onPick(v); close(); } catch (x) { if (errEl) errEl.textContent = x.message; else toast(x.message, true); if (btn) btn.disabled = false; } };
+  $$(".cv-tab", m).forEach((t) => t.addEventListener("click", () => { $$(".cv-tab", m).forEach((x) => x.classList.toggle("on", x === t)); $$(".cv-pane", m).forEach((p) => (p.hidden = p.dataset.pane !== t.dataset.src)); }));
+  $(".cv-file", m).addEventListener("change", async (e) => {
+    const f = e.target.files[0], errEl = $(".form-error", e.target.parentElement); if (!f) return; e.target.disabled = true; errEl.textContent = "Хуулж байна…";
+    try { const fd = new FormData(); fd.append("file", f); const info = await api("/api/me/files?visibility=public", { method: "POST", body: fd }); await pick(info.path, null, errEl); }
+    catch (x) { errEl.textContent = x.message; e.target.disabled = false; }
+  });
+  $(".cv-url-form", m).addEventListener("submit", (e) => { e.preventDefault(); pick(e.target.url.value.trim(), $("button", e.target), $(".form-error", e.target)); });
+  $(".cv-embed-form", m).addEventListener("submit", (e) => { e.preventDefault(); const t = e.target.embed.value.trim(); if (!t) return; pick("embed:" + t, $("button", e.target), $(".form-error", e.target)); });
 }
 
 /* ---------- modal ---------- */
@@ -5796,7 +5825,7 @@ function mountA11y() {
 // Бүх хуудсанд (зүүн доод буланд); iframe дотор (хичээлд суулгасан хуудас) давхардуулахгүй.
 if (window.self === window.top) mountA11y();
 
-window.SG = { coverPicker, THREAD_EVENTS, panelIn, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, apiList, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
+window.SG = { coverPicker, coverHTML, coverKind, embedLink, THREAD_EVENTS, panelIn, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, apiList, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх

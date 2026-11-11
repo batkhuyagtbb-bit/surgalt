@@ -146,6 +146,17 @@ func parseTemplates() *template.Template {
 	funcs := template.FuncMap{
 		"money": money, "initials": initials, "hue": hue, "icon": icon, "v": func() string { return assetVersion }, "terms": func() string { return TermsVersion },
 		"inc": func(i int) int { return i + 1 },
+		// Сургалтын толгойн зураг (handlers_course.go coverOK): төрөл ба эх сурвалж.
+		"coverKind": coverKind,
+		"coverSrc": func(c string) string {
+			switch coverKind(c) {
+			case "tpl":
+				return "/static/covers/" + c + ".svg"
+			case "embed":
+				return strings.TrimSpace(strings.TrimPrefix(c, coverEmbedPrefix))
+			}
+			return c
+		},
 		// recent: сүүлийн 14 хоногт үүссэн эсэх ("Шинэ" тэмдэг). Хуудас 30 секунд л кэшлэгдэнэ.
 		"recent":   func(t time.Time) bool { return time.Since(t) < 14*24*time.Hour },
 		"rfc":      func(t time.Time) string { return t.UTC().Format(time.RFC3339) },

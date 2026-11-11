@@ -5055,3 +5055,8 @@ a.np-item:active{background:var(--line)}
 
 /* Сургалтын товч тайлбарын үгийн тоолуур */
 .desc-wc{display:block;margin-top:4px;font-size:.78rem}.desc-wc.over{color:var(--danger,#dc2626);font-weight:700}
+
+/* Толгойн зургийн эх сурвалжийн табууд (загвар / компьютерээс / холбоос / embed) */
+.cv-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}.cv-tab{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--text);padding:7px 13px;font:700 .8rem var(--sans);cursor:pointer}.cv-tab.on{background:var(--brand,#1f3c8f);border-color:transparent;color:#fff}
+.cv-pane[hidden]{display:none}.cv-pane .form{margin-top:8px}.cv-file{margin:6px 0;width:100%}
+iframe.cv-img{border:0;pointer-events:auto}.gp-cover iframe.cv-img{pointer-events:none}

@@ -421,7 +421,7 @@ async function courses() {
   const list = all.filter((c) => !c.shared), shared = all.filter((c) => c.shared), incoming = (sh.shares || []).filter((x) => x.mode === "view");
   searchCourses = list;
   const card = (c) => `<div class="group-wrap">
-      <a class="group" href="#course=${esc(c.id)}" style="--h:${hueOfName(c.title)}"><div class="group-art${c.cover ? " has-cv" : ""}">${c.cover ? `<img class="cv-img" src="/static/covers/${esc(c.cover)}.svg" alt="" loading="lazy">` : ""}<span class="chip">${c.published ? "Нийтлэгдсэн" : "Ноорог"}</span><b>${esc(c.title.trim()[0] || "?")}</b></div>
+      <a class="group" href="#course=${esc(c.id)}" style="--h:${hueOfName(c.title)}"><div class="group-art${c.cover && SG.coverKind(c.cover) !== "embed" ? " has-cv" : ""}">${SG.coverKind(c.cover) === "embed" ? "" : SG.coverHTML(c.cover, true)}<span class="chip">${c.published ? "Нийтлэгдсэн" : "Ноорог"}</span><b>${esc(c.title.trim()[0] || "?")}</b></div>
       <div class="group-body"><strong>${esc(c.title)}</strong>${c.shared ? `<small class="g-org">${ico("users", 14)}${esc(c.org?.display_name || "Хамтрагч")}</small>` : ""}<small>${ico("book", 14)}${c.lesson_count} хичээл · ${c.free_lesson_count} үнэгүй</small><small>${ico("eye", 14)}${c.views || 0} үзэлт · ${money(c.price) === "Үнэгүй" ? "Хичээлээр" : money(c.price)}</small>
       ${teachersLine(c.teacher_list)}<span class="btn btn-glass btn-sm" style="margin-top:6px">${c.shared ? "Хичээл оруулах" : "Удирдах"}</span></div></a>
       ${c.shared ? "" : `<button type="button" class="group-del" data-del-course="${esc(c.id)}" data-title="${esc(c.title)}" title="Сургалт устгах" aria-label="«${esc(c.title)}» сургалтыг устгах">${ico("trash", 17)}</button>`}</div>`;
@@ -1463,7 +1463,7 @@ async function courseEditor(id) {
   };
   const render = () => {
     main.innerHTML = `<section class="gp-head" style="--h:${hueOfName(c.title)}">
-        <div class="gp-cover${c.cover ? " has-cv" : ""}">${c.cover ? `<img class="cv-img" src="/static/covers/${esc(c.cover)}.svg" alt="">` : ""}<a class="gp-back" href="#courses" aria-label="Сургалтууд руу буцах">${ico("back", 18)}Сургалтууд</a><b>${esc(c.title.trim()[0] || "?")}</b>${shared ? "" : `<button type="button" class="gp-cover-btn" data-cover-pick title="20 загвараас сонгоно">${ico("edit", 14)}Толгойн зураг</button>`}</div>
+        <div class="gp-cover${c.cover ? " has-cv" : ""}">${SG.coverHTML(c.cover)}<a class="gp-back" href="#courses" aria-label="Сургалтууд руу буцах">${ico("back", 18)}Сургалтууд</a><b>${esc(c.title.trim()[0] || "?")}</b>${shared ? "" : `<button type="button" class="gp-cover-btn" data-cover-pick title="20 загвараас сонгоно">${ico("edit", 14)}Толгойн зураг</button>`}</div>
         <div class="gp-bar">
           <div class="grow gp-info"><h1>${esc(c.title)}</h1>
             <p class="gp-desc">${c.description ? esc(c.description) : `<span class="muted">${shared ? "Тайлбар нэмээгүй байна." : "Тайлбар нэмээгүй байна — «Тохиргоо»-оос нэмнэ."}</span>`}</p>
@@ -1736,7 +1736,7 @@ async function courseEditor(id) {
   const saveCourse = async (body) => { c = { ...c, ...(await api(`/api/courses/${c.id}`, { method: "PUT", body })) }; searchCourses = null; };
   const courseBody = (extra) => ({ title: c.title, description: c.description, price: c.price, published: !!c.published, drip: !!c.drip, unlock_all_paid: !!c.unlock_all_paid, certificate: !!c.certificate, camera: c.camera || "optional", max_warnings: c.max_warnings || 0, block_hours: c.block_hours || 0, block_minutes: c.block_minutes || 0, ...extra });
   // Толгойн зургийн загвар: 120 SVG (салбар бүрээр 100 + хөдөлгөөнт 20, /static/covers) эсвэл өнгөт градиент — нийтлэг цонх (app.js).
-  const coverPicker = () => SG.coverPicker({ title: "Толгойн зураг", lead: "Сургалтын хуудас, картын толгойд харагдана. 120 загвар: салбар бүрээр (математик, физик, хими, биологи, анагаах, газарзүй, технологи, инженер, хүмүүнлэг, урлаг…), абстракт, хөдөлгөөнт.", current: c.cover || "", allowNone: true, hue: hueOfName(c.title),
+  const coverPicker = () => SG.coverPicker({ title: "Толгойн зураг", lead: "Сургалтын хуудас, картын толгойд харагдана: 120 загвар (салбар бүрээр, абстракт, хөдөлгөөнт), компьютерээсээ зураг, зургийн холбоос эсвэл embed (YouTube, Canva, Google Slides…).", current: c.cover || "", allowNone: true, hue: hueOfName(c.title), sources: true,
     onPick: async (id) => { await saveCourse(courseBody({ cover: id })); toast(id ? "Толгойн зураг солигдлоо ✓" : "Градиент болгов ✓"); render(); } });
   const lessonBody = (f, l) => {
     const isFree = f.mode.value === "free";

@@ -1,7 +1,13 @@
 package httpapi
 
 import (
+	"bytes"
+	"encoding/json"
+	"image"
+	"image/png"
 	"io"
+	"mime/multipart"
+	"net/http/httptest"
 	"net/http"
 	"strings"
 	"testing"
@@ -77,4 +83,76 @@ func TestProfileCoverTemplate(t *testing.T) {
 	if code, _ := call(t, srv, "PUT", "/api/me/profile", tt, `{"display_name":"Б. Багш","cover_url":"/static/app.css"}`); code != 400 {
 		t.Fatalf("өөр static файл: %d", code)
 	}
+}
+
+// Толгойн зургийн эх сурвалжууд: өөрийн public файл, https холбоос, embed зөвшөөрөгдөнө; бусдын файл, private файл,
+// http холбоос, хэт урт embed татгалзагдана; нийтийн хуудсанд төрлөөрөө орно.
+func TestCourseCoverSources(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "cvs", "teacher")
+	_, other := register(t, srv, "cvo", "teacher")
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Эх сурвалж","price":0,"published":true}`)
+	cid := c["id"].(string)
+	put := func(cover string) (int, map[string]any) {
+		return call(t, srv, "PUT", "/api/courses/"+cid, tt, `{"title":"Эх сурвалж","price":0,"published":true,"cover":"`+cover+`"}`)
+	}
+	pub := uploadPublic(t, srv, tt, "cover.png")
+	if code, u := put(pub); code != 200 || u["cover"] != pub {
+		t.Fatalf("өөрийн public файл: %d %v", code, u)
+	}
+	priv := uploadFile(t, srv, tt, "secret.png", []byte("x"))
+	if code, _ := put(priv); code != 400 {
+		t.Fatalf("private файл толгой болохгүй: %d", code)
+	}
+	if code, _ := put("/files/" + other + "/public/x.webp"); code != 400 {
+		t.Fatalf("бусдын файл: %d", code)
+	}
+	if code, u := put("https://example.com/cover.jpg"); code != 200 || u["cover"] != "https://example.com/cover.jpg" {
+		t.Fatalf("https холбоос: %d %v", code, u)
+	}
+	if code, _ := put("http://example.com/cover.jpg"); code != 400 {
+		t.Fatalf("http холбоос: %d", code)
+	}
+	if code, u := put("embed:https://www.youtube.com/watch?v=abc123"); code != 200 || u["cover"] != "embed:https://www.youtube.com/watch?v=abc123" {
+		t.Fatalf("embed: %d %v", code, u)
+	}
+	if code, _ := put("embed:" + strings.Repeat("x", 20001)); code != 400 {
+		t.Fatalf("хэт урт embed: %d", code)
+	}
+	res, err := http.Get(srv.URL + "/c/" + cid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if !strings.Contains(string(body), `data-cv-embed="https://www.youtube.com/watch?v=abc123"`) {
+		t.Fatal("нийтийн хуудсанд embed толгой алга")
+	}
+}
+
+// uploadPublic — нээлттэй (public) файлын санд жижиг PNG оруулаад замыг нь өгнө.
+func uploadPublic(t *testing.T, srv *httptest.Server, token, name string) string {
+	t.Helper()
+	var pngBuf bytes.Buffer
+	_ = png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 4, 4)))
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, _ := mw.CreateFormFile("file", name)
+	fw.Write(pngBuf.Bytes())
+	mw.Close()
+	req, _ := http.NewRequest("POST", srv.URL+"/api/me/files?visibility=public", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var out map[string]any
+	_ = json.NewDecoder(res.Body).Decode(&out)
+	if res.StatusCode != 201 && res.StatusCode != 200 {
+		t.Fatalf("public файл хуулагдсангүй: %d %v", res.StatusCode, out)
+	}
+	return out["path"].(string)
 }

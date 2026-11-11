@@ -76,9 +76,6 @@ func (in *courseInput) validate() string {
 		}
 		in.AccessCode = &code
 	}
-	if in.Cover != nil && *in.Cover != "" && !coverRe.MatchString(*in.Cover) {
-		return "толгойн зургийн загвар буруу"
-	}
 	switch in.Camera {
 	case "":
 		in.Camera = "optional"
@@ -141,6 +138,10 @@ func (s *Server) handleCreateCourse(w http.ResponseWriter, r *http.Request) {
 		course.AccessCode, course.Locked = *in.AccessCode, *in.AccessCode != ""
 	}
 	if in.Cover != nil {
+		if msg := coverOK(*in.Cover, c.UID); msg != "" {
+			writeErr(w, http.StatusBadRequest, msg)
+			return
+		}
 		course.Cover = *in.Cover
 	}
 	if err := s.store.CreateCourse(r.Context(), course); s.storeErr(w, r, err) {
@@ -171,6 +172,10 @@ func (s *Server) handleUpdateCourse(w http.ResponseWriter, r *http.Request) {
 		course.AccessCode = cur.AccessCode // «Нийтлэх» г.м хэсэгчилсэн хадгалалт нууц үгийг арилгахгүй
 	}
 	if in.Cover != nil {
+		if msg := coverOK(*in.Cover, c.UID); msg != "" {
+			writeErr(w, http.StatusBadRequest, msg)
+			return
+		}
 		course.Cover = *in.Cover
 	} else if cur, err := s.store.CourseByID(r.Context(), course.ID); err == nil {
 		course.Cover = cur.Cover // хэсэгчилсэн хадгалалт зургийг арилгахгүй
@@ -227,6 +232,44 @@ type lessonInput struct {
 	Assignment   *store.Assignment `json:"assignment"`     // хоосон биш бол даалгавар
 	Discussion   bool              `json:"discussion"`     // хэлэлцүүлэгтэй (лайк, сэтгэгдэл)
 	UnlockRule   string            `json:"unlock_rule"`    // дараалалд нээгдэх нөхцөл (store.UnlockRules)
+}
+
+// Толгойн зургийн эх сурвалж (Course.Cover): "tNN" загвар | өөрийн public файл (/files/<багш>/public/…) | https зургийн
+// холбоос | "embed:" + HTML/холбоос (суралцагчид sandbox iframe-д, блокийн embed-тэй ижил).
+const coverEmbedPrefix, maxCoverEmbed = "embed:", 20_000
+
+func coverOK(cover, teacherID string) string {
+	switch {
+	case cover == "", coverRe.MatchString(cover):
+		return ""
+	case strings.HasPrefix(cover, coverEmbedPrefix):
+		t := strings.TrimSpace(strings.TrimPrefix(cover, coverEmbedPrefix))
+		if t == "" || len(t) > maxCoverEmbed {
+			return "embed 1-20,000 тэмдэгт"
+		}
+		return ""
+	case strings.HasPrefix(cover, "/files/"):
+		if !strings.HasPrefix(cover, "/files/"+teacherID+"/"+files.Public+"/") {
+			return "толгойн зураг: өөрийн нээлттэй (public) файл байх ёстой"
+		}
+		return ""
+	case validURL(cover) && len(cover) <= maxBlockURL:
+		return ""
+	}
+	return "толгойн зураг: загвар, өөрийн файл, https холбоос эсвэл embed"
+}
+
+// coverKind — харагдацад: tpl | img | embed | "" (загвар.html, студи ижил дүрмээр).
+func coverKind(cover string) string {
+	switch {
+	case cover == "":
+		return ""
+	case coverRe.MatchString(cover):
+		return "tpl"
+	case strings.HasPrefix(cover, coverEmbedPrefix):
+		return "embed"
+	}
+	return "img"
 }
 
 // coverRe — толгойн зургийн загварын ID (/static/covers/t01.svg … t20.svg).

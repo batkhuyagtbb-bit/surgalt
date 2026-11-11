@@ -16,7 +16,7 @@
     <div class="lp-scrim" data-lp-toc-close></div>
   </section>
   <section class="hero hero-course{{with $c.Cover}} has-cv{{end}}" style="--h:{{hue $c.Title}}">
-    <div class="hero-inner">{{with $c.Cover}}<div class="course-cover reveal" aria-hidden="true"><img class="cv-img" src="/static/covers/{{.}}.svg" alt=""></div>{{end}}
+    <div class="hero-inner">{{with $c.Cover}}{{if eq (coverKind .) "embed"}}<div class="course-cover course-cover-embed reveal" data-cv-embed="{{coverSrc .}}"></div>{{else}}<div class="course-cover reveal" aria-hidden="true"><img class="cv-img" src="{{coverSrc .}}" alt="" referrerpolicy="no-referrer"></div>{{end}}{{end}}
       <div class="hero-left">
         <a class="teacher-chip reveal" href="/t/{{$t.Username}}">
           <span class="avatar avatar-sm" style="--h:{{hue $t.Username}}">{{if $t.AvatarURL}}<img src="{{$t.AvatarURL}}" alt="">{{else}}{{initials $t.DisplayName}}{{end}}</span>
