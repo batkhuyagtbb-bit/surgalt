@@ -373,7 +373,7 @@ const programSelect = (cur = "") => me.org ? `<label>Мэргэжлийн хөт
 const courseFormHTML = (c = {}) => `
   <label>Сургалтын нэр<input name="title" required maxlength="200" value="${esc(c.title || "")}" placeholder="${me.org ? "Програмчлалын үндэс" : "ЭЕШ Математик — Бүрэн бэлтгэл"}"></label>
   ${programSelect(c.program_id)}
-  <label>Тайлбар<textarea name="description" rows="4" placeholder="Энэ сургалтаар юу сурах вэ?">${esc(c.description || "")}</textarea></label>
+  <label>Товч тайлбар<textarea name="description" rows="4" placeholder="Энэ сургалтаар юу сурах вэ? (50 үгэнд багтаана)">${esc(c.description || "")}</textarea><small class="muted desc-wc" data-desc-wc aria-live="polite">${descWC(c.description || "")}</small></label>
   <div class="form-row"><label>Багц үнэ (₮)<input name="price" type="number" min="0" step="1000" value="${c.price || 0}"><small class="muted">0 бол хичээл тус бүрээр зарна</small></label>
   <label class="check" style="align-self:center"><input type="checkbox" name="published" ${c.published ? "checked" : ""}> Нийтлэх (профайл дээр харагдана)</label></div>
   <fieldset class="cs-lock"><legend>🔒 Нууц үгтэй сургалт</legend>
@@ -407,6 +407,10 @@ document.addEventListener("click", (e) => {
 });
 const FORMATS = [["", "— Сургалтын хэлбэр —"], ["lecture", "Лекц"], ["seminar", "Семинар"], ["practice", "Дадлага"], ["lab", "Лаборатори"]];
 const MODES = [["", "— Заах аргын төрөл —"], ["classroom", "Танхимын"], ["online", "Цахим"], ["blended", "Холимог"]];
+// Сургалтын товч тайлбарын үгийн тоо (дээд 50 — сервер ч шалгана).
+const DESC_MAX_WORDS = 50, wordCount = (t) => (t.trim() ? t.trim().split(/\s+/).length : 0);
+const descWC = (t) => { const n = wordCount(t); return `${n}/${DESC_MAX_WORDS} үг${n > DESC_MAX_WORDS ? " — хэтэрсэн, богиносгоно уу" : ""}`; };
+document.addEventListener("input", (e) => { const t = e.target; if (t.name !== "description" || !t.closest("form")) return; const wc = $("[data-desc-wc]", t.closest("label")); if (!wc) return; wc.textContent = descWC(t.value); wc.classList.toggle("over", wordCount(t.value) > DESC_MAX_WORDS); });
 const kindName = (k) => (FORMATS.find(([v]) => v === k)?.[1] || MODES.find(([v]) => v === k)?.[1] || "");
 const UNLOCKS = [[0, "Шууд (өмнөхийг үзмэгц)"], [1, "1 цагийн дараа"], [24, "1 хоногийн дараа"], [72, "3 хоногийн дараа"], [168, "7 хоногийн дараа"], [336, "14 хоногийн дараа"], [720, "1 сарын дараа"]];
 

@@ -47,3 +47,17 @@ func TestCourseCover(t *testing.T) {
 		t.Fatalf("зураггүй болгох: %v", u)
 	}
 }
+
+// Сургалтын товч тайлбар 50 үгэнд багтана.
+func TestCourseDescriptionWords(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "desc", "teacher")
+	long := strings.Repeat("үг ", 51)
+	if code, r := call(t, srv, "POST", "/api/courses", tt, `{"title":"Урт","price":0,"description":"`+long+`"}`); code != 400 || !strings.Contains(r["error"].(string), "50 үг") {
+		t.Fatalf("51 үг: %d %v", code, r)
+	}
+	if code, _ := call(t, srv, "POST", "/api/courses", tt, `{"title":"Яг","price":0,"description":"`+strings.Repeat("үг ", 50)+`"}`); code != 201 {
+		t.Fatalf("50 үг: %d", code)
+	}
+}

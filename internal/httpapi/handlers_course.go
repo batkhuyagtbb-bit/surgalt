@@ -49,6 +49,8 @@ func (in *courseInput) validate() string {
 	switch {
 	case in.Title == "" || utf8.RuneCountInString(in.Title) > 200:
 		return "гарчиг 1-200 тэмдэгт"
+	case len(strings.Fields(in.Description)) > maxDescWords:
+		return "товч тайлбар 50 үгэнд багтана"
 	case utf8.RuneCountInString(in.Description) > 20000:
 		return "тайлбар хэт урт"
 	case in.Price < 0 || in.Price > maxPrice:
@@ -229,6 +231,9 @@ type lessonInput struct {
 
 // coverRe — толгойн зургийн загварын ID (/static/covers/t01.svg … t20.svg).
 var coverRe = regexp.MustCompile(`^t(0[1-9]|1[0-9]|20)$`)
+
+// maxDescWords — сургалтын товч тайлбарын дээд үгийн тоо (карт, нийтийн хуудасны толгойд багтахуйц).
+const maxDescWords = 50
 
 const maxUnlockHours = 24 * 365
 

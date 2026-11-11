@@ -5049,3 +5049,6 @@ a.np-item:active{background:var(--line)}
 .cv-none{background:linear-gradient(135deg,hsl(var(--h,222) 62% 33%),hsl(var(--h,222) 68% 21%))}
 .cv-opt.on{border-color:var(--accent)}.cv-opt span{position:absolute;left:8px;bottom:8px;padding:3px 9px;border-radius:999px;background:rgba(15,23,42,.6);color:#fff;font:700 .72rem var(--sans)}
 @media (max-width:520px){.cv-grid{grid-template-columns:1fr}}
+
+/* Сургалтын товч тайлбарын үгийн тоолуур */
+.desc-wc{display:block;margin-top:4px;font-size:.78rem}.desc-wc.over{color:var(--danger,#dc2626);font-weight:700}
