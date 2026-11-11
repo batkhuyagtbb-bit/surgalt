@@ -1742,10 +1742,11 @@ async function courseEditor(id) {
     });
   };
   const saveCourse = async (body) => { c = { ...c, ...(await api(`/api/courses/${c.id}`, { method: "PUT", body })) }; searchCourses = null; };
-  const courseBody = (extra) => ({ title: c.title, description: c.description, price: c.price, published: !!c.published, drip: !!c.drip, unlock_all_paid: !!c.unlock_all_paid, certificate: !!c.certificate, camera: c.camera || "optional", max_warnings: c.max_warnings || 0, block_hours: c.block_hours || 0, block_minutes: c.block_minutes || 0, ...extra });
+  // Одоогийн тохиргоог хэвээр нь, нэг талбарыг солих (толгойн зураг г.м.). Нийтийн courseBody(f) формоос уншдаг — нэр давхцуулахгүй.
+  const coursePatch = (extra) => ({ title: c.title, description: c.description, price: c.price, published: !!c.published, drip: !!c.drip, unlock_all_paid: !!c.unlock_all_paid, certificate: !!c.certificate, camera: c.camera || "optional", max_warnings: c.max_warnings || 0, block_hours: c.block_hours || 0, block_minutes: c.block_minutes || 0, ...extra });
   // Толгойн зургийн загвар: 120 SVG (салбар бүрээр 100 + хөдөлгөөнт 20, /static/covers) эсвэл өнгөт градиент — нийтлэг цонх (app.js).
   const coverPicker = () => SG.coverPicker({ title: "Толгойн зураг", lead: "Сургалтын хуудас, картын толгойд харагдана: 120 загвар (салбар бүрээр, абстракт, хөдөлгөөнт), компьютерээсээ зураг, зургийн холбоос эсвэл embed (YouTube, Canva, Google Slides…).", current: c.cover || "", allowNone: true, hue: hueOfName(c.title), sources: true,
-    onPick: async (id) => { await saveCourse(courseBody({ cover: id })); toast(id ? "Толгойн зураг солигдлоо ✓" : "Градиент болгов ✓"); render(); } });
+    onPick: async (id) => { await saveCourse(coursePatch({ cover: id })); toast(id ? "Толгойн зураг солигдлоо ✓" : "Градиент болгов ✓"); render(); } });
   const lessonBody = (f, l) => {
     const isFree = f.mode.value === "free";
     const blocks = f._be.collect();
