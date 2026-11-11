@@ -5060,3 +5060,16 @@ a.np-item:active{background:var(--line)}
 .cv-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}.cv-tab{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--text);padding:7px 13px;font:700 .8rem var(--sans);cursor:pointer}.cv-tab.on{background:var(--brand,#1f3c8f);border-color:transparent;color:#fff}
 .cv-pane[hidden]{display:none}.cv-pane .form{margin-top:8px}.cv-file{margin:6px 0;width:100%}
 iframe.cv-img{border:0;pointer-events:auto}.gp-cover iframe.cv-img{pointer-events:none}
+
+/* Сургалтын нийтийн хуудас: толгойн зурагтай бол баннер дээр нь гарчиг, багш, тайлбар, товчнуудыг давхарлан зохион байгуулна */
+.hero-course.has-cv .hero-inner{position:relative;isolation:isolate;min-height:clamp(380px,44vw,540px);padding:clamp(22px,4vw,48px);border-radius:28px;overflow:hidden;align-items:end;box-shadow:var(--shadow-lg);background:#0f172a}
+.hero-course.has-cv .course-cover{position:absolute;inset:0;grid-column:auto;height:auto;border-radius:0;box-shadow:none;z-index:0}
+.hero-course.has-cv .course-cover::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(15,23,42,.02) 0%,rgba(15,23,42,.35) 50%,rgba(15,23,42,.85) 100%),linear-gradient(90deg,rgba(15,23,42,.55) 0%,rgba(15,23,42,0) 65%)}
+.hero-course.has-cv .hero-left,.hero-course.has-cv .hero-card{position:relative;z-index:1}
+.hero-course.has-cv .display{color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.4)}
+.hero-course.has-cv .lead{color:rgba(255,255,255,.88);text-shadow:0 1px 3px rgba(0,0,0,.35)}
+.hero-course.has-cv .teacher-chip{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.32);color:#fff;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.hero-course.has-cv .teacher-chip small,.hero-course.has-cv .org-teachers,.hero-course.has-cv .org-teachers .muted,.hero-course.has-cv .org-teacher{color:rgba(255,255,255,.8)}
+.hero-course.has-cv .hero-cta .btn-glass{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.38);color:#fff;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.hero-course.has-cv .hero-card{background:rgba(255,255,255,.93);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);align-self:end}
+@media (max-width:860px){.hero-course.has-cv .hero-inner{min-height:0;grid-template-columns:1fr;padding:18px;gap:18px}.hero-course.has-cv .hero-inner::before{content:"";display:block;height:clamp(120px,32vw,200px)}}
