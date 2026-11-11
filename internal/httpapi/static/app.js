@@ -305,6 +305,10 @@ function ripples() {
 /* ---------- modal ---------- */
 // Нээгдэх агшинд эцгийнх нь «зөөлөн гарах» анимейшнийг (stacking context үүсгэдэг) зогсооно — цонх бусад хэсгийн доор дарагдахгүй.
 function openModal(el) { if (!el) return; el.parentElement?.closest(".fade-in")?.classList.remove("fade-in"); el.classList.add("open"); el.setAttribute("aria-hidden", "false"); }
+// Баруунаас гарч ирдэг цонх: зүүн талын (бүдэг) хэсэгт нэг дарахад хаагдахгүй (санамсаргүй хаагдахаас хамгаална),
+// 2 дарахад хаагдана. Цонх бүрийн өөрийн «e.target === m» хаалтыг энд capture үед зогсооно.
+document.addEventListener("click", (e) => { const m = e.target; if (m.classList?.contains("modal") && m.classList.contains("open") && !m.dataset.dbl) e.stopPropagation(); }, true);
+document.addEventListener("dblclick", (e) => { const m = e.target; if (!m.classList?.contains("modal") || !m.classList.contains("open")) return; m.dataset.dbl = "1"; m.click(); delete m.dataset.dbl; if (m.classList.contains("open")) closeModal(m); }, true);
 function closeModal(el) {
   if (!el) return;
   el.classList.remove("open"); el.setAttribute("aria-hidden", "true");
