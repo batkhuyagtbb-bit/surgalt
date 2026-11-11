@@ -255,7 +255,7 @@ VIEWS.teachers = {
     </tr></thead><tbody></tbody></table></div>`;
     const row = (t) => `<tr data-teacher="${esc(t.id)}" tabindex="0">
       <td><span class="adm-person" title="${esc(t.email || "")}">${avatar(t.name, t.avatar_url)}<span><b>${esc(t.name || t.username)}</b><small>@${esc(t.username)}</small></span></span></td>
-      <td>${planChip(t)}<small>${dd(t.plan_until)}${t.plan_active ? " хүртэл · " + t.plan_pct + "%" : ""}</small></td>
+      <td>${planChip(t)}<small>${orgUntil(t)}${t.plan_active ? " · " + t.plan_pct + "%" : ""}</small></td>
       <td class="n">${num(t.courses)}${t.courses ? `<small>${num(t.courses_published)} нийтэлсэн</small>` : ""}</td><td class="n">${num(t.lessons)}</td><td class="n">${num(t.books)}</td>
       <td class="n">${num(t.files)}<small>${bytes(t.file_bytes)}</small></td><td class="n">${num(t.students)}</td>
       <td class="n"><b>${tg(t.revenue)}</b><small>${num(t.sales)} удаа</small></td><td class="n">${tg(t.paid_out)}</td>
@@ -421,9 +421,9 @@ function openOrg(o, done) {
 }
 
 // Системийн эрх (plans.go): шошго ба олгох сонголт.
-const PLAN_OPTS = [["month", "Сарын · 1 сар"], ["half", "Хагас жил · 6 сар"], ["year", "Бүтэн жил · 1 жил"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
-const orgUntil = (o) => (o.plan === "contract" ? "хугацаагүй" : `${dd(o.plan_until)}${o.plan_active ? " хүртэл" : "-нд дууссан"}`);
-const ORG_PLAN_OPTS = [["org_month", "Сарын · 1 сар · 2GB"], ["org_half", "Хагас жил · 6 сар · 5GB"], ["org_year", "Бүтэн жил · 1 жил · 5GB"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+const PLAN_OPTS = [["month", "Сарын · 1 сар"], ["half", "Хагас жил · 6 сар"], ["year", "Бүтэн жил · 1 жил"], ["unlimited", "Хязгааргүй · хугацаагүй · сан хязгааргүй"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+const orgUntil = (o) => (o.plan === "contract" || o.plan === "unlimited" ? "хугацаагүй" : `${dd(o.plan_until)}${o.plan_active ? " хүртэл" : "-нд дууссан"}`);
+const ORG_PLAN_OPTS = [["org_month", "Сарын · 1 сар · 2GB"], ["org_half", "Хагас жил · 6 сар · 5GB"], ["org_year", "Бүтэн жил · 1 жил · 5GB"], ["unlimited", "Хязгааргүй · хугацаагүй · сан хязгааргүй"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
 const planChip = (t) => `<span class="chip ${!t.plan_active ? "chip-coral" : t.plan === "trial" ? "chip-amber" : "chip-teal"}">${t.plan_active ? esc(t.plan_name) : "Дууссан"}</span>`;
 
 async function openTeacher(id) {
@@ -457,7 +457,7 @@ async function openTeacher(id) {
       ${kpi("Борлуулалт", tg(t.revenue), `${num(t.sales)} удаа`, "good")}
       ${kpi("Татсан", tg(t.paid_out), "данс руу шилжүүлсэн")}
       ${kpi("Хүлээгдэж буй", tg(t.pending), "татах хүсэлт", t.pending ? "warn" : "")}
-      ${kpi("Системийн эрх", planChip(t), t.plan_active ? `${dd(t.plan_until)} хүртэл · шимтгэл ${t.plan_pct}%` : `${dd(t.plan_until)}-нд дууссан`, t.plan_active ? "" : "warn")}
+      ${kpi("Системийн эрх", planChip(t), t.plan_active ? `${orgUntil(t)} · шимтгэл ${t.plan_pct}%` : orgUntil(t), t.plan_active ? "" : "warn")}
       ${kpi("Платформын шимтгэл", tg(t.commission), "борлуулалтаас")}
       ${kpi("Үлдэгдэл", tg(t.available), "шимтгэл хассан, татаж болох")}
       ${kpi("Суралцагч", num(t.students), `${num(t.profile_views)} профайл үзэлт`)}
@@ -472,7 +472,7 @@ async function openTeacher(id) {
     e.preventDefault();
     const sel = e.target.plan, label = sel.selectedOptions[0].textContent;
     if (!confirm(`${t.name || t.username}-д «${label}» багцыг үнэгүй олгох уу?`)) return;
-    try { const r = await api(`/api/admin/teachers/${encodeURIComponent(id)}/plan`, { method: "POST", body: { plan: sel.value } }); toast(`Олголоо · ${dd(r.until)} хүртэл`); openTeacher(id); }
+    try { const r = await api(`/api/admin/teachers/${encodeURIComponent(id)}/plan`, { method: "POST", body: { plan: sel.value } }); toast(r.unlimited ? "Олголоо · хугацаагүй" : `Олголоо · ${dd(r.until)} хүртэл`); openTeacher(id); }
     catch (x) { toast(x.message, true); }
   });
   $(".dr-tabs", body).addEventListener("click", (e) => {

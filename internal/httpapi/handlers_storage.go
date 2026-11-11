@@ -17,6 +17,9 @@ type StoragePlan struct {
 }
 
 func sizeLabel(mb int64) string {
+	if mb >= store.UnlimitedMB {
+		return "хязгааргүй"
+	}
 	if mb >= 1024 && mb%1024 == 0 {
 		return fmt.Sprintf("%dGB", mb/1024)
 	}
@@ -70,7 +73,7 @@ func (s *Server) handleMyStorage(w http.ResponseWriter, r *http.Request) {
 		basePlan = planName(id)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"used": used, "quota": s.quotaOf(u), "free_bytes": s.cfg.StorageFreeMB << 20,
+		"used": used, "quota": s.quotaOf(u), "free_bytes": s.cfg.StorageFreeMB << 20, "unlimited": s.quotaOf(u) >= store.UnlimitedMB<<20,
 		"base_bytes": base, "base_label": sizeLabel(base >> 20), "base_plan": basePlan,
 		"plan_mb": u.StorageExtraBytes >> 20, "plan_active": active, "expires_at": u.StorageExpiresAt,
 	})

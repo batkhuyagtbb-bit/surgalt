@@ -122,7 +122,7 @@ const planDate = (s) => { const d = new Date(s); return `${d.getFullYear()}.${St
 const goWallet = () => { const t = document.querySelector('.pf-tab[data-tab="wallet"]'); if (t) t.click(); else location.hash = "wallet"; };
 function planNowHTML(ps) {
   const what = ps.plan === "trial" ? "Үнэгүй хугацаа" : ps.active ? `«${esc(ps.name)}» багц` : "Системийн эрх дууссан";
-  const when = ps.active ? `${planDate(ps.until)} хүртэл · <b>${ps.days_left}</b> хоног үлдсэн · гүйлгээний шимтгэл ${ps.commission_pct}%` : `${planDate(ps.until)}-нд дууссан`;
+  const when = ps.unlimited ? `Хугацаагүй · файлын сан хязгааргүй · гүйлгээний шимтгэл ${ps.commission_pct}%` : ps.active ? `${planDate(ps.until)} хүртэл · <b>${ps.days_left}</b> хоног үлдсэн · гүйлгээний шимтгэл ${ps.commission_pct}%` : `${planDate(ps.until)}-нд дууссан`;
   const next = ps.upcoming.length ? `<small>Дараа нь: ${ps.upcoming.map((u) => `${esc(u.name)} (${planDate(u.from)} – ${planDate(u.until)})`).join(", ")}</small>` : "";
   return `<div class="sp-now${!ps.active ? " off" : ps.days_left <= 7 ? " warn" : ""}"><span class="sp-ic">${ico(ps.active ? "clock" : "lock", 20)}</span><div><b>${what}</b><small>${when}</small>${next}</div></div>`;
 }
@@ -175,7 +175,7 @@ function planLock(ps) {
 }
 // Дуусахад 7 хоног үлдсэн бол бүх хэсэгт, үнэгүй хугацаанд тойм дээр сануулга.
 function planBanner(ps, view) {
-  if (!ps?.active || ps.contract || !main || view === "wallet") return;
+  if (!ps?.active || ps.contract || ps.unlimited || !main || view === "wallet") return;
   const soon = ps.days_left <= 7, trial = ps.plan === "trial";
   if (!soon && !(trial && (!view || view === "overview"))) return;
   const el = document.createElement("div");
@@ -215,7 +215,7 @@ async function overview() {
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(now); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i); return d; });
   const perDay = (d) => meetings.filter((m) => dayKey(m.starts_at) === dayKey(d));
   const next = meetings[0];
-  const pct = storage.quota ? Math.round(storage.used / storage.quota * 100) : 0;
+  const pct = storage.quota && !storage.unlimited ? Math.round(storage.used / storage.quota * 100) : 0;
   const kpi = (ic, id, label, sub, href) => `<a class="anx-kpi ovx-kpi" href="${href}"><span class="anx-ic">${ico(ic, 18)}</span><small>${label}</small><b id="${id}">0</b><div class="anx-sub">${sub}</div></a>`;
   // Ухаалаг зөвлөмж: одоо байгаа өгөгдлөөс хамгийн чухал 4 алхам (ноорог, хоосон сургалт, ойрын шууд хичээл, сан, борлуулалт).
   const soon = meetings.find((m) => new Date(m.starts_at) - now < 24 * 3600e3 && new Date(m.starts_at).getTime() + m.duration_min * 60000 > now);
@@ -276,7 +276,7 @@ async function overview() {
           <div class="agenda" id="agenda"></div></section>
         <section class="anx-card"><div class="anx-card-head"><h3>${ico("files", 18)}Файлын сан</h3><a class="link" href="#files">Удирдах ${ico("chevron", 14)}</a></div>
           <div class="anx-meter ovx-store"><i id="sMeter" style="width:0;background:${pct >= 80 ? "var(--coral)" : "var(--brand)"}"></i></div>
-          <p class="muted small" style="margin:.6em 0 0">${fmtSize(storage.used)} / ${fmtSize(storage.quota)} ашигласан · ${pct}%</p></section>
+          <p class="muted small" style="margin:.6em 0 0">${fmtSize(storage.used)} / ${storage.unlimited ? "хязгааргүй" : fmtSize(storage.quota)} ашигласан${storage.unlimited ? "" : ` · ${pct}%`}</p></section>
       </div>
     </div>
 
@@ -2103,8 +2103,8 @@ async function books() {
 async function files() {
   const [lib, st, plans] = await Promise.all([loadLibrary(), api("/api/me/storage"), api("/api/storage/plans", { token: null })]);
   const perMB = Math.min(...plans.plans.map((p) => p.price_month / p.mb));
-  const pct = Math.min(100, (st.used / st.quota) * 100);
-  main.innerHTML = panel(`<div class="panel-head"><h2>Файлын сан</h2><span class="chip ${pct > 85 ? "chip-coral" : "chip-gold"}">${fmtSize(st.used)} / ${fmtSize(st.quota)}</span></div>
+  const pct = st.unlimited ? 0 : Math.min(100, (st.used / st.quota) * 100);
+  main.innerHTML = panel(`<div class="panel-head"><h2>Файлын сан</h2><span class="chip ${pct > 85 ? "chip-coral" : "chip-gold"}">${fmtSize(st.used)} / ${st.unlimited ? "хязгааргүй" : fmtSize(st.quota)}</span></div>
       <div class="meter"><i id="fMeter"></i></div>
       <p class="muted small">${st.base_plan ? `«${esc(st.base_plan)}» багцад ${esc(st.base_label)}` : `Үнэгүй ${plans.free_label}`}${st.plan_active ? ` + ${esc(String(st.plan_mb >= 1024 ? st.plan_mb / 1024 + "GB" : st.plan_mb + "MB"))} нэмэлт сан (${fmtDate(st.expires_at)} хүртэл)` : ""}.
       Зураг автоматаар <b>WebP</b> болж ${plans.max_image_side}px хүртэл багасна, видео <b>WebM</b>, Word/PowerPoint <b>PDF (3D ном)</b> болно.</p>

@@ -67,6 +67,25 @@ var legacyPlans = []Plan{
 	{ID: "pro", Name: "Enterprise", Label: "Бизнес / Энтерпрайз", StorageMB: 2048, Months: 12, Price: 500000, Pct: TransactionFeePct},
 }
 
+// PlanUnlimited — хянагчийн олгодог хязгааргүй эрх: хугацаагүй (ContractUntil), файлын сан UnlimitedMB. Худалдаалахгүй.
+const PlanUnlimited = "unlimited"
+
+// UnlimitedMB — «хязгааргүй» файлын сан (1TB): quota-гийн тооцоонд энэ хэмжээ, харагдацад «хязгааргүй».
+const UnlimitedMB int64 = 1 << 20
+
+// adminPlans — зөвхөн хянагч олгодог багцууд (PlanByID таньдаг, худалдаанд байхгүй).
+var adminPlans = []Plan{
+	{ID: PlanUnlimited, Name: "Хязгааргүй", Label: "Хянагч олгосон", StorageMB: UnlimitedMB, Months: 0, Pct: TransactionFeePct},
+}
+
+// Until — from-оос эхэлсэн багцын төгсгөл; хугацаагүй (Months 0) багцад ContractUntil.
+func (p Plan) Until(from time.Time) time.Time {
+	if p.Months <= 0 {
+		return ContractUntil
+	}
+	return from.AddDate(0, p.Months, 0)
+}
+
 // Үнэгүй хугацааны (болон эрхгүй үеийн) шимтгэл = TransactionFeePct. Хуучин захиалга (commission_pct 0) л
 // TEACHER_COMMISSION_PERCENT-ээр тооцогдоно.
 const (
@@ -120,7 +139,7 @@ const planTrialMonthsBefore = 3
 
 // PlanByID — багц (байгууллагын, хуучин багцыг ч таньна: хадгалсан эрх, захиалга).
 func PlanByID(id string) (Plan, bool) {
-	for _, list := range [][]Plan{Plans, OrgPlans, legacyPlans} {
+	for _, list := range [][]Plan{Plans, OrgPlans, legacyPlans, adminPlans} {
 		for _, p := range list {
 			if p.ID == id {
 				return p, true
@@ -164,6 +183,9 @@ func (u *User) FeePct() float64 {
 
 // PlanTerm — «3 сар», «1 жил».
 func PlanTerm(months int) string {
+	if months <= 0 {
+		return "хугацаагүй"
+	}
 	if months%12 == 0 {
 		return strconv.Itoa(months/12) + " жил"
 	}
@@ -282,8 +304,20 @@ func (u *User) AddPlan(pl Plan, order string, now time.Time) PlanPeriod {
 	u.Plan.Periods = append([]PlanPeriod(nil), u.Plan.Periods...) // хуулбар дээр (дуудагчийн slice-ийг өөрчлөхгүй)
 	var np PlanPeriod
 	switch {
+	case pl.Months <= 0: // хязгааргүй: одооноос хугацаагүй; бусад багцын үлдэгдэл хэрэггүй (өнгөрсөн хэсэг нь үлдэнэ)
+		out := make([]PlanPeriod, 0, len(u.Plan.Periods)+1)
+		for _, p := range u.Plan.Periods {
+			if p.From.Before(now) {
+				if p.Until.After(now) {
+					p.Until = now
+				}
+				out = append(out, p)
+			}
+		}
+		np = PlanPeriod{Plan: pl.ID, From: now, Until: ContractUntil, Order: order}
+		u.Plan.Periods = append(out, np)
 	case !ok:
-		np = PlanPeriod{Plan: pl.ID, From: now, Until: now.AddDate(0, pl.Months, 0), Order: order}
+		np = PlanPeriod{Plan: pl.ID, From: now, Until: pl.Until(now), Order: order}
 		u.Plan.Periods = append(u.Plan.Periods, np)
 	case pl.Pct < pct && u.Org == nil: // байгууллагын шимтгэл багцаас үл хамаарна — араас нь
 		end := now.AddDate(0, pl.Months, 0)
@@ -307,7 +341,7 @@ func (u *User) AddPlan(pl Plan, order string, now time.Time) PlanPeriod {
 		u.Plan.Periods = append(out, np)
 	default:
 		start := u.PlanUntil()
-		np = PlanPeriod{Plan: pl.ID, From: start, Until: start.AddDate(0, pl.Months, 0), Order: order}
+		np = PlanPeriod{Plan: pl.ID, From: start, Until: pl.Until(start), Order: order}
 		u.Plan.Periods = append(u.Plan.Periods, np)
 	}
 	sort.Slice(u.Plan.Periods, func(i, j int) bool { return u.Plan.Periods[i].From.Before(u.Plan.Periods[j].From) })

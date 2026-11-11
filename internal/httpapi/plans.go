@@ -68,6 +68,14 @@ type planPeriodView struct {
 	Until time.Time `json:"until"`
 }
 
+// planEndsText — мэдэгдэлд: « · дуусах: 2027.01.02», хязгааргүй эрхэд « · хугацаагүй».
+func planEndsText(u *store.User) string {
+	if id, _, _ := u.PlanAt(time.Now()); id == store.PlanUnlimited {
+		return " · хугацаагүй"
+	}
+	return " · дуусах: " + u.PlanUntil().In(mnLoc).Format("2006.01.02")
+}
+
 func planName(id string) string {
 	if id == store.PlanTrial {
 		return "Үнэгүй хугацаа"
@@ -104,6 +112,7 @@ func planStatus(u *store.User, now time.Time) map[string]any {
 	st := planCatalog(u)
 	st["plan"], st["name"], st["commission_pct"], st["active"] = id, planName(id), pct, active
 	st["until"], st["days_left"], st["trial_until"], st["upcoming"] = until, days, u.TrialUntil(), upcoming
+	st["unlimited"] = id == store.PlanUnlimited // хянагчийн олгосон хугацаагүй эрх: сануулга, дуусах огноо харуулахгүй
 	if u.Org != nil { // байгууллага: байгууллагын багц, хянагчийн тогтоосон шимтгэл, гэрээний файлын сан
 		st["org"], st["storage_mb"], st["contract"] = true, u.Org.StorageMB, u.Org.Contract()
 	}
@@ -192,6 +201,9 @@ func (s *Server) handleAdminGrantPlan(w http.ResponseWriter, r *http.Request) {
 			return errNotTeacher
 		}
 		pl, ok := store.PlanOnSale(x, in.Plan) // байгууллагад байгууллагын багц
+		if !ok && in.Plan == store.PlanUnlimited { // хязгааргүй: зөвхөн хянагч олгоно (багш, байгууллага хоёуланд)
+			pl, ok = store.PlanByID(in.Plan)
+		}
 		if !ok {
 			return errNoPlan
 		}
@@ -213,7 +225,7 @@ func (s *Server) handleAdminGrantPlan(w http.ResponseWriter, r *http.Request) {
 	s.planEnds.Delete(u.ID)
 	s.adminInvalidate()
 	s.notify(r.Context(), &store.Notification{UserID: u.ID, Type: NotifPlan, Count: 1, ActorID: admin.ID, Title: "🎁 Танд системийн эрх олгогдлоо",
-		Body: p.Title() + " · " + store.PlanTerm(p.Months) + " · дуусах: " + u.PlanUntil().In(mnLoc).Format("2006.01.02"), Link: "/me#wallet"})
+		Body: p.Title() + " · " + store.PlanTerm(p.Months) + planEndsText(u), Link: "/me#wallet"})
 	s.hub.SendUsers([]string{u.ID}, map[string]any{"type": "plan_changed"})
 	s.log.Info("хянагч багц олгов", "user", u.ID, "plan", p.ID, "admin", admin.ID)
 	writeJSON(w, http.StatusOK, planStatus(u, time.Now()))
