@@ -4162,6 +4162,30 @@ function profileOwner(root, h) {
     } finally { root.classList.remove("uploading"); URL.revokeObjectURL(preview); }
   });
 
+  // «Загвараас сонгох»: сургалтын толгойн зургийн 20 загвар (/static/covers) нүүр зураг болно — байрлал тохируулах шаардлагагүй.
+  $$("[data-cover-template]").forEach((b) => b.addEventListener("click", async () => {
+    const names = await fetch("/static/covers/index.json").then((r) => r.json()).catch(() => ({}));
+    const ids = Object.keys(names).length ? Object.keys(names) : Array.from({ length: 20 }, (_, i) => "t" + String(i + 1).padStart(2, "0"));
+    const cur = $("img.pf-cover-img", $("#pfCover"))?.getAttribute("src") || "";
+    $("#coverTplModal")?.remove();
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="coverTplModal"><div class="modal-card" style="width:min(720px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${icon("x", 18)}</button>
+      <h3>Нүүр зургийн загвар</h3><p class="muted small">Сургалтын толгойн зургийн 20 загвар — профайлын нүүр зураг болгоно. Өөрийн зураг оруулахыг хүсвэл «Нүүр зураг солих».</p>
+      <div class="cv-grid">${ids.map((id) => `<button type="button" class="cv-opt ${cur === "/static/covers/" + id + ".svg" ? "on" : ""}" data-cv="${id}" style="--cv:url(/static/covers/${id}.svg)"><span>${esc(names[id] || id)}</span></button>`).join("")}</div></div></div>`);
+    const m = $("#coverTplModal"); openModal(m);
+    const close = () => { closeModal(m); setTimeout(() => m.remove(), 300); };
+    m.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-close]") || e.target === m) return close();
+      const o = e.target.closest("[data-cv]"); if (!o) return;
+      $$(".cv-opt", m).forEach((x) => x.classList.toggle("on", x === o));
+      const src = "/static/covers/" + o.dataset.cv + ".svg", box = $("#pfCover");
+      try {
+        await save({ cover_url: src });
+        $("img.pf-cover-img", box)?.remove(); box.insertAdjacentHTML("afterbegin", `<img class="pf-cover-img" src="${esc(src)}" alt="" style="object-position:50% 50%">`);
+        toast("Нүүр зураг солигдлоо ✓"); close();
+      } catch (x) { toast(x.message, true); }
+    });
+  }));
+
   // «Профайл засах»: мэдээлэл, профайлын холбоос, зөвлөмж — бүгд нэг цонхонд (тусдаа «Тохиргоо» хэсэг байхгүй).
   const modal = $("#editModal"), form = $("#editForm"), err = $("#editErr");
   const emTab = (name) => {

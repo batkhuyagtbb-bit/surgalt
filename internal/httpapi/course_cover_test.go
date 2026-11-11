@@ -61,3 +61,20 @@ func TestCourseDescriptionWords(t *testing.T) {
 		t.Fatalf("50 үг: %d", code)
 	}
 }
+
+// Толгойн зургийн загвар профайлын нүүр зураг ч болно; буруу загвар татгалзагдана.
+func TestProfileCoverTemplate(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "pcov", "teacher")
+	code, me := call(t, srv, "PUT", "/api/me/profile", tt, `{"display_name":"Б. Багш","cover_url":"/static/covers/t13.svg"}`)
+	if code != 200 || me["cover_url"] != "/static/covers/t13.svg" {
+		t.Fatalf("загвар нүүр зураг: %d %v", code, me)
+	}
+	if code, _ := call(t, srv, "PUT", "/api/me/profile", tt, `{"display_name":"Б. Багш","cover_url":"/static/covers/t99.svg"}`); code != 400 {
+		t.Fatalf("буруу загвар: %d", code)
+	}
+	if code, _ := call(t, srv, "PUT", "/api/me/profile", tt, `{"display_name":"Б. Багш","cover_url":"/static/app.css"}`); code != 400 {
+		t.Fatalf("өөр static файл: %d", code)
+	}
+}

@@ -217,8 +217,8 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	case utf8.RuneCountInString(in.Bio) > 4000:
 		writeErr(w, http.StatusBadRequest, "танилцуулга хэт урт")
 		return
-	case !ownImage(in.AvatarURL, c.UID) || !ownImage(in.CoverURL, c.UID):
-		writeErr(w, http.StatusBadRequest, "зураг: http(s) холбоос эсвэл өөрийн public файл")
+	case !ownImage(in.AvatarURL, c.UID) || !(ownImage(in.CoverURL, c.UID) || coverTemplate(in.CoverURL)):
+		writeErr(w, http.StatusBadRequest, "зураг: http(s) холбоос, өөрийн public файл эсвэл толгойн зургийн загвар")
 		return
 	case utf8.RuneCountInString(in.Location) > maxLocationLen:
 		writeErr(w, http.StatusBadRequest, "байршил 60 тэмдэгтээс ихгүй")
@@ -376,6 +376,13 @@ func (s *Server) onUserCreated(u *store.User) {
 }
 
 // ownImage: хоосон, http(s) холбоос, эсвэл тухайн хэрэглэгчийн нээлттэй сангийн файл.
+// coverTemplate — сургалтын толгойн зургийн загвар (/static/covers/t01–t20.svg): профайлын нүүр зурагт ч зөвшөөрнө.
+func coverTemplate(u string) bool {
+	id, ok := strings.CutPrefix(u, "/static/covers/")
+	id, ok2 := strings.CutSuffix(id, ".svg")
+	return ok && ok2 && coverRe.MatchString(id)
+}
+
 func ownImage(u, uid string) bool {
 	return u == "" || validURL(u) || strings.HasPrefix(u, "/files/"+uid+"/"+files.Public+"/")
 }
