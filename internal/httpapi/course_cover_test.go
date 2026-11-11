@@ -101,7 +101,7 @@ func TestCourseCoverSources(t *testing.T) {
 	if code, u := put(pub); code != 200 || u["cover"] != pub {
 		t.Fatalf("өөрийн public файл: %d %v", code, u)
 	}
-	priv := uploadFile(t, srv, tt, "secret.png", []byte("x"))
+	priv := uploadFile(t, srv, tt, "secret.pdf", []byte("%PDF-1.4 x"))
 	if code, _ := put(priv); code != 400 {
 		t.Fatalf("private файл толгой болохгүй: %d", code)
 	}
@@ -111,8 +111,8 @@ func TestCourseCoverSources(t *testing.T) {
 	if code, u := put("https://example.com/cover.jpg"); code != 200 || u["cover"] != "https://example.com/cover.jpg" {
 		t.Fatalf("https холбоос: %d %v", code, u)
 	}
-	if code, _ := put("http://example.com/cover.jpg"); code != 400 {
-		t.Fatalf("http холбоос: %d", code)
+	if code, _ := put("ftp://example.com/cover.jpg"); code != 400 {
+		t.Fatalf("http(s) биш холбоос: %d", code)
 	}
 	if code, u := put("embed:https://www.youtube.com/watch?v=abc123"); code != 200 || u["cover"] != "embed:https://www.youtube.com/watch?v=abc123" {
 		t.Fatalf("embed: %d %v", code, u)

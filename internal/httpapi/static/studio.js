@@ -748,7 +748,7 @@ const beDropHTML = (type) => `<div class="be-drop"><span>${ico(BE[type][0], 22)}
     <small class="muted">Энд чирж оруулах эсвэл сонгоно · ${BE_LIMIT[type] >= 1024 ? BE_LIMIT[type] / 1024 + " GB" : BE_LIMIT[type] + " MB"} хүртэл${type === "image" ? " · автоматаар жижгэрнэ" : ""}</small></div>
     <div class="be-drop-acts"><button type="button" class="btn btn-gold btn-sm" data-pick>${ico("clip", 15)}Файл сонгох</button>
     ${type === "audio" ? `<button type="button" class="btn btn-glass btn-sm" data-rec>${ico("mic", 15)}Бичлэг хийх</button>` : ""}
-    ${type === "video" ? `<button type="button" class="btn btn-glass btn-sm" data-vurl>${ico("link", 15)}YouTube холбоос</button>` : ""}</div>
+    <button type="button" class="btn btn-glass btn-sm" data-vurl title="${{ video: "YouTube, Vimeo эсвэл видео файлын (mp4, webm) холбоос", image: "Зургийн холбоос (https://…)", audio: "Аудио файлын холбоос (mp3, m4a…)", file: "Файлын холбоос (PDF, Word, PowerPoint…)" }[type] || "Холбоос"}">${ico("link", 15)}${type === "video" ? "YouTube / холбоос" : "Холбоос"}</button></div>
     <div class="progress" hidden><i></i></div></div>`;
 function beMediaPreview(b) {
   const u = b.preview || b.url;
@@ -1144,7 +1144,12 @@ function mountBlockEditor(f, blocks) {
     if (t.closest(".be-sum")) { setCompact(false); el.scrollIntoView({ block: "center" }); flash(el); (el.querySelector(".be-rt, .be-h, .be-q") || el).focus?.({ preventScroll: true }); return; }
     if (t.closest("[data-pick], [data-replace]")) return pick(el);
     if (t.closest("[data-rec]")) return record(el, t.closest("[data-rec]"));
-    if (t.closest("[data-vurl]")) { const u = prompt("YouTube эсвэл Vimeo холбоос"); if (u && /^https?:\/\//.test(u.trim())) setMedia(el, { path: u.trim(), url: u.trim(), original_name: "Видео холбоос" }); return; }
+    if (t.closest("[data-vurl]")) { // зураг, дуу, файл, видеог холбоосоор (https://…) оруулах — сервер http(s) холбоосыг зөвшөөрнө
+      const ty = el.dataset.type, Q = { video: "YouTube, Vimeo эсвэл видео файлын (mp4, webm) холбоос", image: "Зургийн холбоос (https://…)", audio: "Аудио файлын холбоос (mp3, m4a, ogg…)", file: "Файлын холбоос (PDF, Word, PowerPoint…)" }, N = { video: "Видео холбоос", image: "Зургийн холбоос", audio: "Аудио холбоос", file: "Файлын холбоос" };
+      const u = prompt(Q[ty] || "Холбоос (https://…)"); if (u === null) return; const v = u.trim();
+      if (!/^https?:\/\/\S+$/.test(v)) return toast("Холбоос https:// -ээр эхлэх ёстой", true);
+      setMedia(el, { path: v, url: v, original_name: v.split("/").pop()?.split("?")[0] || N[ty] || "Холбоос" }); return;
+    }
     if (t.closest("[data-opt-add]")) { const opts = $(".be-opts", el); if (opts.children.length >= 8) return toast("Дээд тал нь 8 хариулт"); opts.insertAdjacentHTML("beforeend", beOptHTML(el.dataset.id, $(".be-qkind", el).value === "multi", "", false)); opts.lastElementChild.querySelector(".be-opt-t").focus(); return; }
     if (t.closest("[data-opt-del]")) { const opts = $(".be-opts", el); if (opts.children.length <= 2) return toast("Дор хаяж 2 хариулт"); t.closest(".be-opt").remove(); }
     if (t.closest("[data-ans-add]")) { const a = $(".be-answers", el); if (a.children.length >= 10) return toast("Дээд тал нь 10"); a.insertAdjacentHTML("beforeend", `<div class="be-opt"><span class="be-ok">✓</span><input class="be-ans" maxlength="200" placeholder="Зөвд тооцох хариулт"><button type="button" class="icon-btn" data-row-del aria-label="Хасах">${ico("x", 14)}</button></div>`); a.lastElementChild.querySelector("input").focus(); return; }
