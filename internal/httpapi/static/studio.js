@@ -1379,6 +1379,7 @@ async function courseEditor(id) {
       <span class="ol-num">${String(n).padStart(2, "0")}</span>
       <span class="ol-title"><strong>${esc(l.title)}</strong><small>${[l.format && kindName(l.format), l.mode && kindName(l.mode)].filter(Boolean).map((k) => `<span class="kind">${esc(k)}</span>`).join("")}${audience(l)}${c.drip && !l.always_open && n > 1 ? ruleBadge(l) : ""}${kindBadge(l)}${l.active_min ? `<span class="aud">🕒 ${l.active_min} мин идэвхтэй</span>` : ""}</small></span>
       <span class="ol-acts">${visHTML(l)}
+      <button type="button" class="icon-btn" data-share-post aria-label="«${esc(l.title)}» хичээлийг өөр багштай хуваалцах" title="Өөр багштай хуваалцах">${ico("link", 17)}</button>
       <button type="button" class="icon-btn" data-lesson-settings aria-label="«${esc(l.title)}» хичээлийн тохиргоо" title="Тохиргоо">${ico("gear", 17)}</button>
       <button type="button" class="icon-btn" data-edit-post aria-label="Засах" title="Засах">${ico("edit", 17)}</button>
       <button type="button" class="icon-btn ol-del" data-del-post aria-label="Устгах" title="Устгах">${ico("x", 17)}</button></span></li>`;
@@ -1600,6 +1601,37 @@ async function courseEditor(id) {
   };
 
   // Даалгаврын хариунууд: багш оноо, тайлбар өгнө.
+  // Багш хооронд хичээл хуваалцах (lesson_share.go): 30 хоногийн код → өөр багш «+ Нэмэх → Хуваалцсан хичээл»-д оруулж хуулбар авна.
+  const codeModal = (id, title, body) => {
+    $("#" + id)?.remove();
+    document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="${id}"><div class="modal-card" style="width:min(560px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button><h3>${ico("link", 20)} ${title}</h3>${body}</div></div>`);
+    const m = $("#" + id); SG.openModal(m);
+    const close = () => { SG.closeModal(m); setTimeout(() => m.remove(), 300); };
+    m.addEventListener("click", (e) => { if (e.target.closest("[data-close]") || e.target === m) close(); });
+    return [m, close];
+  };
+  const shareModal = async (l) => {
+    let d; try { d = await api(`/api/courses/${c.id}/lessons/${l.id}/share`, { method: "POST" }); } catch (x) { toast(x.message, true); return; }
+    const [m] = codeModal("shareModal", "Хичээл хуваалцах", `<p class="muted small">«${esc(l.title)}» хичээлийн кодыг өөр багшид өгнө. Тэр багш өөрийн сургалтын <b>+ Нэмэх → Хуваалцсан хичээл</b>-д кодыг оруулж хуулбар авна (блок, асуулт, шалгалт, даалгавар; файлууд тэр багшийн файлын сан руу хуулагдана). Код ${fmtDate(d.expires)} хүртэл хүчинтэй, хэдэн ч удаа ашиглаж болно.</p>
+      <textarea class="share-code" readonly rows="4" aria-label="Хуваалцах код">${esc(d.code)}</textarea>
+      <div class="dr-acts"><button type="button" class="btn btn-gold btn-sm" data-copy-code>Код хуулах</button></div>`);
+    $("[data-copy-code]", m).onclick = () => navigator.clipboard?.writeText(d.code).then(() => toast("Код хуулагдлаа ✓"), () => $(".share-code", m).select());
+  };
+  const importModal = (section) => {
+    const [m, close] = codeModal("importModal", "Хуваалцсан хичээл оруулах", `<p class="muted small">Өөр багшийн өгсөн кодыг буулгана. Хичээлийн хуулбар ${section ? `«${esc(section)}» бүлэгт ` : ""}<b>бэлтгэж байна</b> төлөвтэй үүснэ — шалгаад нийтэлнэ. Файлууд таны файлын сан руу хуулагдана.</p>
+      <form id="importForm"><textarea name="code" class="share-code" rows="4" required placeholder="Хуваалцах код…" aria-label="Код"></textarea>
+      <div class="dr-acts"><button class="btn btn-gold btn-sm">Оруулах</button></div><p class="form-error" aria-live="polite"></p></form>`);
+    $("textarea", m).focus();
+    $("#importForm", m).onsubmit = async (e) => {
+      e.preventDefault(); const f = e.target, b = $("button", f), err = $(".form-error", f); b.disabled = true; err.textContent = "";
+      try {
+        const nl = await api(`/api/courses/${c.id}/lessons/import`, { method: "POST", body: { code: f.code.value.trim(), section: section || "" } });
+        close(); toast(`«${nl.title}» хичээл орлоо ✓`);
+        if (section) { lessons = [...lessons, nl]; await placeNew(nl.id, section); }
+        await reload();
+      } catch (x) { err.textContent = x.message; b.disabled = false; }
+    };
+  };
   const gradeModal = async (lid) => {
     const d = await api(`/api/courses/${c.id}/lessons/${lid}/submissions`);
     const max = d.assignment?.max_score || 100, rub = d.assignment?.grading === "rubric" && d.assignment.rubric;
@@ -1776,12 +1808,13 @@ async function courseEditor(id) {
       const m = document.createElement("div"); m.className = "kind-menu"; m.setAttribute("role", "menu");
       m.innerHTML = `<button type="button" role="menuitem" data-new-kind="lesson">${ico("doc", 18)} <b>Хичээл</b><small>текст, видео, файл, асуулт</small></button>
         <button type="button" role="menuitem" data-new-kind="exam">${ico("exam", 18)} <b>Шалгалт</b><small>хугацаа, оролдлого, хоцорвол төлбөртэй/төлбөргүй</small></button>
-        <button type="button" role="menuitem" data-new-kind="assignment">${ico("clip", 18)} <b>Даалгавар</b><small>хариу илгээж дүгнүүлнэ, хоцорвол төлбөртэй/төлбөргүй</small></button>`;
+        <button type="button" role="menuitem" data-new-kind="assignment">${ico("clip", 18)} <b>Даалгавар</b><small>хариу илгээж дүгнүүлнэ, хоцорвол төлбөртэй/төлбөргүй</small></button>
+        <button type="button" role="menuitem" data-new-kind="import">${ico("link", 18)} <b>Хуваалцсан хичээл</b><small>өөр багшийн өгсөн кодоор хуулбар авна</small></button>`;
       document.body.append(m);
       const place = () => { const r = anchor.getBoundingClientRect(), w = 300; m.style.top = Math.min(r.bottom + 6, innerHeight - 190) + "px"; m.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px"; };
       place();
       const kill = () => { m.remove(); removeEventListener("scroll", place, true); removeEventListener("resize", place); };
-      m.onclick = (ev) => { const k = ev.target.closest("[data-new-kind]")?.dataset.newKind; kill(); if (k) openComposer(preset ?? "", k); };
+      m.onclick = (ev) => { const k = ev.target.closest("[data-new-kind]")?.dataset.newKind; kill(); if (k === "import") importModal(preset ?? ""); else if (k) openComposer(preset ?? "", k); };
       addEventListener("scroll", place, true); addEventListener("resize", place); // гүйлгэхэд товчоо дагана
       setTimeout(() => document.addEventListener("click", (ev) => { if (!m.contains(ev.target)) kill(); }, { once: true }), 0);
     };
@@ -1831,6 +1864,7 @@ async function courseEditor(id) {
     }
     const post = t.closest(".post, .ol-row"), l = post && lessons.find((x) => x.id === post.dataset.lid);
     if (t.closest("[data-cancel]")) return render();
+    if (t.closest("[data-share-post]") && l) return shareModal(l);
     if (t.closest("[data-lesson-settings]") && l) {
       const f = $("#lsForm"); f.dataset.lsLid = l.id; f.innerHTML = lessonSettingsHTML(l);
       SG.openModal($("#lsModal")); return;

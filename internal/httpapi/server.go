@@ -267,6 +267,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/courses/{id}/teachers/{uid}", s.handleRemoveCourseTeacher)
 	mux.HandleFunc("DELETE /api/courses/{id}/lessons/{lid}", s.handleDeleteLesson)
 	mux.HandleFunc("PUT /api/courses/{id}/lessons/{lid}/visibility", s.handleLessonVisibility)
+	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/share", s.handleShareLesson) // багш хооронд хуваалцах код (lesson_share.go)
+	mux.HandleFunc("POST /api/courses/{id}/lessons/import", s.handleImportLesson)
 	mux.HandleFunc("PUT /api/courses/{id}/lesson-order", s.handleReorderLessons)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/buy", s.handleBuyLesson)
 	mux.HandleFunc("POST /api/courses/{id}/unlock", s.handleUnlockCourse)
