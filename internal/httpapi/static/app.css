@@ -5035,6 +5035,23 @@ a.np-item:active{background:var(--line)}
 .share-h{margin:18px 0 6px;font:800 .95rem var(--sans);display:flex;align-items:center;gap:8px}
 .share-seg{margin:4px 0 8px}.share-hint{margin:0 0 10px}
 .shared-view{margin:12px 0;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.share-in a.grow{color:inherit;text-decoration:none}.share-in a.grow:hover b{color:var(--brand)}
+@media (max-width:600px){.share-in li{flex-wrap:wrap}.share-in .grow{flex-basis:calc(100% - 46px)}}
+/* Хуваалцсан сургалтын хуудас (#shared=<id>): хичээлүүдийг сонгоод өөрийн сургалт болгоно */
+.sh-page{display:grid;gap:14px;min-width:0}
+.sh-back{justify-self:start;display:inline-flex;align-items:center;gap:4px;padding:6px 12px 6px 8px;border:1px solid var(--line);border-radius:99px;background:var(--surface);color:var(--text-2);font-weight:700;font-size:.88rem;text-decoration:none}
+.sh-back:hover{color:var(--brand);border-color:var(--brand)}
+.sh-page h1{overflow-wrap:anywhere}
+.sh-from{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sh-steps{margin:0;padding:12px 14px 12px 34px;border:1px dashed var(--line-2);border-radius:var(--radius);background:var(--brand-soft);color:var(--text-2);font-size:.9rem;display:grid;gap:4px}
+.sh-bar{position:sticky;top:64px;z-index:5;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow-sm)}
+.sh-count{color:var(--muted);font-weight:600;font-size:.88rem}
+.sh-bar-acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.sh-check{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;flex:none}
+.sh-check input{width:18px;height:18px;margin:0;accent-color:var(--brand);cursor:pointer}
+.sh-sec-name{flex:1;min-width:0;font:800 1.02rem var(--sans);overflow-wrap:anywhere}
+.sh-row:has(input[data-lid]:not(:checked)){opacity:.55}
+@media (max-width:600px){.sh-bar{top:56px}.sh-bar-acts{margin-left:0;width:100%}.sh-bar-acts .btn{flex:1;justify-content:center}.sh-row .sh-lbl{display:none}.sh-row .ol-num{display:none}}
 .ol-sec-vis{margin-left:4px}
 .del-list{margin:8px 0 10px;padding-left:20px;display:grid;gap:3px;font-size:.9rem}
 

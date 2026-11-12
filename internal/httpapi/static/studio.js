@@ -75,6 +75,9 @@ Object.assign(ICON, {
 });
 const ico = (n, size = 20) => `<svg data-ico="${n}" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n] || ""}</svg>`;
 ICON.medal ||= '<circle cx="12" cy="15" r="5"/><path d="M8.5 11 6 3h4l2 5 2-5h4l-2.5 8"/><path d="m12 13 .9 1.8 2 .3-1.4 1.4.3 2-1.8-1-1.8 1 .3-2-1.4-1.4 2-.3z"/>'; // сертификат
+ICON.download ||= '<path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'; // хуваалцсаныг хадгалах
+ICON.copy ||= '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>'; // өөрийн сургалт болгох
+ICON.send ||= '<path d="M14.54 21.69a.5.5 0 0 0 .94-.03l6.5-19a.5.5 0 0 0-.64-.63l-19 6.5a.5.5 0 0 0-.03.94l7.93 3.18a2 2 0 0 1 1.11 1.11z"/><path d="m21.85 2.15-10.94 10.93"/>';
 // Хөдөлгөөнт дүрсэнд (animateIcons) шинээр ашигласан нэрсийн статик зам (байхгүй бол л нэмнэ).
 for (const [k, v] of Object.entries({"upload":"<path d=\"M12 3v12\"/><path d=\"m17 8-5-5-5 5\"/><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/>","exam":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\"/><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\"/><path d=\"m9 14 2 2 4-4\"/>","doc":"<path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M10 9H8M16 13H8M16 17H8\"/>","headphones":"<path d=\"M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3\"/>","folder":"<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/>","eye":"<path d=\"M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","live":"<path d=\"m16 13 5.22 3.48a.5.5 0 0 0 .78-.42V7.94a.5.5 0 0 0-.76-.43L16 10.5\"/><rect x=\"2\" y=\"6\" width=\"14\" height=\"12\" rx=\"2\"/>","book":"<path d=\"M12 7v14\"/><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\"/>","files":"<path d=\"M20 7h-3a2 2 0 0 1-2-2V2\"/><path d=\"M9 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l4 4v10a2 2 0 0 1-2 2Z\"/><path d=\"M3 7.6v12.8A1.6 1.6 0 0 0 4.6 22h9.8\"/>"})) ICON[k] ||= v;
 
@@ -85,7 +88,7 @@ const setDrawer = () => {};
 let searchCourses = null;
 let cleanup = null;
 
-const views = { overview, courses, books, course: (id) => courseEditor(id), files, live, chat: (id) => chat(id), learning, students, wallet };
+const views = { overview, courses, books, course: (id) => courseEditor(id), shared: (sid) => sharedCourse(sid), files, live, chat: (id) => chat(id), learning, students, wallet };
 
 /* Профайл хуудаснаас дуудагдана: тухайн хэсгийг өгсөн контейнерт рендерлэнэ.
    Системийн эрх дууссан бол «Данс»-аас бусад хэсэгт багц сунгах дэлгэц гарна. */
@@ -416,6 +419,118 @@ const UNLOCKS = [[0, "Шууд (өмнөхийг үзмэгц)"], [1, "1 цаг�
 
 // Сургалтын карт дээрх багш нар (байгууллагын сургалт).
 const teachersLine = (ts) => (ts?.length ? `<small class="g-teachers" title="Заадаг багш">${ico("users", 14)}${ts.map((t) => esc(t.display_name)).join(", ")}</small>` : "");
+
+/* ---------- Надад хуваалцсан (lesson_share.go) ----------
+   Бусад багшийн «харах, хадгалах» эрхээр өгсөн сургалт/хичээл. Сургалтыг нээвэл (#shared=<id>, sharedCourse) хичээлүүд
+   нь бүлэг, дарааллаараа бүтэн хуудсаар харагдана: хэрэгтэйгээ сонгоод өөрийн шинэ сургалт болгох эсвэл байгаа
+   сургалтад нэмнэ. Хуулбар бүрэн таных тул хөтөлбөр бүтээгчээр дараалал, бүлгийг чирж сольж, засаж, нэмж, хасна. */
+const SHARE_KIND = { exam: "Шалгалт", assignment: "Даалгавар" };
+const mkModal = (id, w, html) => { $("#" + id)?.remove(); document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="${id}"><div class="modal-card" style="width:min(${w}px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}</div></div>`); const m = $("#" + id); SG.openModal(m); const close = () => { SG.closeModal(m); setTimeout(() => m.remove(), 300); }; m.addEventListener("click", (e) => { if (e.target.closest("[data-close]") || e.target === m) close(); }); return [m, close]; };
+const shareAvatar = (p) => `<span class="avatar avatar-sm" style="--h:${hueOfName(p.display_name)}">${p.avatar_url ? `<img src="${esc(p.avatar_url)}" alt="">` : esc((p.display_name || "?")[0])}</span>`;
+const sharedRowHTML = (x) => x.lesson_id
+  ? `<li data-sid="${esc(x.id)}">${shareAvatar(x.from)}<span class="grow"><b>${esc(x.lesson_title)}</b><small class="muted">${SHARE_KIND[x.lesson_kind] || "Хичээл"} · «${esc(x.course_title)}» сургалтаас · ${esc(x.from.display_name)} · ${fmtDate(x.created_at)}</small></span>
+      <button type="button" class="btn btn-glass btn-sm" data-shared-view="${esc(x.id)}">${ico("eye", 15)}Харах</button><button type="button" class="btn btn-gold btn-sm" data-shared-save="${esc(x.id)}">${ico("download", 15)}Хадгалах</button></li>`
+  : `<li data-sid="${esc(x.id)}">${shareAvatar(x.from)}<a class="grow" href="#shared=${esc(x.id)}"><b>${esc(x.course_title)}</b><small class="muted">Сургалт · ${x.lesson_count || 0} хичээл · ${esc(x.from.display_name)} · ${fmtDate(x.created_at)}</small></a>
+      <a class="btn btn-glass btn-sm" href="#shared=${esc(x.id)}">${ico("book", 15)}Хичээлүүд</a><button type="button" class="btn btn-gold btn-sm" data-shared-save="${esc(x.id)}">${ico("copy", 15)}Өөрийн болгох</button></li>`;
+
+// Хадгалах цонх: шинэ сургалт болгох (сургалтаар хуваалцсан бол анхдагч) эсвэл байгаа сургалтад нэмэх.
+// lessonId — нэг хичээл, lessonIds — сонгосон хичээлүүд, аль нь ч үгүй бол бүх хичээл.
+async function saveSharedDialog(x, { lessonId = "", lessonIds = null, title = "" } = {}) {
+  let mine; try { mine = await api("/api/me/courses?shared=1"); } catch (y) { return toast(y.message, true); }
+  const one = !!lessonId, n = one ? 1 : lessonIds ? lessonIds.length : x.lesson_count || 0;
+  const name = title || (one ? x.lesson_title : x.course_title) || "";
+  const dest = one && mine.length ? "existing" : "new";
+  const [m, close] = mkModal("saveSharedModal", 540, `<h3>${ico("download", 20)} Өөрийн сургалтад хадгалах</h3>
+    <p class="muted small">«${esc(name)}»${n > 1 ? ` — <b>${n} хичээл</b>` : ""}. Хуулбар бүрэн таных: дараалал, бүлгийг чирж сольж, засаж, нэмж, хасна. Эх сургалт өөрчлөгдөхгүй; файлууд таны файлын сан руу хуулагдана.</p>
+    <form class="form" id="saveSharedForm">
+      <div class="seg share-seg" role="radiogroup" aria-label="Хаана хадгалах">
+        <label><input type="radio" name="dest" value="new" ${dest === "new" ? "checked" : ""}><span>${ico("plus", 15)}Шинэ сургалт болгох</span></label>
+        <label><input type="radio" name="dest" value="existing" ${dest === "existing" ? "checked" : ""} ${mine.length ? "" : "disabled"}><span>${ico("book", 15)}Байгаа сургалтад нэмэх</span></label></div>
+      <div data-dest="new"><label>Шинэ сургалтын нэр<input name="title" maxlength="200" value="${esc(name)}"></label>
+        <p class="muted small share-hint">${one ? "Хичээл шинэ сургалтын эхний хичээл болно." : "Тайлбар, толгойн зураг, үнэ, тохиргоо, бүлэг, дараалал нь хуулагдана."} Сургалт ноорог төлөвтэй үүсэх тул шалгаж, зохион байгуулаад нийтэлнэ.</p></div>
+      <div data-dest="existing"><label>Аль сургалтад<select name="course_id">${mine.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}${c.shared ? ` · ${esc(c.org?.display_name || "хамтрагч")}` : ""}</option>`).join("")}</select></label>
+        <label>Бүлэг (заавал биш)<input name="section" maxlength="80" placeholder="${one ? "Хоосон бол бүлэггүй" : "Хоосон бол эх бүлгүүд нь хэвээр"}"></label>
+        <p class="muted small share-hint">Хичээлүүд «бэлтгэж байна» (хаалттай) төлөвтэй сүүлд нь нэмэгдэнэ — дараа нь хүссэн байрандаа чирж, шалгаад нээнэ.</p></div>
+      <div class="dr-acts"><button class="btn btn-gold btn-sm">${ico("download", 15)}Хадгалах</button></div><p class="form-error" aria-live="polite"></p></form>`);
+  const f = $("#saveSharedForm", m), sync = () => $$("[data-dest]", f).forEach((el) => { el.hidden = el.dataset.dest !== f.dest.value; });
+  f.addEventListener("change", sync); sync();
+  f.onsubmit = async (e) => {
+    e.preventDefault(); const b = $(".dr-acts button", f), err = $(".form-error", f); b.disabled = true; err.textContent = "";
+    const isNew = f.dest.value === "new";
+    const body = { lesson_id: lessonId, ...(lessonIds ? { lesson_ids: lessonIds } : {}), ...(isNew ? { new_course: true, title: f.title.value.trim() } : { course_id: f.course_id.value, section: f.section.value.trim() }) };
+    try {
+      const d = await api(`/api/me/shared/${x.id}/save`, { method: "POST", body }); close();
+      toast(isNew ? `Сургалт үүслээ · ${d.count} хичээл ✓ Одоо дараалал, бүлгээ зохион байгуулна уу` : `${d.count} хичээл нэмэгдлээ ✓`);
+      location.hash = "course=" + d.course_id;
+    } catch (y) { err.textContent = y.message; b.disabled = false; }
+  };
+}
+
+// Нэг хичээлийг урьдчилан харах (суралцагчийн харагдацаар, медиа нь гарын үсэгтэй холбоосоор).
+async function viewSharedLesson(x, lessonId) {
+  let d; try { d = await api(`/api/me/shared/${x.id}?lesson=${encodeURIComponent(lessonId)}`); } catch (y) { return toast(y.message, true); }
+  const l = d.lesson; if (!l) return;
+  const kind = { exam: "шалгалт", assignment: "даалгавар" }[l.exam ? "exam" : l.assignment ? "assignment" : ""] || "хичээл";
+  const [m, close] = mkModal("viewSharedModal", 860, `<h3>${ico("eye", 20)} ${esc(l.title)}</h3><p class="muted small">${esc(x.from.display_name)} багшийн «${esc(d.course.title)}» сургалтын ${kind} · зөвхөн харах</p>
+    ${l.exam ? `<p class="chip chip-gold">Шалгалт · ${l.exam.time_min || "∞"} мин · ${l.exam.attempts || "∞"} оролдлого · тэнцэх ${l.exam.pass_pct || 0}%</p>` : ""}${l.assignment ? `<p class="chip chip-gold">Даалгавар · дээд оноо ${l.assignment.max_score || 100}</p>` : ""}
+    <div class="shared-view">${SG.blocksHTML(l.blocks || []) || `<p class="muted small">Агуулга нэмээгүй хичээл.</p>`}</div>
+    <div class="dr-acts"><button type="button" class="btn btn-gold btn-sm" data-save-one>${ico("download", 15)}Өөрийн сургалтад хадгалах</button></div>`);
+  $("[data-save-one]", m).onclick = () => { close(); saveSharedDialog(x, { lessonId, title: l.title }); };
+}
+
+// Хуваалцсан сургалтын хуудас: хичээлүүд бүлгээрээ, сонгох чагттай; «Өөрийн сургалт болгох» — сонгосныг шинэ сургалт
+// болгон хуулж студийн хөтөлбөр бүтээгч рүү шилжинэ (тэнд дараалал, бүлгийг чирж зохион байгуулна).
+async function sharedCourse(sid) {
+  const d = await api(`/api/me/shared/${encodeURIComponent(sid)}`);
+  const x = d.share, co = d.course;
+  const rows = d.lessons || (d.lesson ? [{ id: d.lesson.id, title: d.lesson.title, section: d.lesson.section, kind: d.lesson.exam ? "exam" : d.lesson.assignment ? "assignment" : "lesson", hidden: d.lesson.hidden, is_free: d.lesson.is_free, blocks: (d.lesson.blocks || []).length }] : []);
+  const groups = [];
+  for (const r of rows) { let g = groups.find((y) => y.name === (r.section || "")); if (!g) groups.push((g = { name: r.section || "", items: [] })); g.items.push(r); }
+  const named = groups.filter((g) => g.name).length;
+  let num = 0;
+  const rowHTML = (r) => `<li class="ol-row sh-row"><label class="sh-check" title="Сонгох"><input type="checkbox" data-lid="${esc(r.id)}" checked aria-label="«${esc(r.title)}» хичээлийг сонгох"></label>
+      <span class="ol-num">${++num}</span><span class="ol-title"><strong>${esc(r.title)}</strong><small class="muted">${r.kind !== "lesson" ? `<span class="kind ${r.kind === "exam" ? "kind-exam" : "kind-asg"}">${ico(r.kind === "exam" ? "exam" : "clip", 14)}${SHARE_KIND[r.kind]}</span>` : ""}<span>${r.blocks} хэсэг</span>${r.is_free ? `<span class="aud aud-free">Үнэгүй</span>` : ""}${r.hidden ? `<span class="aud">${ico("lock", 13)}Хаалттай</span>` : ""}</small></span>
+      <button type="button" class="btn btn-glass btn-sm" data-view="${esc(r.id)}">${ico("eye", 15)}<span class="sh-lbl">Харах</span></button></li>`;
+  main.innerHTML = `<div class="sh-page">
+    <a class="sh-back" href="#courses">${ico("back", 16)}Сургалтууд</a>
+    <div class="gp-list-head"><div><h1>${esc(x.lesson_id ? x.lesson_title : co.title)}</h1>
+      <p class="muted sh-from">${shareAvatar(x.from)}<span><b>${esc(x.from.display_name)}</b> багшийн хуваалцсан · ${rows.length} хичээл${named ? ` · ${named} бүлэг` : ""} · зөвхөн харах</span></p></div>
+      <div class="gp-list-acts"><button type="button" class="btn btn-gold" data-fork>${ico("copy", 18)}Өөрийн сургалт болгох</button></div></div>
+    ${co.description && !x.lesson_id ? `<p class="gp-desc">${esc(co.description)}</p>` : ""}
+    <ol class="sh-steps"><li><b>Хичээлүүдийг хараад</b> хэрэгтэйгээ сонгоно</li><li><b>«Өөрийн сургалт болгох»</b> — шинэ сургалт үүснэ (эсвэл байгаа сургалтад нэмнэ)</li><li>Студидээ <b>дараалал, бүлгийг чирж</b> сольж, засаж, нэмж зохион байгуулна</li></ol>
+    ${rows.length ? `<div class="sh-bar"><label class="sh-check"><input type="checkbox" data-all checked><span>Бүгд</span></label><span class="sh-count" aria-live="polite"></span>
+      <span class="sh-bar-acts"><button type="button" class="btn btn-glass btn-sm" data-add>${ico("book", 15)}Сургалтад нэмэх</button><button type="button" class="btn btn-gold btn-sm" data-fork>${ico("copy", 15)}Өөрийн сургалт болгох</button></span></div>
+    <div class="ol sh-ol">${groups.map((g, i) => `<section class="ol-sec" data-sec="${esc(g.name)}"><header class="ol-sec-head"><label class="sh-check" title="Бүлгийг бүхэлд нь сонгох"><input type="checkbox" data-sec-all checked aria-label="«${esc(g.name || "Бүлэггүй")}» бүлгийг бүхэлд нь сонгох"></label>
+      <span class="lg-num">${i + 1}</span><strong class="sh-sec-name">${g.name ? esc(g.name) : `<span class="muted">Бүлэггүй хичээлүүд</span>`}</strong><small class="muted">${g.items.length} хичээл</small></header>
+      <ol class="ol-list">${g.items.map(rowHTML).join("")}</ol></section>`).join("")}</div>` : `<p class="muted">Энэ сургалтад одоогоор хичээл алга.</p>`}</div>`;
+  const page = $(".sh-page", main), boxes = () => $$("[data-lid]", page);
+  const picked = () => boxes().filter((b) => b.checked).map((b) => b.dataset.lid);
+  const sync = () => {
+    const all = boxes(), on = picked().length;
+    $$("[data-sec-all]", page).forEach((s) => { const bs = $$("[data-lid]", s.closest(".ol-sec")), k = bs.filter((b) => b.checked).length; s.checked = k === bs.length; s.indeterminate = k > 0 && k < bs.length; });
+    const a = $("[data-all]", page); if (a) { a.checked = on === all.length; a.indeterminate = on > 0 && on < all.length; }
+    const c = $(".sh-count", page); if (c) c.textContent = `${on}/${all.length} хичээл сонгосон`;
+    $$("[data-fork],[data-add]", page).forEach((b) => { b.disabled = !on; });
+  };
+  page.addEventListener("change", (e) => {
+    const t = e.target;
+    if (t.matches("[data-all]")) boxes().forEach((b) => { b.checked = t.checked; });
+    else if (t.matches("[data-sec-all]")) $$("[data-lid]", t.closest(".ol-sec")).forEach((b) => { b.checked = t.checked; });
+    sync();
+  });
+  const save = (mode) => {
+    const ids = picked(); if (!ids.length) return toast("Дор хаяж нэг хичээл сонгоно уу", true);
+    const opts = x.lesson_id ? { lessonId: x.lesson_id } : ids.length === rows.length ? {} : { lessonIds: ids };
+    saveSharedDialog(x, opts).then(() => { const m = $("#saveSharedModal"); if (m && mode) { const r = $(`input[name="dest"][value="${mode}"]`, m); if (r && !r.disabled) { r.checked = true; r.dispatchEvent(new Event("change", { bubbles: true })); } } });
+  };
+  page.addEventListener("click", (e) => {
+    const v = e.target.closest("[data-view]"); if (v) return viewSharedLesson(x, v.dataset.view);
+    if (e.target.closest("[data-fork]")) return save("new");
+    if (e.target.closest("[data-add]")) return save("existing");
+  });
+  sync();
+}
+
 async function courses() {
   const [all, sh] = await Promise.all([api("/api/me/courses?shared=1"), api("/api/me/shared").catch(() => ({ shares: [] }))]);
   const list = all.filter((c) => !c.shared), shared = all.filter((c) => c.shared), incoming = (sh.shares || []).filter((x) => x.mode === "view");
@@ -441,47 +556,17 @@ async function courses() {
       <p class="muted small">Эзэмшигч нь (багш эсвэл байгууллага) танд «хамт хөгжүүлэх» эрх өгсөн: та хичээл оруулж, зохион байгуулна. Үнэ, нийтлэх тохиргоо, орлогыг эзэмшигч удирдана. Таны профайл дээр харагдахгүй — байгууллагын хуудсанд таны нэр багшаар гарна.</p>
       <div class="group-grid gp-grid">${shared.map(card).join("")}</div></section>` : ""}
     ${incoming.length ? `<section class="gp-prog gp-shared-list" id="sharedIn"><h2>${ico("link", 18)}Надад хуваалцсан<small>${incoming.length}</small></h2>
-      <p class="muted small">Бусад багшийн танд «харах, хадгалах» эрхээр өгсөн сургалт, хичээлүүд: урьдчилан хараад өөрийн сургалтад хуулбарлан хадгална (файлууд таны файлын сан руу хуулагдана).</p>
-      <ul class="share-rows share-in">${incoming.map((x) => `<li data-sid="${esc(x.id)}"><span class="avatar avatar-sm" style="--h:${hueOfName(x.from.display_name)}">${x.from.avatar_url ? `<img src="${esc(x.from.avatar_url)}" alt="">` : esc((x.from.display_name || "?")[0])}</span>
-        <span class="grow"><b>${esc(x.lesson_id ? x.lesson_title : x.course_title)}</b><small class="muted">${x.lesson_id ? `${{ exam: "Шалгалт", assignment: "Даалгавар" }[x.lesson_kind] || "Хичээл"} · «${esc(x.course_title)}» сургалтаас` : "Сургалт бүхэлдээ"} · ${esc(x.from.display_name)} · ${fmtDate(x.created_at)}</small></span>
-        <button type="button" class="btn btn-glass btn-sm" data-shared-view="${esc(x.id)}">${ico("eye", 15)}Харах</button><button type="button" class="btn btn-gold btn-sm" data-shared-save="${esc(x.id)}">${ico("download", 15)}Хадгалах</button></li>`).join("")}</ul></section>` : ""}</div>
+      <p class="muted small">Бусад багшийн танд «харах, хадгалах» эрхээр өгсөн сургалт, хичээлүүд. Сургалтыг нээж хичээлүүдийг нь хараад <b>өөрийн сургалт болгон</b> хуулж авна — дараа нь дараалал, бүлэг, агуулгыг нь өөрөө зохион байгуулна (эх сургалт өөрчлөгдөхгүй, файлууд таны сан руу хуулагдана).</p>
+      <ul class="share-rows share-in">${incoming.map(sharedRowHTML).join("")}</ul></section>` : ""}</div>
     <div class="modal" id="courseModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
       <h3 class="h3">Шинэ сургалт үүсгэх</h3><form class="form" id="courseForm">${courseFormHTML()}<p class="form-error" role="alert"></p>
       <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Үүсгэх</button></div></form></div></div>`;
-  const mkModal = (id, w, html) => { $("#" + id)?.remove(); document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="${id}"><div class="modal-card" style="width:min(${w}px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}</div></div>`); const m = $("#" + id); SG.openModal(m); const close = () => { SG.closeModal(m); setTimeout(() => m.remove(), 300); }; m.addEventListener("click", (e) => { if (e.target.closest("[data-close]") || e.target === m) close(); }); return [m, close]; };
-  // Хуваалцсан хичээлийг хадгалах: өөрийн сургалт + бүлэг сонгоно (сургалтаар хуваалцсан бол бүх хичээл, бүлэг нь хэвээр).
-  const saveShared = (x, lessonId) => {
-    if (!list.length) return toast("Эхлээд өөрийн сургалт үүсгэнэ үү", true);
-    const one = !!(lessonId || x.lesson_id);
-    const [m, close] = mkModal("saveSharedModal", 520, `<h3>${ico("download", 20)} Өөрийн сургалтад хадгалах</h3><p class="muted small">«${esc(one ? (x.lesson_title || "хичээл") : x.course_title)}» — хуулбар «бэлтгэж байна» төлөвтэй үүснэ, шалгаад нийтэлнэ.</p>
-      <form class="form" id="saveSharedForm"><label>Аль сургалтад<select name="course_id">${list.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}</option>`).join("")}</select></label>
-      <label>Бүлэг (заавал биш)<input name="section" maxlength="80" placeholder="${one ? "Хоосон бол бүлэггүй" : "Хоосон бол эх бүлгүүд нь хэвээр"}"></label>
-      <div class="dr-acts"><button class="btn btn-gold btn-sm">Хадгалах</button></div><p class="form-error" aria-live="polite"></p></form>`);
-    $("#saveSharedForm", m).onsubmit = async (e) => {
-      e.preventDefault(); const f = e.target, b = $("button", f), err = $(".form-error", f); b.disabled = true; err.textContent = "";
-      try { const d = await api(`/api/me/shared/${x.id}/save`, { method: "POST", body: { course_id: f.course_id.value, section: f.section.value.trim(), lesson_id: lessonId || "" } }); close(); toast(`${d.count} хичээл хадгалагдлаа ✓`); location.hash = "course=" + f.course_id.value; }
-      catch (y) { err.textContent = y.message; b.disabled = false; }
-    };
-  };
-  // Урьдчилан харах: сургалтаар бол хичээлийн жагсаалт → нэг хичээл; агуулгыг суралцагчийн харагдацаар (SG.blocksHTML).
-  const viewShared = async (x, lessonId) => {
-    let d; try { d = await api(`/api/me/shared/${x.id}${lessonId ? "?lesson=" + encodeURIComponent(lessonId) : ""}`); } catch (y) { return toast(y.message, true); }
-    const l = d.lesson, K = { exam: "Шалгалт", assignment: "Даалгавар" };
-    const [m] = mkModal("viewSharedModal", 860, `<h3>${ico("eye", 20)} ${esc(l ? l.title : d.course.title)}</h3><p class="muted small">${esc(x.from.display_name)} багшийн ${l ? `«${esc(d.course.title)}» сургалтын ${K[l.exam ? "exam" : l.assignment ? "assignment" : ""] || "хичээл"}` : "сургалт"} · зөвхөн харах</p>
-      ${l ? `${l.exam ? `<p class="chip chip-gold">Шалгалт · ${l.exam.time_min || "∞"} мин · ${l.exam.attempts || "∞"} оролдлого · тэнцэх ${l.exam.pass_pct || 0}%</p>` : ""}${l.assignment ? `<p class="chip chip-gold">Даалгавар · дээд оноо ${l.assignment.max_score || 100}</p>` : ""}
-        <div class="shared-view">${SG.blocksHTML(l.blocks || [])}</div>` : `<ul class="share-rows">${(d.lessons || []).map((r) => `<li><span class="grow"><b>${esc(r.title)}</b><small class="muted">${r.section ? esc(r.section) + " · " : ""}${K[r.kind] || "Хичээл"} · ${r.blocks} хэсэг${r.hidden ? " · хаалттай" : ""}</small></span><button type="button" class="btn btn-glass btn-sm" data-view-lesson="${esc(r.id)}">Харах</button><button type="button" class="btn btn-ghost btn-sm" data-save-lesson="${esc(r.id)}">Хадгалах</button></li>`).join("")}</ul>`}
-      <div class="dr-acts"><button type="button" class="btn btn-gold btn-sm" data-save-all>${ico("download", 15)}${l ? "Өөрийн сургалтад хадгалах" : "Бүх хичээлийг хадгалах"}</button></div>`);
-    m.addEventListener("click", (e) => {
-      const v = e.target.closest("[data-view-lesson]"), sv = e.target.closest("[data-save-lesson]");
-      if (v) return viewShared(x, v.dataset.viewLesson);
-      if (sv) return saveShared(x, sv.dataset.saveLesson);
-      if (e.target.closest("[data-save-all]")) return saveShared(x, lessonId || "");
-    });
-  };
-  main.addEventListener("click", (e) => {
+  // Хуваалцсан хичээл: «Харах» — урьдчилан харах цонх, «Хадгалах» / «Өөрийн болгох» — хадгалах цонх. Сургалтыг
+  // нээвэл (#shared=<id>) хичээлүүд нь бүтэн хуудсаар харагдана (sharedCourse).
+  $("#sharedIn")?.addEventListener("click", (e) => {
     const v = e.target.closest("[data-shared-view]"), sv = e.target.closest("[data-shared-save]"); if (!v && !sv) return;
     const x = incoming.find((y) => y.id === (v || sv).dataset[v ? "sharedView" : "sharedSave"]); if (!x) return;
-    if (v) viewShared(x, ""); else saveShared(x, "");
+    if (v) viewSharedLesson(x, x.lesson_id); else saveSharedDialog(x, { lessonId: x.lesson_id || "" });
   });
   const f = $("#courseForm"), open = () => { SG.openModal($("#courseModal")); f.title.focus(); };
   $("#newCourse").onclick = open; if ($("#newCourse2")) $("#newCourse2").onclick = open;
@@ -1475,7 +1560,7 @@ async function courseEditor(id) {
         <div class="gp-bar">
           <div class="grow gp-info"><h1>${esc(c.title)}</h1>
             <p class="gp-desc">${c.description ? esc(c.description) : `<span class="muted">${shared ? "Тайлбар нэмээгүй байна." : "Тайлбар нэмээгүй байна — «Тохиргоо»-оос нэмнэ."}</span>`}</p>
-            ${shared ? `<p class="gp-shared">${ico("school", 16)}<span>Байгууллагын сургалт · <b>${esc(org?.display_name || "")}</b> — та хичээл оруулж, дүгнэж, зохион байгуулна. Үнэ, нийтлэх, устгах тохиргоог байгууллага удирдана.</span><button type="button" class="linkish" id="gpLeave">Сургалтаас гарах</button></p>` : ""}
+            ${shared ? `<p class="gp-shared">${ico("school", 16)}<span>Хамт хөгжүүлж буй сургалт · эзэмшигч <b>${esc(org?.display_name || "")}</b> — та хичээл оруулж, дараалал, бүлгийг зохион байгуулж, дүгнэнэ. Үнэ, нийтлэх, устгах тохиргоог эзэмшигч удирдана.</span><button type="button" class="linkish" id="gpLeave">Сургалтаас гарах</button></p>` : ""}
             ${orgOwner || teacherList.length ? `<p class="gp-teachers">${ico("users", 15)}<span>Заадаг багш: ${teacherList.length ? teacherList.map((t) => `<a href="/t/${esc(t.username)}" target="_blank" rel="noopener">${esc(t.display_name)}</a>`).join(", ") : `<span class="muted">холбоогүй</span>`}</span>${orgOwner ? `<button type="button" class="linkish" id="gpTeachers">${teacherList.length ? "Өөрчлөх" : "Багш холбох"}</button>` : ""}</p>` : ""}
           </div>
           <div class="gp-hside">

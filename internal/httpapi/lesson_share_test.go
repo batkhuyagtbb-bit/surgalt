@@ -107,3 +107,112 @@ func TestLessonShare(t *testing.T) {
 		t.Fatalf("устсан хичээлийн хуваалцалт: %v", mine2)
 	}
 }
+
+// Сургалтаар хуваалцсан («харах, хадгалах»): хүлээн авагч хичээлүүдийг (хаалттай нь ч) бүлэг, дарааллаараа харж,
+// өөрийн шинэ сургалт болгоно — тайлбар, үнэ, тохиргоо, бүлэг, дараалал, хичээлийн нээлттэй/хаалттай төлөв хэвээр,
+// файл нь өөрийнх нь сан руу; дараа нь өөрөө дараалал, бүлгийг сольж зохион байгуулна. Сонгосон хичээлүүдийг л авч
+// болно; өөрийн сургалтгүй ч болно. «Зөвхөн багцаар» хичээлийг үнэгүй сургалтад хадгалахад үнэгүй болно.
+func TestSharedCourseFork(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	ta, _ := register(t, srv, "owner", "teacher")
+	tb, idb := register(t, srv, "forker", "teacher")
+	_, ca := call(t, srv, "POST", "/api/courses", ta, `{"title":"Математик","description":"Алгебрын үндэс","price":50000,"drip":true,"certificate":true,"cover":"t03","published":true}`)
+	cida := ca["id"].(string)
+	pdf := uploadFile(t, srv, ta, "notes.pdf", []byte("%PDF-1.4 test"))
+	mk := func(body string) string {
+		code, l := call(t, srv, "POST", "/api/courses/"+cida+"/lessons", ta, body)
+		if code != 201 {
+			t.Fatalf("хичээл үүсгэх: %d %v", code, l)
+		}
+		return l["id"].(string)
+	}
+	l1 := mk(`{"title":"Танилцуулга","is_free":true,"section":"1-р бүлэг"}`)
+	l2 := mk(`{"title":"Тэгшитгэл","section":"1-р бүлэг","blocks":[{"id":"f1","type":"file","url":"` + pdf + `","name":"notes.pdf"}]}`) // зөвхөн багцаар
+	l3 := mk(`{"title":"Шалгалт","is_free":true,"section":"2-р бүлэг","exam":{"time_min":30,"attempts":1,"pass_pct":60}}`)
+	l4 := mk(`{"title":"Бэлтгэж буй","is_free":true,"section":"2-р бүлэг","hidden":true}`)
+	code, sh := call(t, srv, "POST", "/api/courses/"+cida+"/share", ta, `{"who":"forker@x.mn"}`)
+	if code != 201 {
+		t.Fatalf("хуваалцах: %d %v", code, sh)
+	}
+	sid := sh["id"].(string)
+	// Жагсаалтад бүх хичээлийн тоо (хаалттай нь ч), харахад бүх хичээл эх дарааллаараа бүлэгтэйгээ.
+	_, mine := call(t, srv, "GET", "/api/me/shared", tb, "")
+	if n := mine["shares"].([]any)[0].(map[string]any)["lesson_count"]; n != float64(4) {
+		t.Fatalf("хичээлийн тоо: %v", n)
+	}
+	_, v := call(t, srv, "GET", "/api/me/shared/"+sid, tb, "")
+	rows := v["lessons"].([]any)
+	if len(rows) != 4 || rows[0].(map[string]any)["id"] != l1 || rows[3].(map[string]any)["hidden"] != true || rows[2].(map[string]any)["kind"] != "exam" || rows[1].(map[string]any)["section"] != "1-р бүлэг" {
+		t.Fatalf("хуваалцсан сургалтын хичээлүүд: %v", rows)
+	}
+	// Өөрийн сургалтгүй ч шинэ сургалт болгоно.
+	code, fk := call(t, srv, "POST", "/api/me/shared/"+sid+"/save", tb, `{"new_course":true,"title":"  Миний математик  "}`)
+	if code != 201 || fk["count"].(float64) != 4 || fk["course_id"] == "" {
+		t.Fatalf("өөрийн сургалт болгох: %d %v", code, fk)
+	}
+	nc := fk["course_id"].(string)
+	_, my := call(t, srv, "GET", "/api/me/courses/"+nc, tb, "")
+	co := my["course"].(map[string]any)
+	if co["teacher_id"] != idb || co["title"] != "Миний математик" || co["description"] != "Алгебрын үндэс" || co["price"] != float64(50000) || co["drip"] != true || co["certificate"] != true || co["cover"] != "t03" || co["published"] != false {
+		t.Fatalf("шинэ сургалтын тохиргоо: %v", co)
+	}
+	if my["shared"] == true {
+		t.Fatal("хуулбар сургалт хүлээн авагчийнх байх ёстой")
+	}
+	ls := my["lessons"].([]any)
+	want := []struct {
+		title, section string
+		hidden         bool
+	}{{"Танилцуулга", "1-р бүлэг", false}, {"Тэгшитгэл", "1-р бүлэг", false}, {"Шалгалт", "2-р бүлэг", false}, {"Бэлтгэж буй", "2-р бүлэг", true}}
+	ids := make([]string, len(ls))
+	for i, x := range ls {
+		l := x.(map[string]any)
+		ids[i] = l["id"].(string)
+		h, _ := l["hidden"].(bool)
+		if l["title"] != want[i].title || l["section"] != want[i].section || h != want[i].hidden || l["position"] != float64(i+1) {
+			t.Fatalf("хуулбар хичээл %d: %v", i, l)
+		}
+	}
+	if fu := ls[1].(map[string]any)["blocks"].([]any)[0].(map[string]any)["url"].(string); !strings.Contains(fu, "/files/"+idb+"/") {
+		t.Fatalf("файл хүлээн авагчийн сан руу: %s", fu)
+	}
+	if ls[2].(map[string]any)["exam"] == nil {
+		t.Fatal("шалгалтын тохиргоо хуулагдах ёстой")
+	}
+	// Хүлээн авагч өөрөө зохион байгуулна: дараалал, бүлгийг солих.
+	if code, r := call(t, srv, "PUT", "/api/courses/"+nc+"/lesson-order", tb, `{"items":[{"id":"`+ids[3]+`","section":"Эхлэл"},{"id":"`+ids[0]+`","section":"Эхлэл"},{"id":"`+ids[1]+`","section":""},{"id":"`+ids[2]+`","section":""}]}`); code != 200 {
+		t.Fatalf("дараалал солих: %d %v", code, r)
+	}
+	_, my2 := call(t, srv, "GET", "/api/me/courses/"+nc, tb, "")
+	moved := map[string]map[string]any{}
+	for _, x := range my2["lessons"].([]any) {
+		moved[x.(map[string]any)["id"].(string)] = x.(map[string]any)
+	}
+	if moved[ids[3]]["position"] != float64(1) || moved[ids[3]]["section"] != "Эхлэл" {
+		t.Fatalf("зохион байгуулсны дараа: %v", moved[ids[3]])
+	}
+	// Эх сургалт өөрчлөгдөхгүй.
+	_, src := call(t, srv, "GET", "/api/me/courses/"+cida, ta, "")
+	if sl := src["lessons"].([]any); len(sl) != 4 || sl[0].(map[string]any)["id"] != l1 {
+		t.Fatalf("эх сургалт өөрчлөгдсөн: %v", sl)
+	}
+	// Сонгосон хичээлүүд (эх дарааллаар) — үнэгүй сургалтад «зөвхөн багцаар» хичээл үнэгүй болж, хаалттай нэмэгдэнэ.
+	_, cb := call(t, srv, "POST", "/api/courses", tb, `{"title":"Үнэгүй сургалт","price":0}`)
+	code, part := call(t, srv, "POST", "/api/me/shared/"+sid+"/save", tb, `{"course_id":"`+cb["id"].(string)+`","lesson_ids":["`+l3+`","`+l2+`"]}`)
+	if code != 201 || part["count"].(float64) != 2 {
+		t.Fatalf("сонгосон хичээлүүд: %d %v", code, part)
+	}
+	pl := part["lessons"].([]any)
+	if pl[0].(map[string]any)["title"] != "Тэгшитгэл" || pl[0].(map[string]any)["is_free"] != true || pl[0].(map[string]any)["hidden"] != true || pl[1].(map[string]any)["title"] != "Шалгалт" {
+		t.Fatalf("сонгосон хичээлийн хуулбар: %v", pl)
+	}
+	if code, _ := call(t, srv, "POST", "/api/me/shared/"+sid+"/save", tb, `{"new_course":true,"lesson_ids":["nope"]}`); code != http.StatusNotFound {
+		t.Fatalf("байхгүй хичээл сонгох: %d", code)
+	}
+	_ = l4
+	// Бусдын хуваалцалтаар сургалт үүсгэхгүй.
+	if code, _ := call(t, srv, "POST", "/api/me/shared/"+sid+"/save", ta, `{"new_course":true}`); code != http.StatusNotFound {
+		t.Fatalf("бусдын хуваалцалт: %d", code)
+	}
+}

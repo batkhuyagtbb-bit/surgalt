@@ -3977,7 +3977,8 @@ function profilePage() {
     else swap();
     if (manage && window.Studio) {
       const box = $(`[data-panel="m-${name}"]`);
-      if (name === "courses" && courseArg) window.Studio.mount(box, "course", courseArg);
+      if (name === "courses" && courseArg?.startsWith("shared:")) window.Studio.mount(box, "shared", courseArg.slice(7)); // надад хуваалцсан сургалт
+      else if (name === "courses" && courseArg) window.Studio.mount(box, "course", courseArg);
       else window.Studio.mount(box, MANAGED[name]);
     }
     moveInk();
@@ -4000,6 +4001,7 @@ function profilePage() {
   const fromHash = () => {
     const h = new URLSearchParams(location.hash.slice(1));
     if (h.has("course")) { courseArg = h.get("course"); return showTab("courses"); }
+    if (h.has("shared")) { courseArg = "shared:" + h.get("shared"); return showTab("courses"); }
     if (h.has("chat")) { // мэдэгдлээс ирсэн: яриаг баруун самбарт нээнэ
       const id = h.get("chat") || undefined, go = () => window.openRailChat?.(id);
       window.openRailChat ? go() : addEventListener("studio-ready", go, { once: true });
