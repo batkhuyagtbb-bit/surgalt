@@ -74,6 +74,80 @@ type StudentStat struct {
 	BoardVoiceSec  int `json:"board_voice_sec"`  // дуут өрөөнд ярьсан хугацаа
 	BoardTeam      int `json:"board_team"`       // сүүлд байсан баг (-1 = алга)
 	CollabScore    int `json:"collab_score"`     // багаар ажилласан оноо 0-100
+	// Мартах муруйн давталт: энэ хугацаанд болсон үе шат (1, 3, 7, 14, 30 хоног) ба тэрэнд эргэж орж давтсан нь.
+	ReviewDue  int `json:"review_due"`
+	ReviewDone int `json:"review_done"`
+	// Dims — 8 талын хэмжүүр (0-100, −1 = өгөгдөлгүй): студийн radar график (dimScores).
+	Dims []int `json:"dims"`
+}
+
+// dimNames — Dims-ийн дараалал: идэвх, анхаарал, ойлголт, видео, шалгалт, эргэцүүлэл, багаар ажиллах, санах ой.
+var dimNames = []string{"activity", "attention", "understanding", "video", "exam", "reflection", "collab", "memory"}
+
+// dimScores — суралцагчийг 8 талаас 0-100 оноогоор (тухайн талд өгөгдөл байхгүй бол −1, дундажид орохгүй):
+//   - идэвх: идэвхтэй хувь (60%) + суралцсан өдөр (40%, 5 өдөр = дүүрэн);
+//   - анхаарал: анхаарлын индекс;
+//   - ойлголт: зөв хариултын хувь (60%) + анхны оролдлогоор зөв (40%) − таамаг (1.5 сек-ээс хурдан, ≤20);
+//   - видео: үзсэн дундаж хувь; шалгалт: шилдэг оролдлогын хувь;
+//   - эргэцүүлэл: дүгнэлт бичсэн хичээлийн хувь × үгийн тоо (дунджаар 12+ үг = дүүрэн);
+//   - багаар: багаар ажилласан оноо (collabScore);
+//   - санах ой: мартах муруйн үе шатуудаас (1, 3, 7, 14, 30 хоног) хэдэд нь эргэж орж давтсан хувь (curveReviews).
+func (st *StudentStat) dimScores() []int {
+	clamp := func(v float64) int { return max(0, min(100, int(math.Round(v)))) }
+	d := []int{-1, -1, -1, -1, -1, -1, -1, -1}
+	if st.TotalSec > 0 {
+		d[0] = clamp(0.6*float64(st.ActivePct) + 0.4*math.Min(100, float64(st.ActiveDays)*20))
+		d[1] = clamp(float64(st.Attention))
+	}
+	if st.QuizTotal > 0 {
+		first := float64(st.QuizAccuracy)
+		if st.QuizQuestions > 0 {
+			first = float64(st.QuizFirstTry)
+		}
+		guess := math.Min(20, float64(st.QuizGuesses)*50/float64(st.QuizTotal))
+		d[2] = clamp(0.6*float64(st.QuizAccuracy) + 0.4*first - guess)
+	}
+	if st.VideoClips > 0 {
+		d[3] = clamp(float64(st.VideoCoverage))
+	}
+	if st.ExamBest >= 0 {
+		d[4] = clamp(float64(st.ExamBest))
+	}
+	if st.Lessons > 0 || st.Reflections > 0 {
+		words := 1.0
+		if st.Reflections > 0 {
+			words = math.Min(1, float64(st.ReflectionWords)/12)
+		}
+		d[5] = clamp(float64(st.Reflections) * 100 / math.Max(1, float64(st.Lessons)) * words)
+	}
+	if st.BoardDays > 0 {
+		d[6] = clamp(float64(st.CollabScore))
+	}
+	if st.ReviewDue > 0 {
+		d[7] = clamp(float64(st.ReviewDone) * 100 / float64(st.ReviewDue))
+	}
+	return d
+}
+
+// avgDims — ангийн дундаж: тал бүрт өгөгдөлтэй суралцагчдын дундаж (хэн ч байхгүй бол −1).
+func avgDims(list []*StudentStat) []int {
+	sum, n := make([]int, len(dimNames)), make([]int, len(dimNames))
+	for _, st := range list {
+		for i, v := range st.Dims {
+			if v >= 0 && i < len(sum) {
+				sum[i] += v
+				n[i]++
+			}
+		}
+	}
+	out := make([]int, len(dimNames))
+	for i := range out {
+		out[i] = -1
+		if n[i] > 0 {
+			out[i] = int(math.Round(float64(sum[i]) / float64(n[i])))
+		}
+	}
+	return out
 }
 
 // collabScore — «Багаар ажилласан оноо» 0-100: самбар дээр идэвхтэй байсан хувь (40%), самбарт хийсэн
@@ -170,6 +244,7 @@ func (st *StudentStat) finish(focusSum float64, focusN int) {
 	}
 	st.LearnScore = st.learnScore()
 	st.CollabScore = st.collabScore()
+	st.Dims = st.dimScores()
 	switch {
 	case st.TotalSec == 0:
 		st.Risk = "ok"
@@ -414,6 +489,31 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 			st.ExamBest = a.Pct
 		}
 	}
+	// Санах ой (мартах муруй): хичээлийг анх үзсэнээс 1, 3, 7, 14, 30 хоногийн дараа («давтаарай» сануулга очих үе)
+	// тэр хичээлдээ эргэж орсон эсэх — энэ тайлант хугацаанд болсон үе шат бүрээр (curveReviews).
+	visits := map[[2]string][]time.Time{}
+	for i := range ss {
+		k := [2]string{ss[i].UserID, ss[i].LessonID}
+		visits[k] = append(visits[k], ss[i].StartedAt)
+	}
+	nowT := time.Now()
+	for _, sc := range scope {
+		for uid, byLesson := range sc.progress {
+			if skip[uid] || (userID != "" && uid != userID) {
+				continue
+			}
+			for lid, p := range byLesson {
+				if p.ViewedAt.IsZero() {
+					continue
+				}
+				if due, done := curveReviews(p.ViewedAt, visits[[2]string{uid, lid}], since, nowT); due > 0 {
+					st := get(uid, "")
+					st.ReviewDue += due
+					st.ReviewDone += done
+				}
+			}
+		}
+	}
 	out := &analyticsData{Students: []*StudentStat{}, Daily: []map[string]any{}, Events: []store.ActivityEvent{}}
 	var tot StudentStat
 	tot.Counts = map[string]int{}
@@ -482,7 +582,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 		"attention": attention, "violations": tot.Violations, "exams": len(atts), "learn_score": learn, "reflections": reflections,
 		"quiz_lessons": qLessons, "quiz_mastered": qMastered, "rank_dist": rankDist, "top_rank": topRank, "cheated_lessons": cheated,
 		"board_students": boardN, "collab_score": collab / max(boardN, 1), "board_ops": boardOps, "board_msgs": boardMsgs,
-		"board_voice_sec": boardVoice, "board_active_sec": boardActive, "risk": riskN}
+		"board_voice_sec": boardVoice, "board_active_sec": boardActive, "risk": riskN, "dims": avgDims(out.Students)}
 	return out, ss, atts, nil
 }
 
@@ -902,4 +1002,29 @@ func (s *Server) teacherStudentBlocks(r *http.Request, teacherID, uid string, ti
 		out = append(out, b)
 	}
 	return out
+}
+
+// curveReviews — нэг хичээлийн мартах муруйн үе шатуудаас (reviewStages: анх үзсэнээс 1, 3, 7, 14, 30 хоног) хэд нь
+// [since, now] хугацаанд болсон (сануулга очиж, хариу өгөх 24 цаг өнгөрсөн — due), хэдэд нь суралцагч тэр хичээлдээ
+// эргэж орсон (done): сануулгаас 12 цагийн өмнөөс дараагийн үе шат хүртэл (сүүлийнхэд 30 хоног) сесс эхэлсэн бол.
+func curveReviews(viewed time.Time, visits []time.Time, since, now time.Time) (due, done int) {
+	for i, d := range reviewStages {
+		at := viewed.AddDate(0, 0, d)
+		if at.Before(since) || at.Add(24*time.Hour).After(now) {
+			continue
+		}
+		end := viewed.AddDate(0, 0, d+30)
+		if i+1 < len(reviewStages) {
+			end = viewed.AddDate(0, 0, reviewStages[i+1])
+		}
+		due++
+		from := at.Add(-12 * time.Hour)
+		for _, v := range visits {
+			if !v.Before(from) && v.Before(end) {
+				done++
+				break
+			}
+		}
+	}
+	return due, done
 }

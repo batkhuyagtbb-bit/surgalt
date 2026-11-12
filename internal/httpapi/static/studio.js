@@ -2957,6 +2957,34 @@ async function chatWithStudent(el) {
 }
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-chat-student]"); if (b) chatWithStudent(b.closest(".student")); });
 
+// 8 хэмжүүрийн radar (analytics.go dimScores): суралцагч бүр ба анги бүхэлдээ. −1 = өгөгдөлгүй («—», 0-д зурна).
+const DIM_LABELS = ["Идэвх", "Анхаарал", "Ойлголт", "Видео", "Шалгалт", "Эргэцүүлэл", "Багаар", "Санах ой"];
+const DIM_HINTS = ["идэвхтэй хувь, суралцсан өдөр", "анхаарлын индекс", "зөв хариулт, анх удаад зөв, таамаг", "видео үзсэн хувь", "шилдэг оролдлогын хувь", "дүгнэлт бичсэн хичээл, үгийн тоо", "самбар, багийн чат, дуу", "мартах муруйн дагуу давтсан хувь"];
+function radarSVG(series) {
+  const cx = 200, cy = 150, R = 100, n = DIM_LABELS.length, P = (i, r) => [cx + Math.sin((i / n) * Math.PI * 2) * r, cy - Math.cos((i / n) * Math.PI * 2) * r];
+  const pts = (f) => Array.from({ length: n }, (_, i) => P(i, f(i)).map((v) => v.toFixed(1)).join(",")).join(" ");
+  const main = series[0]?.vals || [];
+  let s = `<svg class="radar" viewBox="0 0 400 300" role="img" aria-label="${esc(DIM_LABELS.map((l, i) => `${l} ${main[i] >= 0 ? main[i] : "—"}`).join(", "))}">`;
+  [0.25, 0.5, 0.75, 1].forEach((k) => { s += `<polygon class="rd-grid" points="${pts(() => R * k)}"/>`; });
+  for (let i = 0; i < n; i++) { const [x, y] = P(i, R); s += `<line class="rd-axis" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }
+  series.slice().reverse().forEach((se) => {
+    s += `<polygon class="rd-poly" points="${pts((i) => (R * Math.max(0, se.vals[i] ?? -1)) / 100)}" style="fill:${se.fill};stroke:${se.stroke}" ${se.dash ? 'stroke-dasharray="5 4"' : ""}/>`;
+    if (!se.dash) se.vals.forEach((v, i) => { if (v >= 0) { const [x, y] = P(i, (R * v) / 100); s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" style="fill:${se.stroke}"/>`; } });
+  });
+  for (let i = 0; i < n; i++) {
+    const [x, y] = P(i, R + 24), anchor = Math.abs(x - cx) < 8 ? "middle" : x > cx ? "start" : "end", v = main[i];
+    s += `<text class="rd-l" x="${x.toFixed(1)}" y="${(y - 2).toFixed(1)}" text-anchor="${anchor}">${DIM_LABELS[i]}</text><text class="rd-v${v >= 0 ? "" : " na"}" x="${x.toFixed(1)}" y="${(y + 12).toFixed(1)}" text-anchor="${anchor}">${v >= 0 ? v : "—"}</text>`;
+  }
+  return s + "</svg>";
+}
+// Хэмжүүрийн хэсэг: radar + тал бүрийн мөр (утга, тайлбар). cmp — харьцуулах ангийн дундаж (тасархай).
+function dimsBlock(dims, cmp, title) {
+  if (!dims || !dims.some((v) => v >= 0)) return "";
+  const series = [{ vals: dims, fill: "rgba(20,184,166,.22)", stroke: "#0d9488" }];
+  if (cmp && cmp.some((v) => v >= 0)) series.push({ vals: cmp, fill: "rgba(31,60,143,.06)", stroke: "#1f3c8f", dash: true });
+  return `<div class="dims"><div class="dims-chart">${radarSVG(series)}${series[1] ? `<div class="an-legend dims-legend"><span><i style="background:#0d9488"></i>${esc(title || "Суралцагч")}</span><span><i style="background:#1f3c8f"></i>Ангийн дундаж</span></div>` : ""}</div>
+    <ul class="dims-list">${DIM_LABELS.map((l, i) => { const v = dims[i], c = cmp?.[i]; return `<li><span><b>${l}</b><small>${DIM_HINTS[i]}</small></span><span class="dims-bar"><i style="width:${Math.max(0, v)}%;background:${v >= 70 ? "var(--teal)" : v >= 40 ? "var(--accent)" : "#e5484d"}"></i>${c >= 0 && series[1] ? `<em style="left:${c}%" title="Ангийн дундаж ${c}"></em>` : ""}</span><b class="dims-v">${v >= 0 ? v : "—"}</b></li>`; }).join("")}</ul></div>`;
+}
 async function students() {
   // Олон мянган суралцагчтай үед эхний 200-г л ачаална; бусдыг нь «Бүх суралцагчид» дээр нэрээр хайна.
   const [rowsPage, courseList] = await Promise.all([apiList("/api/me/students?limit=200"), api("/api/me/courses?shared=1")]);
@@ -3102,6 +3130,7 @@ async function students() {
           ${ranks.length ? `<ul class="anx-ranks">${ranks.map(([k, v]) => `<li><span>${esc(k)}</span><i style="width:${v / rankMax * 100}%"></i><b>${v}</b></li>`).join("")}</ul>` : `<p class="muted small">Цол олгогдоогүй байна.</p>`}
           ${t.cheated_lessons ? `<p class="anx-warn">⛔ ${t.cheated_lessons} хичээлд хуулах оролдлого — оноо тооцогдоогүй</p>` : ""}</section>
       </div>
+      ${t.dims?.some((v) => v >= 0) ? `<section class="anx-card"><div class="anx-card-head"><h3>${ico("target", 18)}8 хэмжүүр — анги бүхэлдээ</h3><span class="muted small">${t.students} суралцагчийн дундаж · мөр дээр дарж хүн бүрийнхийг харна</span></div>${dimsBlock(t.dims, null)}</section>` : ""}
       <section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Суралцагч бүрээр <span class="chip">${data.total ?? list.length}</span></h3><label class="rail-search anx-search">${ico("search", 16)}<input type="search" id="anSearch" placeholder="Нэрээр хайх…" aria-label="Хайх" value="${esc(st.q || "")}"></label></div>
         <p class="muted small anx-hint">Мөр дээр дарж дэлгэрэнгүйг (бичсэн дүгнэлт, асуултын хариулт, видео үзэлтийн зураглал) харна.</p>
         <div class="an-table-wrap"><table class="tbl an-table anx-table"><thead><tr><th>Суралцагч</th><th>Идэвхтэй</th><th>Анхаарал</th><th>Суралцсан</th><th>Зөрчил</th><th>Шалгалт</th><th>Төлөв</th><th><span class="sr-only">Үйлдэл</span></th></tr></thead><tbody>
@@ -3159,6 +3188,7 @@ async function students() {
         <div class="an-tile learn"><small>Суралцсан оноо</small><b>${x.learn_score}%</b></div>
         <div class="an-tile"><small>Тогтмол байдал</small><b>${x.streak_days}</b><span class="muted small">дараалсан өдөр · ${x.active_days} нийт өдөр</span></div>
         <div class="an-tile ${x.rank?.cheated ? "warn" : "learn"}"><small>Нэгдсэн цол</small><b>${esc(x.rank?.name || "Шинэ цэрэг")} ${esc(x.rank?.insignia || "")}</b><span class="muted small">${x.rank?.points || 0} оноо${x.rank?.integration?.bonus ? ` (интеграц +${x.rank.integration.bonus})` : ""}${x.rank?.next ? ` · дараагийнх ${x.rank.next}` : ""}${x.rank?.cheated ? ` · ⛔ ${x.rank.cheated} хичээл тооцогдоогүй` : ""}</span></div></div>
+      ${x.dims?.some((v) => v >= 0) ? `<h4>8 хэмжүүр</h4><p class="muted small" style="margin:0 0 8px">Будсан — ${esc(x.name)}, тасархай — ангийн дундаж (ижил сургалт, хугацаагаар).</p>${dimsBlock(x.dims, data.totals?.dims, x.name)}` : ""}
       ${x.lesson_ranks?.length ? `<h4>Нэгдсэн цолд нэмсэн оноо — хичээл бүрээр</h4><p class="muted small" style="margin:0 0 8px">Цолыг хичээл бүрт биш, бүх хичээлийг нэгтгэж олгоно. Хичээл бүр 0-100 оноо нэмнэ (дууссан, идэвхтэй хугацаа, асуулга, дүгнэлт, видео; таб солилт хасна). Бүлэг, сургалтын бүх хичээлийг дуусгавал интеграцын нэмэлт оноо${x.rank?.integration ? ` — одоо +${x.rank.integration.bonus || 0} (${x.rank.integration.sections || 0}/${x.rank.integration.sections_all || 0} бүлэг, ${x.rank.integration.courses || 0}/${x.rank.integration.courses_all || 0} сургалт бүтэн)` : ""}. Зөрчилтэй (хуулах оролдлого, хичээлээс гарч зогссон) хичээлийн оноо тооцогдохгүй — дахин 10+ минут судалбал тооцогдоно.</p>
         ${x.rank?.tips?.length ? `<ul class="muted small" style="margin:0 0 8px 18px">${x.rank.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
         <table class="tbl"><thead><tr><th>Хичээл</th><th>Нэмсэн оноо</th><th>Үндэслэл</th></tr></thead><tbody>${x.lesson_ranks.map((r) => `<tr class="${r.disqualified ? "an-wrongq" : ""}"><td>${esc(r.title)}</td><td>${r.disqualified ? "⛔ тооцогдоогүй" : "+" + r.points}</td><td class="muted small">${(r.reasons || []).map(esc).join(", ")}</td></tr>`).join("")}</tbody></table>` : ""}
@@ -3170,6 +3200,7 @@ async function students() {
         <div class="an-tile"><small>Асуулга дуусгасан</small><b>${x.quiz_lessons ? `${x.quiz_mastered}/${x.quiz_lessons}` : "—"}</b><span class="muted small">хичээл · анх удаад зөв ${x.quiz_questions ? x.quiz_first_try + "%" : "—"} · ${x.quiz_questions ? (x.quiz_attempts / 10).toFixed(1) + " оролдлого/асуулт" : ""}</span></div>
         <div class="an-tile"><small>▶ Видео үзэлт</small><b>${x.video_clips ? x.video_coverage + "%" : "—"}</b><span class="muted small">${x.video_clips} видео</span></div>
         <div class="an-tile"><small>Дүгнэлт бичсэн</small><b>${x.reflections}</b><span class="muted small">${x.reflections ? `дундаж ${x.reflection_words} үг` : "одоогоор алга"}</span></div>
+        <div class="an-tile ${x.review_due && x.review_done * 2 < x.review_due ? "warn" : ""}"><small>🧠 Мартах муруйн давталт</small><b>${x.review_due ? Math.round((x.review_done * 100) / x.review_due) + "%" : "—"}</b><span class="muted small">${x.review_due ? `${x.review_done}/${x.review_due} үе шатанд эргэж давтсан` : "давтах үе шат болоогүй"}</span></div>
         <div class="an-tile ${x.board_days ? "learn" : ""}"><small>🧩 Багаар ажилласан</small><b>${x.board_days ? x.collab_score + "%" : "—"}</b><span class="muted small">${x.board_days ? `${esc(teamName(x.board_team))} · идэвхтэй ${dur(x.board_active_sec)} · ${x.board_ops} засвар · ${x.board_msgs} чат${x.board_voice_sec ? ` · ${dur(x.board_voice_sec)} ярьсан` : ""}` : "самбар дээр ажиллаагүй"}</span></div></div>
       ${d.watches?.length ? `<h4>Видеоны үзэлтийн зураглал</h4><p class="muted small" style="margin:0 0 8px">Бараан хэсэг = давтаж үзсэн, цайвар саарал = алгассан хэсэг.</p><div class="vh">${d.watches.map(heatmap).join("")}</div>` : ""}
       ${d.reflections?.length ? `<h4>Бичсэн дүгнэлтүүд</h4><div class="refl-list">${d.reflections.map((r) => `<div class="refl-item"><b>${esc(r.lesson)}</b><small class="muted">${fmtDate(r.at)}</small><p>${esc(r.text)}</p></div>`).join("")}</div>` : ""}

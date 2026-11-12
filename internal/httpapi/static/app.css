@@ -1282,6 +1282,7 @@ html.lbx-open{overflow:hidden}
 .rb-audio{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
 .rb-audio>div{flex:1;min-width:200px;display:grid;gap:6px}.rb-audio audio{width:100%}.rb-audio figcaption{flex-basis:100%;text-align:left;margin:0}
 .rb-audio-ico{font-size:1.6rem}
+.rb-audio>.mn{flex-basis:100%;min-width:0} /* аудио дээрх мөчийн тэмдэглэл: тоглуулагчийн доор бүтэн өргөнөөр (цэгтэй шугам товчны өргөнөөр богиносохгүй) */
 .rb-video .player{border-radius:12px;overflow:hidden}
 .rb-file{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--text);text-decoration:none}
 .rb-file>span:nth-child(2){flex:1;display:grid;min-width:0}.rb-file small{color:var(--muted)}
@@ -3170,6 +3171,27 @@ html.lp-focus .rail-tab{display:none!important}
 .anx-stat.bad b{color:var(--coral)}
 .anx-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px;align-items:start}
 .anx-card{min-width:0;padding:18px 20px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--shadow-sm)}
+/* 7 хэмжүүрийн radar (студийн аналитик: анги бүхэлдээ ба суралцагч бүр) */
+.dims{display:grid;grid-template-columns:minmax(240px,380px) minmax(0,1fr);gap:18px;align-items:center}
+.dims-chart{min-width:0}
+.radar{display:block;width:100%;height:auto}
+.rd-grid{fill:none;stroke:var(--line);stroke-width:1}
+.rd-axis{stroke:var(--line);stroke-width:1}
+.rd-poly{stroke-width:2.5;stroke-linejoin:round}
+.rd-l{font:700 11.5px var(--sans);fill:var(--text-2)}
+.rd-v{font:800 12px var(--sans);fill:var(--text)}
+.rd-v.na{fill:var(--muted);font-weight:600}
+.dims-legend{justify-content:center;margin-top:4px}
+.dims-list{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.dims-list li{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(80px,1fr) 34px;gap:10px;align-items:center}
+.dims-list li>span:first-child{display:grid;min-width:0}
+.dims-list b{font-size:.88rem}
+.dims-list small{color:var(--muted);font-size:.74rem;line-height:1.3}
+.dims-bar{position:relative;height:8px;border-radius:4px;background:var(--ink-2)}
+.dims-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.dims-bar em{position:absolute;top:-3px;width:2px;height:14px;margin-left:-1px;background:#1f3c8f;border-radius:1px}
+.dims-v{text-align:right;font-variant-numeric:tabular-nums}
+@media (max-width:720px){.dims{grid-template-columns:1fr}.dims-chart{max-width:380px;margin:0 auto}}
 .anx-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 12px}
 .anx-card-head h3{display:flex;align-items:center;gap:8px;margin:0;font-size:1.02rem}
 .anx-card-head h3 svg{color:var(--brand)}

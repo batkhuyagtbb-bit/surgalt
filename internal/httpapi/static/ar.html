@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Surgalt.mn хэрхэн ажилладаг вэ: багш хичээлээ зохион байгуулж, платформ хүргэж, суралцагч алхам алхмаар сурдаг — 3D-ээр, энгийн тайлбартай.">
+<meta property="og:title" content="Surgalt.mn — систем хэрхэн ажилладаг вэ">
+<meta property="og:description" content="Багш → surgalt.mn → Суралцагч: 27 шаттай 3D аялал, системийн бүх боломж.">
+<meta name="theme-color" content="#060914">
+<title>Surgalt.mn — систем хэрхэн ажилладаг вэ</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='16' fill='%231f3c8f'/><text x='27' y='47' font-family='Arial,sans-serif' font-size='44' font-weight='700' fill='%23fff' text-anchor='middle'>s</text><circle cx='48' cy='43' r='6' fill='%23eaa02e'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&display=swap">
+<style>
+/* Систем хэрхэн ажилладаг вэ (ar.js): Багш → surgalt.mn → Суралцагч, 3D (three.js r128, локал), 9 алхамтай аялал. */
+@font-face{font-family:"Manrope";font-style:normal;font-weight:200 800;font-display:swap;src:url(/static/fonts/manrope-cyrillic.woff2) format("woff2");unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:"Manrope";font-style:normal;font-weight:200 800;font-display:swap;src:url(/static/fonts/manrope-cyrillic-ext.woff2) format("woff2");unicode-range:U+0460-052F,U+1C80-1C8A,U+20B4,U+2DE0-2DFF,U+A640-A69F,U+FE2E-FE2F}
+@font-face{font-family:"Manrope";font-style:normal;font-weight:200 800;font-display:swap;src:url(/static/fonts/manrope-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+:root{
+  --night:#060914; --deep:#0b1230; --panel:rgba(12,19,46,.84); --line:rgba(255,255,255,.12);
+  --text:#eef2ff; --text-2:#c3cdf0; --muted:#8a96bf;
+  --gold:#f0a83a; --teal:#22c3b5; --green:#34c759; --violet:#9b7bff; --blue:#6f8cff;
+  --f-display:"Unbounded","Manrope",system-ui,sans-serif; --f-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{background:radial-gradient(ellipse 90% 70% at 50% 40%,#15225a 0%,var(--deep) 45%,var(--night) 100%);color:var(--text);font-family:var(--f-body);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+button{font:inherit;color:inherit}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;outline:none}
+#scene.dragging{cursor:grabbing}
+#scene.hover{cursor:pointer}
+#labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+
+/* 3D доторх шошго (ар.js байрлалыг нь кадр бүрт тооцно) */
+.lbl{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 11px 5px 10px;border-radius:999px;
+  background:rgba(8,13,34,.74);border:1px solid rgba(255,255,255,.14);box-shadow:0 8px 24px -10px rgba(0,0,0,.7);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  white-space:nowrap;opacity:0;will-change:transform,opacity}
+.lbl b{display:flex;align-items:center;gap:6px;font:700 12px/1.2 var(--f-body);letter-spacing:.01em}
+.lbl b::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--c,#fff);box-shadow:0 0 10px var(--c,#fff)}
+.lbl small{font:600 10.5px/1.2 var(--f-body);color:var(--muted)}
+.lbl.zone{padding:0;background:none;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+.lbl.zone b{font:800 clamp(12px,1.3vw,16px)/1 var(--f-display);letter-spacing:.16em;text-transform:uppercase;color:var(--c);text-shadow:0 0 18px color-mix(in srgb,var(--c) 60%,transparent)}
+.lbl.zone b::before{display:none}
+.lbl.flow{padding:3px 9px;border-color:color-mix(in srgb,var(--c) 45%,transparent)}
+.lbl.flow b{font-size:11px;color:var(--c)}
+.lbl.flow b::before{width:6px;height:6px}
+.lbl.hero{padding:7px 14px 7px 12px;border:1.5px solid rgba(34,195,181,.75);background:rgba(8,30,40,.85);box-shadow:0 0 24px -4px rgba(34,195,181,.7),0 10px 30px -10px rgba(0,0,0,.8)}
+.lbl.hero b{font:800 14px/1.2 var(--f-display);letter-spacing:.01em;color:#bff7f0}
+.lbl.hero small{color:#8fe3d9}
+.card.hero .card-head{flex-wrap:wrap;row-gap:8px}.card.hero .card-head::after{content:"";flex-basis:100%;order:2}
+.hero-tag{order:3;margin:0;padding:4px 10px;border-radius:999px;background:linear-gradient(90deg,#f0a83a,#ffd23f);color:#2a1800;font:800 10.5px/1.2 var(--f-body);letter-spacing:.06em;text-transform:uppercase;box-shadow:0 0 16px -2px rgba(240,168,58,.7)}
+.card.hero{border-color:rgba(240,168,58,.55);box-shadow:0 30px 80px -30px rgba(0,0,0,.8),0 0 0 1px rgba(240,168,58,.25),0 0 40px -12px rgba(240,168,58,.5)}
+
+/* Толгой */
+.top{position:fixed;top:0;left:0;right:0;display:flex;align-items:flex-start;gap:18px;padding:18px max(20px,env(safe-area-inset-right)) 40px max(20px,env(safe-area-inset-left));
+  background:linear-gradient(to bottom,rgba(6,9,20,.9),rgba(6,9,20,0));pointer-events:none}
+.top>*{pointer-events:auto}
+.brand{flex:none;display:inline-flex;align-items:center;gap:9px;color:#fff;text-decoration:none;font:800 17px/1 var(--f-display);letter-spacing:-.01em;padding-top:4px}
+.brand i{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#1f3c8f;font:800 18px/1 Arial,sans-serif;font-style:normal;position:relative}
+.brand i::after{content:"";position:absolute;right:4px;bottom:6px;width:6px;height:6px;border-radius:50%;background:var(--gold)}
+.brand span{color:var(--gold)}
+.top-title{flex:1;min-width:0}
+.top-title h1{margin:0;font:700 clamp(15px,1.6vw,21px)/1.25 var(--f-display);letter-spacing:-.01em}
+.top-title p{margin:5px 0 0;color:var(--text-2);font-size:13.5px;line-height:1.45}
+.top-title p b{color:#fff;font-weight:700}
+.top-acts{flex:none;display:flex;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.06);
+  font:700 13px var(--f-body);cursor:pointer;transition:background .2s,border-color .2s,transform .15s}
+.btn:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.24)}
+.btn:active{transform:scale(.97)}
+.btn:focus-visible,.nav-b:focus-visible,.dot:focus-visible{outline:3px solid rgba(111,140,255,.6);outline-offset:2px}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:#1d1300}
+.btn.gold:hover{background:#ffb84d}
+.btn svg{width:15px;height:15px}
+
+/* Тайлбар (өнгө) */
+.legend{position:fixed;top:92px;right:max(20px,env(safe-area-inset-right));display:grid;gap:7px;padding:12px 14px;border-radius:16px;background:rgba(8,13,34,.55);border:1px solid var(--line);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-size:12px;color:var(--text-2)}
+.legend span{display:flex;align-items:center;gap:8px}
+.legend i{width:22px;height:3px;border-radius:2px;background:var(--c);box-shadow:0 0 10px var(--c)}
+.legend h4{margin:0 0 2px;font:700 10.5px var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+/* Алхмын карт */
+.card{position:fixed;left:max(20px,env(safe-area-inset-left));bottom:max(20px,env(safe-area-inset-bottom));width:min(410px,calc(100% - 40px));padding:18px 20px 16px;border-radius:22px;
+  background:var(--panel);border:1px solid var(--line);box-shadow:0 30px 80px -30px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.06);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+@media (min-width:900px){.card{max-height:calc(100vh - 130px);max-height:calc(100dvh - 130px);overflow:auto;scrollbar-width:thin}}
+.card::before{content:"";position:absolute;left:20px;right:20px;top:0;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--c),transparent)}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.zone-chip{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:999px;background:color-mix(in srgb,var(--c) 16%,transparent);color:var(--c);
+  font:800 11px/1.2 var(--f-body);letter-spacing:.08em;text-transform:uppercase}
+.zone-chip::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c)}
+.card-num{font:700 12px var(--f-body);color:var(--muted)}
+.card-num b{color:#fff;font:800 15px var(--f-display)}
+.card-body.in{animation:cardIn .45s cubic-bezier(.2,.8,.2,1)}
+@keyframes cardIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card h2{margin:12px 0 6px;font:700 clamp(17px,1.5vw,20px)/1.3 var(--f-display);letter-spacing:-.01em}
+.card p{margin:0;color:var(--text-2);font-size:14.5px;line-height:1.6}
+.card ul{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:7px}
+.card li{position:relative;padding-left:24px;font-size:13.5px;line-height:1.45;color:var(--text)}
+.card li::before{content:"";position:absolute;left:2px;top:3px;width:14px;height:14px;border-radius:50%;background:color-mix(in srgb,var(--c) 22%,transparent)}
+.card li::after{content:"";position:absolute;left:6.5px;top:6.5px;width:5px;height:3px;border-left:2px solid var(--c);border-bottom:2px solid var(--c);transform:rotate(-45deg)}
+.card li[hidden]{display:none}
+.card li.pts-more{padding-left:0}.card li.pts-more::before,.card li.pts-more::after{display:none}
+.pts-more button{padding:5px 12px;border-radius:999px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 12%,transparent);color:var(--text);font:700 12.5px var(--f-body);cursor:pointer}
+.pts-more button:hover{background:color-mix(in srgb,var(--c) 22%,transparent)}
+/* «Урсгал» тайлбар зөвхөн тоймд */
+.legend{transition:opacity .3s}body:not(.ov) .legend{opacity:0;pointer-events:none}
+.card-nav{position:sticky;bottom:-16px;z-index:2;display:flex;align-items:center;gap:10px;margin:16px -20px -16px;padding:10px 20px 14px;background:linear-gradient(to bottom,rgba(12,19,46,0),rgba(12,19,46,.96) 30%)}
+.nav-b{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.06);cursor:pointer;transition:background .2s}
+.nav-b:hover{background:rgba(255,255,255,.14)}
+.nav-b:disabled{opacity:.35;cursor:default}
+.nav-b svg{width:16px;height:16px}
+.nav-b.next{width:auto;padding:0 14px 0 16px;gap:6px;display:inline-flex;align-items:center;background:color-mix(in srgb,var(--c) 22%,transparent);border-color:color-mix(in srgb,var(--c) 45%,transparent);font:700 13px var(--f-body)}
+.nav-mid{flex:1;text-align:center;font:700 12px var(--f-body);color:var(--muted)}
+
+/* Шагнал (тэмдэг, XP) */
+.reward{display:flex;align-items:center;gap:9px;margin:13px 0 0;padding:8px 11px;border-radius:12px;background:linear-gradient(90deg,rgba(240,168,58,.16),rgba(240,168,58,.04));border:1px solid rgba(240,168,58,.28);font-size:12.5px;color:#ffe2b3}
+.reward b{color:#ffcf7a}
+.rw-ico{font-size:17px;line-height:1}
+
+/* Шатны газрын зураг: 4 ертөнц, дугуй бүр нэг шат */
+.map{display:flex;flex-wrap:wrap;gap:9px 14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.map-w{flex:none;display:grid;gap:5px}
+.map-w small{font:800 9.5px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--c);white-space:nowrap}
+.map-d{display:flex;align-items:center;gap:3px}
+.map-d .dot+.dot::before{content:"";position:absolute;right:100%;top:50%;width:3px;height:2px;background:rgba(255,255,255,.18)}
+.dot{position:relative;flex:none;display:grid;place-items:center;width:22px;height:22px;padding:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.04);
+  font:800 10px/1 var(--f-body);color:var(--muted);cursor:pointer;transition:transform .2s,background .25s,border-color .25s,color .25s}
+.dot:hover{transform:scale(1.12);border-color:var(--c);color:#fff}
+.dot.done{background:color-mix(in srgb,var(--c) 30%,transparent);border-color:color-mix(in srgb,var(--c) 70%,transparent);color:#fff}
+.dot.on{background:var(--c);border-color:var(--c);color:#0b1230;transform:scale(1.15);box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 25%,transparent),0 0 16px var(--c)}
+
+/* XP самбар */
+.xp{flex:none;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;row-gap:5px;align-items:center;min-width:200px;padding:8px 14px;border-radius:16px;
+  background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.xp-lvl{grid-row:1;grid-column:1/3;font:800 12px var(--f-body);color:var(--gold);letter-spacing:.02em}
+.xp-lvl::before{content:"★ "}
+.xp-bar{grid-row:2;grid-column:1;width:120px;height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
+.xp-bar i{display:block;height:100%;width:0;border-radius:3px;background:linear-gradient(90deg,var(--gold),#ffd23f);box-shadow:0 0 10px var(--gold);transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.xp-num{grid-row:2;grid-column:2;font:700 11px var(--f-body);color:var(--text-2);white-space:nowrap}
+
+/* Тэмдэг авсан мэдэгдэл */
+.toast{position:fixed;left:50%;top:92px;z-index:20;display:flex;align-items:center;gap:10px;max-width:min(520px,calc(100% - 32px));padding:11px 18px 11px 14px;border-radius:999px;
+  background:rgba(12,19,46,.92);border:1px solid rgba(240,168,58,.45);box-shadow:0 18px 50px -12px rgba(0,0,0,.7),0 0 24px -6px rgba(240,168,58,.5);font-size:13.5px;
+  transform:translate(-50%,-16px);opacity:0;pointer-events:none;transition:opacity .35s,transform .45s cubic-bezier(.2,1.4,.4,1)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.big{border-radius:20px;padding:14px 20px;font-size:15px;border-color:var(--gold)}
+.toast b{color:#ffcf7a}
+.t-ico{font-size:20px;line-height:1}
+
+/* «Бүх боломж» цонх */
+.cat{position:fixed;inset:0;z-index:30;display:flex;justify-content:center;align-items:flex-start;padding:max(24px,env(safe-area-inset-top)) 16px 24px;background:rgba(4,7,18,.66);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  opacity:0;transition:opacity .22s;overflow:auto}
+.cat.show{opacity:1}
+.cat-card{width:min(1080px,100%);padding:22px 24px 26px;border-radius:24px;background:#0c1330;border:1px solid var(--line);box-shadow:0 40px 120px -30px rgba(0,0,0,.9);transform:translateY(10px);transition:transform .3s}
+.cat.show .cat-card{transform:none}
+.cat-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.cat-head h2{margin:0;font:700 clamp(18px,2vw,24px)/1.25 var(--f-display)}
+.cat-head p{margin:5px 0 0;color:var(--muted);font-size:13px}
+.cat-q{width:100%;margin:16px 0 12px;height:44px;padding:0 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--text);font:600 16px var(--f-body);outline:none}
+.cat-q:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(111,140,255,.25)}
+.cat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.cat-tab{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);font:700 12.5px var(--f-body);cursor:pointer}
+.cat-tab i{font-style:normal;font-size:11px;color:var(--muted)}
+.cat-tab.on{background:color-mix(in srgb,var(--c) 22%,transparent);border-color:var(--c);color:#fff}
+.cat-tab.on i{color:var(--c)}
+.cat-grid{columns:3 300px;column-gap:16px}
+.cat-sec{break-inside:avoid;margin:0 0 16px;padding:14px 16px;border-radius:18px;background:rgba(255,255,255,.035);border:1px solid var(--line);border-top:3px solid var(--c)}
+.cat-sec h3{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px;font:800 14px var(--f-body);color:var(--c)}
+.cat-sec h3 small{font:700 11px var(--f-body);color:var(--muted)}
+.cat-sec ul{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.cat-sec li{display:grid;gap:2px;padding-left:14px;position:relative}
+.cat-sec li::before{content:"";position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:50%;background:var(--c)}
+.cat-sec li b{font:700 13.5px/1.35 var(--f-body);color:#fff}
+.cat-sec li span{font-size:12.5px;line-height:1.45;color:var(--text-2)}
+.cat-empty{color:var(--muted);text-align:center;padding:30px 0}
+/* Бүтээлч хэсгийн дэлгэрэнгүй цонх (3D дээр дарахад) */
+body.det-open #labels{visibility:hidden}
+.card-det{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 0;padding:10px 11px;border-radius:14px;background:rgba(34,195,181,.08);border:1px dashed rgba(34,195,181,.4)}
+.card-det-cap{flex-basis:100%;font:700 11.5px var(--f-body);color:#8fe3d9}
+.det-chip{display:grid;place-items:center;width:36px;height:36px;padding:0;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.05);cursor:pointer;transition:transform .15s,border-color .2s,background .2s}
+.det-chip:hover{transform:translateY(-2px) scale(1.06);border-color:var(--teal)}
+.det-chip.on{border-color:var(--teal);background:rgba(34,195,181,.18);box-shadow:0 0 14px -2px rgba(34,195,181,.7)}
+.det-chip img{width:26px;height:26px;display:block}
+.det-chip:focus-visible{outline:3px solid rgba(34,195,181,.6);outline-offset:2px}
+/* Хамгаалалтын аргачлалууд: том тоо, 3 бүлэг, дарж тайлбар; 3D дээр ажиллаж буй нь .live */
+.card-prot{margin:12px 0 0;padding:11px 12px 6px;border-radius:14px;background:rgba(255,90,90,.07);border:1px solid rgba(255,90,90,.35)}
+.pm-head{display:flex;align-items:center;gap:11px;margin:0 0 8px}
+.pm-n{font:800 40px/1 var(--f-display);color:#ff6b6b;text-shadow:0 0 22px rgba(255,90,90,.45);min-width:52px;text-align:center}
+.pm-head>span{display:flex;flex-direction:column;gap:2px}.pm-head>span>b{font:800 14.5px var(--f-body);color:#fff}
+.pm-head small{font:600 11.5px var(--f-body);color:#9aa6cc}
+.pm-g{margin:0 0 8px}.pm-g h4{display:flex;align-items:center;gap:7px;margin:0 0 4px;font:800 11.5px var(--f-body);letter-spacing:.04em;text-transform:uppercase;color:var(--g)}
+.pm-g h4 i{font-style:normal;display:inline-grid;place-items:center;min-width:20px;height:18px;padding:0 5px;border-radius:9px;background:color-mix(in srgb,var(--g) 22%,transparent);color:#fff;font-size:11px}
+.pm-i{border-radius:10px;border:1px solid transparent;transition:background .2s,border-color .2s}
+.pm-i summary{display:flex;align-items:center;gap:9px;padding:5px 6px;cursor:pointer;list-style:none;font:700 13px/1.3 var(--f-body);color:#e6ebff;border-radius:10px}
+.pm-i summary::-webkit-details-marker{display:none}
+.pm-i summary::after{content:"+";margin-left:auto;font-weight:800;color:#8a96bf}.pm-i[open] summary::after{content:"−"}
+.pm-i summary:hover{background:rgba(255,255,255,.05)}.pm-i summary:focus-visible{outline:2px solid var(--g);outline-offset:1px}
+.pm-k{flex:none;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.08);font:800 11px var(--f-body);color:#cfd6f5}
+.pm-i p{margin:0 6px 7px 37px;font:500 12.5px/1.45 var(--f-body);color:#b9c3e6}
+.pm-i[open]{background:rgba(255,255,255,.04);border-color:var(--line)}
+.pm-i.live{border-color:color-mix(in srgb,var(--g) 60%,transparent);background:color-mix(in srgb,var(--g) 12%,transparent)}
+.pm-i.live .pm-k{background:var(--g);color:#0b1020;box-shadow:0 0 12px var(--g);animation:pmBeat 1s ease-in-out infinite}
+@keyframes pmBeat{50%{transform:scale(1.14)}}
+@media (prefers-reduced-motion:reduce){.pm-i.live .pm-k{animation:none}}
+.det{position:fixed;inset:0;z-index:28;display:flex;justify-content:center;align-items:center;padding:16px;background:rgba(4,7,18,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;transition:opacity .22s;overflow:auto}
+.det.show{opacity:1}
+.det-card{width:min(640px,100%);max-height:calc(100dvh - 32px);overflow:auto;padding:20px 22px;border-radius:24px;background:#0c1330;border:1px solid rgba(34,195,181,.45);box-shadow:0 40px 120px -30px rgba(0,0,0,.9),0 0 50px -20px rgba(34,195,181,.6);transform:translateY(12px) scale(.98);transition:transform .3s cubic-bezier(.2,1.2,.4,1)}
+.det.show .det-card{transform:none}
+.det-head{display:flex;align-items:center;gap:14px}
+.det-head img{flex:none;width:52px;height:52px;filter:drop-shadow(0 6px 16px rgba(0,0,0,.4))}
+.det-head div{flex:1;min-width:0}
+.det-kick{font:800 10.5px var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:#8fe3d9}
+.det-head h3{margin:3px 0 0;font:700 clamp(17px,2vw,21px)/1.25 var(--f-display)}
+.det-lead{margin:12px 0 0;color:var(--text-2);font-size:14.5px;line-height:1.6}
+.det-mock{margin:14px 0 0;padding:16px;border-radius:16px;background:#f7f9ff;color:#1b2340;font-size:14px;line-height:1.55}
+.det-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+.det-col{padding:12px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.det-col h4{margin:0 0 8px;font:800 11px var(--f-body);letter-spacing:.06em;text-transform:uppercase}
+.det-col.c1 h4{color:var(--teal)}.det-col.c2 h4{color:var(--blue)}.det-col.c3 h4{color:var(--gold)}
+.det-col ul{margin:0;padding-left:16px;display:grid;gap:5px;font-size:12.5px;line-height:1.45;color:var(--text)}
+.det-nav{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+@media (max-width:640px){.det-cols{grid-template-columns:1fr}.det-card{padding:16px}}
+/* 3D үзүүлэн: дэлгэрэнгүй нь картын байранд (зүүн), бодит таблет баруун талд ажиллаж харагдана */
+.det-3d{display:flex;align-items:center;gap:8px;margin:12px 0 0;padding:9px 12px;border-radius:12px;background:rgba(34,195,181,.1);border:1px solid rgba(34,195,181,.35);font:700 12.5px var(--f-body);color:#8fe3d9}
+.det-3d-dot{flex:none;width:8px;height:8px;border-radius:50%;background:#22c3b5;box-shadow:0 0 10px #22c3b5;animation:pmBeat 1.2s ease-in-out infinite}
+body.show3d .card,body.show3d .legend,body.show3d #hint{visibility:hidden}
+body.show3d .det{inset:auto;left:max(20px,env(safe-area-inset-left));top:110px;bottom:max(20px,env(safe-area-inset-bottom));width:min(410px,calc(100% - 40px));padding:0;display:block;background:none;backdrop-filter:none;-webkit-backdrop-filter:none;overflow:visible}
+body.show3d .det-card{width:100%;max-height:100%;transform:translateX(-16px)}
+body.show3d .det.show .det-card{transform:none}
+body.show3d .det-cols{grid-template-columns:1fr}
+@media (max-width:899px){body.show3d .det{left:12px;right:12px;top:auto;bottom:max(12px,env(safe-area-inset-bottom));width:auto;height:44vh;height:44dvh}body.show3d .det-card{transform:translateY(16px)}}
+/* жишээ дэлгэцүүд */
+.mk-text{margin:0}.det-mock mark{padding:1px 3px;border-radius:4px;color:inherit}
+.m1{background:#ffe58a}.m2{background:#b9f2c9}.m3{background:#ffc2c2}.m4{background:#cfe0ff}
+.mk-legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.mk-legend span{padding:3px 9px;border-radius:999px;font:700 11.5px var(--f-body)}
+.mk-ask{display:flex;justify-content:space-between;gap:10px;margin-top:10px;padding:8px 12px;border-radius:12px;background:#fff1f1;border:1px solid #ffc2c2;font-size:13px}.mk-ask b{color:#c2410c}
+.st-row{display:flex;gap:10px}.st{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;border:3px solid #cbd2e1;font:700 9.5px var(--f-body);font-style:normal;color:#59637a;background:#fff}.st.on{border-color:#ff6fae;color:#be185d}
+.nt-card{display:grid;gap:3px;margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff;border-left:4px solid #ff6fae;box-shadow:0 2px 8px rgba(18,24,41,.06)}.nt-card b{font-size:12px;color:#be185d}.nt-img{display:block;padding:12px;border-radius:8px;background:#eef1f8;color:#59637a;font-size:12px;text-align:center}
+.qz-q{margin:0 0 10px;font-weight:700}.qz-o{display:flex;justify-content:space-between;margin-top:6px;padding:9px 12px;border-radius:10px;border:1.5px solid #dfe4ef;background:#fff}.qz-o.ok{border-color:#34c759;background:#eafbef}.qz-o.ok b{color:#15803d}
+.qz-exp{margin-top:10px;padding:9px 12px;border-radius:10px;background:#eef4ff;color:#1d3a8a;font-size:13px}
+.cl-cloud{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 14px;padding:10px;border-radius:12px;background:#0f1838}.cl-cloud b{font-family:var(--f-body);line-height:1.1}
+.ds-c{display:grid;gap:2px;padding:9px 12px;border-radius:12px;background:#fff;margin-top:6px;box-shadow:0 2px 8px rgba(18,24,41,.05)}.ds-c b{font-size:12.5px}.ds-c i{font-style:normal;font-size:11.5px;color:#8a96bf}.ds-r{margin-left:26px;border-left:3px solid #9b7bff}
+.rf-box{padding:10px 12px;border-radius:12px;background:#fff;border:1.5px solid #34c759;min-height:60px}.rf-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;color:#59637a}.rf-foot b{padding:5px 14px;border-radius:999px;background:#34c759;color:#06210f}
+.vd-scr{display:flex;align-items:center;gap:10px;height:90px;padding:0 16px;border-radius:12px;background:#0f1838;color:#fff;font-size:22px}.vd-scr span{font-size:13px;color:#c3cdf0}
+.vd-heat{display:flex;gap:2px;margin-top:8px;height:12px}.vd-heat i{flex:1;border-radius:3px;background:#ff5a5a}
+.vd-legend{display:flex;justify-content:space-between;gap:10px;margin-top:6px;font-size:11.5px;color:#59637a}
+.vd-scr .vn-add{margin-left:auto;padding:5px 11px;border-radius:999px;background:#e11d48;color:#fff;font:800 11.5px var(--f-body)}
+.vn-line{position:relative;height:8px;margin:10px 0 4px;border-radius:4px;background:#dfe4ef}
+.vn-line i{position:absolute;top:50%;width:13px;height:13px;margin:-6.5px 0 0 -6.5px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(18,24,41,.25)}
+.vn-line i.vn-now{width:3px;height:18px;margin:-9px 0 0 -1.5px;border:0;border-radius:2px;background:#e11d48;box-shadow:none}
+.vn-audio{display:grid;gap:6px;margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(18,24,41,.06)}
+.vn-audio span{font:700 12px var(--f-body);color:#59637a}
+.vn-wave{position:relative;display:flex;align-items:center;gap:3px;height:30px}
+.vn-wave i{flex:1;border-radius:2px;background:#c7cde0}
+.vn-wave em{position:absolute;top:-3px;bottom:-3px;width:3px;margin-left:-1.5px;border-radius:2px;background:#e11d48}
+.vn-wave em::after{content:"";position:absolute;top:-6px;left:-4px;width:11px;height:11px;border-radius:50%;background:#ffd23f;border:2px solid #fff}
+.vn-go{color:#e11d48;font-weight:800}
+.pp-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:#fff;margin-top:6px}.pp-row i{width:9px;height:9px;border-radius:50%;background:#cbd2e1}.pp-row i.on{background:#34c759;box-shadow:0 0 0 3px #d9f7e2}.pp-row span{margin-left:auto;font-size:12px;color:#8a96bf}
+.pp-btn{margin-top:8px;padding:8px;border-radius:10px;border:1.5px dashed #22c3b5;color:#0f766e;text-align:center;font-weight:700;font-size:13px}
+.bd-teams{display:flex;flex-wrap:wrap;gap:6px}.bd-teams span{padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--c) 16%,#fff);color:var(--c);font:800 11.5px var(--f-body);border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
+.bd-wrap{display:grid;grid-template-columns:1.5fr 1fr;gap:8px;margin-top:10px}.bd-canvas{border-radius:10px;background:#fff;border:1px solid #dfe4ef;padding:4px}.bd-canvas svg{display:block;width:100%;height:auto}
+.bd-chat{display:grid;align-content:start;gap:5px;padding:8px;border-radius:10px;background:#e9edfa;font-size:12px}.bd-chat b{font-size:12px;color:#1d2f6e}.bd-chat span{padding:5px 7px;border-radius:8px;background:#fff}.bd-chat i{font-style:normal;font-weight:800;color:#ea580c}
+.bd-voice{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;font-size:12.5px}.bd-voice .live{color:#e11d48}.bd-voice span{padding:3px 9px;border-radius:999px;background:#eafbef;color:#15803d;font-weight:700}
+.pf-book{display:flex;justify-content:center;perspective:600px;padding:10px 0}.pf-pg{width:130px;height:150px;padding:12px;background:#fbfaf5;border:1px solid #e3e0d4;font:800 13px var(--f-body);color:#1d2f6e;box-shadow:0 6px 16px rgba(18,24,41,.12)}.pf-pg i{display:block;height:6px;margin-top:9px;border-radius:3px;background:#c7cde0}.pf-pg.flip{transform:rotateY(-22deg);transform-origin:left center;border-left:none}
+body.cat-open #labels{visibility:hidden}
+body.ov .lbl small{display:none}
+.bar{height:2px;margin-top:12px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--c)}
+
+.hint{position:fixed;right:max(20px,env(safe-area-inset-right));bottom:max(22px,env(safe-area-inset-bottom));max-width:360px;font-size:12px;color:var(--muted);text-align:right;line-height:1.5;transition:opacity .8s}
+.hint.off{opacity:0}
+
+/* WebGL ажиллахгүй үед: алхмуудыг энгийн жагсаалтаар */
+.fallback{position:fixed;inset:0;overflow:auto;padding:110px 20px 40px}
+.fallback ol{list-style:none;margin:0 auto;padding:0;max-width:760px;display:grid;gap:12px;counter-reset:s}
+.fallback li{padding:16px 18px;border-radius:18px;background:var(--panel);border:1px solid var(--line);counter-increment:s}
+.fallback li h3{margin:6px 0 4px;font:700 16px var(--f-display)}
+.fallback li h3::before{content:counter(s) ". ";color:var(--c)}
+.fallback li p{margin:0;color:var(--text-2);font-size:14px;line-height:1.55}
+
+@media (max-width:899px){
+  .legend{display:none}
+  .hint{display:none}
+  .card{left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));width:auto;max-height:44vh;max-height:44dvh;overflow:auto;padding:15px 16px 13px}
+  .card p{font-size:14px}
+  .card-nav{margin:12px -16px -13px;padding:10px 16px 12px;bottom:-13px}
+  .card ul{gap:5px}
+  .top{padding:14px 14px 30px;gap:12px}
+  .top-title p{display:none}
+  .brand{font-size:0;gap:0}
+  .brand span{display:none}
+  .btn{height:36px;padding:0 12px}
+  .btn .lbl-wide,#btnCat span{display:none}
+  .xp{position:fixed;left:14px;right:14px;top:62px;min-width:0;grid-template-columns:auto 1fr auto;grid-template-rows:auto;padding:6px 12px;background:rgba(8,13,34,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  .xp-lvl{grid-row:1;grid-column:1}.xp-bar{grid-row:1;grid-column:2;width:auto}.xp-num{grid-row:1;grid-column:3}
+  .toast{top:110px}
+  .top-title{display:none}
+  .cat-card{padding:18px 16px 22px;border-radius:20px}
+  .cat-grid{columns:1}
+}
+@media (max-width:420px){.top-title h1{font-size:14px}}
+@media (prefers-reduced-motion:reduce){.card-body.in{animation:none}.toast{transition:opacity .2s}}
+</style>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+<div id="labels" aria-hidden="true"></div>
+
+<header class="top">
+  <a class="brand" href="/" aria-label="surgalt.mn нүүр"><i>s</i>surgalt<span>.mn</span></a>
+  <div class="top-title">
+    <h1>Систем хэрхэн ажилладаг вэ?</h1>
+    <p><b>Багш</b> хичээлээ зохион байгуулна → <b>surgalt.mn</b> хадгалж, хүргэнэ → <b>суралцагч бүтээлчээр суралцана</b>.</p>
+  </div>
+  <div class="xp" id="xp" title="Шат бүрийг үзэхэд XP, тэмдэг авна">
+    <span class="xp-lvl" id="xpLvl">Зочин</span>
+    <span class="xp-bar"><i id="xpFill"></i></span>
+    <span class="xp-num" id="xpNum">0 XP</span>
+  </div>
+  <div class="top-acts">
+    <button type="button" class="btn" id="btnCat" title="Системийн бүх боломжийн жагсаалт"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Бүх боломж</span></button>
+    <button type="button" class="btn" id="btnOverview" title="Бүх системийг нэг дор (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/></svg><span class="lbl-wide">Тойм</span></button>
+    <button type="button" class="btn gold" id="btnPlay" aria-pressed="false" title="Алхмуудыг автоматаар үзүүлнэ (Space)"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg><span>Аялал</span></button>
+  </div>
+</header>
+
+<aside class="legend" aria-label="Урсгалын өнгө">
+  <h4>Урсгал</h4>
+  <span style="--c:var(--gold)"><i></i>Агуулга (багшаас)</span>
+  <span style="--c:var(--teal)"><i></i>Нээгдсэн хичээл</span>
+  <span style="--c:var(--green)"><i></i>Явц, дүн, хариу</span>
+  <span style="--c:var(--violet)"><i></i>Багш хооронд хуваалцах</span>
+  <span style="--c:#ffc83d"><i></i>QPay төлбөр → орлого</span>
+</aside>
+
+<section class="card" id="card" aria-live="polite" style="--c:var(--blue)">
+  <div class="card-head"><span class="zone-chip" id="cZone">Тойм</span><span class="hero-tag" id="cHero" hidden>★ Гол онцлог</span><span class="card-num" id="cNum"></span></div>
+  <div class="card-body">
+    <h2 id="cTitle">Гурван оролцогч — нэг урсгал</h2>
+    <p id="cText"></p>
+    <ul id="cPoints"></ul>
+    <div class="card-det" id="cDet" hidden></div>
+    <div class="card-prot" id="cProt" hidden></div>
+    <p class="reward" id="cReward" hidden></p>
+  </div>
+  <div class="map" id="map" aria-label="Шатууд"></div>
+  <div class="card-nav">
+    <button type="button" class="nav-b" id="prev" aria-label="Өмнөх алхам"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+    <span class="nav-mid" id="navMid"></span>
+    <button type="button" class="nav-b next" id="next"><span id="nextLbl">Эхлэх</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+  </div>
+  <div class="bar" id="bar" hidden><i></i></div>
+</section>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="det" id="det" hidden role="dialog" aria-modal="true" aria-labelledby="detTitle"><div class="det-card"></div></div>
+<div class="cat" id="cat" hidden role="dialog" aria-modal="true" aria-labelledby="catTitle">
+  <div class="cat-card">
+    <header class="cat-head">
+      <div><h2 id="catTitle">Системийн бүх боломж</h2><p id="catCount"></p></div>
+      <button type="button" class="nav-b" id="catClose" aria-label="Хаах"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <input type="search" class="cat-q" id="catQ" placeholder="Хайх: шалгалт, QPay, самбар…" aria-label="Боломж хайх" autocomplete="off">
+    <div class="cat-tabs" id="catTabs"></div>
+    <div class="cat-grid" id="catGrid"></div>
+  </div>
+</div>
+<p class="hint" id="hint">Чирж эргүүлнэ · дугуйгаар томруулна · объект дээр очвол нэр, дарвал тайлбар гарна · ← → алхам солино</p>
+<div class="fallback" id="fallback" hidden></div>
+<noscript><div class="fallback"><ol><li style="--c:#f0a83a"><h3>Багш</h3><p>Сургалт үүсгэж, бүлэг, хичээлээ зохион байгуулна.</p></li><li style="--c:#6f8cff"><h3>surgalt.mn</h3><p>Агуулгыг хадгалж, зөв хүнд зөв цагт нээнэ.</p></li><li style="--c:#22c3b5"><h3>Суралцагч</h3><p>Элсэж, бүтээлчээр суралцаж, цол ахина.</p></li></ol></div></noscript>
+
+<script src="/static/vendor/three-r128.min.js"></script>
+<script src="/static/ar.js"></script>
+</body>
+</html>

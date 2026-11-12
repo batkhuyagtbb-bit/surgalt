@@ -35,7 +35,7 @@ const (
 var adminPathRe = regexp.MustCompile(`^/[A-Za-z0-9_-]{3,64}$`)
 
 // reservedPaths — сайтын бусад хуудастай давхцах ёсгүй.
-var reservedPaths = map[string]bool{"/login": true, "/privacy": true, "/terms": true, "/intro2": true, "/me": true,
+var reservedPaths = map[string]bool{"/login": true, "/privacy": true, "/terms": true, "/intro2": true, "/ar": true, "/me": true,
 	"/studio": true, "/reset": true, "/healthz": true}
 
 // ValidAdminPath — main.go-д ADMIN_PATH-ыг шалгахад.

@@ -468,6 +468,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /login", s.pageStatic("login"))
 	mux.HandleFunc("GET /privacy", s.pageStatic("privacy"))
 	mux.HandleFunc("GET /intro2", s.pageIntro)
+	// «Систем хэрхэн ажилладаг вэ?» — 3D тайлбар (static/ar.html + ar.js, inline скриптгүй).
+	mux.HandleFunc("GET /ar", s.pageAR)
+	mux.HandleFunc("GET /ar.html", s.pageAR)
 	mux.HandleFunc("GET /terms", s.pageStatic("terms"))
 	mux.HandleFunc("GET /data-deletion", s.pageDataDeletion)
 	// /me — нэвтэрсэн хүний өөрийн хуудас руу шилжүүлнэ (багш: /t/<нэр>, суралцагч: /). Хуучин /studio холбоос ч мөн.
