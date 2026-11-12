@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"net/http"
+	"os"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"surgalt/internal/files"
@@ -306,12 +309,20 @@ func (s *Server) handleSharedView(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slices.SortStableFunc(ls, func(a, b store.Lesson) int { return a.Position - b.Position })
+		fc := s.fileCopier(c.UID, 0)
 		rows := make([]map[string]any, 0, len(ls))
 		for i := range ls {
 			l := &ls[i]
-			rows = append(rows, map[string]any{"id": l.ID, "title": l.Title, "section": l.Section, "kind": lessonKind(l), "hidden": l.Hidden, "is_free": l.IsFree, "blocks": len(l.Blocks)})
+			n, _ := fc.need(nil, lessonFiles(ls[i:i+1])) // хуулахад хэрэгтэй хэмжээ (өөрийн санд)
+			rows = append(rows, map[string]any{"id": l.ID, "title": l.Title, "section": l.Section, "kind": lessonKind(l), "hidden": l.Hidden, "is_free": l.IsFree, "blocks": len(l.Blocks), "bytes": n})
 		}
 		out["lessons"] = rows
+	}
+	// Хүлээн авагчийн файлын сан: хуулахаас өмнө багтах эсэхийг студи харуулна.
+	if u, err := s.store.UserByID(ctx, c.UID); err == nil && s.files != nil {
+		if used, err := s.files.Usage(c.UID); err == nil {
+			out["storage"] = map[string]int64{"used": used, "quota": s.quotaOf(u)}
+		}
 	}
 	if lid != "" {
 		l, err := s.sharedLesson(ctx, sh, lid)
@@ -347,6 +358,7 @@ func (s *Server) handleSharedView(w http.ResponseWriter, r *http.Request) {
 			b.HTML = s.richMedia(b.HTML)
 		}
 		out["lesson"] = cp
+		out["lesson_bytes"], _ = s.fileCopier(c.UID, 0).need(nil, lessonFiles([]store.Lesson{*l}))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -423,13 +435,10 @@ func (s *Server) handleSharedSave(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "хадгалах хичээл алга")
 		return
 	}
+	// Хадгалах сургалтын эзэн — файлууд түүний санд хуулагдаж, багтаамжийг нь ашиглана (шинэ сургалт бол өөрөө).
 	var target *store.Course
-	if in.NewCourse {
-		var ok bool
-		if target, ok = s.forkCourse(w, r, c.UID, src, srcLessons, sh, in.Title); !ok {
-			return
-		}
-	} else {
+	ownerID := c.UID
+	if !in.NewCourse {
 		var err error
 		target, err = s.store.CourseByID(ctx, in.CourseID)
 		if errors.Is(err, store.ErrNotFound) || (err == nil && !teaches(target, c.UID)) {
@@ -439,15 +448,50 @@ func (s *Server) handleSharedSave(w http.ResponseWriter, r *http.Request) {
 		if s.storeErr(w, r, err) {
 			return
 		}
-		if !s.planOpen(w, r, target.TeacherID) {
-			return
-		}
+		ownerID = target.TeacherID
 	}
-	owner, err := s.store.UserByID(ctx, target.TeacherID)
+	if !s.planOpen(w, r, ownerID) {
+		return
+	}
+	owner, err := s.store.UserByID(ctx, ownerID)
 	if s.storeErr(w, r, err) {
 		return
 	}
-	cpFile := s.fileCopier(target.TeacherID, s.quotaOf(owner))
+	// Багтаамжийг урьдчилан шалгана: өмнө нь хуулж явсаар дундуур нь «дотоод алдаа» өгч, хагас хуулбар нь санг
+	// дүүргэдэг байв.
+	fc := s.fileCopier(ownerID, s.quotaOf(owner))
+	var optional []string
+	if in.NewCourse && sh.LessonID == "" {
+		optional = []string{src.Cover}
+	}
+	need, err := fc.need(lessonFiles(srcLessons), optional)
+	if errors.Is(err, errSharedFile) {
+		writeErr(w, http.StatusNotFound, "хуваалцсан хичээлийн файл олдсонгүй (эх багш устгасан байж магадгүй)")
+		return
+	}
+	if need > 0 && s.files != nil {
+		used, err := s.files.Usage(ownerID)
+		if err != nil {
+			s.filesErr(w, err)
+			return
+		}
+		if free := max(0, fc.quota-used); need > free {
+			whose := "Таны"
+			if ownerID != c.UID {
+				whose = "Сургалтын эзэмшигчийн"
+			}
+			writeErr(w, http.StatusRequestEntityTooLarge, "Файлын сан хүрэлцэхгүй: сонгосон хичээлүүдийн файл "+mbLabel(need)+", "+whose+
+				" санд "+mbLabel(free)+" сул байна (нийт "+mbLabel(fc.quota)+"). Цөөн хичээл сонгох, эсвэл «Данс» → «Файлын сан»-аас багтаамжаа нэмнэ үү.")
+			return
+		}
+	}
+	if in.NewCourse {
+		var ok bool
+		if target, ok = s.forkCourse(w, r, c.UID, src, srcLessons, sh, in.Title, fc); !ok {
+			fc.rollback()
+			return
+		}
+	}
 	saved := []*store.Lesson{}
 	for i := range srcLessons {
 		section := in.Section
@@ -456,28 +500,36 @@ func (s *Server) handleSharedSave(w http.ResponseWriter, r *http.Request) {
 		}
 		// Шинэ сургалт ноорог тул эх хичээлийн нээлттэй/хаалттай төлөв хэвээр; байгаа сургалтад хаалттай орно.
 		hidden := !in.NewCourse || srcLessons[i].Hidden
-		nl, err := s.copyLesson(ctx, target, &srcLessons[i], section, hidden, cpFile)
+		nl, err := s.copyLesson(ctx, target, &srcLessons[i], section, hidden, fc.copy)
 		if err != nil {
 			var ce *copyErr
-			if errors.As(err, &ce) {
-				writeErr(w, ce.status, ce.msg)
-			} else if errors.Is(err, errSharedFile) {
-				writeErr(w, http.StatusNotFound, "хуваалцсан хичээлийн файл олдсонгүй (эх багш устгасан байж магадгүй)")
-			} else if s.storeErr(w, r, err) {
-				// файлын сангийн алдаа (багтаамж г.м) storeErr-т танигдахгүй бол доор
-			} else {
-				s.filesErr(w, err)
-			}
 			switch {
-			case in.NewCourse && len(saved) == 0: // нэг ч хичээл ороогүй шинэ сургалтыг үлдээхгүй
-				if err := s.store.DeleteCourse(ctx, target.TeacherID, target.ID); err != nil {
-					s.log.Warn("хоосон хуулбар сургалтыг устгаж чадсангүй", "course", target.ID, "err", err)
+			case errors.As(err, &ce):
+				writeErr(w, ce.status, ce.msg)
+			case errors.Is(err, errSharedFile):
+				writeErr(w, http.StatusNotFound, "хуваалцсан хичээлийн файл олдсонгүй (эх багш устгасан байж магадгүй)")
+			case errors.Is(err, files.ErrQuota), errors.Is(err, files.ErrTooLarge), errors.Is(err, files.ErrType):
+				s.filesErr(w, err)
+			default:
+				s.storeErr(w, r, err)
+			}
+			// Бүгдийг буцаана: энэ удаа нэмсэн хичээл, хуулсан файл, шинэ сургалт үлдэхгүй.
+			bg := context.WithoutCancel(ctx)
+			for _, l := range saved {
+				if err := s.store.DeleteLesson(bg, target.ID, l.ID); err != nil {
+					s.log.Warn("хуулбар хичээлийг буцааж чадсангүй", "course", target.ID, "lesson", l.ID, "err", err)
+				}
+			}
+			if in.NewCourse {
+				if err := s.store.DeleteCourse(bg, target.TeacherID, target.ID); err != nil {
+					s.log.Warn("хуулбар сургалтыг буцааж чадсангүй", "course", target.ID, "err", err)
 				}
 				s.profiles.Delete(c.Name)
 				s.search.markDirty()
-			case len(saved) > 0:
-				s.courseEdited(ctx, target)
+			} else if len(saved) > 0 {
+				s.courseEdited(bg, target)
 			}
+			fc.rollback()
 			return
 		}
 		saved = append(saved, nl)
@@ -490,10 +542,7 @@ func (s *Server) handleSharedSave(w http.ResponseWriter, r *http.Request) {
 // forkCourse — хуваалцсан сургалтаас хүлээн авагчийн өөрийн шинэ (ноорог) сургалтыг үүсгэнэ: гарчиг (өөрөө өөрчилж
 // болно), тайлбар, толгойн зураг (файл бол түүний сан руу хуулна), үнэ, дараалал, камер, сертификат, сануулгын
 // тохиргоо. Нууц үг, нийтлэх төлөв, байгууллагын хөтөлбөр, хамт заагч багш нар хуулагдахгүй.
-func (s *Server) forkCourse(w http.ResponseWriter, r *http.Request, uid string, src *store.Course, srcLessons []store.Lesson, sh *store.Share, title string) (*store.Course, bool) {
-	if !s.planOpen(w, r, uid) {
-		return nil, false
-	}
+func (s *Server) forkCourse(w http.ResponseWriter, r *http.Request, uid string, src *store.Course, srcLessons []store.Lesson, sh *store.Share, title string, fc *fileCopy) (*store.Course, bool) {
 	if title = strings.TrimSpace(title); title == "" {
 		title = src.Title
 		if sh.LessonID != "" && len(srcLessons) == 1 {
@@ -514,10 +563,8 @@ func (s *Server) forkCourse(w http.ResponseWriter, r *http.Request, uid string, 
 		Camera: in.Camera, Certificate: in.Certificate, MaxWarnings: in.MaxWarnings, BlockHours: in.BlockHours, BlockMinutes: in.BlockMinutes}
 	if cover := src.Cover; cover != "" && sh.LessonID == "" {
 		if strings.HasPrefix(cover, "/files/") {
-			if u, err := s.store.UserByID(ctx, uid); err == nil {
-				if np, err := s.fileCopier(uid, s.quotaOf(u))(cover); err == nil {
-					cover = np
-				}
+			if np, err := fc.copy(cover); err == nil {
+				cover = np
 			}
 		}
 		if coverOK(cover, uid) == "" {
@@ -596,36 +643,130 @@ func (s *Server) copyLesson(ctx context.Context, target *store.Course, src *stor
 	return nl, nil
 }
 
-// fileCopier — өөр багшийн файлын сангийн замыг toID багшийн сан руу хуулж шинэ замыг өгнө (ижил зам нэг л удаа
-// хуулагдана). Гадаад холбоос, аль хэдийн өөрийн файл бол өөрчлөхгүй.
-func (s *Server) fileCopier(toID string, quota int64) func(string) (string, error) {
-	done := map[string]string{}
-	return func(u string) (string, error) {
-		u = stripSig(strings.TrimSpace(u))
-		if !strings.HasPrefix(u, "/files/") || files.OwnedBy(u, toID) {
-			return u, nil
-		}
-		if v, ok := done[u]; ok {
-			return v, nil
-		}
-		teacher, vis, name, ok := files.SplitPath(u)
-		if !ok || s.files == nil {
-			return "", errSharedFile
-		}
-		f, _, err := s.files.Open(teacher, vis, name)
-		if err != nil {
-			return "", errSharedFile
-		}
-		defer f.Close()
-		orig := name // <санамсаргүй>__<эх нэр> → эх нэрээр
-		if i := strings.Index(name, "__"); i >= 0 {
-			orig = name[i+2:]
-		}
-		info, err := s.files.SaveOpts(toID, vis, orig, f, quota, false)
-		if err != nil {
-			return "", err
-		}
-		done[u] = info.Path
-		return info.Path, nil
+// fileCopy — өөр багшийн файлын сангийн замыг toID багшийн сан руу хуулж шинэ замыг өгнө (ижил зам нэг л удаа
+// хуулагдана). Гадаад холбоос, аль хэдийн өөрийн файл бол өөрчлөхгүй. Хуулсан файлуудыг санаж, алдаа гарвал
+// rollback-аар устгана (хагас хуулбар хүлээн авагчийн санг дүүргэхгүй).
+type fileCopy struct {
+	s       *Server
+	toID    string
+	quota   int64
+	done    map[string]string
+	created []string
+}
+
+func (s *Server) fileCopier(toID string, quota int64) *fileCopy {
+	return &fileCopy{s: s, toID: toID, quota: quota, done: map[string]string{}}
+}
+
+// foreign — хуулах шаардлагатай (өөр багшийн файлын сангийн) зам; үгүй бол "".
+func (fc *fileCopy) foreign(u string) string {
+	u = stripSig(strings.TrimSpace(u))
+	if !strings.HasPrefix(u, "/files/") || files.OwnedBy(u, fc.toID) {
+		return ""
 	}
+	return u
+}
+
+func (fc *fileCopy) copy(u string) (string, error) {
+	src := fc.foreign(u)
+	if src == "" {
+		return stripSig(strings.TrimSpace(u)), nil
+	}
+	if v, ok := fc.done[src]; ok {
+		return v, nil
+	}
+	teacher, vis, name, ok := files.SplitPath(src)
+	if !ok || fc.s.files == nil {
+		return "", errSharedFile
+	}
+	f, _, err := fc.s.files.Open(teacher, vis, name)
+	if err != nil {
+		return "", errSharedFile
+	}
+	defer f.Close()
+	orig := name // <санамсаргүй>__<эх нэр> → эх нэрээр
+	if i := strings.Index(name, "__"); i >= 0 {
+		orig = name[i+2:]
+	}
+	info, err := fc.s.files.SaveOpts(fc.toID, vis, orig, f, fc.quota, false)
+	if err != nil {
+		return "", err
+	}
+	fc.done[src] = info.Path
+	fc.created = append(fc.created, info.Path)
+	return info.Path, nil
+}
+
+// need — эдгээр замуудыг хуулахад хэрэгтэй багтаамж (давхардлыг нэг удаа). Олдохгүй файл байвал errSharedFile;
+// optional замууд (толгойн зураг) олдохгүй бол алгасна.
+func (fc *fileCopy) need(paths, optional []string) (int64, error) {
+	seen := map[string]bool{}
+	var total int64
+	for i, u := range append(slices.Clone(paths), optional...) {
+		src := fc.foreign(u)
+		if src == "" || seen[src] {
+			continue
+		}
+		seen[src] = true
+		teacher, vis, name, ok := files.SplitPath(src)
+		var f *os.File
+		var fi fs.FileInfo
+		err := errSharedFile
+		if ok && fc.s.files != nil {
+			f, fi, err = fc.s.files.Open(teacher, vis, name)
+		}
+		if err != nil {
+			if i >= len(paths) {
+				continue
+			}
+			return 0, errSharedFile
+		}
+		f.Close()
+		total += fi.Size()
+	}
+	return total, nil
+}
+
+// rollback — энэ удаа хуулсан файлуудыг устгана.
+func (fc *fileCopy) rollback() {
+	for _, p := range fc.created {
+		if teacher, vis, name, ok := files.SplitPath(p); ok {
+			_ = fc.s.files.Delete(teacher, vis, name)
+		}
+	}
+	fc.created = nil
+}
+
+// lessonFiles — хичээлүүдийн файлын сангийн замууд (видео, блокийн медиа, текст доторх зураг, асуултын зураг).
+func lessonFiles(ls []store.Lesson) []string {
+	var out []string
+	for i := range ls {
+		l := &ls[i]
+		out = append(out, l.VideoURL)
+		for j := range l.Blocks {
+			b := &l.Blocks[j]
+			switch b.Type {
+			case "image", "audio", "video", "file":
+				out = append(out, b.URL)
+			case "text":
+				out = append(out, filePathRe.FindAllString(b.HTML, -1)...)
+			case "quiz":
+				if b.Quiz != nil {
+					out = append(out, b.Quiz.Image)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// mbLabel — байтыг «12.3 MB» гэх мэт.
+func mbLabel(n int64) string {
+	switch {
+	case n >= 1<<30:
+		return strconv.FormatFloat(float64(n)/(1<<30), 'f', 2, 64) + " GB"
+	case n >= 1<<20:
+		return strconv.FormatFloat(float64(n)/(1<<20), 'f', 1, 64) + " MB"
+	}
+	return strconv.FormatInt(max(1, n>>10), 10) + " KB"
 }

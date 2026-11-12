@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"net/http"
 	"strings"
 	"testing"
@@ -214,5 +215,48 @@ func TestSharedCourseFork(t *testing.T) {
 	// Бусдын хуваалцалтаар сургалт үүсгэхгүй.
 	if code, _ := call(t, srv, "POST", "/api/me/shared/"+sid+"/save", ta, `{"new_course":true}`); code != http.StatusNotFound {
 		t.Fatalf("бусдын хуваалцалт: %d", code)
+	}
+}
+
+// Хүлээн авагчийн файлын сан хүрэлцэхгүй бол хуулахаас өмнө ойлгомжтой 413 (өмнө нь дундуур нь «дотоод алдаа» өгч,
+// хагас хуулбар санг дүүргэдэг байв): юу ч хуулагдахгүй, сургалт үүсэхгүй; багтах хэмжээгээр сонговол хадгалагдана.
+// Урьдчилан харахад хичээл бүрийн файлын хэмжээ, хүлээн авагчийн сан харагдана.
+func TestSharedSaveQuota(t *testing.T) {
+	srv, _ := newTestServer(t) // үнэгүй сан 10MB
+	defer srv.Close()
+	ta, _ := register(t, srv, "bigowner", "teacher")
+	tb, _ := register(t, srv, "smalltaker", "teacher")
+	uploadFile(t, srv, tb, "mine.pdf", append([]byte("%PDF-1.4 "), bytes.Repeat([]byte("m"), 5<<20)...)) // 5MB ашигласан
+	_, ca := call(t, srv, "POST", "/api/courses", ta, `{"title":"Видео сургалт","price":0}`)
+	cid := ca["id"].(string)
+	for i, name := range []string{"a.pdf", "b.pdf"} {
+		p := uploadFile(t, srv, ta, name, append([]byte("%PDF-1.4 "), bytes.Repeat([]byte{byte('a' + i)}, 4<<20)...))
+		if code, l := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", ta, `{"title":"Хичээл `+name+`","is_free":true,"blocks":[{"id":"f","type":"file","url":"`+p+`","name":"`+name+`"}]}`); code != 201 {
+			t.Fatalf("хичээл: %d %v", code, l)
+		}
+	}
+	_, sh := call(t, srv, "POST", "/api/courses/"+cid+"/share", ta, `{"who":"smalltaker@x.mn"}`)
+	sid := sh["id"].(string)
+	_, v := call(t, srv, "GET", "/api/me/shared/"+sid, tb, "")
+	rows, st := v["lessons"].([]any), v["storage"].(map[string]any)
+	if b := rows[0].(map[string]any)["bytes"].(float64); b < 4<<20 || st["quota"].(float64) != 10<<20 || st["used"].(float64) < 5<<20 {
+		t.Fatalf("хэмжээ, сан: %v %v", rows, st)
+	}
+	usage := func() float64 { _, s := call(t, srv, "GET", "/api/me/storage", tb, ""); return s["used"].(float64) }
+	before := usage()
+	code, e := call(t, srv, "POST", "/api/me/shared/"+sid+"/save", tb, `{"new_course":true}`)
+	if code != http.StatusRequestEntityTooLarge || !strings.Contains(e["error"].(string), "Файлын сан хүрэлцэхгүй") {
+		t.Fatalf("багтахгүй: %d %v", code, e)
+	}
+	if _, cs := callArrMap(t, srv, "GET", "/api/me/courses", tb); len(cs) != 0 || usage() != before {
+		t.Fatalf("юу ч үлдэх ёсгүй: %v, %v → %v", cs, before, usage())
+	}
+	_, cb := call(t, srv, "POST", "/api/courses", tb, `{"title":"Миний","price":0}`)
+	if code, _ := call(t, srv, "POST", "/api/me/shared/"+sid+"/save", tb, `{"course_id":"`+cb["id"].(string)+`"}`); code != http.StatusRequestEntityTooLarge || usage() != before {
+		t.Fatalf("байгаа сургалтад багтахгүй: %d", code)
+	}
+	one := rows[0].(map[string]any)["id"].(string)
+	if code, r := call(t, srv, "POST", "/api/me/shared/"+sid+"/save", tb, `{"new_course":true,"lesson_ids":["`+one+`"]}`); code != 201 || r["count"].(float64) != 1 {
+		t.Fatalf("багтах хэмжээгээр: %d %v", code, r)
 	}
 }

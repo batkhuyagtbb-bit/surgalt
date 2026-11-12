@@ -435,13 +435,19 @@ const sharedRowHTML = (x) => x.lesson_id
 
 // Хадгалах цонх: шинэ сургалт болгох (сургалтаар хуваалцсан бол анхдагч) эсвэл байгаа сургалтад нэмэх.
 // lessonId — нэг хичээл, lessonIds — сонгосон хичээлүүд, аль нь ч үгүй бол бүх хичээл.
-async function saveSharedDialog(x, { lessonId = "", lessonIds = null, title = "" } = {}) {
-  let mine; try { mine = await api("/api/me/courses?shared=1"); } catch (y) { return toast(y.message, true); }
+async function saveSharedDialog(x, { lessonId = "", lessonIds = null, title = "", info = null } = {}) {
+  let mine; try { [mine, info] = await Promise.all([api("/api/me/courses?shared=1"), info || api(`/api/me/shared/${x.id}${lessonId ? "?lesson=" + encodeURIComponent(lessonId) : ""}`).catch(() => null)]); } catch (y) { return toast(y.message, true); }
   const one = !!lessonId, n = one ? 1 : lessonIds ? lessonIds.length : x.lesson_count || 0;
   const name = title || (one ? x.lesson_title : x.course_title) || "";
   const dest = one && mine.length ? "existing" : "new";
+  // Хуулах файлын хэмжээ (хичээл бүрийнхийг нэмсэн — давхардсан файл нэг л удаа хуулагдах тул бодит нь бага байж болно).
+  const want = lessonIds ? new Set(lessonIds) : null;
+  const bytes = !info ? 0 : one ? (info.lesson_bytes ?? (info.lessons || []).find((r) => r.id === lessonId)?.bytes ?? 0) : (info.lessons || []).filter((r) => !want || want.has(r.id)).reduce((s, r) => s + (r.bytes || 0), 0);
+  const st = info?.storage, free = st ? Math.max(0, st.quota - st.used) : Infinity, over = bytes > free;
+  const sizeLine = bytes ? `<p class="sh-size-line${over ? " is-over" : ""}">${ico(over ? "alert" : "files", 15)}<span>Хуулах файл ≈ <b>${fmtSize(bytes)}</b>${st ? ` · таны санд <b>${fmtSize(free)}</b> сул (нийт ${fmtSize(st.quota)})` : ""}${over ? `. <b>Багтахгүй</b> — цөөн хичээл сонгох, эсвэл «Данс»-аас файлын сангаа нэмнэ үү.` : ""}</span></p>` : "";
   const [m, close] = mkModal("saveSharedModal", 540, `<h3>${ico("download", 20)} Өөрийн сургалтад хадгалах</h3>
     <p class="muted small">«${esc(name)}»${n > 1 ? ` — <b>${n} хичээл</b>` : ""}. Хуулбар бүрэн таных: дараалал, бүлгийг чирж сольж, засаж, нэмж, хасна. Эх сургалт өөрчлөгдөхгүй; файлууд таны файлын сан руу хуулагдана.</p>
+    ${sizeLine}
     <form class="form" id="saveSharedForm">
       <div class="seg share-seg" role="radiogroup" aria-label="Хаана хадгалах">
         <label><input type="radio" name="dest" value="new" ${dest === "new" ? "checked" : ""}><span>${ico("plus", 15)}Шинэ сургалт болгох</span></label>
@@ -483,13 +489,13 @@ async function viewSharedLesson(x, lessonId) {
 async function sharedCourse(sid) {
   const d = await api(`/api/me/shared/${encodeURIComponent(sid)}`);
   const x = d.share, co = d.course;
-  const rows = d.lessons || (d.lesson ? [{ id: d.lesson.id, title: d.lesson.title, section: d.lesson.section, kind: d.lesson.exam ? "exam" : d.lesson.assignment ? "assignment" : "lesson", hidden: d.lesson.hidden, is_free: d.lesson.is_free, blocks: (d.lesson.blocks || []).length }] : []);
+  const rows = d.lessons || (d.lesson ? [{ id: d.lesson.id, title: d.lesson.title, section: d.lesson.section, kind: d.lesson.exam ? "exam" : d.lesson.assignment ? "assignment" : "lesson", hidden: d.lesson.hidden, is_free: d.lesson.is_free, blocks: (d.lesson.blocks || []).length, bytes: d.lesson_bytes || 0 }] : []);
   const groups = [];
   for (const r of rows) { let g = groups.find((y) => y.name === (r.section || "")); if (!g) groups.push((g = { name: r.section || "", items: [] })); g.items.push(r); }
   const named = groups.filter((g) => g.name).length;
   let num = 0;
   const rowHTML = (r) => `<li class="ol-row sh-row"><label class="sh-check" title="Сонгох"><input type="checkbox" data-lid="${esc(r.id)}" checked aria-label="«${esc(r.title)}» хичээлийг сонгох"></label>
-      <span class="ol-num">${++num}</span><span class="ol-title"><strong>${esc(r.title)}</strong><small class="muted">${r.kind !== "lesson" ? `<span class="kind ${r.kind === "exam" ? "kind-exam" : "kind-asg"}">${ico(r.kind === "exam" ? "exam" : "clip", 14)}${SHARE_KIND[r.kind]}</span>` : ""}<span>${r.blocks} хэсэг</span>${r.is_free ? `<span class="aud aud-free">Үнэгүй</span>` : ""}${r.hidden ? `<span class="aud">${ico("lock", 13)}Хаалттай</span>` : ""}</small></span>
+      <span class="ol-num">${++num}</span><span class="ol-title"><strong>${esc(r.title)}</strong><small class="muted">${r.kind !== "lesson" ? `<span class="kind ${r.kind === "exam" ? "kind-exam" : "kind-asg"}">${ico(r.kind === "exam" ? "exam" : "clip", 14)}${SHARE_KIND[r.kind]}</span>` : ""}<span>${r.blocks} хэсэг</span>${r.bytes ? `<span title="Хуулах файлын хэмжээ">${ico("files", 13)}${fmtSize(r.bytes)}</span>` : ""}${r.is_free ? `<span class="aud aud-free">Үнэгүй</span>` : ""}${r.hidden ? `<span class="aud">${ico("lock", 13)}Хаалттай</span>` : ""}</small></span>
       <button type="button" class="btn btn-glass btn-sm" data-view="${esc(r.id)}">${ico("eye", 15)}<span class="sh-lbl">Харах</span></button></li>`;
   main.innerHTML = `<div class="sh-page">
     <a class="sh-back" href="#courses">${ico("back", 16)}Сургалтууд</a>
@@ -498,7 +504,7 @@ async function sharedCourse(sid) {
       <div class="gp-list-acts"><button type="button" class="btn btn-gold" data-fork>${ico("copy", 18)}Өөрийн сургалт болгох</button></div></div>
     ${co.description && !x.lesson_id ? `<p class="gp-desc">${esc(co.description)}</p>` : ""}
     <ol class="sh-steps"><li><b>Хичээлүүдийг хараад</b> хэрэгтэйгээ сонгоно</li><li><b>«Өөрийн сургалт болгох»</b> — шинэ сургалт үүснэ (эсвэл байгаа сургалтад нэмнэ)</li><li>Студидээ <b>дараалал, бүлгийг чирж</b> сольж, засаж, нэмж зохион байгуулна</li></ol>
-    ${rows.length ? `<div class="sh-bar"><label class="sh-check"><input type="checkbox" data-all checked><span>Бүгд</span></label><span class="sh-count" aria-live="polite"></span>
+    ${rows.length ? `<div class="sh-bar"><label class="sh-check"><input type="checkbox" data-all checked><span>Бүгд</span></label><span class="sh-count" aria-live="polite"></span><span class="sh-size"></span>
       <span class="sh-bar-acts"><button type="button" class="btn btn-glass btn-sm" data-add>${ico("book", 15)}Сургалтад нэмэх</button><button type="button" class="btn btn-gold btn-sm" data-fork>${ico("copy", 15)}Өөрийн сургалт болгох</button></span></div>
     <div class="ol sh-ol">${groups.map((g, i) => `<section class="ol-sec" data-sec="${esc(g.name)}"><header class="ol-sec-head"><label class="sh-check" title="Бүлгийг бүхэлд нь сонгох"><input type="checkbox" data-sec-all checked aria-label="«${esc(g.name || "Бүлэггүй")}» бүлгийг бүхэлд нь сонгох"></label>
       <span class="lg-num">${i + 1}</span><strong class="sh-sec-name">${g.name ? esc(g.name) : `<span class="muted">Бүлэггүй хичээлүүд</span>`}</strong><small class="muted">${g.items.length} хичээл</small></header>
@@ -510,6 +516,10 @@ async function sharedCourse(sid) {
     $$("[data-sec-all]", page).forEach((s) => { const bs = $$("[data-lid]", s.closest(".ol-sec")), k = bs.filter((b) => b.checked).length; s.checked = k === bs.length; s.indeterminate = k > 0 && k < bs.length; });
     const a = $("[data-all]", page); if (a) { a.checked = on === all.length; a.indeterminate = on > 0 && on < all.length; }
     const c = $(".sh-count", page); if (c) c.textContent = `${on}/${all.length} хичээл сонгосон`;
+    // Сонгосон хичээлүүдийн файл таны санд багтах эсэх.
+    const sel = new Set(picked()), bytes = rows.filter((r) => sel.has(r.id)).reduce((s, r) => s + (r.bytes || 0), 0);
+    const st = d.storage, free = st ? Math.max(0, st.quota - st.used) : Infinity, sz = $(".sh-size", page);
+    if (sz) { sz.hidden = !bytes; sz.classList.toggle("is-over", bytes > free); sz.innerHTML = bytes ? `${ico(bytes > free ? "alert" : "files", 14)}≈ ${fmtSize(bytes)} файл${st ? ` · санд ${fmtSize(free)} сул` : ""}${bytes > free ? " — багтахгүй" : ""}` : ""; }
     $$("[data-fork],[data-add]", page).forEach((b) => { b.disabled = !on; });
   };
   page.addEventListener("change", (e) => {
@@ -520,7 +530,7 @@ async function sharedCourse(sid) {
   });
   const save = (mode) => {
     const ids = picked(); if (!ids.length) return toast("Дор хаяж нэг хичээл сонгоно уу", true);
-    const opts = x.lesson_id ? { lessonId: x.lesson_id } : ids.length === rows.length ? {} : { lessonIds: ids };
+    const opts = { info: d, ...(x.lesson_id ? { lessonId: x.lesson_id } : ids.length === rows.length ? {} : { lessonIds: ids }) };
     saveSharedDialog(x, opts).then(() => { const m = $("#saveSharedModal"); if (m && mode) { const r = $(`input[name="dest"][value="${mode}"]`, m); if (r && !r.disabled) { r.checked = true; r.dispatchEvent(new Event("change", { bubbles: true })); } } });
   };
   page.addEventListener("click", (e) => {

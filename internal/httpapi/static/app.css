@@ -5046,6 +5046,11 @@ a.np-item:active{background:var(--line)}
 .sh-steps{margin:0;padding:12px 14px 12px 34px;border:1px dashed var(--line-2);border-radius:var(--radius);background:var(--brand-soft);color:var(--text-2);font-size:.9rem;display:grid;gap:4px}
 .sh-bar{position:sticky;top:64px;z-index:5;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow-sm)}
 .sh-count{color:var(--muted);font-weight:600;font-size:.88rem}
+.sh-size{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-weight:600;font-size:.85rem}
+.sh-size[hidden]{display:none}.sh-size.is-over,.sh-size-line.is-over{color:#b42318}
+.sh-size-line{display:flex;align-items:flex-start;gap:8px;margin:0 0 10px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);font-size:.86rem;color:var(--text-2)}
+.sh-size-line svg{flex:none;margin-top:2px}
+.sh-size-line.is-over{border-color:#f4c7c3;background:#fef3f2}
 .sh-bar-acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
 .sh-check{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;flex:none}
 .sh-check input{width:18px;height:18px;margin:0;accent-color:var(--brand);cursor:pointer}
