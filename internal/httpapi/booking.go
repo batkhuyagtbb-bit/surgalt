@@ -139,25 +139,25 @@ func (s *Server) handleAddSlots(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	switch {
 	case in.Weeks > maxWeeks:
-		writeErr(w, http.StatusBadRequest, "давталт 53 долоо хоногоос ихгүй")
+		writeErr(w, http.StatusBadRequest, "давталт 53 долоо хоногоос хэтрэхгүй байх ёстой")
 		return
 	case len(in.Starts)*in.Weeks > maxExpanded:
-		writeErr(w, http.StatusBadRequest, "хэт олон цаг — сонголт эсвэл давталтаа багасгана уу")
+		writeErr(w, http.StatusBadRequest, "цаг хэт олон байна — сонгосон цаг эсвэл давталтаа багасгана уу")
 		return
 	case len(in.Starts) == 0 || len(in.Starts) > maxSlotsPerReq:
 		writeErr(w, http.StatusBadRequest, "1-60 цаг сонгоно уу")
 		return
 	case in.DurationMin < 15 || in.DurationMin > 240:
-		writeErr(w, http.StatusBadRequest, "үргэлжлэх хугацаа 15-240 минут")
+		writeErr(w, http.StatusBadRequest, "үргэлжлэх хугацаа 15-240 минут байх ёстой")
 		return
 	case in.Mode != store.SlotOnline && in.Mode != store.SlotOffline:
-		writeErr(w, http.StatusBadRequest, "онлайн эсвэл биечлэн")
+		writeErr(w, http.StatusBadRequest, "уулзалтын хэлбэрээ сонгоно уу: онлайн эсвэл биечлэн")
 		return
 	case in.Price < 0 || in.Price > maxPrice:
-		writeErr(w, http.StatusBadRequest, "үнэ 0-100,000,000₮")
+		writeErr(w, http.StatusBadRequest, "үнэ 0-100,000,000₮ хооронд байх ёстой")
 		return
 	case utf8.RuneCountInString(in.Location) > 120:
-		writeErr(w, http.StatusBadRequest, "байршил 120 тэмдэгтээс ихгүй")
+		writeErr(w, http.StatusBadRequest, "байршил 120 тэмдэгтээс хэтрэхгүй байх ёстой")
 		return
 	}
 	if in.Mode == store.SlotOffline && in.Location == "" {
@@ -177,7 +177,7 @@ func (s *Server) handleAddSlots(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(existing)+len(in.Starts)*in.Weeks > maxFutureSlots {
-		writeErr(w, http.StatusBadRequest, "хэт олон сул цаг — хуучнаа цэвэрлэнэ үү")
+		writeErr(w, http.StatusBadRequest, "сул цаг хэт олон байна — хуучныг нь устгана уу")
 		return
 	}
 	dur := time.Duration(in.DurationMin) * time.Minute
@@ -199,7 +199,7 @@ func (s *Server) handleAddSlots(w http.ResponseWriter, r *http.Request) {
 	for _, st0 := range in.Starts {
 		st0 = st0.Truncate(time.Minute)
 		if st0.Before(now.Add(slotLead)) || st0.After(now.Add(slotMaxAhead)) {
-			writeErr(w, http.StatusBadRequest, "өнгөрсөн эсвэл хэт хол цаг")
+			writeErr(w, http.StatusBadRequest, "өнгөрсөн эсвэл хэт холын цаг сонгох боломжгүй")
 			return
 		}
 		series := ""
@@ -210,7 +210,7 @@ func (s *Server) handleAddSlots(w http.ResponseWriter, r *http.Request) {
 			st := st0.AddDate(0, 0, 7*wk) // Улаанбаатарт зуны цаг байхгүй — цагийн зөрүү гарахгүй
 			if busy(st, add) {
 				if in.Weeks == 1 {
-					writeErr(w, http.StatusConflict, "Энэ цаг өөр тэмдэглэсэн цагтай давхцаж байна")
+					writeErr(w, http.StatusConflict, "Энэ цаг таны өмнө тэмдэглэсэн цагтай давхцаж байна")
 					return
 				}
 				continue // давталтад: тэр долоо хоногийг алгасна
@@ -240,7 +240,7 @@ func (s *Server) handleDeleteSlot(w http.ResponseWriter, r *http.Request) {
 	}
 	sl, err := s.store.SlotByID(r.Context(), r.PathValue("id"))
 	if err != nil || sl.TeacherID != c.UID {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	if r.URL.Query().Get("series") == "1" && sl.SeriesID != "" && sl.StudentID == "" {
@@ -263,7 +263,7 @@ func (s *Server) handleDeleteSlot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.cancelSlots(r.Context(), c.UID, c.Name, []store.Slot{*sl}) == 0 {
-		writeErr(w, http.StatusInternalServerError, "хасаж чадсангүй")
+		writeErr(w, http.StatusInternalServerError, "цагийг хасаж чадсангүй — дахин оролдоно уу")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -307,7 +307,7 @@ func (s *Server) cancelSlots(ctx context.Context, teacherID, teacherUser string,
 			l := byStudent[uid]
 			body := "Өөр цаг сонгож дахин захиална уу."
 			if l.paid {
-				body = "Төлсөн мөнгийг багш буцаан олгоно — чатаар холбогдоорой."
+				body = "Таны төлсөн төлбөрийг багш буцаан олгоно — чатаар холбогдоорой."
 			}
 			nt := &store.Notification{UserID: uid, Type: NotifBooking, Count: 1, ActorID: teacherID, Link: "/t/" + teacherUser, Body: body,
 				Title: "❌ " + teacher + " уулзалтыг цуцаллаа · " + l.when[0]}
@@ -400,7 +400,7 @@ func (s *Server) handleSlotMeet(w http.ResponseWriter, r *http.Request) {
 	}
 	link, ok := cleanMeetURL(in.MeetURL)
 	if !ok {
-		writeErr(w, http.StatusBadRequest, "уулзалтын холбоос: https://meet.google.com/… (эсвэл Zoom, Teams)")
+		writeErr(w, http.StatusBadRequest, "уулзалтын холбоосоо оруулна уу: https://meet.google.com/… (эсвэл Zoom, Teams)")
 		return
 	}
 	sl, err := s.store.UpdateSlot(r.Context(), r.PathValue("id"), func(x *store.Slot) error {
@@ -431,7 +431,7 @@ func (s *Server) handleTeacherSlots(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if t.Role != store.RoleTeacher {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	now := time.Now()
@@ -471,7 +471,7 @@ func (s *Server) handleBookSlot(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&in) // бие заавал биш
 	in.Note = strings.TrimSpace(in.Note)
 	if utf8.RuneCountInString(in.Note) > 500 {
-		writeErr(w, http.StatusBadRequest, "тэмдэглэл 500 тэмдэгтээс ихгүй")
+		writeErr(w, http.StatusBadRequest, "тэмдэглэл 500 тэмдэгтээс хэтрэхгүй байх ёстой")
 		return
 	}
 	ctx, now := r.Context(), time.Now()
@@ -509,7 +509,7 @@ func (s *Server) handleBookSlot(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if errors.Is(err, errSlotTaken) {
-		writeErr(w, http.StatusConflict, "Энэ цагийг өөр хүн авчихлаа — өөр цаг сонгоно уу")
+		writeErr(w, http.StatusConflict, "Энэ цагийг өөр хүн захиалсан байна — өөр цаг сонгоно уу")
 		return
 	}
 	if s.storeErr(w, r, err) {
@@ -550,9 +550,9 @@ func (s *Server) slotPaid(ctx context.Context, o *store.Order) {
 		s.log.Warn("төлсөн цаг баталгаажсангүй", "order", o.ID, "err", err)
 		s.notify(ctx,
 			&store.Notification{UserID: o.TeacherID, Type: NotifBooking, Count: 1, ActorID: o.UserID, Title: "⚠️ " + name + " төлбөр төлсөн боловч цаг баталгаажсангүй",
-				Body: o.Title + " — мөнгийг буцаах эсвэл өөр цаг санал болгоно уу.", Link: "/me#live"},
-			&store.Notification{UserID: o.UserID, Type: NotifBooking, Count: 1, ActorID: o.TeacherID, Title: "⚠️ Таны төлсөн цаг өөр хүнд очсон байна",
-				Body: o.Title + " — багш тантай холбогдож буцаан олгоно.", Link: "/"})
+				Body: o.Title + " — төлбөрийг буцаах эсвэл өөр цаг санал болгоно уу.", Link: "/me#live"},
+			&store.Notification{UserID: o.UserID, Type: NotifBooking, Count: 1, ActorID: o.TeacherID, Title: "⚠️ Таны төлбөр төлсөн цагийг өөр хүн захиалсан байна",
+				Body: o.Title + " — багш тантай холбогдож төлбөрийг буцаан олгоно.", Link: "/"})
 		return
 	}
 	if fresh {
@@ -599,7 +599,7 @@ func (s *Server) slotConfirmed(ctx context.Context, sl *store.Slot) {
 		tb += " — «" + short(sl.Note) + "»"
 	}
 	if sl.Mode == store.SlotOnline && sl.MeetURL == "" && s.Meet != nil {
-		tb += " · Google Meet холбоогүй тул холбоосыг чатаар илгээнэ үү"
+		tb += " · Google Meet холбогдоогүй тул уулзалтын холбоосоо чатаар илгээнэ үү"
 	}
 	sb := place
 	if sl.MeetURL != "" {

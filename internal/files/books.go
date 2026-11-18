@@ -48,7 +48,7 @@ func (s *Store) SaveBookPage(teacherID, bookID string, n int, r io.Reader) error
 		return err
 	}
 	if len(raw) > MaxBookPageBytes {
-		return fmt.Errorf("%w: хуудас 6MB-аас их", ErrBadPage)
+		return fmt.Errorf("%w: хуудасны хэмжээ 6MB-аас их байна", ErrBadPage)
 	}
 	cfg, _, err := image.DecodeConfig(bytes.NewReader(raw))
 	if err != nil || cfg.Width < 50 || cfg.Height < 50 || cfg.Width > maxBookPageSide || cfg.Height > maxBookPageSide {

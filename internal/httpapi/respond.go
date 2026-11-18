@@ -44,14 +44,14 @@ func (s *Server) storeErr(w http.ResponseWriter, r *http.Request, err error) boo
 	case err == nil:
 		return false
 	case errors.Is(err, store.ErrNotFound):
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 	case errors.Is(err, store.ErrConflict):
-		writeErr(w, http.StatusConflict, "давхардсан эсвэл зөрчилтэй")
+		writeErr(w, http.StatusConflict, "давхардал эсвэл зөрчил үүслээ — хуудсаа сэргээгээд дахин оролдоно уу")
 	case r.Context().Err() != nil:
-		writeErr(w, http.StatusServiceUnavailable, "хүсэлт цуцлагдсан")
+		writeErr(w, http.StatusServiceUnavailable, "хүсэлт цуцлагдлаа")
 	default:
 		s.log.Error("store", "err", err, "path", r.URL.Path)
-		writeErr(w, http.StatusInternalServerError, "дотоод алдаа")
+		writeErr(w, http.StatusInternalServerError, "системд алдаа гарлаа — түр хүлээгээд дахин оролдоно уу")
 	}
 	return true
 }
@@ -108,7 +108,7 @@ func (s *Server) requireTeacherAny(w http.ResponseWriter, r *http.Request) (auth
 			c.Role = string(store.RoleTeacher)
 			return c, true
 		}
-		writeErr(w, http.StatusForbidden, "зөвхөн багш")
+		writeErr(w, http.StatusForbidden, "энэ үйлдлийг зөвхөн багш хийх боломжтой")
 		return c, false
 	}
 	return c, true

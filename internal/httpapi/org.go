@@ -40,7 +40,7 @@ func (s *Server) teachCourse(w http.ResponseWriter, r *http.Request, uid string)
 		return nil, false
 	}
 	if !teaches(course, uid) {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return nil, false
 	}
 	if !s.planOpen(w, r, course.TeacherID) {
@@ -172,7 +172,7 @@ func (s *Server) handleMyOrg(w http.ResponseWriter, r *http.Request) {
 	}
 	u, ok := s.orgOf(r.Context(), c.UID)
 	if !ok {
-		writeErr(w, http.StatusNotFound, "байгууллагын бүртгэл биш")
+		writeErr(w, http.StatusNotFound, "энэ бүртгэл байгууллагын бүртгэл биш байна")
 		return
 	}
 	writeJSON(w, http.StatusOK, viewOrg(u.Org))
@@ -192,7 +192,7 @@ func (s *Server) handleOrgPrograms(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(in.Programs) > maxPrograms {
-		writeErr(w, http.StatusBadRequest, "хөтөлбөр 50-аас ихгүй")
+		writeErr(w, http.StatusBadRequest, "хөтөлбөрийн тоо 50-аас хэтрэхгүй байх ёстой")
 		return
 	}
 	names := map[string]bool{}
@@ -202,10 +202,10 @@ func (s *Server) handleOrgPrograms(w http.ResponseWriter, r *http.Request) {
 		p.Description = strings.TrimSpace(p.Description)
 		switch {
 		case p.Name == "" || utf8.RuneCountInString(p.Name) > 120:
-			writeErr(w, http.StatusBadRequest, "хөтөлбөрийн нэр 1-120 тэмдэгт")
+			writeErr(w, http.StatusBadRequest, "хөтөлбөрийн нэр 1-120 тэмдэгт байх ёстой")
 			return
 		case utf8.RuneCountInString(p.Description) > 1000:
-			writeErr(w, http.StatusBadRequest, "хөтөлбөрийн тайлбар 1000 тэмдэгтээс ихгүй")
+			writeErr(w, http.StatusBadRequest, "хөтөлбөрийн тайлбар 1000 тэмдэгтээс хэтрэхгүй байх ёстой")
 			return
 		case names[strings.ToLower(p.Name)]:
 			writeErr(w, http.StatusBadRequest, "«"+p.Name+"» нэртэй хөтөлбөр давхардаж байна")
@@ -232,7 +232,7 @@ func (s *Server) handleOrgPrograms(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if errors.Is(err, store.ErrNotFound) {
-		writeErr(w, http.StatusNotFound, "байгууллагын бүртгэл биш")
+		writeErr(w, http.StatusNotFound, "энэ бүртгэл байгууллагын бүртгэл биш байна")
 		return
 	}
 	if s.storeErr(w, r, err) {
@@ -284,7 +284,7 @@ func (s *Server) handleAddCourseTeacher(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 	org, ok := s.orgOf(ctx, c.UID)
 	if !ok {
-		writeErr(w, http.StatusForbidden, "багш холбох нь зөвхөн байгууллагын сургалтад")
+		writeErr(w, http.StatusForbidden, "багшийг зөвхөн байгууллагын сургалтад холбох боломжтой")
 		return
 	}
 	course, ok := s.ownCourse(w, r, c.UID)
@@ -305,19 +305,19 @@ func (s *Server) handleAddCourseTeacher(w http.ResponseWriter, r *http.Request) 
 	case s.storeErr(w, r, err):
 		return
 	case t.ID == c.UID:
-		writeErr(w, http.StatusBadRequest, "байгууллага өөрөө сургалтын эзэмшигч — багшаа холбоно уу")
+		writeErr(w, http.StatusBadRequest, "байгууллага өөрөө сургалтын эзэмшигч тул өөрийгөө холбох шаардлагагүй — багшаа холбоно уу")
 		return
 	case t.Role != store.RoleTeacher:
 		writeErr(w, http.StatusBadRequest, "«"+t.DisplayName+"» багшийн бүртгэлгүй байна — эхлээд багшаар бүртгүүлэх шаардлагатай")
 		return
 	case t.Org != nil:
-		writeErr(w, http.StatusBadRequest, "байгууллагын бүртгэлийг багшаар холбохгүй")
+		writeErr(w, http.StatusBadRequest, "байгууллагын бүртгэлийг багшаар холбох боломжгүй")
 		return
 	case slices.Contains(course.Teachers, t.ID):
-		writeErr(w, http.StatusConflict, "«"+t.DisplayName+"» энэ сургалтад аль хэдийн холбогдсон")
+		writeErr(w, http.StatusConflict, "«"+t.DisplayName+"» энэ сургалтад аль хэдийн холбогдсон байна")
 		return
 	case len(course.Teachers) >= maxCourseTeachers:
-		writeErr(w, http.StatusBadRequest, "нэг сургалтад 10 хүртэл багш холбоно")
+		writeErr(w, http.StatusBadRequest, "нэг сургалтад 10 хүртэл багш холбох боломжтой")
 		return
 	}
 	updated, err := s.store.SetCourseOrg(ctx, c.UID, course.ID, course.ProgramID, append(slices.Clone(course.Teachers), t.ID))
@@ -327,7 +327,7 @@ func (s *Server) handleAddCourseTeacher(w http.ResponseWriter, r *http.Request) 
 	s.courseEdited(ctx, updated)
 	s.notify(ctx, &store.Notification{UserID: t.ID, Type: NotifAccount, Count: 1, ActorID: c.UID,
 		Title: "🏫 " + org.DisplayName + " таныг багшаар холболоо",
-		Body:  "«" + course.Title + "» сургалтад хичээл оруулж, зохион байгуулна. Студийн «Сургалтууд» хэсэгт харагдана.", Link: "/me#course=" + course.ID})
+		Body:  "Та «" + course.Title + "» сургалтад хичээл нэмж, зохион байгуулах боломжтой. Сургалт студийн «Сургалтууд» хэсэгт харагдана.", Link: "/me#course=" + course.ID})
 	s.log.Info("байгууллага багш холбов", "org", c.UID, "course", course.ID, "teacher", t.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"teachers": updated.Teachers, "teacher_list": pickRefs(s.peopleRefs(ctx, updated.Teachers), updated.Teachers)})
 }
@@ -347,11 +347,11 @@ func (s *Server) handleRemoveCourseTeacher(w http.ResponseWriter, r *http.Reques
 	tid := r.PathValue("uid")
 	self := tid == c.UID && slices.Contains(course.Teachers, c.UID)
 	if course.TeacherID != c.UID && !self {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	if !slices.Contains(course.Teachers, tid) {
-		writeErr(w, http.StatusNotFound, "энэ багш сургалтад холбогдоогүй")
+		writeErr(w, http.StatusNotFound, "энэ багш уг сургалтад холбогдоогүй байна")
 		return
 	}
 	updated, err := s.store.SetCourseOrg(ctx, course.TeacherID, course.ID, course.ProgramID, slices.DeleteFunc(slices.Clone(course.Teachers), func(x string) bool { return x == tid }))
@@ -516,16 +516,16 @@ type orgTerms struct {
 func (t orgTerms) validate() string {
 	switch {
 	case t.Pct < 0 || t.Pct > 100:
-		return "шимтгэл 0-100%"
+		return "шимтгэл 0-100% хооронд байх ёстой"
 	case t.StorageMB < 0 || t.StorageMB > maxOrgStorageMB:
-		return "файлын сан 0-1,048,576 MB (1 TB)"
+		return "файлын сан 0-1,048,576 MB (1 TB) хооронд байх ёстой"
 	}
 	return ""
 }
 
 func validOrgName(name string) string {
 	if name == "" || utf8.RuneCountInString(name) > 80 {
-		return "байгууллагын нэр 1-80 тэмдэгт"
+		return "байгууллагын нэр 1-80 тэмдэгт байх ёстой"
 	}
 	return ""
 }
@@ -541,7 +541,7 @@ func (s *Server) managerCandidate(w http.ResponseWriter, r *http.Request, id str
 		return nil, false
 	}
 	if m.Org != nil {
-		writeErr(w, http.StatusBadRequest, "байгууллагын бүртгэлийг удирдагчаар холбохгүй — хүний бүртгэл сонгоно уу")
+		writeErr(w, http.StatusBadRequest, "байгууллагын бүртгэлийг удирдагчаар холбох боломжгүй — хувь хүний бүртгэл сонгоно уу")
 		return nil, false
 	}
 	return m, true
@@ -551,7 +551,7 @@ func (s *Server) notifyManager(ctx context.Context, uid string, org *store.User)
 	s.managed.Delete(uid)
 	s.notify(ctx, &store.Notification{UserID: uid, Type: NotifAccount, Count: 1, ActorID: org.ID,
 		Title: "🏫 Та «" + org.DisplayName + "» байгууллагын удирдагч боллоо",
-		Body:  "Дээд цэсний «" + org.DisplayName + "» товчоор байгууллагын профайл руу шилжиж сургалт, багш, хөтөлбөрөө удирдана.", Link: "/"})
+		Body:  "Дээд цэсний «" + org.DisplayName + "» товчоор байгууллагын профайл руу шилжиж, сургалт, багш, хөтөлбөрөө удирдах боломжтой.", Link: "/"})
 }
 
 // handleAdminCreateOrg: POST /api/admin/orgs {name, username, commission_pct, storage_mb, manager?, email?, password?} —
@@ -583,13 +583,13 @@ func (s *Server) handleAdminCreateOrg(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case msg != "":
 	case !usernameRe.MatchString(in.Username):
-		msg = "профайлын нэр: 3-32 тэмдэгт, a-z 0-9 _"
+		msg = "профайлын нэр 3-32 тэмдэгт байх бөгөөд зөвхөн a-z, 0-9, _ тэмдэгт ашиглана"
 	case in.Manager == "" && in.Email == "":
-		msg = "удирдах хүнээ сонгоно уу (эсвэл байгууллагын нэвтрэх имэйл, нууц үг өгнө)"
+		msg = "удирдах хүнээ сонгоно уу (эсвэл байгууллагын нэвтрэх имэйл, нууц үгийг оруулна уу)"
 	case in.Email != "" && func() bool { _, err := mail.ParseAddress(in.Email); return err != nil }():
-		msg = "имэйл буруу"
+		msg = "имэйл хаягаа зөв бичнэ үү"
 	case in.Email != "" && (len(in.Password) < minPassword || len(in.Password) > 72):
-		msg = "нууц үг 6-72 тэмдэгт"
+		msg = "нууц үг 6-72 тэмдэгт байх ёстой"
 	}
 	if msg != "" {
 		writeErr(w, http.StatusBadRequest, msg)
@@ -612,7 +612,7 @@ func (s *Server) handleAdminCreateOrg(w http.ResponseWriter, r *http.Request) {
 	} else {
 		hash, err := auth.HashPassword(ctx, in.Password)
 		if err != nil {
-			writeErr(w, http.StatusServiceUnavailable, "түр ачаалалтай байна")
+			writeErr(w, http.StatusServiceUnavailable, "систем түр ачаалалтай байна — дахин оролдоно уу")
 			return
 		}
 		u.PasswordHash = hash
@@ -673,7 +673,7 @@ func (s *Server) handleAdminUpdateOrg(w http.ResponseWriter, r *http.Request) {
 	if in.Username != nil {
 		un := strings.ToLower(strings.TrimSpace(*in.Username))
 		if !usernameRe.MatchString(un) {
-			writeErr(w, http.StatusBadRequest, "профайлын нэр: 3-32 тэмдэгт, a-z 0-9 _")
+			writeErr(w, http.StatusBadRequest, "профайлын нэр 3-32 тэмдэгт байх бөгөөд зөвхөн a-z, 0-9, _ тэмдэгт ашиглана")
 			return
 		}
 		if un != cur.Username {
@@ -757,10 +757,10 @@ func (s *Server) handleAdminOrgManager(w http.ResponseWriter, r *http.Request) {
 	})
 	switch {
 	case errors.Is(err, errHas):
-		writeErr(w, http.StatusConflict, "энэ хүн аль хэдийн удирдагч")
+		writeErr(w, http.StatusConflict, "энэ хүн аль хэдийн удирдагч болсон байна")
 		return
 	case errors.Is(err, errFull):
-		writeErr(w, http.StatusBadRequest, "нэг байгууллагад 10 хүртэл удирдагч")
+		writeErr(w, http.StatusBadRequest, "нэг байгууллагад 10 хүртэл удирдагч томилох боломжтой")
 		return
 	case s.storeErr(w, r, err):
 		return
@@ -797,7 +797,7 @@ func (s *Server) handleAdminDeleteOrg(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if blocked != "" {
-		writeErr(w, http.StatusConflict, "Сургалт, номтой байгууллагыг устгахгүй — суралцагчдын төлбөр, хандалт хамааралтай. Эхлээд байгууллагын сургалтуудыг устгана уу (суралцагчтай бол ноорог болгож нууна).")
+		writeErr(w, http.StatusConflict, "Сургалт эсвэл номтой байгууллагыг устгах боломжгүй: суралцагчдын төлбөр, хандах эрх үүнтэй холбоотой. Эхлээд байгууллагын сургалтуудыг устгана уу (суралцагчтай сургалтыг ноорог болгож нууна).")
 		return
 	}
 	for _, m := range u.Org.Managers {

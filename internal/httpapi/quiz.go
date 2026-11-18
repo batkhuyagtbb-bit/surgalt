@@ -26,19 +26,19 @@ var quizKinds = map[string]string{"single": "нэг сонголттой", "mult
 func validateQuiz(q *store.Quiz, teacherID string) string {
 	q.Kind = q.QuizKind()
 	if quizKinds[q.Kind] == "" {
-		return "асуултын төрөл буруу"
+		return "асуултын төрлөө сонгоно уу"
 	}
 	q.Question, q.Explain, q.Image = strings.TrimSpace(q.Question), strings.TrimSpace(q.Explain), stripSig(strings.TrimSpace(q.Image))
 	name := "«" + q.Question + "» асуулт"
 	switch {
 	case q.Question == "" || utf8.RuneCountInString(q.Question) > 1000:
-		return "асуулт 1-1000 тэмдэгт"
+		return "асуулт 1-1000 тэмдэгт байх ёстой"
 	case utf8.RuneCountInString(q.Explain) > 1000:
-		return "тайлбар 1000 тэмдэгтээс хэтрэхгүй"
+		return "тайлбар 1000 тэмдэгтээс хэтрэхгүй байх ёстой"
 	case q.Points < 0 || q.Points > 100:
-		return "оноо 0-100"
+		return "оноо 0-100 хооронд байх ёстой"
 	case q.Image != "" && (len(q.Image) > maxBlockURL || (!validURL(q.Image) && !files.OwnedBy(q.Image, teacherID))):
-		return name + ": зураг өөрийн файлын сангаас эсвэл http(s) холбоос"
+		return name + ": зургаа өөрийн файлын сангаас сонгох эсвэл http(s) холбоос оруулна уу"
 	}
 	trimAll := func(xs []string, max int) bool {
 		for i := range xs {
@@ -54,15 +54,15 @@ func validateQuiz(q *store.Quiz, teacherID string) string {
 		q.Multi = q.Kind == "multi"
 		q.Answers, q.Left, q.Right, q.Spot = nil, nil, nil, nil
 		if len(q.Options) < 2 || len(q.Options) > maxQuizOptions {
-			return name + " 2-8 хариулттай байна"
+			return name + " 2-8 хариулттай байх ёстой"
 		}
 		if !trimAll(q.Options, 300) {
-			return name + "-ын хариулт хоосон эсвэл хэт урт байна"
+			return name + "ын хариулт хоосон эсвэл хэт урт байна"
 		}
 		slices.Sort(q.Correct)
 		q.Correct = slices.Compact(q.Correct)
 		if len(q.Correct) == 0 {
-			return name + "-ын зөв хариултыг сонгоно уу"
+			return name + "ын зөв хариултыг сонгоно уу"
 		}
 		for _, c := range q.Correct {
 			if c < 0 || c >= len(q.Options) {
@@ -70,7 +70,7 @@ func validateQuiz(q *store.Quiz, teacherID string) string {
 			}
 		}
 		if !q.Multi && len(q.Correct) != 1 {
-			return name + ": нэг сонголттой асуултад зөвхөн нэг зөв хариулт"
+			return name + ": нэг сонголттой асуултад зөвхөн нэг зөв хариулт байх ёстой"
 		}
 	case "text":
 		q.Options, q.Correct, q.Left, q.Right, q.Spot, q.Multi = nil, nil, nil, nil, nil, false

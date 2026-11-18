@@ -32,11 +32,11 @@ import (
 var (
 	ErrNotFound      = errors.New("файл олдсонгүй")
 	ErrBadName       = errors.New("файлын нэр буруу")
-	ErrType          = errors.New("энэ төрлийн файл зөвшөөрөгдөхгүй")
-	ErrQuota         = errors.New("файлын сангийн багтаамж хүрэлцэхгүй")
-	ErrTooLarge      = errors.New("файл хэт том")
+	ErrType          = errors.New("энэ төрлийн файлыг оруулах боломжгүй")
+	ErrQuota         = errors.New("файлын сангийн багтаамж хүрэлцэхгүй байна — шаардлагагүй файлаа устгах эсвэл багтаамжаа нэмнэ үү")
+	ErrTooLarge      = errors.New("файлын хэмжээ хэт их байна")
 	ErrBadVisibility = errors.New("visibility нь public эсвэл private")
-	ErrBadImage      = errors.New("зураг уншигдсангүй (эвдэрсэн эсвэл дэмжигдэхгүй формат)")
+	ErrBadImage      = errors.New("зургийг уншиж чадсангүй — файл гэмтсэн эсвэл формат нь дэмжигдэхгүй байна")
 )
 
 const (

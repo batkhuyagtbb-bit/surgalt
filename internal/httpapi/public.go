@@ -589,11 +589,16 @@ func (s *Server) pageIntro(w http.ResponseWriter, r *http.Request) {
 }
 
 // pageAR — «Систем хэрхэн ажилладаг вэ?» 3D тайлбар (static/ar.html: template-гүй, скрипт нь /static/ar.js).
+// /static нь жилийн "immutable" кэштэй тул скриптүүдийг ?v=<assetVersion>-тэй холбоно: эс бөгөөс өмнө орсон
+// браузер (утас) хуучин ar.js-ээ кэшээс ашигласаар, шинэ HTML-тэй таарахгүй (жишээ нь карт хумигдахгүй) болдог.
 func (s *Server) pageAR(w http.ResponseWriter, r *http.Request) {
 	b, err := staticFS.ReadFile("static/ar.html")
 	if err != nil {
 		http.NotFound(w, r)
 		return
+	}
+	for _, f := range []string{"/static/ar.js", "/static/vendor/three-r128.min.js"} {
+		b = bytes.ReplaceAll(b, []byte(`src="`+f+`"`), []byte(`src="`+f+`?v=`+assetVersion+`"`))
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=300")

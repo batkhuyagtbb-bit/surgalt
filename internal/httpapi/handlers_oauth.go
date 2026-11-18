@@ -81,7 +81,7 @@ func (s *Server) provider(w http.ResponseWriter, r *http.Request) (*oauth.Provid
 // handleOAuthStart: /auth/{provider}/start?role=teacher&next=/me
 func (s *Server) handleOAuthStart(w http.ResponseWriter, r *http.Request) {
 	if !s.authLim.Allow(s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон оролдлого")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон удаа оролдлоо — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	p, ok := s.provider(w, r)
@@ -103,7 +103,7 @@ func (s *Server) handleOAuthStart(w http.ResponseWriter, r *http.Request) {
 	}
 	sealed, err := s.tokens.Seal(st, 10*time.Minute)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "дотоод алдаа")
+		writeErr(w, http.StatusInternalServerError, "системд алдаа гарлаа — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	http.SetCookie(w, &http.Cookie{
@@ -130,7 +130,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	var st oauthState
 	ck, err := r.Cookie(oauthCookie)
 	if err != nil || s.tokens.Open(ck.Value, &st) != nil || !constantEq(st.State, q.Get("state")) {
-		fail("Нэвтрэх хугацаа дууссан, дахин оролдоно уу")
+		fail("Нэвтрэх хугацаа дууссан — дахин оролдоно уу")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
@@ -142,25 +142,25 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	tok, err := p.Config.Exchange(ctx, q.Get("code"), opts...)
 	if err != nil {
 		s.log.Warn("oauth exchange", "provider", p.Name, "err", err)
-		fail(p.Label + "-тай холбогдож чадсангүй")
+		fail(p.Label + " үйлчилгээтэй холбогдож чадсангүй — дахин оролдоно уу")
 		return
 	}
 	id, err := p.FetchIdentity(ctx, tok)
 	if err != nil {
 		s.log.Warn("oauth userinfo", "provider", p.Name, "err", err)
-		fail(p.Label + "-аас мэдээлэл авч чадсангүй")
+		fail(p.Label + " үйлчилгээнээс мэдээлэл авч чадсангүй — дахин оролдоно уу")
 		return
 	}
 	u, _, err := s.loginWithIdentity(ctx, id, store.Role(st.Role))
 	if err != nil {
 		s.log.Error("oauth login", "provider", p.Name, "err", err)
-		fail("Бүртгэл үүсгэж чадсангүй")
+		fail("Бүртгэл үүсгэж чадсангүй — дахин оролдоно уу")
 		return
 	}
 	u = s.asTeacher(r, u)
 	jwt, err := s.tokens.SignUser(u.ID, string(u.Role), u.Username)
 	if err != nil {
-		fail("Токен үүсгэж чадсангүй")
+		fail("Нэвтрэхэд алдаа гарлаа — дахин оролдоно уу")
 		return
 	}
 	// Токеныг URL fragment-ээр дамжуулна: сервер лог, Referer-т үлдэхгүй.

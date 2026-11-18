@@ -55,7 +55,7 @@ func (s *Server) lessonFor(ctx context.Context, uid, cid, lid string, ignoreBloc
 		return nil, nil, err
 	}
 	if !course.Published && !teaches(course, uid) {
-		return nil, nil, apiError(http.StatusNotFound, "олдсонгүй", nil)
+		return nil, nil, apiError(http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй", nil)
 	}
 	l, err := s.store.LessonByID(ctx, cid, lid)
 	if err != nil {
@@ -69,7 +69,7 @@ func (s *Server) lessonFor(ctx context.Context, uid, cid, lid string, ignoreBloc
 		return nil, nil, err
 	}
 	if !has {
-		return nil, nil, apiError(http.StatusPaymentRequired, "энэ хичээл төлбөртэй", map[string]any{"lesson_price": l.Price, "course_price": course.Price})
+		return nil, nil, apiError(http.StatusPaymentRequired, "энэ хичээл төлбөртэй — үзэхийн тулд худалдаж авна уу", map[string]any{"lesson_price": l.Price, "course_price": course.Price})
 	}
 	if !ignoreBlock {
 		if b := s.lessonBlocked(ctx, uid, course, l.ID); b != nil {
@@ -90,8 +90,8 @@ func (s *Server) lessonFor(ctx context.Context, uid, cid, lid string, ignoreBloc
 			return nil, nil, err
 		}
 		enrolled, _ := s.store.IsEnrolled(ctx, uid, course.ID)
-		if st := dripState(course, lessons, l, progress, fullAccess(course, uid, enrolled), time.Now(), s.dripFacts(ctx, uid, course.ID)); !st.Open {
-			return nil, nil, apiError(http.StatusLocked, "энэ хичээл хараахан нээгдээгүй", map[string]any{"state": st})
+		if st := dripState(course, lessons, l, progress, fullAccess(course, uid, enrolled), time.Now(), s.dripFacts(ctx, uid, course.ID, lessons)); !st.Open {
+			return nil, nil, apiError(http.StatusLocked, "энэ хичээл хараахан нээгдээгүй байна", map[string]any{"state": st})
 		}
 		s.dripOpen.Set(uid+"|"+l.ID, true)
 	}
@@ -137,6 +137,7 @@ func (s *Server) StartActivity(ctx context.Context, uid, fallbackName, ip, cours
 	if err := s.store.CreateSession(ctx, sess); err != nil {
 		return nil, err
 	}
+	s.reviewDueChanged(uid) // давтах popup: хичээлд эргэж орлоо
 	done, err := s.lessonActiveSec(ctx, uid, l.ID)
 	if err != nil {
 		return nil, err

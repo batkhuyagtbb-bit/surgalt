@@ -647,7 +647,7 @@ func writeLocked(w http.ResponseWriter, bs *boardSess, v any) {
 	data, err := json.Marshal(v)
 	bs.mu.Unlock()
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "дотоод алдаа")
+		writeErr(w, http.StatusInternalServerError, "системд алдаа гарлаа — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -688,7 +688,7 @@ func (s *Server) handleGetBoard(w http.ResponseWriter, r *http.Request) {
 	}
 	if room == "" || !validBoardRoom(room) || !bs.canRead(uid, br.teacher, room) {
 		if peek {
-			errLocked(w, bs, http.StatusForbidden, "энэ самбарыг харах эрхгүй")
+			errLocked(w, bs, http.StatusForbidden, "танд энэ самбарыг харах эрх байхгүй")
 			return
 		}
 		room = bs.defaultRoom(uid, br.teacher)
@@ -719,7 +719,7 @@ func (s *Server) handleBoardOps(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.boardLim.Allow(c.UID) {
 		w.Header().Set("Retry-After", "1")
-		writeErr(w, http.StatusTooManyRequests, "хэт олон өөрчлөлт, түр хүлээнэ үү")
+		writeErr(w, http.StatusTooManyRequests, "өөрчлөлт хэт олон байна — түр хүлээгээд үргэлжлүүлнэ үү")
 		return
 	}
 	var in struct {
@@ -731,7 +731,7 @@ func (s *Server) handleBoardOps(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		var mbe *http.MaxBytesError
 		if errors.As(err, &mbe) {
-			writeErr(w, http.StatusRequestEntityTooLarge, "өөрчлөлт хэт том")
+			writeErr(w, http.StatusRequestEntityTooLarge, "өөрчлөлтийн хэмжээ хэт том байна")
 			return
 		}
 		writeErr(w, http.StatusBadRequest, "JSON буруу")
@@ -779,7 +779,7 @@ func (s *Server) handleBoardOps(w http.ResponseWriter, r *http.Request) {
 	}
 	bs, uid, now := br.s, br.c.UID, time.Now()
 	if !bs.canWrite(uid, br.teacher, in.Room) {
-		msg := "энэ самбарт бичих эрхгүй"
+		msg := "танд энэ самбарт бичих эрх байхгүй"
 		if bs.state.Lock {
 			msg = "багш самбарыг түр зогсоосон байна"
 		}
@@ -859,7 +859,7 @@ func (s *Server) handleBoardOps(w http.ResponseWriter, r *http.Request) {
 // validBoardObj — Fabric объектын JSON-г шалгаж ID-г буцаана. Зураг зөвхөн манай серверээс (/board-img/, /static/).
 func validBoardObj(o json.RawMessage) (string, error) {
 	if len(o) > boardMaxObjBytes {
-		return "", errors.New("объект хэт том (зураасыг богиносгоно уу)")
+		return "", errors.New("объект хэт том байна — зураасаа богиносгоно уу")
 	}
 	var head struct {
 		ID   string `json:"id"`
@@ -961,7 +961,7 @@ func (s *Server) handleBoardState(w http.ResponseWriter, r *http.Request) {
 	}
 	bs, now := br.s, time.Now()
 	if !br.teacher {
-		errLocked(w, bs, http.StatusForbidden, "зөвхөн багш удирдана")
+		errLocked(w, bs, http.StatusForbidden, "самбарыг зөвхөн багш удирдана")
 		return
 	}
 	st := &bs.state
@@ -974,7 +974,7 @@ func (s *Server) handleBoardState(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.Teams != nil {
 		if *in.Teams < 2 || *in.Teams > boardMaxTeams {
-			errLocked(w, bs, http.StatusBadRequest, "багийн тоо 2-12")
+			errLocked(w, bs, http.StatusBadRequest, "багийн тоо 2-12 хооронд байх ёстой")
 			return
 		}
 		st.Teams = *in.Teams
@@ -1093,7 +1093,7 @@ func (s *Server) boardImageAllowed(w http.ResponseWriter, r *http.Request) (*boa
 	}
 	bs.mu.Unlock()
 	if !s.boardLim.Allow("img:" + br.c.UID) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон зураг, түр хүлээнэ үү")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон зураг оруулж байна — түр хүлээнэ үү")
 		return nil, false
 	}
 	return br, true
@@ -1108,7 +1108,7 @@ func (s *Server) handleBoardImage(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, boardImageMax)
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
-		writeErr(w, http.StatusRequestEntityTooLarge, "зураг 15MB-аас ихгүй байна")
+		writeErr(w, http.StatusRequestEntityTooLarge, "зургийн хэмжээ 15MB-аас хэтрэхгүй байх ёстой")
 		return
 	}
 	s.boardSaveImage(w, br.g.lessonID, raw)
@@ -1128,14 +1128,14 @@ func (s *Server) handleBoardFetch(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := url.Parse(strings.TrimSpace(in.URL))
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || len(in.URL) > 4000 {
-		writeErr(w, http.StatusBadRequest, "зургийн холбоос буруу")
+		writeErr(w, http.StatusBadRequest, "зургийн холбоос буруу байна")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "зургийн холбоос буруу")
+		writeErr(w, http.StatusBadRequest, "зургийн холбоос буруу байна")
 		return
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; surgalt-board/1; +https://surgalt.mn)")
@@ -1152,7 +1152,7 @@ func (s *Server) handleBoardFetch(w http.ResponseWriter, r *http.Request) {
 	}
 	raw, err := io.ReadAll(io.LimitReader(res.Body, boardImageMax+1))
 	if err != nil || len(raw) > boardImageMax {
-		writeErr(w, http.StatusRequestEntityTooLarge, "зураг 15MB-аас ихгүй байна")
+		writeErr(w, http.StatusRequestEntityTooLarge, "зургийн хэмжээ 15MB-аас хэтрэхгүй байх ёстой")
 		return
 	}
 	if !strings.HasPrefix(http.DetectContentType(raw), "image/") {
@@ -1168,12 +1168,12 @@ func (s *Server) boardSaveImage(w http.ResponseWriter, lessonID string, raw []by
 	<-boardImgSem
 	switch {
 	case errors.Is(err, files.ErrImage):
-		writeErr(w, http.StatusBadRequest, "зургийг уншиж чадсангүй (PNG, JPEG, WebP, GIF)")
+		writeErr(w, http.StatusBadRequest, "зургийг уншиж чадсангүй — PNG, JPEG, WebP эсвэл GIF зураг оруулна уу")
 	case errors.Is(err, files.ErrBoardFull):
 		writeErr(w, http.StatusRequestEntityTooLarge, err.Error())
 	case err != nil:
 		s.log.Error("самбарын зураг", "err", err)
-		writeErr(w, http.StatusInternalServerError, "зургийг хадгалж чадсангүй")
+		writeErr(w, http.StatusInternalServerError, "зургийг хадгалж чадсангүй — дахин оролдоно уу")
 	default:
 		writeJSON(w, http.StatusOK, map[string]any{"url": "/board-img/" + lessonID + "/" + name, "w": iw, "h": ih})
 	}

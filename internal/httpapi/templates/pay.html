@@ -17,7 +17,7 @@
     <div id="ppState">
     {{if .Paid}}<p class="pp-ok"><b>✓</b> Төлбөр амжилттай төлөгдлөө.<br>Компьютер дээрх хуудас өөрөө нээгдэнэ.</p>
     {{else}}<button class="btn btn-gold btn-block btn-lg" id="ppPay" data-url="/api/orders/{{.Order.ID}}/dev-pay?t={{.Token}}">Төлөх</button>
-    <p class="pp-note">Туршилтын горим тул жинхэнэ мөнгө шилжихгүй. Жинхэнэ орчинд банкны апп-аараа QPay QR уншуулж төлнө.</p>{{end}}
+    <p class="pp-note">Туршилтын горим тул бодит мөнгө шилжихгүй. Бодит орчинд банкны аппаараа QPay QR кодыг уншуулж төлнө.</p>{{end}}
     </div>
   </div>
 </main>

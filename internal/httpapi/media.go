@@ -81,12 +81,12 @@ func (s *Server) handleMedia(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, max-age=10800")
 	path, _, ok := s.files.ResolveTicket(r.PathValue("ticket"))
 	if !ok {
-		writeErr(w, http.StatusForbidden, "холбоосны хугацаа дууссан эсвэл хүчингүй")
+		writeErr(w, http.StatusForbidden, "холбоосын хугацаа дууссан эсвэл хүчингүй болсон байна")
 		return
 	}
 	if strings.HasPrefix(path, "https://") { // гадаад видео: proxy (холбоос суралцагчид харагдахгүй)
 		if d := r.Header.Get("Sec-Fetch-Dest"); (d != "" && d != "video" && d != "audio" && d != "empty") || r.Header.Get("Sec-Fetch-Mode") == "navigate" {
-			writeErr(w, http.StatusForbidden, "зөвхөн хичээл дотроос үзнэ")
+			writeErr(w, http.StatusForbidden, "энэ файлыг зөвхөн хичээл дотроос үзэх боломжтой")
 			return
 		}
 		s.proxyMedia(w, r, path)
@@ -95,11 +95,11 @@ func (s *Server) handleMedia(w http.ResponseWriter, r *http.Request) {
 	// Хуудас болгон нээх (шинэ таб, хаягийн мөр, татах) → хориглоно; <video>/<audio> болон хичээлийн
 	// баримт харагчийн (fetch) хүсэлт л үйлчилнэ.
 	if d := r.Header.Get("Sec-Fetch-Dest"); d != "" && d != "video" && d != "audio" && d != "empty" {
-		writeErr(w, http.StatusForbidden, "зөвхөн хичээл дотроос үзнэ")
+		writeErr(w, http.StatusForbidden, "энэ файлыг зөвхөн хичээл дотроос үзэх боломжтой")
 		return
 	}
 	if r.Header.Get("Sec-Fetch-Mode") == "navigate" {
-		writeErr(w, http.StatusForbidden, "зөвхөн хичээл дотроос үзнэ")
+		writeErr(w, http.StatusForbidden, "энэ файлыг зөвхөн хичээл дотроос үзэх боломжтой")
 		return
 	}
 	teacher, vis, name, ok := files.SplitPath(path)
@@ -184,7 +184,7 @@ var mediaProxy = &http.Client{
 func (s *Server) proxyMedia(w http.ResponseWriter, r *http.Request, src string) {
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, src, nil)
 	if err != nil {
-		writeErr(w, http.StatusBadGateway, "видео нээгдсэнгүй")
+		writeErr(w, http.StatusBadGateway, "видеог нээж чадсангүй — холбоосоо шалгана уу")
 		return
 	}
 	if rg := r.Header.Get("Range"); rg != "" {
@@ -193,13 +193,13 @@ func (s *Server) proxyMedia(w http.ResponseWriter, r *http.Request, src string) 
 	req.Header.Set("User-Agent", "surgalt-media/1")
 	res, err := mediaProxy.Do(req)
 	if err != nil {
-		writeErr(w, http.StatusBadGateway, "видео нээгдсэнгүй")
+		writeErr(w, http.StatusBadGateway, "видеог нээж чадсангүй — холбоосоо шалгана уу")
 		return
 	}
 	defer res.Body.Close()
 	ct := res.Header.Get("Content-Type")
 	if !strings.HasPrefix(ct, "video/") && !strings.HasPrefix(ct, "audio/") && ct != "application/octet-stream" {
-		writeErr(w, http.StatusUnsupportedMediaType, "видео биш файл")
+		writeErr(w, http.StatusUnsupportedMediaType, "энэ файл видео биш байна")
 		return
 	}
 	for _, h := range []string{"Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "Last-Modified", "ETag"} {

@@ -78,6 +78,7 @@ ICON.medal ||= '<circle cx="12" cy="15" r="5"/><path d="M8.5 11 6 3h4l2 5 2-5h4l
 ICON.download ||= '<path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'; // хуваалцсаныг хадгалах
 ICON.copy ||= '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>'; // өөрийн сургалт болгох
 ICON.send ||= '<path d="M14.54 21.69a.5.5 0 0 0 .94-.03l6.5-19a.5.5 0 0 0-.64-.63l-19 6.5a.5.5 0 0 0-.03.94l7.93 3.18a2 2 0 0 1 1.11 1.11z"/><path d="m21.85 2.15-10.94 10.93"/>';
+ICON.qr ||= '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20v.01M17 20h4v-3"/>'; // сургалтын QR
 // Хөдөлгөөнт дүрсэнд (animateIcons) шинээр ашигласан нэрсийн статик зам (байхгүй бол л нэмнэ).
 for (const [k, v] of Object.entries({"upload":"<path d=\"M12 3v12\"/><path d=\"m17 8-5-5-5 5\"/><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/>","exam":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\"/><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\"/><path d=\"m9 14 2 2 4-4\"/>","doc":"<path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M10 9H8M16 13H8M16 17H8\"/>","headphones":"<path d=\"M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3\"/>","folder":"<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/>","eye":"<path d=\"M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","live":"<path d=\"m16 13 5.22 3.48a.5.5 0 0 0 .78-.42V7.94a.5.5 0 0 0-.76-.43L16 10.5\"/><rect x=\"2\" y=\"6\" width=\"14\" height=\"12\" rx=\"2\"/>","book":"<path d=\"M12 7v14\"/><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\"/>","files":"<path d=\"M20 7h-3a2 2 0 0 1-2-2V2\"/><path d=\"M9 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l4 4v10a2 2 0 0 1-2 2Z\"/><path d=\"M3 7.6v12.8A1.6 1.6 0 0 0 4.6 22h9.8\"/>"})) ICON[k] ||= v;
 
@@ -149,8 +150,8 @@ function planCardsHTML(ps) {
 const planRulesHTML = (ps) => `<ul class="sp-rules">
   <li>${ps.org ? "Байгууллагад" : "Шинэ багшид"} эхний ${ps.trial_months} сар үнэгүй.</li>
   <li>Борлуулалтаас хувь авахгүй — зөвхөн гүйлгээний шимтгэл ${ps.fee_pct ?? ps.trial_pct}% хасагдаж, үлдсэн нь таны данс руу шилжинэ (үнэгүй хугацаанд ч).</li>
-  <li>${ps.org ? "Багц байгууллагын профайлд — холбосон багш нар, удирдагчид нэмэлт төлбөргүй." : "Багц нэг профайлд."} Сунгавал одоогийн эрхийн араас үргэлжилнэ — үнэгүй хугацаанд авсан ч хоног алдагдахгүй.</li>
-  <li>Эрх дуусвал сургалт удирдах, шинээр борлуулах боломж хаагдана. Худалдаж авсан суралцагчдын эрх, таны орлого хэвээр — «Данс»-аас татна.</li></ul>`;
+  <li>${ps.org ? "Багц байгууллагын профайлд үйлчилнэ — холбосон багш нар, удирдагчид нэмэлт төлбөргүй ашиглана." : "Багц нэг профайлд үйлчилнэ."} Сунгавал шинэ хугацаа одоогийн эрхийн дараа залгагдана — үнэгүй хугацаанд авсан ч хоног алдагдахгүй.</li>
+  <li>Эрх дуусвал сургалт удирдах, шинээр борлуулах боломж хаагдана. Худалдаж авсан суралцагчдын эрх, таны орлого хэвээр үлдэнэ — орлогоо «Данс» хэсгээс татна.</li></ul>`;
 function bindPlanBuy(root, after) {
   root.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-plan-buy]"); if (!b) return;
@@ -171,7 +172,7 @@ function planLock(ps) {
     <section class="anx-card sp-lock-card"><span class="sp-lock-ic">${ico("lock", 30)}</span>
       <h2>Системийн эрх дууссан</h2>
       <p>${planDate(ps.until)}-нд дууссан тул сургалт удирдах, шинээр борлуулах боломж түр хаагдлаа. Доорх багцаас сонгож QPay-ээр төлмөгц шууд нээгдэнэ.</p>
-      <p class="muted small">Худалдаж авсан суралцагчдын эрх хэвээр. Орлогоо <button type="button" class="linkish" data-go-wallet>«Данс»</button> хэсгээс татна.</p></section>
+      <p class="muted small">Худалдаж авсан суралцагчдын эрх хэвээр үлдэнэ. Орлогоо <button type="button" class="linkish" data-go-wallet>«Данс»</button> хэсгээс татна.</p></section>
     ${planCardsHTML(ps)}${planRulesHTML(ps)}</div>`;
   $("[data-go-wallet]", main).onclick = goWallet;
   bindPlanBuy(main, () => mounted && window.Studio.mount(...mounted));
@@ -225,9 +226,9 @@ async function overview() {
   const drafts = courses.filter((c) => !c.published), empty = courses.filter((c) => !c.lesson_count);
   const todo = [
     soon && { ic: "live", tone: "amber", t: `${until(soon.starts_at)} шууд хичээл`, s: `«${soon.title}» · ${fmtTime(soon.starts_at)}`, href: "#live" },
-    drafts.length && { ic: "lock", tone: "", t: `${drafts.length} сургалт ноорог хэвээр`, s: "Нийтэлбэл профайл дээр харагдаж, худалдаалагдана", href: drafts.length === 1 ? `#course=${drafts[0].id}` : "#courses" },
+    drafts.length && { ic: "lock", tone: "", t: `${drafts.length} сургалт ноорог хэвээр`, s: "Нийтэлбэл профайл дээр харагдаж, худалдаанд гарна", href: drafts.length === 1 ? `#course=${drafts[0].id}` : "#courses" },
     empty[0] && { ic: "plus", tone: "", t: `«${empty[0].title}» сургалтад хичээл алга`, s: "Эхний хичээлээ нийтлээрэй", href: `#course=${empty[0].id}` },
-    pct >= 80 && { ic: "files", tone: "bad", t: `Файлын сан ${pct}% дүүрсэн`, s: "Илүүдэл файлаа цэвэрлэх эсвэл багтаамж нэмэх", href: "#files" },
+    pct >= 80 && { ic: "files", tone: "bad", t: `Файлын сан ${pct}% дүүрсэн`, s: "Шаардлагагүй файлаа устгах эсвэл багтаамжаа нэмэх", href: "#files" },
     !sales.count && courses.length && { ic: "money", tone: "", t: "Анхны борлуулалтаа хүлээж байна", s: "Үнэгүй хичээл нэмж, профайлынхаа холбоосыг түгээгээрэй", href: "#courses" },
     tp.students && { ic: "chart", tone: "", t: `${tp.students} суралцагчийн идэвх`, s: "Анхаарал, зөрчил, суралцсан оноог хянах", href: "#students" },
   ].filter(Boolean).slice(0, 4);
@@ -274,7 +275,7 @@ async function overview() {
         <section class="anx-card"><div class="anx-card-head"><h3>${ico("cal", 18)}Шууд хичээлийн хуваарь</h3><a class="link" href="#live">Товлох ${ico("chevron", 14)}</a></div>
           ${next ? `<div class="ovx-next"><small>Дараагийнх · ${fmtDate(next.starts_at)}</small><strong>${esc(next.title)}</strong><span class="muted small">${next.duration_min} мин${titleOf[next.course_id] ? " · " + esc(titleOf[next.course_id]) : ""}</span>
             <div class="ovx-next-acts"><span class="chip chip-amber">${until(next.starts_at)}</span><a class="btn btn-gold btn-sm" href="${esc(next.meet_url)}" target="_blank" rel="noopener">${ico("live", 15)}Live эхлүүлэх</a></div></div>` : ""}
-          <p class="ovx-days-h">Ойрын 7 хоног · өдөр дээр дарж хуваарийг харна</p>
+          <p class="ovx-days-h">Ойрын 7 хоног · өдрөө дарж хуваарийг харна уу</p>
           <div class="days ovx-days" id="days">${days.map((d, i) => { const n = perDay(d).length; return `<button class="day" data-i="${i}"><small>${WEEKDAYS_SHORT[d.getDay()]}</small><b>${String(d.getDate()).padStart(2, "0")}</b>${n ? `<i>${n}</i>` : ""}</button>`; }).join("")}</div>
           <div class="agenda" id="agenda"></div></section>
         <section class="anx-card"><div class="anx-card-head"><h3>${ico("files", 18)}Файлын сан</h3><a class="link" href="#files">Удирдах ${ico("chevron", 14)}</a></div>
@@ -321,8 +322,8 @@ async function overview() {
         <div class="anx-stat"><small>Бүртгэлтэй хэрэглэгч</small><b>${t.members}</b></div>
         <div class="anx-stat"><small>Дундаж хугацаа</small><b>${t.measured ? secs(t.avg_sec) : "—"}</b></div>
         <div class="anx-stat"><small>Нийт хугацаа</small><b>${t.total_sec ? secs(t.total_sec) : "—"}</b></div>
-        <div class="anx-stat ${t.bounce_pct >= 60 ? "bad" : ""}"><small>10 секундэд гарсан</small><b>${t.measured ? t.bounce_pct + "%" : "—"}</b></div></div>
-      ${vst.kind !== "course" ? `<p class="vs-lead">${ico("phone", 16)}<span><b>${t.phone || 0}</b> хүн утасны дугаарыг тань харсан</span><small>нэг хүн 6 цагт нэг удаа тоологдоно</small></p>` : ""}
+        <div class="anx-stat ${t.bounce_pct >= 60 ? "bad" : ""}"><small>10 секундийн дотор гарсан</small><b>${t.measured ? t.bounce_pct + "%" : "—"}</b></div></div>
+      ${vst.kind !== "course" ? `<p class="vs-lead">${ico("phone", 16)}<span><b>${t.phone || 0}</b> хүн таны утасны дугаарыг харсан</span><small>нэг хүн 6 цагт нэг удаа тоологдоно</small></p>` : ""}
       <div class="vs-grid">
         <div class="vs-main"><h4 class="anx-sub-h">Өдөр бүрийн үзэлт</h4>${visChart(d.daily)}
           ${d.courses.length && vst.kind !== "profile" ? `<h4 class="anx-sub-h">Сургалт бүрээр</h4><div class="an-table-wrap"><table class="tbl"><thead><tr><th>Сургалт</th><th>Үзэлт</th><th>Зочин</th><th>Дундаж хугацаа</th></tr></thead><tbody>${d.courses.map((c) => `<tr><td>${esc(c.title || "—")}</td><td><b>${c.views}</b></td><td>${c.unique}</td><td>${c.avg_sec ? secs(c.avg_sec) : "—"}</td></tr>`).join("")}</tbody></table></div>` : ""}
@@ -376,23 +377,23 @@ const programSelect = (cur = "") => me.org ? `<label>Мэргэжлийн хөт
 const courseFormHTML = (c = {}) => `
   <label>Сургалтын нэр<input name="title" required maxlength="200" value="${esc(c.title || "")}" placeholder="${me.org ? "Програмчлалын үндэс" : "ЭЕШ Математик — Бүрэн бэлтгэл"}"></label>
   ${programSelect(c.program_id)}
-  <label>Товч тайлбар<textarea name="description" rows="4" placeholder="Энэ сургалтаар юу сурах вэ? (50 үгэнд багтаана)">${esc(c.description || "")}</textarea><small class="muted desc-wc" data-desc-wc aria-live="polite">${descWC(c.description || "")}</small></label>
+  <label>Товч тайлбар<textarea name="description" rows="4" placeholder="Энэ сургалтаар суралцагч юу сурах вэ? (50 үгэнд багтаана уу)">${esc(c.description || "")}</textarea><small class="muted desc-wc" data-desc-wc aria-live="polite">${descWC(c.description || "")}</small></label>
   <div class="form-row"><label>Багц үнэ (₮)<input name="price" type="number" min="0" step="1000" value="${c.price || 0}"><small class="muted">0 бол хичээл тус бүрээр зарна</small></label>
   <label class="check" style="align-self:center"><input type="checkbox" name="published" ${c.published ? "checked" : ""}> Нийтлэх (профайл дээр харагдана)</label></div>
   <fieldset class="cs-lock"><legend>🔒 Нууц үгтэй сургалт</legend>
-    <label class="check"><input type="checkbox" name="locked" ${c.access_code ? "checked" : ""}> Зөвхөн нууц үг мэдэх суралцагч үзнэ — оруулсан хүн үнэ төлөхгүй элсэж, бүх хичээлийг нээнэ</label>
+    <label class="check"><input type="checkbox" name="locked" ${c.access_code ? "checked" : ""}> Зөвхөн нууц үг мэдэх суралцагч үзнэ — нууц үгийг оруулсан хүн төлбөргүй элсэж, бүх хичээл нь нээгдэнэ</label>
     <div class="cs-code" ${c.access_code ? "" : "hidden"}><div class="cs-code-row"><input name="access_code" maxlength="64" value="${esc(c.access_code || "")}" placeholder="Жишээ: 10a-mat" autocomplete="off" spellcheck="false" aria-label="Нууц үг">
       <button type="button" class="btn btn-ghost btn-sm" data-gen-code>Санамсаргүй</button><button type="button" class="btn btn-ghost btn-sm" data-copy-code>Хуулах</button></div>
-      <small class="muted">Энэ үгийг суралцагчдадаа өгнө (том, жижиг үсэг хамаагүй). Үгээ солибол шинэ хүмүүс шинэ үгээр орно, өмнө элссэн хүмүүс эрхээ хадгална.</small></div></fieldset>
+      <small class="muted">Энэ нууц үгийг суралцагчдадаа өгнө үү (том, жижиг үсэг ялгахгүй). Нууц үгээ солибол шинээр элсэгчид шинэ үгээр орж, өмнө элссэн суралцагчид эрхээ хадгална.</small></div></fieldset>
   <fieldset><legend>Хичээлийн нээлт</legend>
-    <label class="check"><input type="checkbox" name="drip" ${c.drip ? "checked" : ""}> Дарааллаар нээгдэнэ — суралцагч өмнөх хичээлээ үзэж, доторх асуултуудад нь бүгдэд нь зөв хариулсны дараа дараагийнх нь (тохируулсан цаг/хоногийн дараа) нээгдэнэ</label>
+    <label class="check"><input type="checkbox" name="drip" ${c.drip ? "checked" : ""}> Дарааллаар нээгдэнэ — суралцагч өмнөх хичээлээ үзэж, доторх бүх асуултад зөв хариулсны дараа дараагийн хичээл (тохируулсан хугацаа өнгөрмөгц) нээгдэнэ</label>
     <fieldset class="warn-set"><legend>Анхаарлын хяналт</legend>
-      <div class="pe-grid pe-grid-2"><label>Таб/цонх солих сануулгын тоо<input name="max_warnings" type="number" min="1" max="20" value="${c.max_warnings || 3}"><small>Энэ тоонд хүрмэгц хичээл зогсож, тэр хичээл рүү дахин орж чадахгүй.</small></label>
-      <label>Хаагдсаны дараа<select name="block_minutes">${[[30, "30 минутын дараа автоматаар (анхдагч)"], [5, "5 минутын дараа автоматаар"], [10, "10 минутын дараа автоматаар"], [15, "15 минутын дараа автоматаар"], [60, "1 цагийн дараа автоматаар"], [180, "3 цагийн дараа автоматаар"], [1440, "1 өдрийн дараа автоматаар"], [10080, "7 хоногийн дараа автоматаар"], [-1, "Багш «Дахин нээх» дарах хүртэл"]].map(([v, t]) => `<option value="${v}" ${(c.block_minutes || (c.block_hours || 0) * 60 || 30) === v ? "selected" : ""}>${t}</option>`).join("")}</select><small>Давтан хаагдвал хугацаа 2 дахин уртасна. Хаагдмагц танд улаан «Дахин нээх» товчтой мэдэгдэл очно — хугацаанаас өмнө ч нээж болно.</small></label></div></fieldset>
-    <label class="check"><input type="checkbox" name="unlock_all_paid" ${c.unlock_all_paid !== false ? "checked" : ""}> Багцын төлбөр төлсөн суралцагчид бүх хичээл шууд нээлттэй</label>
-    <small class="muted">Хичээл бүрийн хүлээх хугацааг (шууд, цаг, 7 хоног, сар) хичээл дээр нь тохируулна.</small></fieldset>
+      <div class="pe-grid pe-grid-2"><label>Таб/цонх солиход өгөх сануулгын тоо<input name="max_warnings" type="number" min="1" max="20" value="${c.max_warnings || 3}"><small>Энэ тоонд хүрмэгц хичээл зогсож, суралцагч тухайн хичээлд дахин орж чадахгүй болно.</small></label>
+      <label>Хаагдсаны дараа<select name="block_minutes">${[[30, "30 минутын дараа автоматаар (анхдагч)"], [5, "5 минутын дараа автоматаар"], [10, "10 минутын дараа автоматаар"], [15, "15 минутын дараа автоматаар"], [60, "1 цагийн дараа автоматаар"], [180, "3 цагийн дараа автоматаар"], [1440, "1 өдрийн дараа автоматаар"], [10080, "7 хоногийн дараа автоматаар"], [-1, "Багш «Дахин нээх» дарах хүртэл"]].map(([v, t]) => `<option value="${v}" ${(c.block_minutes || (c.block_hours || 0) * 60 || 30) === v ? "selected" : ""}>${t}</option>`).join("")}</select><small>Давтан хаагдвал хугацаа 2 дахин уртасна. Хаагдмагц танд улаан «Дахин нээх» товчтой мэдэгдэл очих тул хугацаа дуусахаас өмнө ч нээж болно.</small></label></div></fieldset>
+    <label class="check"><input type="checkbox" name="unlock_all_paid" ${c.unlock_all_paid !== false ? "checked" : ""}> Багцын төлбөр төлсөн суралцагчид бүх хичээл шууд нээгдэнэ</label>
+    <small class="muted">Хичээл бүрийн хүлээх хугацааг (шууд, цаг, 7 хоног, сар) тухайн хичээлийн тохиргоонд тохируулна.</small></fieldset>
   <input type="hidden" name="camera" value="${esc(c.camera || "optional")}">
-  <label class="check"><input type="checkbox" name="certificate" ${c.certificate ? "checked" : ""}><span>${ico("medal", 16)} Сургалтыг дүүргэсэн суралцагчид сертификат олгоно (хайлтад «Сертификаттай» шошго гарна)</span></label>`;
+  <label class="check"><input type="checkbox" name="certificate" ${c.certificate ? "checked" : ""}><span>${ico("medal", 16)} Сургалтыг дүүргэсэн суралцагчид гэрчилгээ олгоно (хайлтад «Сертификаттай» шошго гарна)</span></label>`;
 const courseBody = (f) => ({ title: f.title.value, description: f.description.value, price: +f.price.value || 0, published: f.published.checked, drip: f.drip.checked, unlock_all_paid: f.unlock_all_paid.checked, certificate: f.certificate.checked, camera: f.camera.value,
   max_warnings: f.max_warnings ? +f.max_warnings.value || 3 : undefined, block_minutes: f.block_minutes ? +f.block_minutes.value || 30 : undefined, block_hours: 0,
   access_code: f.locked ? (f.locked.checked ? f.access_code.value.trim() : "") : undefined, program_id: f.program_id ? f.program_id.value : undefined });
@@ -425,7 +426,8 @@ const teachersLine = (ts) => (ts?.length ? `<small class="g-teachers" title="З�
    нь бүлэг, дарааллаараа бүтэн хуудсаар харагдана: хэрэгтэйгээ сонгоод өөрийн шинэ сургалт болгох эсвэл байгаа
    сургалтад нэмнэ. Хуулбар бүрэн таных тул хөтөлбөр бүтээгчээр дараалал, бүлгийг чирж сольж, засаж, нэмж, хасна. */
 const SHARE_KIND = { exam: "Шалгалт", assignment: "Даалгавар" };
-const mkModal = (id, w, html) => { $("#" + id)?.remove(); document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="${id}"><div class="modal-card" style="width:min(${w}px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}</div></div>`); const m = $("#" + id); SG.openModal(m); const close = () => { SG.closeModal(m); setTimeout(() => m.remove(), 300); }; m.addEventListener("click", (e) => { if (e.target.closest("[data-close]") || e.target === m) close(); }); return [m, close]; };
+// side — баруун талаас гулсаж гарах цонх (бүтэн өндөр; утсан дээр бүтэн дэлгэц). Хаахад (✕, фон, Esc) фокус нээсэн товч руу буцна.
+const mkModal = (id, w, html, side = false) => { const back = document.activeElement, refocus = () => { if (back?.isConnected) back.focus({ preventScroll: true }); }; $("#" + id)?.remove(); document.body.insertAdjacentHTML("beforeend", `<div class="modal${side ? " modal-side" : ""}" id="${id}" role="dialog" aria-modal="true"><div class="modal-card" style="width:min(${w}px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}</div></div>`); const m = $("#" + id); if (side) void m.offsetWidth; SG.openModal(m); const close = () => { SG.closeModal(m); setTimeout(() => m.remove(), 300); refocus(); }; m.addEventListener("click", (e) => { if (e.target.closest("[data-close]") || e.target === m) close(); }); m.addEventListener("keydown", (e) => { if (e.key === "Escape") refocus(); }); return [m, close]; };
 const shareAvatar = (p) => `<span class="avatar avatar-sm" style="--h:${hueOfName(p.display_name)}">${p.avatar_url ? `<img src="${esc(p.avatar_url)}" alt="">` : esc((p.display_name || "?")[0])}</span>`;
 const sharedRowHTML = (x) => x.lesson_id
   ? `<li data-sid="${esc(x.id)}">${shareAvatar(x.from)}<span class="grow"><b>${esc(x.lesson_title)}</b><small class="muted">${SHARE_KIND[x.lesson_kind] || "Хичээл"} · «${esc(x.course_title)}» сургалтаас · ${esc(x.from.display_name)} · ${fmtDate(x.created_at)}</small></span>
@@ -444,19 +446,19 @@ async function saveSharedDialog(x, { lessonId = "", lessonIds = null, title = ""
   const want = lessonIds ? new Set(lessonIds) : null;
   const bytes = !info ? 0 : one ? (info.lesson_bytes ?? (info.lessons || []).find((r) => r.id === lessonId)?.bytes ?? 0) : (info.lessons || []).filter((r) => !want || want.has(r.id)).reduce((s, r) => s + (r.bytes || 0), 0);
   const st = info?.storage, free = st ? Math.max(0, st.quota - st.used) : Infinity, over = bytes > free;
-  const sizeLine = bytes ? `<p class="sh-size-line${over ? " is-over" : ""}">${ico(over ? "alert" : "files", 15)}<span>Хуулах файл ≈ <b>${fmtSize(bytes)}</b>${st ? ` · таны санд <b>${fmtSize(free)}</b> сул (нийт ${fmtSize(st.quota)})` : ""}${over ? `. <b>Багтахгүй</b> — цөөн хичээл сонгох, эсвэл «Данс»-аас файлын сангаа нэмнэ үү.` : ""}</span></p>` : "";
+  const sizeLine = bytes ? `<p class="sh-size-line${over ? " is-over" : ""}">${ico(over ? "alert" : "files", 15)}<span>Хуулах файл ≈ <b>${fmtSize(bytes)}</b>${st ? ` · таны санд <b>${fmtSize(free)}</b> сул (нийт ${fmtSize(st.quota)})` : ""}${over ? `. <b>Багтахгүй</b> — цөөн хичээл сонгох эсвэл «Данс» хэсгээс файлын сангаа нэмнэ үү.` : ""}</span></p>` : "";
   const [m, close] = mkModal("saveSharedModal", 540, `<h3>${ico("download", 20)} Өөрийн сургалтад хадгалах</h3>
-    <p class="muted small">«${esc(name)}»${n > 1 ? ` — <b>${n} хичээл</b>` : ""}. Хуулбар бүрэн таных: дараалал, бүлгийг чирж сольж, засаж, нэмж, хасна. Эх сургалт өөрчлөгдөхгүй; файлууд таны файлын сан руу хуулагдана.</p>
+    <p class="muted small">«${esc(name)}»${n > 1 ? ` — <b>${n} хичээл</b>` : ""}. Хуулбар бүрэн таных: дараалал, бүлгийг чирж өөрчлөх, засах, нэмэх, хасах боломжтой. Эх сургалт өөрчлөгдөхгүй; файлууд таны файлын сан руу хуулагдана.</p>
     ${sizeLine}
     <form class="form" id="saveSharedForm">
       <div class="seg share-seg" role="radiogroup" aria-label="Хаана хадгалах">
         <label><input type="radio" name="dest" value="new" ${dest === "new" ? "checked" : ""}><span>${ico("plus", 15)}Шинэ сургалт болгох</span></label>
         <label><input type="radio" name="dest" value="existing" ${dest === "existing" ? "checked" : ""} ${mine.length ? "" : "disabled"}><span>${ico("book", 15)}Байгаа сургалтад нэмэх</span></label></div>
       <div data-dest="new"><label>Шинэ сургалтын нэр<input name="title" maxlength="200" value="${esc(name)}"></label>
-        <p class="muted small share-hint">${one ? "Хичээл шинэ сургалтын эхний хичээл болно." : "Тайлбар, толгойн зураг, үнэ, тохиргоо, бүлэг, дараалал нь хуулагдана."} Сургалт ноорог төлөвтэй үүсэх тул шалгаж, зохион байгуулаад нийтэлнэ.</p></div>
+        <p class="muted small share-hint">${one ? "Хичээл шинэ сургалтын эхний хичээл болно." : "Тайлбар, толгойн зураг, үнэ, тохиргоо, бүлэг, дараалал нь хуулагдана."} Сургалт ноорог төлөвтэй үүсэх тул шалгаж, зохион байгуулсны дараа нийтэлнэ үү.</p></div>
       <div data-dest="existing"><label>Аль сургалтад<select name="course_id">${mine.map((c) => `<option value="${esc(c.id)}">${esc(c.title)}${c.shared ? ` · ${esc(c.org?.display_name || "хамтрагч")}` : ""}</option>`).join("")}</select></label>
-        <label>Бүлэг (заавал биш)<input name="section" maxlength="80" placeholder="${one ? "Хоосон бол бүлэггүй" : "Хоосон бол эх бүлгүүд нь хэвээр"}"></label>
-        <p class="muted small share-hint">Хичээлүүд «бэлтгэж байна» (хаалттай) төлөвтэй сүүлд нь нэмэгдэнэ — дараа нь хүссэн байрандаа чирж, шалгаад нээнэ.</p></div>
+        <label>Бүлэг (заавал биш)<input name="section" maxlength="80" placeholder="${one ? "Хоосон бол бүлэггүй" : "Хоосон бол эх бүлгүүд нь хэвээр үлдэнэ"}"></label>
+        <p class="muted small share-hint">Хичээлүүд «бэлтгэж байна» (хаалттай) төлөвтэйгээр төгсгөлд нэмэгдэнэ — дараа нь хүссэн байрлалд нь чирж, шалгаад нээнэ үү.</p></div>
       <div class="dr-acts"><button class="btn btn-gold btn-sm">${ico("download", 15)}Хадгалах</button></div><p class="form-error" aria-live="polite"></p></form>`);
   const f = $("#saveSharedForm", m), sync = () => $$("[data-dest]", f).forEach((el) => { el.hidden = el.dataset.dest !== f.dest.value; });
   f.addEventListener("change", sync); sync();
@@ -479,7 +481,7 @@ async function viewSharedLesson(x, lessonId) {
   const kind = { exam: "шалгалт", assignment: "даалгавар" }[l.exam ? "exam" : l.assignment ? "assignment" : ""] || "хичээл";
   const [m, close] = mkModal("viewSharedModal", 860, `<h3>${ico("eye", 20)} ${esc(l.title)}</h3><p class="muted small">${esc(x.from.display_name)} багшийн «${esc(d.course.title)}» сургалтын ${kind} · зөвхөн харах</p>
     ${l.exam ? `<p class="chip chip-gold">Шалгалт · ${l.exam.time_min || "∞"} мин · ${l.exam.attempts || "∞"} оролдлого · тэнцэх ${l.exam.pass_pct || 0}%</p>` : ""}${l.assignment ? `<p class="chip chip-gold">Даалгавар · дээд оноо ${l.assignment.max_score || 100}</p>` : ""}
-    <div class="shared-view">${SG.blocksHTML(l.blocks || []) || `<p class="muted small">Агуулга нэмээгүй хичээл.</p>`}</div>
+    <div class="shared-view">${SG.blocksHTML(l.blocks || []) || `<p class="muted small">Энэ хичээлд агуулга нэмээгүй байна.</p>`}</div>
     <div class="dr-acts"><button type="button" class="btn btn-gold btn-sm" data-save-one>${ico("download", 15)}Өөрийн сургалтад хадгалах</button></div>`);
   $("[data-save-one]", m).onclick = () => { close(); saveSharedDialog(x, { lessonId, title: l.title }); };
 }
@@ -503,7 +505,7 @@ async function sharedCourse(sid) {
       <p class="muted sh-from">${shareAvatar(x.from)}<span><b>${esc(x.from.display_name)}</b> багшийн хуваалцсан · ${rows.length} хичээл${named ? ` · ${named} бүлэг` : ""} · зөвхөн харах</span></p></div>
       <div class="gp-list-acts"><button type="button" class="btn btn-gold" data-fork>${ico("copy", 18)}Өөрийн сургалт болгох</button></div></div>
     ${co.description && !x.lesson_id ? `<p class="gp-desc">${esc(co.description)}</p>` : ""}
-    <ol class="sh-steps"><li><b>Хичээлүүдийг хараад</b> хэрэгтэйгээ сонгоно</li><li><b>«Өөрийн сургалт болгох»</b> — шинэ сургалт үүснэ (эсвэл байгаа сургалтад нэмнэ)</li><li>Студидээ <b>дараалал, бүлгийг чирж</b> сольж, засаж, нэмж зохион байгуулна</li></ol>
+    <ol class="sh-steps"><li><b>Хичээлүүдийг хараад</b> хэрэгтэйгээ сонгоно</li><li><b>«Өөрийн сургалт болгох»</b> — шинэ сургалт үүснэ (эсвэл байгаа сургалтад нэмнэ)</li><li>Студидээ <b>дараалал, бүлгийг чирж</b> өөрчилж, засаж, нэмж зохион байгуулна</li></ol>
     ${rows.length ? `<div class="sh-bar"><label class="sh-check"><input type="checkbox" data-all checked><span>Бүгд</span></label><span class="sh-count" aria-live="polite"></span><span class="sh-size"></span>
       <span class="sh-bar-acts"><button type="button" class="btn btn-glass btn-sm" data-add>${ico("book", 15)}Сургалтад нэмэх</button><button type="button" class="btn btn-gold btn-sm" data-fork>${ico("copy", 15)}Өөрийн сургалт болгох</button></span></div>
     <div class="ol sh-ol">${groups.map((g, i) => `<section class="ol-sec" data-sec="${esc(g.name)}"><header class="ol-sec-head"><label class="sh-check" title="Бүлгийг бүхэлд нь сонгох"><input type="checkbox" data-sec-all checked aria-label="«${esc(g.name || "Бүлэггүй")}» бүлгийг бүхэлд нь сонгох"></label>
@@ -563,10 +565,10 @@ async function courses() {
       <div class="gp-list-acts">${me.org ? `<button class="btn btn-glass" id="orgPrograms">${ico("school", 18)}Мэргэжлийн хөтөлбөр</button>` : ""}<button class="btn btn-gold" id="newCourse">${ico("plus", 18)}Шинэ сургалт үүсгэх</button></div></div>
     <div class="gp-courses">${ownHTML}
     ${shared.length ? `<section class="gp-prog gp-shared-list"><h2>${ico("users", 18)}Надтай хамт хөгжүүлж буй сургалтууд<small>${shared.length}</small></h2>
-      <p class="muted small">Эзэмшигч нь (багш эсвэл байгууллага) танд «хамт хөгжүүлэх» эрх өгсөн: та хичээл оруулж, зохион байгуулна. Үнэ, нийтлэх тохиргоо, орлогыг эзэмшигч удирдана. Таны профайл дээр харагдахгүй — байгууллагын хуудсанд таны нэр багшаар гарна.</p>
+      <p class="muted small">Эдгээр сургалтын эзэмшигч (багш эсвэл байгууллага) танд «хамт хөгжүүлэх» эрх өгсөн тул та хичээл оруулж, зохион байгуулах боломжтой. Үнэ, нийтлэх тохиргоо, орлогыг эзэмшигч удирдана. Сургалт таны профайл дээр харагдахгүй ч байгууллагын хуудсанд таны нэр багшаар гарна.</p>
       <div class="group-grid gp-grid">${shared.map(card).join("")}</div></section>` : ""}
     ${incoming.length ? `<section class="gp-prog gp-shared-list" id="sharedIn"><h2>${ico("link", 18)}Надад хуваалцсан<small>${incoming.length}</small></h2>
-      <p class="muted small">Бусад багшийн танд «харах, хадгалах» эрхээр өгсөн сургалт, хичээлүүд. Сургалтыг нээж хичээлүүдийг нь хараад <b>өөрийн сургалт болгон</b> хуулж авна — дараа нь дараалал, бүлэг, агуулгыг нь өөрөө зохион байгуулна (эх сургалт өөрчлөгдөхгүй, файлууд таны сан руу хуулагдана).</p>
+      <p class="muted small">Бусад багшийн танд «харах, хадгалах» эрхтэйгээр хуваалцсан сургалт, хичээлүүд. Сургалтыг нээж хичээлүүдийг нь хараад <b>өөрийн сургалт болгон</b> хуулж авна — дараа нь дараалал, бүлэг, агуулгыг нь өөрөө зохион байгуулна (эх сургалт өөрчлөгдөхгүй, файлууд таны сан руу хуулагдана).</p>
       <ul class="share-rows share-in">${incoming.map(sharedRowHTML).join("")}</ul></section>` : ""}</div>
     <div class="modal" id="courseModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
       <h3 class="h3">Шинэ сургалт үүсгэх</h3><form class="form" id="courseForm">${courseFormHTML()}<p class="form-error" role="alert"></p>
@@ -594,15 +596,15 @@ async function courses() {
     const id = b.dataset.delCourse, title = b.dataset.title;
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="delCourseModal"><div class="modal-card" style="width:min(460px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
       <h3 class="h3">${ico("trash", 18)} Сургалтыг устгах уу?</h3>
-      <p><b>«${esc(title)}»</b> сургалтыг устгахад <b>дотор нь байгаа бүх зүйл дагаад устана</b> — буцааж сэргээх боломжгүй:</p>
+      <p><b>«${esc(title)}»</b> сургалтыг устгахад <b>доторх бүх зүйл хамт устана</b> — буцааж сэргээх боломжгүй:</p>
       <ul class="del-list"><li>бүх хичээл, шалгалт, даалгавар (асуулт, рубрик, тохиргоотой нь)</li><li>суралцагчдын явц, шалгалт/даалгаврын хариу, дүн, тэмдэглэл</li><li>хэлэлцүүлэг, сэтгэгдэл, лайк, самбар, үүлэн үг</li><li>зөвхөн энэ сургалтад ашигласан файлууд (видео, зураг, баримт)</li><li>хуваалцалт, бүлэг чат, товлосон шууд хичээл</li></ul>
       <p class="muted small" id="delStat">Тоолж байна…</p>
-      <p class="muted small">Суралцагч элссэн эсвэл хичээл худалдаж авсан сургалтыг устгахгүй — тэр үед «Тохиргоо»-оос ноорог болгож нууна уу.</p>
+      <p class="muted small">Суралцагч элссэн эсвэл хичээл худалдаж авсан сургалтыг устгах боломжгүй — энэ тохиолдолд «Тохиргоо» хэсгээс ноорог болгож нууна уу.</p>
       <p class="form-error" role="alert"></p>
       <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button type="button" class="btn btn-danger" data-confirm-del>${ico("trash", 16)}Устгах</button></div></div></div>`);
     const m = $("#delCourseModal"); SG.openModal(m);
     api(`/api/me/courses/${id}`).then((d) => { const ls = d.lessons || [], ex = ls.filter((l) => l.exam).length, as = ls.filter((l) => l.assignment).length, bl = ls.reduce((n, l) => n + (l.blocks?.length || 0), 0);
-      $("#delStat", m).innerHTML = `Устах: <b>${ls.length}</b> хичээл (${ex} шалгалт, ${as} даалгавар), <b>${bl}</b> агуулгын хэсэг. Хичээлээ өөр сургалтад хэрэгтэй бол эхлээд «Хуваалцах»-аар хамтрагчдаа хадгалуулна уу.`; }).catch(() => { $("#delStat", m).textContent = ""; });
+      $("#delStat", m).innerHTML = `Устах зүйл: <b>${ls.length}</b> хичээл (${ex} шалгалт, ${as} даалгавар), <b>${bl}</b> агуулгын хэсэг. Хичээлээ өөр сургалтад ашиглах бол эхлээд «Хуваалцах» товчоор хамтрагчдаа хадгалуулна уу.`; }).catch(() => { $("#delStat", m).textContent = ""; });
     const close = () => { SG.closeModal(m); setTimeout(() => m.remove(), 300); };
     m.addEventListener("click", async (ev) => {
       if (ev.target === m || ev.target.closest("[data-close]")) return close();
@@ -622,7 +624,7 @@ function orgProgramsModal(after) {
       <span class="prog-acts"><button type="button" class="icon-btn" data-prog-up aria-label="Дээш" title="Дээш">↑</button><button type="button" class="icon-btn" data-prog-del aria-label="Хасах" title="Хасах">${ico("x", 15)}</button></span></div>`;
   document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="progModal"><div class="modal-card" style="width:min(640px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
     <h3 class="h3">${ico("school", 18)} Мэргэжлийн хөтөлбөр</h3>
-    <p class="muted small">Сургалтуудаа мэргэжил, хөтөлбөрөөр бүлэглэнэ — байгууллагын профайл дээр хөтөлбөр бүрийн доор сургалтууд нь, сургалт бүрт заадаг багш нь харагдана.</p>
+    <p class="muted small">Сургалтуудаа мэргэжил, хөтөлбөрөөр ангилна — байгууллагын профайл дээр хөтөлбөр бүрийн доор түүний сургалтууд, сургалт бүрд заадаг багш нь харагдана.</p>
     <form class="form" id="progForm"><div class="prog-list">${me.org.programs.map(row).join("") || row()}</div>
       <button type="button" class="btn btn-glass btn-sm" data-prog-add>${ico("plus", 15)}Хөтөлбөр нэмэх</button>
       <p class="form-error" role="alert"></p>
@@ -652,7 +654,7 @@ function courseTeachersModal(c, list, onChange) {
       <button type="button" class="btn btn-ghost btn-sm" data-unlink="${esc(t.id)}">Салгах</button></div>`;
   document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="ctModal"><div class="modal-card" style="width:min(560px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
     <h3 class="h3">${ico("users", 18)} Заадаг багш нар</h3>
-    <p class="muted small">Холбосон багш энэ сургалтад хичээл оруулж, дүгнэж, зохион байгуулна. Үнэ, нийтлэх, устгах, орлого — танд. Сургалт багшийн профайлд гарахгүй, таны хуудсанд багшийн нэр профайл руу нь холбоостой харагдана.</p>
+    <p class="muted small">Холбосон багш энэ сургалтад хичээл оруулж, суралцагчдын ажлыг дүгнэж, зохион байгуулна. Үнэ, нийтлэх, устгах эрх болон орлого танд үлдэнэ. Сургалт багшийн профайлд гарахгүй; харин таны хуудсанд багшийн нэр түүний профайлын холбоостой харагдана.</p>
     <form class="ct-add" id="ctForm"><input class="input" name="who" required placeholder="Багшийн @нэр, имэйл эсвэл профайлын холбоос" aria-label="Багш" autocomplete="off" spellcheck="false"><button class="btn btn-gold">${ico("plus", 16)}Холбох</button></form>
     <p class="form-error" role="alert"></p>
     <div class="items ct-list"></div></div></div>`);
@@ -701,22 +703,22 @@ function lessonBlocks(l) {
   return out.length ? out : [{ id: beId(), type: "text", text: "" }];
 }
 
-const QKINDS = [["single", "◉ Нэг сонголт"], ["multi", "☑ Олон сонголт"], ["text", "✎ Бичгээр"], ["match", "⇄ Харгалзуулах"], ["image", "🎯 Зурган дээр заах"]];
+const QKINDS = [["single", "◉ Нэг сонголт"], ["multi", "☑ Олон сонголт"], ["text", "✎ Бичгээр"], ["match", "⇄ Харгалзуулах"], ["image", "🎯 Зураг дээр заах"]];
 function quizBodyHTML(kind, id, q) {
   if (kind === "single" || kind === "multi") {
     const opts = q.options?.length ? q.options : ["", ""];
     return `<div class="be-opts">${opts.map((o, i) => beOptHTML(id, kind === "multi", o, (q.correct || []).includes(i))).join("")}</div>
-      <div class="be-qfoot"><button type="button" class="btn btn-glass btn-sm" data-opt-add>${ico("plus", 15)}Хариулт нэмэх</button><span class="muted small">Зөв хариулт(ууд)-ын өмнөх тэмдгийг сонгоно.</span></div>`;
+      <div class="be-qfoot"><button type="button" class="btn btn-glass btn-sm" data-opt-add>${ico("plus", 15)}Хариулт нэмэх</button><span class="muted small">Зөв хариулт(ууд)-ын өмнөх тэмдгийг сонгоно уу.</span></div>`;
   }
   if (kind === "text") {
     const ans = q.answers?.length ? q.answers : [""];
     return `<div class="be-answers">${ans.map((a) => `<div class="be-opt"><span class="be-ok">✓</span><input class="be-ans" maxlength="200" placeholder="Зөвд тооцох хариулт" value="${esc(a)}"><button type="button" class="icon-btn" data-row-del aria-label="Хасах">${ico("x", 14)}</button></div>`).join("")}</div>
-      <div class="be-qfoot"><button type="button" class="btn btn-glass btn-sm" data-ans-add>${ico("plus", 15)}Өөр хувилбар нэмэх</button><span class="muted small">Том жижиг үсэг, илүүдэл зай, цэг таслалыг тооцохгүй.</span></div>`;
+      <div class="be-qfoot"><button type="button" class="btn btn-glass btn-sm" data-ans-add>${ico("plus", 15)}Өөр хувилбар нэмэх</button><span class="muted small">Том, жижиг үсэг, илүү зай, цэг таслалыг харгалзахгүй.</span></div>`;
   }
   if (kind === "match") {
     const L = q.left?.length ? q.left : ["", ""], R = q.right?.length ? q.right : ["", ""];
     return `<div class="be-pairs">${L.map((l, i) => pairHTML(l, R[i] || "")).join("")}</div>
-      <div class="be-qfoot"><button type="button" class="btn btn-glass btn-sm" data-pair-add>${ico("plus", 15)}Хос нэмэх</button><span class="muted small">Зүүн талыг зөв хостой нь нэг мөрөнд бичнэ — суралцагчид баруун тал холилдож харагдана.</span></div>`;
+      <div class="be-qfoot"><button type="button" class="btn btn-glass btn-sm" data-pair-add>${ico("plus", 15)}Хос нэмэх</button><span class="muted small">Зүүн талын үгийг зөв хостой нь нэг мөрөнд бичнэ үү — суралцагчид баруун тал нь холилдсон дарааллаар харагдана.</span></div>`;
   }
   return `<label class="be-radius">Зөв хэсгийн хэмжээ<input type="range" class="be-r" min="2" max="40" value="${q.spot?.r || 8}"></label>
     <p class="muted small" style="margin:0">Дээрх зураг дээр зөв хариултын хэсгийг дарж тэмдэглэнэ үү.</p>`;
@@ -726,7 +728,7 @@ function qimgHTML(kind, url, spot) {
   if (!url) return `<button type="button" class="btn btn-glass btn-sm" data-qimg>${ico("image", 15)}${kind === "image" ? "Зураг оруулах (заавал)" : "Асуултад зураг нэмэх"}</button><div class="progress" hidden><i></i></div>`;
   const r = spot?.r || 8;
   return `<div class="be-spotwrap ${kind === "image" ? "pick" : ""}"><img src="${esc(url)}" alt="" draggable="false">${kind === "image" && spot?.x != null && spot?.x !== "" ? `<i class="be-spot" style="left:${spot.x}%;top:${spot.y}%;width:${r * 2}%;height:${r * 2}%"></i>` : ""}</div>
-    <div class="be-media-tools"><span class="muted small">${kind === "image" ? "Зураг дээр дарж зөв хэсгийг заана" : "Асуултын зураг"}</span><span><button type="button" class="btn btn-glass btn-sm" data-qimg>Солих</button> <button type="button" class="btn btn-ghost btn-sm" data-qimg-del>Хасах</button></span></div>`;
+    <div class="be-media-tools"><span class="muted small">${kind === "image" ? "Зураг дээр дарж зөв хэсгийг заана уу" : "Асуултын зураг"}</span><span><button type="button" class="btn btn-glass btn-sm" data-qimg>Солих</button> <button type="button" class="btn btn-ghost btn-sm" data-qimg-del>Хасах</button></span></div>`;
 }
 /* ---------- Текстийн хэсэг: Word шиг засварлагч (өнгө, хэмжээ, хүснэгт, текст доторх зураг) ---------- */
 Object.assign(ICON, {
@@ -810,13 +812,13 @@ function beBlockHTML(b) {
   else if (b.type === "heading") body = `<input class="be-h" maxlength="200" placeholder="Гарчиг бичнэ үү" value="${esc(b.text || "")}">`;
   else if (b.type === "cloud") body = `<input class="be-cloud-q" maxlength="200" placeholder="Асуулт — жишээ нь: Фотосинтез гэж сонсоход юу санаанд орж байна?" value="${esc(b.text || "")}">
       <div class="be-embed-bar"><label class="small">Нэг хүн <select class="be-cloud-n" style="width:auto;margin:0 4px">${[1, 2, 3].map((n) => `<option value="${n}" ${(b.max || 1) === n ? "selected" : ""}>${n}</option>`).join("")}</select> үг илгээнэ</label>
-      <span class="muted small">Суралцагчдын хариулт үүл болж харагдана — олон хүн бичсэн үг томорно.</span></div>
+      <span class="muted small">Суралцагчдын хариулт үгийн үүл болж харагдана — олон хүний бичсэн үг томоор гарна.</span></div>
       <details class="be-cloud-live"><summary>${ico("eye", 15)}Суралцагчдын хариулт (шууд)</summary><div class="be-cloud-res"></div></details>`;
-  else if (b.type === "board") body = `<input class="be-board-t" maxlength="300" placeholder="Самбарын гарчиг эсвэл даалгавар — жишээ нь: Ургамлын хэсгүүдийг зурж нэрлэ" value="${esc(b.text && b.text !== "Цагаан самбар" ? b.text : "")}">
+  else if (b.type === "board") body = `<input class="be-board-t" maxlength="300" placeholder="Самбарын гарчиг эсвэл даалгавар — жишээ нь: Ургамлын хэсгүүдийг зурж нэрлээрэй" value="${esc(b.text && b.text !== "Цагаан самбар" ? b.text : "")}">
       <div class="be-embed-bar"><label class="small">Анхдагч багийн тоо <select class="be-board-n" style="width:auto;margin:0 4px">${[2, 3, 4, 5, 6, 8, 10, 12].map((n) => `<option value="${n}" ${(b.max || 4) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
-      <span class="muted small">Хичээл дээр «Самбар нээх» дарж та тайлбарлана; хүүхдүүд хувиараа эсвэл багаар зурж, бичиж, зураг оруулна — бүгд танд шууд харагдана.</span></div>
+      <span class="muted small">Хичээлийн үеэр «Самбар нээх» дарж тайлбарлана; суралцагчид хувиараа эсвэл багаар зурж, бичиж, зураг оруулах бөгөөд бүгд танд шууд харагдана.</span></div>
       <div class="be-live"><button type="button" class="btn btn-gold btn-sm" data-board-open>${ico("board", 15)}Самбар нээх</button><span class="muted small">Хичээл эхлэхээс өмнө ажлын хуудсаа бэлдэж, зураг, дүрс байрлуулж болно.</span></div>`;
-  else if (b.type === "embed") body = `<textarea class="be-embed" rows="5" maxlength="60000" spellcheck="false" placeholder="Холбоос (https://…) эсвэл HTML код буулгана уу — Google Docs/Slides/Forms, Canva, YouTube, GeoGebra, Desmos, Padlet, Quizlet… Холбоос хичээл дотроо шууд ажиллана.">${esc(b.text || "")}</textarea>
+  else if (b.type === "embed") body = `<textarea class="be-embed" rows="5" maxlength="60000" spellcheck="false" placeholder="Холбоос (https://…) эсвэл HTML код буулгана уу — Google Docs/Slides/Forms, Canva, YouTube, GeoGebra, Desmos, Padlet, Quizlet… Хичээл дотор шууд ажиллана.">${esc(b.text || "")}</textarea>
       <div class="be-embed-bar"><label class="small">Өндөр<input class="be-embed-h" type="number" min="80" max="2000" step="20" value="${b.height || 420}"> px</label><button type="button" class="btn btn-glass btn-sm" data-embed-preview>Урьдчилан харах</button><span class="muted small">Тусгаарлагдсан хүрээнд аюулгүй ажиллана</span></div>
       <div class="be-embed-prev"></div>`;
   else if (b.type === "quiz") {
@@ -840,7 +842,7 @@ function beBlockHTML(b) {
 const beOptHTML = (id, multi, val, on) => `<div class="be-opt"><input type="${multi ? "checkbox" : "radio"}" name="c-${esc(id)}" ${on ? "checked" : ""} title="Зөв хариулт" aria-label="Зөв хариулт">
   <input class="be-opt-t" maxlength="300" placeholder="Хариулт" value="${esc(val)}"><button type="button" class="icon-btn" data-opt-del aria-label="Хариулт хасах">${ico("x", 14)}</button></div>`;
 const beDropHTML = (type) => `<div class="be-drop"><span>${ico(BE[type][0], 22)}</span><div><b>${type === "image" ? "Зураг" : type === "audio" ? "Дуу бичлэг" : type === "video" ? "Видео" : "Файл (PDF, Word, PowerPoint…)"}</b>
-    <small class="muted">Энд чирж оруулах эсвэл сонгоно · ${BE_LIMIT[type] >= 1024 ? BE_LIMIT[type] / 1024 + " GB" : BE_LIMIT[type] + " MB"} хүртэл${type === "image" ? " · автоматаар жижгэрнэ" : ""}</small></div>
+    <small class="muted">Энд чирж оруулах эсвэл сонгох · ${BE_LIMIT[type] >= 1024 ? BE_LIMIT[type] / 1024 + " GB" : BE_LIMIT[type] + " MB"} хүртэл${type === "image" ? " · автоматаар багасна" : ""}</small></div>
     <div class="be-drop-acts"><button type="button" class="btn btn-gold btn-sm" data-pick>${ico("clip", 15)}Файл сонгох</button>
     ${type === "audio" ? `<button type="button" class="btn btn-glass btn-sm" data-rec>${ico("mic", 15)}Бичлэг хийх</button>` : ""}
     <button type="button" class="btn btn-glass btn-sm" data-vurl title="${{ video: "YouTube, Vimeo эсвэл видео файлын (mp4, webm) холбоос", image: "Зургийн холбоос (https://…)", audio: "Аудио файлын холбоос (mp3, m4a…)", file: "Файлын холбоос (PDF, Word, PowerPoint…)" }[type] || "Холбоос"}">${ico("link", 15)}${type === "video" ? "YouTube / холбоос" : "Холбоос"}</button></div>
@@ -860,7 +862,7 @@ function beMediaPreview(b) {
 function mountRubricEditor(box, init) {
   const rid = () => Math.random().toString(36).slice(2, 10).padEnd(6, "0");
   const st = init?.levels?.length >= 2 ? JSON.parse(JSON.stringify(init))
-    : { levels: ["Маш сайн", "Сайн", "Дунд", "Хангалтгүй"], criteria: [{ id: rid(), name: "Агуулга", points: [10, 7, 4, 1], desc: ["", "", "", ""] }, { id: rid(), name: "Бүтэц, хэлбэр", points: [5, 4, 2, 1], desc: ["", "", "", ""] }] };
+    : { levels: ["Маш сайн", "Сайн", "Дунд", "Сайжруулах шаардлагатай"], criteria: [{ id: rid(), name: "Агуулга", points: [10, 7, 4, 1], desc: ["", "", "", ""] }, { id: rid(), name: "Бүтэц, хэлбэр", points: [5, 4, 2, 1], desc: ["", "", "", ""] }] };
   st.criteria.forEach((c) => { c.points = st.levels.map((_, j) => +(c.points?.[j] ?? 0)); c.desc = st.levels.map((_, j) => c.desc?.[j] ?? ""); });
   const top = (c) => Math.max(0, ...c.points.map((p) => +p || 0));
   const total = () => st.criteria.reduce((a, c) => a + top(c), 0);
@@ -967,8 +969,8 @@ function mountBlockEditor(f, blocks) {
     x.open("POST", "/api/me/files?visibility=private" + filesQ()); x.setRequestHeader("Authorization", "Bearer " + Auth.token);
     x.upload.onprogress = (e) => { if (e.lengthComputable) fill.style.width = Math.max(3, Math.round(e.loaded / e.total * 100)) + "%"; };
     x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {} bar.hidden = true;
-      if (x.status >= 300) return toast(d?.error || "Хуулж чадсангүй", true);
-      setMedia(el, d); toast(d.status === "processing" ? "Хуулагдлаа — видеог боловсруулж байна" : "Хуулагдлаа ✓"); library = null; };
+      if (x.status >= 300) return toast(d?.error || "Байршуулж чадсангүй", true);
+      setMedia(el, d); toast(d.status === "processing" ? "Байршуулагдлаа — видеог боловсруулж байна" : "Байршуулагдлаа ✓"); library = null; };
     x.onerror = () => { bar.hidden = true; toast("Сүлжээний алдаа — дахин оролдоно уу", true); };
     x.send(fd);
   };
@@ -1012,7 +1014,7 @@ function mountBlockEditor(f, blocks) {
     const x = new XMLHttpRequest(), fd = new FormData(); fd.append("file", file);
     x.open("POST", "/api/me/files?visibility=private" + filesQ()); x.setRequestHeader("Authorization", "Bearer " + Auth.token);
     x.upload.onprogress = (e) => { if (bar && e.lengthComputable) $("i", bar).style.width = Math.round(e.loaded / e.total * 100) + "%"; };
-    x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {} if (x.status >= 300) return toast(d?.error || "Хуулж чадсангүй", true);
+    x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {} if (x.status >= 300) return toast(d?.error || "Байршуулж чадсангүй", true);
       qi.dataset.url = d.path; qi.dataset.preview = d.url; qi.dataset.x = ""; qi.innerHTML = qimgHTML($(".be-qkind", el).value, d.url, null); library = null; };
     x.onerror = () => toast("Сүлжээний алдаа", true);
     x.send(fd);
@@ -1070,7 +1072,7 @@ function mountBlockEditor(f, blocks) {
     restore(rt);
     document.execCommand("styleWithCSS", false, true);
     if (cmd === "quote") document.execCommand("formatBlock", false, "blockquote");
-    else if (cmd === "link") { const u = prompt("Холбоос (https://…)"); if (u && /^https?:\/\//.test(u.trim())) document.execCommand("createLink", false, u.trim()); else if (u) toast("Холбоос https:// -ээр эхэлнэ", true); }
+    else if (cmd === "link") { const u = prompt("Холбоос (https://…)"); if (u && /^https?:\/\//.test(u.trim())) document.execCommand("createLink", false, u.trim()); else if (u) toast("Холбоос https://-ээр эхлэх ёстой", true); }
     else if (cmd === "indent" || cmd === "outdent") indent(rt, cmd);
     else if (cmd === "removeFormat") { document.execCommand("removeFormat"); document.execCommand("unlink"); }
     else document.execCommand(cmd, false, val);
@@ -1142,7 +1144,7 @@ function mountBlockEditor(f, blocks) {
   const send = (file) => new Promise((ok, fail) => {
     const x = new XMLHttpRequest(), fd = new FormData(); fd.append("file", file);
     x.open("POST", "/api/me/files?visibility=private" + filesQ()); x.setRequestHeader("Authorization", "Bearer " + Auth.token);
-    x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {} if (x.status < 300 && d) ok(d); else fail(new Error(d?.error || "Хуулж чадсангүй")); };
+    x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {} if (x.status < 300 && d) ok(d); else fail(new Error(d?.error || "Байршуулж чадсангүй")); };
     x.onerror = () => fail(new Error("Сүлжээний алдаа — дахин оролдоно уу")); x.send(fd);
   });
   const rtImage = (rt, file) => {
@@ -1213,7 +1215,7 @@ function mountBlockEditor(f, blocks) {
     const open = (lid) => SG.openBoard({ base: `${lessonBase(lid)}/board/${encodeURIComponent(id)}`, lid, bid: id, title, teacher: true }).catch((err) => toast(err.message, true));
     if (!f.dataset.course) return toast("Сургалтаа эхлээд хадгална уу", true);
     if (f.dataset.edit && saved.get(id)?.type === "board") return open(f.dataset.edit);
-    if (!confirm("Самбарыг нээхийн өмнө хичээлийг хадгална. Хадгалаад нээх үү?")) return;
+    if (!confirm("Самбарыг нээхийн өмнө хичээлийг хадгалах шаардлагатай. Хадгалаад нээх үү?")) return;
     f._afterSave = open; f.requestSubmit();
   });
   box.addEventListener("toggle", (e) => {
@@ -1242,7 +1244,7 @@ function mountBlockEditor(f, blocks) {
     if (t.closest("[data-vurl]")) { // зураг, дуу, файл, видеог холбоосоор (https://…) оруулах — сервер http(s) холбоосыг зөвшөөрнө
       const ty = el.dataset.type, Q = { video: "YouTube, Vimeo эсвэл видео файлын (mp4, webm) холбоос", image: "Зургийн холбоос (https://…)", audio: "Аудио файлын холбоос (mp3, m4a, ogg…)", file: "Файлын холбоос (PDF, Word, PowerPoint…)" }, N = { video: "Видео холбоос", image: "Зургийн холбоос", audio: "Аудио холбоос", file: "Файлын холбоос" };
       const u = prompt(Q[ty] || "Холбоос (https://…)"); if (u === null) return; const v = u.trim();
-      if (!/^https?:\/\/\S+$/.test(v)) return toast("Холбоос https:// -ээр эхлэх ёстой", true);
+      if (!/^https?:\/\/\S+$/.test(v)) return toast("Холбоос https://-ээр эхлэх ёстой", true);
       setMedia(el, { path: v, url: v, original_name: v.split("/").pop()?.split("?")[0] || N[ty] || "Холбоос" }); return;
     }
     if (t.closest("[data-opt-add]")) { const opts = $(".be-opts", el); if (opts.children.length >= 8) return toast("Дээд тал нь 8 хариулт"); opts.insertAdjacentHTML("beforeend", beOptHTML(el.dataset.id, $(".be-qkind", el).value === "multi", "", false)); opts.lastElementChild.querySelector(".be-opt-t").focus(); return; }
@@ -1413,17 +1415,17 @@ async function courseEditor(id) {
       <div class="pe-grid pe-grid-2">
         <label>Дуусах цаг өнгөрсөн бол<select name="${pfx}_late"><option value="free" ${!due?.late || due.late === "free" ? "selected" : ""}>Төлбөргүй үргэлжлүүлнэ</option><option value="paid" ${due?.late === "paid" ? "selected" : ""}>Хоцролтын төлбөр төлж нээнэ</option><option value="closed" ${due?.late === "closed" ? "selected" : ""}>Хаалттай болно</option></select></label>
         <label class="pe-fee" ${due?.late === "paid" ? "" : "hidden"}>Хоцролтын төлбөр (₮)<input name="${pfx}_fee" type="number" min="0" step="500" value="${due?.late_fee || 5000}"></label></div>
-      <label class="pe-entry">${what} төлбөр (₮)<input name="${pfx}_entry" type="number" min="0" step="500" value="${due?.fee || 0}"><small>0 бол үнэгүй. Тавьсан бол суралцагч сургалтад элссэн ч төлж байж ${what === "Шалгалтын" ? "шалгалт өгнө" : "хариу илгээнэ"}.</small></label>`;
+      <label class="pe-entry">${what} төлбөр (₮)<input name="${pfx}_entry" type="number" min="0" step="500" value="${due?.fee || 0}"><small>0 бол үнэгүй. Үнэ тавьсан бол суралцагч сургалтад элссэн ч төлбөрөө төлсний дараа ${what === "Шалгалтын" ? "шалгалт өгнө" : "хариу илгээнэ"}.</small></label>`;
   const ruleBadge = (l) => { const r = UNLOCK_RULES.find(([v]) => v === (l.unlock_rule ?? "")) || UNLOCK_RULES[0]; return `<span class="aud" title="${esc(r[3])}">${r[1]} ${esc(r[2])}${["view", "complete", ""].includes(l.unlock_rule ?? "") && l.unlock_after_h ? " · " + window.SG_humanHours(l.unlock_after_h) : ""}</span>`; };
   const kindOf = (l) => l?.exam ? "exam" : l?.assignment ? "assignment" : "lesson";
   // Энэ хичээл хэзээ нээгдэх вэ (дараалалтай сургалтад): багш гараар сонгоно.
   const UNLOCK_RULES = [
     ["view", "⏱", "Цагаар", "Өмнөх хичээлийг үзсэнээс хойш тохируулсан хугацааны дараа"],
     ["quiz", "🧩", "Асуултад бүрэн зөв хариулсан бол", "Өмнөх хичээлийн бүх асуултад зөв хариулмагц шууд"],
-    ["active", "🕒", "Хугацааг бүрэн судалсан бол", "Өмнөх хичээлийн идэвхтэй минутыг бүрэн гүйцээмэгц шууд"],
-    ["quiz_active", "✅", "Асуулт + хугацаа хоёулаа", "Асуултууд бүгд зөв БА минут бүрэн гүйцсэн үед"],
-    ["complete", "☑️", "«Дууслаа» дармагц", "Өмнөхийг дууссан гэж тэмдэглэснээс хойш (хугацаа нэмж болно)"],
-    ["exam", "📝", "Шалгалтад тэнцсэн бол", "Өмнөх хичээл шалгалт бол тэнцмэгц шууд"],
+    ["active", "🕒", "Хугацаагаа бүрэн гүйцээсэн бол", "Өмнөх хичээлийн идэвхтэй минутыг бүрэн гүйцээмэгц шууд"],
+    ["quiz_active", "✅", "Асуулт + хугацаа хоёулаа", "Бүх асуултад зөв хариулж, минутаа бүрэн гүйцээсэн үед"],
+    ["complete", "☑️", "«Дууслаа» дармагц", "Өмнөх хичээлийг дууссан гэж тэмдэглэснээс хойш (хугацаа нэмж болно)"],
+    ["exam", "📝", "Шалгалтад тэнцсэн бол", "Өмнөх хичээл нь шалгалт бол тэнцмэгц шууд"],
     ["manual", "🔐", "Багш гараар нээнэ", "Та «Шууд нээлттэй болгох» дартал хаалттай"],
     ["", "✨", "Автомат", "Минут → асуулт/шалгалт → эс бөгөөс хугацаа (систем өөрөө)"],
   ];
@@ -1432,9 +1434,9 @@ async function courseEditor(id) {
       <div class="pe-grid pe-grid-2 ur-time" ${["view", "complete", ""].includes(cur) ? "" : "hidden"}><label>Хүлээх хугацаа<select name="unlock_after_h">${UNLOCKS.map(([hv, t]) => `<option value="${hv}" ${h === hv ? "selected" : ""}>${t}</option>`).join("")}${l && !UNLOCKS.some(([hv]) => hv === h) ? `<option value="${h}" selected>${h} цаг</option>` : ""}</select></label>
         <label class="check" style="align-self:end"><input type="checkbox" name="always_open" ${l?.always_open ? "checked" : ""}> Дарааллаас үл хамааран нээлттэй</label></div></div>`; };
   const KIND_TXT = {
-    lesson: { title: "Хичээлийн гарчиг", content: "Агуулга", hint: "Текст, зураг, видео, файл, асуулт — дарааллаар нь нэмнэ. Чирж зөөж болно." },
-    exam: { title: "Шалгалтын нэр", content: "Шалгалтын асуултууд", hint: "«Асуулт» товчоор асуултуудаа нэмнэ. Тайлбар текст нэмж болно. Суралцагчид асуултууд нэг дор өгөгдөж, өөр цонх руу шилжих эсвэл хуулах үед шалгалт шууд хаагдана." },
-    assignment: { title: "Даалгаврын нэр", content: "Даалгаврын нөхцөл", hint: "Юу хийх, юуг хэрхэн илгээхийг энд бичнэ. Суралцагч хариугаа текст ба холбоосоор илгээж, та оноо, тайлбар өгнө." },
+    lesson: { title: "Хичээлийн гарчиг", content: "Агуулга", hint: "Текст, зураг, видео, файл, асуултаа дарааллаар нь нэмнэ. Байрлалыг чирж өөрчилж болно." },
+    exam: { title: "Шалгалтын нэр", content: "Шалгалтын асуултууд", hint: "«Асуулт» товчоор асуултуудаа нэмж, шаардлагатай бол тайлбар текст оруулна. Суралцагчид бүх асуулт нэг дор харагдах бөгөөд өөр цонх руу шилжих эсвэл хуулах үед шалгалт шууд хаагдана." },
+    assignment: { title: "Даалгаврын нэр", content: "Даалгаврын нөхцөл", hint: "Суралцагч юу хийж, ажлаа хэрхэн илгээхийг энд тодорхой бичнэ үү. Суралцагч хариугаа текст болон холбоосоор илгээж, та оноо, эргэх холбоо өгнө." },
   };
   const step = (n, title, body, cls = "", hidden = false) => `<section class="pe-step ${cls}" ${hidden ? "hidden" : ""}><span class="pe-num" aria-hidden="true">${n}</span><div class="pe-step-body"><h4>${title}</h4>${body}</div></section>`;
   // Хичээл оруулах маягт: 1 Төрөл → 2 Нэр, бүлэг → 3 Агуулга → 4 Тохиргоо (төрлөөс хамаарна) → Нэмэлт → Нийтлэх.
@@ -1444,7 +1446,7 @@ async function courseEditor(id) {
         <label><input type="radio" name="kind" value="exam" ${kind === "exam" ? "checked" : ""}><span>${ico("exam", 15)}Шалгалт</span></label>
         <label><input type="radio" name="kind" value="assignment" ${kind === "assignment" ? "checked" : ""}><span>${ico("clip", 15)}Даалгавар</span></label></div>
         <p class="pe-kind-hint muted small" data-k="lesson" ${kind === "lesson" ? "" : "hidden"}>Ердийн хичээл: үзэж, асуултад хариулж, дуусгана.</p>
-        <p class="pe-kind-hint muted small" data-k="exam" ${kind === "exam" ? "" : "hidden"}>Хугацаатай, хамгаалалттай шалгалт. Оноогоор тэнцэнэ.</p>
+        <p class="pe-kind-hint muted small" data-k="exam" ${kind === "exam" ? "" : "hidden"}>Хугацаатай, хамгаалалттай шалгалт. Тэнцэх эсэхийг оноогоор шийднэ.</p>
         <p class="pe-kind-hint muted small" data-k="assignment" ${kind === "assignment" ? "" : "hidden"}>Суралцагч хариу илгээж, та дүгнэнэ.</p>`)}
       ${step(2, "Нэр ба бүлэг", `<input name="title" required maxlength="200" class="pe-title" placeholder="${T.title}" value="${esc(l?.title || "")}">
         ${sectionPicker(l ? l.section || "" : preset || "")}`)}
@@ -1459,22 +1461,22 @@ async function courseEditor(id) {
       ${step(4, "Даалгаврын тохиргоо", `<h5>Үнэлэх арга</h5>
         <div class="gr-modes" role="radiogroup" aria-label="Үнэлэх арга">
           <label class="gr-mode ${l?.assignment?.grading === "rubric" ? "" : "on"}"><input type="radio" name="asg_grading" value="" ${l?.assignment?.grading === "rubric" ? "" : "checked"}><span class="gr-ic" aria-hidden="true">123</span><span><strong>Тоогоор</strong><small>0-ээс дээд оноо хүртэл нэг тоо өгнө</small></span></label>
-          <label class="gr-mode ${l?.assignment?.grading === "rubric" ? "on" : ""}"><input type="radio" name="asg_grading" value="rubric" ${l?.assignment?.grading === "rubric" ? "checked" : ""}><span class="gr-ic" aria-hidden="true">▦</span><span><strong>Рубрикаар</strong><small>Шалгуур × түвшин хүснэгт — оноо өөрөө бодогдоно</small></span></label>
+          <label class="gr-mode ${l?.assignment?.grading === "rubric" ? "on" : ""}"><input type="radio" name="asg_grading" value="rubric" ${l?.assignment?.grading === "rubric" ? "checked" : ""}><span class="gr-ic" aria-hidden="true">▦</span><span><strong>Рубрикаар</strong><small>Шалгуур × түвшний хүснэгт — оноо автоматаар бодогдоно</small></span></label>
         </div>
         <div class="pe-grid pe-grid-3 gr-score" ${l?.assignment?.grading === "rubric" ? "hidden" : ""}><label>Дээд оноо<input name="asg_max" type="number" min="1" max="1000" value="${l?.assignment?.max_score || 100}"></label></div>
         <div class="gr-rubric" ${l?.assignment?.grading === "rubric" ? "" : "hidden"} data-rubric="${esc(JSON.stringify(l?.assignment?.rubric || null))}"></div>
         <h5>Хугацаа ба төлбөр</h5>${dueHTML("asg", l?.assignment?.due, "Даалгаврын")}
-        <h5>Хариуны дүрэм</h5>
-        <div class="pe-grid pe-grid-3"><label>Үгийн баримжаа<input name="asg_words" type="number" min="0" max="5000" step="50" value="${l?.assignment?.words || 500}"><small class="muted">суралцагчид тоолуураар харагдана (хатуу хязгаар биш)</small></label>
+        <h5>Хариу илгээх дүрэм</h5>
+        <div class="pe-grid pe-grid-3"><label>Баримжаа үгийн тоо<input name="asg_words" type="number" min="0" max="5000" step="50" value="${l?.assignment?.words || 500}"><small class="muted">суралцагчид тоолуураар харагдана (хатуу хязгаар биш)</small></label>
           <label class="pe-check" style="align-self:end"><input type="checkbox" name="asg_resubmit" ${l?.assignment?.resubmit ? "checked" : ""}><span>Дахин илгээхийг зөвшөөрөх</span><small class="muted">сонгоогүй бол хариуг нэг л удаа илгээнэ</small></label></div>
-        <p class="muted small" style="margin:8px 0 0">Хариу: суралцагч текстээ <b>өөрөө бичнэ</b> (хуулж буулгах боломжгүй), таб/цонх солисон тоо нь танд харагдана; бүтээлч ажлаа (Canva, Google Docs/Slides, видео, GitHub, Figma…) холбоосоор илгээнэ. Файл илгээхгүй.</p>`, "pe-asg", kind !== "assignment")}
+        <p class="muted small" style="margin:8px 0 0">Хариу: суралцагч текстээ <b>өөрөө бичнэ</b> (хуулж буулгах боломжгүй), таб/цонх солисон тоо нь танд харагдана; бүтээлч ажлаа (Canva, Google Docs/Slides, видео, GitHub, Figma…) холбоосоор илгээнэ. Файл хавсаргах боломжгүй.</p>`, "pe-asg", kind !== "assignment")}
       <details class="pe-step pe-more" ${l?.active_min || l?.format || l?.mode || c.drip ? "open" : ""}><summary><span class="pe-num" aria-hidden="true">${ico("gear", 14)}</span><span class="pe-step-body"><h4>Нэмэлт тохиргоо <small class="muted">хэлбэр, идэвхтэй хугацаа${c.drip ? ", хэзээ нээгдэх" : ""}</small></h4></span></summary>
         <div class="pe-more-body">
           <div class="pe-grid pe-grid-3">
             <label>Сургалтын хэлбэр<select name="format">${FORMATS.map(([v, t]) => `<option value="${v}" ${(l?.format || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
             <label>Заах аргын төрөл<select name="mode_kind">${MODES.map(([v, t]) => `<option value="${v}" ${(l?.mode || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-            <label>Идэвхтэй суралцах хугацаа (мин)<input name="active_min" type="number" min="0" max="600" value="${l?.active_min || 0}"><small>0 бол шаардахгүй. Тавьсан бол энэ хугацаанд идэвхтэй үзэж байж «дууслаа» дарна.</small></label></div>
-          <label class="check" style="margin-top:10px"><input type="checkbox" name="discussion" ${l ? (l.discussion ? "checked" : "") : "checked"}> 💬 Хэлэлцүүлэгтэй — хичээлийн доор суралцагчид лайк дарж, сэтгэгдэл, асуулт бичиж, хоорондоо ярилцана (та ч хариулна)</label>
+            <label>Идэвхтэй суралцах хугацаа (мин)<input name="active_min" type="number" min="0" max="600" value="${l?.active_min || 0}"><small>0 бол шаардахгүй. Тавьсан бол суралцагч энэ хугацаанд идэвхтэй судалсны дараа «Дууслаа» дарна.</small></label></div>
+          <label class="check" style="margin-top:10px"><input type="checkbox" name="discussion" ${l ? (l.discussion ? "checked" : "") : "checked"}> 💬 Хэлэлцүүлэгтэй — хичээлийн доор суралцагчид лайк дарж, сэтгэгдэл, асуулт бичиж, хоорондоо ярилцана (та ч хариулт бичиж болно)</label>
           ${c.drip ? unlockHTML(l) : ""}
         </div></details>
       <div class="pe-foot">
@@ -1484,9 +1486,9 @@ async function courseEditor(id) {
             <label><input type="radio" name="mode" value="paid" ${l?.is_free ? "" : "checked"}><span>${ico("lock", 15)}Төлбөртэй</span></label></div>
           <label class="pe-price" ${l?.is_free ? "hidden" : ""}><input name="price" type="number" min="0" step="500" value="${l ? l.price || 0 : c.price ? 0 : 10000}" aria-label="Үнэ"><span>₮</span></label></div>
         <span class="grow"></span>
-        ${l ? `<button type="button" class="btn btn-ghost btn-sm" data-cancel>Болих</button>` : `<label class="check small pe-hidden" title="Бэлтгэж дуусаагүй бол хаалттай үүсгээд, бэлэн болмогц хөтөлбөрөөс нээнэ"><input type="checkbox" name="hidden_new"> Хаалттай (бэлтгэж дуусаагүй)</label>`}
+        ${l ? `<button type="button" class="btn btn-ghost btn-sm" data-cancel>Болих</button>` : `<label class="check small pe-hidden" title="Бэлтгэж дуусаагүй бол хаалттай үүсгээд, бэлэн болмогц хөтөлбөрөөс нээнэ үү"><input type="checkbox" name="hidden_new"> Хаалттай (бэлтгэж дуусаагүй)</label>`}
         <button class="btn btn-gold">${l ? "Хадгалах" : kind === "exam" ? "Шалгалт нийтлэх" : kind === "assignment" ? "Даалгавар нийтлэх" : "Хичээл нийтлэх"}</button></div>
-      <p class="muted small pe-hint">${c.price ? "Үнэ 0 бол зөвхөн сургалтын багцаар нээгдэнэ." : "Энэ сургалт багц үнэгүй тул төлбөртэй хичээл бүр өөрийн үнэтэй байна."}</p>
+      <p class="muted small pe-hint">${c.price ? "Үнэ 0 бол зөвхөн сургалтын багцаар нээгдэнэ." : "Энэ сургалтад багц үнэ тогтоогоогүй тул төлбөртэй хичээл бүрд тусдаа үнэ тавина."}</p>
       <p class="form-error" role="alert"></p></form>`; };
 
   // Блоктой нийтлэл: эхний зураг + агуулгын тоо + урьдчилан харах.
@@ -1505,7 +1507,7 @@ async function courseEditor(id) {
         : `<button class="post-attach" data-open-media>${ico(/\.pdf$/i.test(stripSig(l.video_url)) ? "book" : "live", 22)}<span><strong>${esc(mediaLabel(l.video_url))}</strong><small class="muted">Дарж нээнэ</small></span>${ico("chevron", 18)}</button><div class="post-media" hidden></div>`) : ""}
       <footer class="post-foot"><button data-edit-post>${ico("edit", 16)}Засах</button><button data-toggle-hidden>${ico(l.hidden ? "eye" : "lock", 16)}${l.hidden ? "Суралцагчдад нээх" : "Хаах"}</button>${l.assignment ? `<button data-grade>${ico("users", 16)}Хариунуудыг дүгнэх</button>` : ""}<button data-toggle-free>${ico(l.is_free ? "lock" : "globe", 16)}${l.is_free ? "Төлбөртэй болгох" : "Үнэгүй болгох"}</button>
         ${c.drip ? `<button data-toggle-always title="Дарааллаас үл хамааран нээлттэй эсэх">${ico(l.always_open ? "lock" : "globe", 16)}${l.always_open ? "Дараалалд оруулах" : "Шууд нээлттэй болгох"}</button>` : ""}
-        ${c.published ? `<a href="/c/${esc(c.id)}#l=${esc(l.id)}" target="_blank" rel="noopener">${ico("eye", 16)}Суралцагчийн нүдээр</a>` : ""}${l.discussion && !l.exam && c.published ? `<a href="/c/${esc(c.id)}#l=${esc(l.id)}" target="_blank" rel="noopener">${ico("chat", 16)}Хэлэлцүүлэг${commentCounts[l.id] ? ` (${commentCounts[l.id]})` : ""}</a>` : ""}
+        ${c.published ? `<a href="/c/${esc(c.id)}?view=student#l=${esc(l.id)}" target="_blank" rel="noopener" title="Шинэ суралцагчийн харагдацаар — явц, хариулт хадгалагдахгүй">${ico("eye", 16)}Суралцагчийн нүдээр</a>` : ""}${l.discussion && !l.exam && c.published ? `<a href="/c/${esc(c.id)}#l=${esc(l.id)}" target="_blank" rel="noopener">${ico("chat", 16)}Хэлэлцүүлэг${commentCounts[l.id] ? ` (${commentCounts[l.id]})` : ""}</a>` : ""}
         <button data-del-post class="post-del" title="Хичээлийг файлуудтай нь хамт устгах">${ico("x", 16)}Устгах</button></footer></article>`;
 
   const free = () => lessons.filter((l) => l.is_free).length;
@@ -1541,12 +1543,12 @@ async function courseEditor(id) {
           <label><input type="radio" name="mode" value="free" ${l.is_free ? "checked" : ""}><span>${ico("globe", 15)}Үнэгүй</span></label>
           <label><input type="radio" name="mode" value="paid" ${l.is_free ? "" : "checked"}><span>${ico("lock", 15)}Төлбөртэй</span></label></div>
         <label class="pe-price" ${l.is_free ? "hidden" : ""}><input name="price" type="number" min="0" step="500" value="${l.price || 0}" aria-label="Үнэ"><span>₮</span></label></div>
-      <p class="muted small" style="margin:6px 0 14px">${c.price ? "Үнэ 0 бол зөвхөн сургалтын багцаар нээгдэнэ." : "Энэ сургалт багц үнэгүй тул төлбөртэй хичээл бүр өөрийн үнэтэй байна."}</p>
+      <p class="muted small" style="margin:6px 0 14px">${c.price ? "Үнэ 0 бол зөвхөн сургалтын багцаар нээгдэнэ." : "Энэ сургалтад багц үнэ тогтоогоогүй тул төлбөртэй хичээл бүрд тусдаа үнэ тавина."}</p>
       <div class="pe-grid pe-grid-3">
         <label>Сургалтын хэлбэр<select name="format">${FORMATS.map(([v, t]) => `<option value="${v}" ${(l.format || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label>Заах аргын төрөл<select name="mode_kind">${MODES.map(([v, t]) => `<option value="${v}" ${(l.mode || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
         <label>Идэвхтэй суралцах хугацаа (мин)<input name="active_min" type="number" min="0" max="600" value="${l.active_min || 0}"><small>0 бол шаардахгүй</small></label></div>
-      <label class="check" style="margin-top:10px"><input type="checkbox" name="discussion" ${l.discussion ? "checked" : ""}> 💬 Хэлэлцүүлэгтэй — хичээлийн доор лайк, сэтгэгдэл, асуулт бичнэ</label>
+      <label class="check" style="margin-top:10px"><input type="checkbox" name="discussion" ${l.discussion ? "checked" : ""}> 💬 Хэлэлцүүлэгтэй — хичээлийн доор суралцагчид сэтгэгдэл, асуулт бичиж, лайк дарна</label>
       ${c.drip ? unlockHTML(l) : ""}
       <p class="form-error" role="alert"></p>
       <div class="hero-cta" style="margin:12px 0 0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div>`;
@@ -1557,20 +1559,20 @@ async function courseEditor(id) {
           <span class="lg-num">${String(i + 1).padStart(2, "0")}</span>
           <input class="ol-sec-name" value="${esc(g.name)}" maxlength="80" placeholder="${g.name || !g.items.length ? "Бүлгийн нэрээ бичнэ үү…" : "Бүлэггүй хичээлүүд — нэр бичвэл бүлэг болно"}" aria-label="Бүлгийн нэр">
           <small class="muted">${g.items.length} хичээл${g.items.some((l) => l.hidden) ? ` · <b class="ol-hidden-n">${g.items.filter((l) => l.hidden).length} хаалттай</b>` : ""}</small>
-          ${g.items.length ? `<label class="ol-vis ol-sec-vis ${g.items.every((l) => l.hidden) ? "off" : ""}" title="${g.items.every((l) => l.hidden) ? "Модуль хаалттай — бүх хичээл нь суралцагчдад харагдахгүй. Шинээр нэмсэн, зөөж оруулсан хичээл ч хаалттай. Нээвэл бүгд хамт нээгдэнэ." : "Модуль нээлттэй. Хаавал бүх хичээл нь хамт хаагдана."}"><input type="checkbox" data-sec-vis ${g.items.every((l) => l.hidden) ? "" : "checked"} aria-label="Бүлгийг нээх/хаах"><i class="switch"></i></label>` : ""}
+          ${g.items.length ? `<label class="ol-vis ol-sec-vis ${g.items.every((l) => l.hidden) ? "off" : ""}" title="${g.items.every((l) => l.hidden) ? "Бүлэг хаалттай — бүх хичээл нь суралцагчдад харагдахгүй. Шинээр нэмсэн, зөөж оруулсан хичээл ч хаалттай байна. Нээвэл бүгд хамт нээгдэнэ." : "Бүлэг нээлттэй. Хаавал бүх хичээл нь хамт хаагдана."}"><input type="checkbox" data-sec-vis ${g.items.every((l) => l.hidden) ? "" : "checked"} aria-label="Бүлгийг нээх/хаах"><i class="switch"></i></label>` : ""}
           <button type="button" class="btn btn-glass btn-sm" data-sec-add>${ico("plus", 15)}Хичээл</button>
           ${g.name ? `<button type="button" class="icon-btn" data-sec-del aria-label="Бүлгийг задлах" title="Бүлгийг задлах (хичээлүүд үлдэнэ)">${ico("x", 16)}</button>` : ""}</header>
         <ol class="ol-list">${g.items.map((l) => rowHTML(l, ++n)).join("")}</ol></section>`).join("")}</div>
       <button type="button" class="ol-add" id="olAddSec">${ico("plus", 18)}Бүлэг нэмэх</button>
-      <p class="muted small ol-tip">${ico("grip", 14)} Хичээлийг бариад чирж өөр бүлэг рүү зөөнө. Гараар: зөөх товч дээр ↑ ↓.</p>`;
+      <p class="muted small ol-tip">${ico("grip", 14)} Хичээлийг бариад чирж өөр бүлэг рүү зөөнө. Гараар зөөхдөө зөөх товчийг сонгоод ↑ ↓ дарна.</p>`;
   };
   const render = () => {
     main.innerHTML = `<section class="gp-head" style="--h:${hueOfName(c.title)}">
         <div class="gp-cover${c.cover ? " has-cv" : ""}">${SG.coverHTML(c.cover)}<a class="gp-back" href="#courses" aria-label="Сургалтууд руу буцах">${ico("back", 18)}Сургалтууд</a><b>${esc(c.title.trim()[0] || "?")}</b>${shared ? "" : `<button type="button" class="gp-cover-btn" data-cover-pick title="20 загвараас сонгоно">${ico("edit", 14)}Толгойн зураг</button>`}</div>
         <div class="gp-bar">
           <div class="grow gp-info"><h1>${esc(c.title)}</h1>
-            <p class="gp-desc">${c.description ? esc(c.description) : `<span class="muted">${shared ? "Тайлбар нэмээгүй байна." : "Тайлбар нэмээгүй байна — «Тохиргоо»-оос нэмнэ."}</span>`}</p>
-            ${shared ? `<p class="gp-shared">${ico("school", 16)}<span>Хамт хөгжүүлж буй сургалт · эзэмшигч <b>${esc(org?.display_name || "")}</b> — та хичээл оруулж, дараалал, бүлгийг зохион байгуулж, дүгнэнэ. Үнэ, нийтлэх, устгах тохиргоог эзэмшигч удирдана.</span><button type="button" class="linkish" id="gpLeave">Сургалтаас гарах</button></p>` : ""}
+            <p class="gp-desc">${c.description ? esc(c.description) : `<span class="muted">${shared ? "Тайлбар нэмээгүй байна." : "Тайлбар нэмээгүй байна — «Тохиргоо» хэсгээс нэмнэ үү."}</span>`}</p>
+            ${shared ? `<p class="gp-shared">${ico("school", 16)}<span>Хамт хөгжүүлж буй сургалт · эзэмшигч <b>${esc(org?.display_name || "")}</b> — та хичээл оруулж, дараалал, бүлгийг зохион байгуулж, суралцагчдын ажлыг дүгнэнэ. Үнэ, нийтлэх, устгах тохиргоог эзэмшигч удирдана.</span><button type="button" class="linkish" id="gpLeave">Сургалтаас гарах</button></p>` : ""}
             ${orgOwner || teacherList.length ? `<p class="gp-teachers">${ico("users", 15)}<span>Заадаг багш: ${teacherList.length ? teacherList.map((t) => `<a href="/t/${esc(t.username)}" target="_blank" rel="noopener">${esc(t.display_name)}</a>`).join(", ") : `<span class="muted">холбоогүй</span>`}</span>${orgOwner ? `<button type="button" class="linkish" id="gpTeachers">${teacherList.length ? "Өөрчлөх" : "Багш холбох"}</button>` : ""}</p>` : ""}
           </div>
           <div class="gp-hside">
@@ -1578,9 +1580,9 @@ async function courseEditor(id) {
               <span class="gp-avs">${roster.slice(0, 5).map((r) => avatar(r.user, "avatar-sm")).join("") || `<span class="gp-av0">${ico("users", 16)}</span>`}</span>
               <span class="gp-rn"><b>${rosterTotal}</b> суралцагч</span>${ico("chevron", 15)}</button>
             <div class="gp-acts">
-              ${c.published ? `<a class="btn btn-glass btn-sm" href="/c/${esc(c.id)}" target="_blank" rel="noopener">${ico("ext", 16)}Харах</a>` : shared ? "" : `<button class="btn btn-gold btn-sm" id="gpPublish">${ico("globe", 16)}Нийтлэх</button>`}
+              ${c.published ? `<a class="btn btn-glass btn-sm" href="/c/${esc(c.id)}" target="_blank" rel="noopener">${ico("ext", 16)}Харах</a><a class="btn btn-glass btn-sm" href="/c/${esc(c.id)}#share" target="_blank" rel="noopener" title="Сургалтын QR код (уншуулбал сургалт руу нэвтэрнэ), Facebook-т хуваалцах">${ico("qr", 16)}QR · Facebook</a>` : shared ? "" : `<button class="btn btn-gold btn-sm" id="gpPublish">${ico("globe", 16)}Нийтлэх</button>`}
               <button class="btn btn-glass btn-sm" id="gpChat" title="Элссэн бүх суралцагчтай нэг дор ярилцана">${ico("chat", 16)}Бүлэг чат</button>
-              ${shared ? "" : `<button class="btn btn-glass btn-sm" id="gpShare" title="Сургалтыг өөр багштай хуваалцах — харах/хадгалах эсвэл хамт хөгжүүлэх">${ico("link", 16)}Хуваалцах</button>`}
+              ${shared ? "" : `<button class="btn btn-glass btn-sm" id="gpShare" title="Сургалтыг өөр багштай хамтарч хөгжүүлэх эсвэл харуулж, хадгалуулах">${ico("users", 16)}Хамтарч ажиллах</button>`}
               <a class="btn btn-glass btn-sm" href="#live" title="Google Meet-ээр шууд хичээл товлох">${ico("live", 16)}Шууд хичээл</a>
               ${shared ? "" : `<button class="btn btn-glass btn-sm" id="gpSettings">${ico("gear", 16)}Тохиргоо</button>`}
             </div></div>
@@ -1613,7 +1615,13 @@ async function courseEditor(id) {
       <div class="modal" id="lsModal"><div class="modal-card" style="width:min(680px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
         <h3 class="h3">${ico("gear", 18)} Хичээлийн тохиргоо</h3><form class="form ls-form" id="lsForm"></form></div></div>
       <div class="modal" id="gpModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
-        <h3 class="h3">Сургалтын тохиргоо</h3><form class="form" id="gpForm">${courseFormHTML(c)}<p class="form-error" role="alert"></p>
+        <h3 class="h3">Сургалтын тохиргоо</h3>
+        ${c.published ? `<div class="gp-share"><a href="/c/${esc(c.id)}#share" target="_blank" rel="noopener" title="Томоор харах"><img src="/c/${esc(c.id)}/qr.png?size=256" alt="Сургалтын QR код" width="104" height="104" loading="lazy"></a>
+          <div class="gp-share-txt"><b>${ico("qr", 16)} QR · Хуваалцах</b><small class="muted">Уншуулбал сургалт руу шууд нэвтэрнэ — танхимд хэвлэж наах, самбарт харуулах, Facebook-т түгээхэд</small>
+          <div class="gp-share-acts"><a class="btn btn-gold btn-sm" href="/c/${esc(c.id)}/qr.png?size=1024&download=1">${ico("download", 16)}QR татах</a><a class="btn btn-sm qr-fb" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(location.origin + "/c/" + c.id)}" target="_blank" rel="noopener">Facebook-т хуваалцах</a><button type="button" class="btn btn-glass btn-sm" data-gp-copy>${ico("link", 16)}Холбоос хуулах</button><a class="btn btn-glass btn-sm" href="/c/${esc(c.id)}?view=student" target="_blank" rel="noopener">${ico("eye", 16)}Суралцагчаар үзэх</a></div></div></div>`
+          : shared ? "" : `<p class="muted small gp-share-off">${ico("qr", 15)} Нийтэлсний дараа энд сургалтын QR код, Facebook-т хуваалцах холбоос гарна.</p>`}
+        ${shared ? "" : `<div class="gp-collab"><span class="gp-collab-ico">${ico("users", 20)}</span><div><b>Хамтарч ажиллах</b><small class="muted">Өөр багшийг урьж сургалтаа хамт хөгжүүлэх, эсвэл харуулж өөрийн сургалт болгон хадгалуулах</small></div><button type="button" class="btn btn-glass btn-sm" data-gp-collab>${ico("send", 15)}Багш урих</button></div>`}
+        <form class="form" id="gpForm">${courseFormHTML(c)}<p class="form-error" role="alert"></p>
         <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`;
     hydrateBooks(main);
     const cf = $("#composerForm"); if (cf) { cf.dataset.course = c.id; mountBlockEditor(cf, lessonBlocks(null)); }
@@ -1633,29 +1641,58 @@ async function courseEditor(id) {
     const dots = (o) => NS_COL.map(([k, t, col]) => o[k] ? `<span class="ns-dot" title="${t}"><i style="background:${col}"></i>${o[k]}</span>` : "").join("");
     const when = (t) => (t ? fmtDate(t) : "—");
     const maxRed = Math.max(0, ...d.lessons.map((l) => l.colors.r || 0));
+    // «Анхаарах»: «Ойлгоогүй» хамгийн олон хичээл — тэмдэглэлтэй хичээлүүдийн тал нь ч адил тоотой бол онцлохгүй.
+    const noted = d.lessons.filter((l) => l.notes).length, redTop = maxRed ? d.lessons.filter((l) => (l.colors.r || 0) === maxRed).length : 0;
+    const warnL = (l) => maxRed > 0 && (l.colors.r || 0) === maxRed && (redTop === 1 || redTop * 2 <= noted);
+    const topL = d.lessons.find(warnL);
     // Идэвхтэй (сүүлийн 7 хоногт тэмдэглэл хөтөлсөн, story үзсэн) суралцагчид дээрээ — дотроо тэмдэглэлийн тоогоор.
     const wk = Date.now() - 7 * 864e5, lastOf = (s) => Math.max(s.last_note ? new Date(s.last_note) : 0, s.last_view ? new Date(s.last_view) : 0);
     d.students.forEach((s) => (s.recent = lastOf(s) >= wk));
     d.students.sort((a, b) => (b.recent - a.recent) || (b.notes - a.notes) || ((b.story_views || 0) - (a.story_views || 0)) || (lastOf(b) - lastOf(a)));
     const nsRecent = d.students.filter((s) => s.recent).length;
-    box.innerHTML = `<div class="jr-head"><div><h2>Тэмдэглэл</h2><span class="muted small">Суралцагчид хичээлдээ хэр идэвхтэй тэмдэглэл хөтөлж, нүүр хуудсандаа story болгон давтаж байгаа нь. Тэмдэглэлийн агуулга хувийнх — зөвхөн тоо харагдана.</span></div></div>
+    // 🃏 Flash card: хэдэн карт үүсгэж, хэдийг давтаж (эргүүлж үзэж), хэдийг нь санасан — зөвхөн тоо.
+    const fcPct = (o) => (o.cards_seen ? Math.round(((o.cards_known || 0) / o.cards_seen) * 100) : 0);
+    const fcOn = (S.cards || 0) + (S.cards_seen || 0) > 0;
+    const fcCell = (o) => (o.cards_seen ? `${o.cards_seen} <small class="ns-fc-pct ${fcPct(o) >= 70 ? "ok" : fcPct(o) < 40 ? "low" : ""}" title="Санасан: ${o.cards_known || 0} / ${o.cards_seen}">${fcPct(o)}% санасан</small>` : "—");
+    box.innerHTML = `<div class="jr-head"><div><h2>Тэмдэглэл</h2><span class="muted small">Суралцагчид хичээлдээ хэр идэвхтэй тэмдэглэл хөтөлж, түүнийгээ нүүр хуудсандаа story болгон, flash card-аар асуулт хариултаар давтаж байгааг харуулна. Тэмдэглэл, картын агуулга хувийнх тул зөвхөн тоо харагдана.</span></div></div>
       <div class="ns-kpis">
         <div class="ns-kpi"><b>${S.writers}</b><span>тэмдэглэл хөтөлсөн суралцагч</span></div>
         <div class="ns-kpi"><b>${n}</b><span>нийт тэмдэглэл</span></div>
         <div class="ns-kpi"><b>${S.story_views}</b><span>story үзэлт · ${S.viewers} хүн</span><small>${S.story_done} нь эцэс хүртэл</small></div>
+        <div class="ns-kpi ns-fc"><b>${S.cards || 0}</b><span>🃏 flash card${S.card_reviewers ? ` · ${S.card_reviewers} хүн давтсан` : ""}</span><small>${S.cards_seen ? `${S.cards_seen} удаа давтсан · ${fcPct(S)}% нь санасан` : "Давтаагүй байна"}</small></div>
         <div class="ns-kpi ns-red"><b>${S.colors.r || 0}</b><span>«Ойлгоогүй» тэмдэглэл</span></div>
       </div>
       ${n ? `<div class="ns-grid"><section class="ns-card"><h3>Төрлөөр</h3>${bar(NS_KIND, S.kinds)}</section><section class="ns-card"><h3>Өнгөөр (утга)</h3>${bar(NS_COL, S.colors)}</section></div>` : ""}
-      <section class="ns-card"><h3>Хичээл бүрээр</h3><div class="jr-wrap"><table class="tbl ns-t"><thead><tr><th>Хичээл</th><th>Тэмдэглэл</th><th>Суралцагч</th><th title="Ойлгоогүй гэж тэмдэглэсэн">❓ Ойлгоогүй</th><th>Story үзэлт</th></tr></thead><tbody>
-        ${d.lessons.map((l) => `<tr class="${l.colors.r && l.colors.r === maxRed ? "ns-warn" : ""}"><td><b>${String(l.position).padStart(2, "0")}</b> ${esc(l.title)}${l.colors.r && l.colors.r === maxRed ? ` <span class="chip chip-coral">Анхаарах</span>` : ""}</td><td>${l.notes || "—"}</td><td>${l.students || "—"}</td><td>${l.colors.r || "—"}</td><td>${l.story_views || "—"}</td></tr>`).join("")}</tbody></table></div></section>
-      <section class="ns-card"><h3>Суралцагч бүрээр${nsRecent ? ` <small class="jr-live-n"><i class="jr-live"></i>${nsRecent} идэвхтэй — дээрээ</small>` : ""}</h3>${(d.students_total ?? 0) > d.students.length ? `<p class="muted small">Нийт ${d.students_total} суралцагчаас хамгийн их тэмдэглэлтэй ${d.students.length}-г харуулж байна.</p>` : ""}${d.students.length ? `<div class="jr-wrap"><table class="tbl ns-t"><thead><tr><th>Суралцагч</th><th>Тэмдэглэл</th><th>Хичээл</th><th>Төрөл</th><th>Өнгө</th><th>Story үзсэн</th><th>Сүүлд</th></tr></thead><tbody>
+      ${d.lessons.length ? `<button type="button" class="ns-card nsl-teaser" data-ns-lessons aria-haspopup="dialog"><span class="nsl-t-ico">${ico("book", 20)}</span>
+        <span class="nsl-t-main"><b>Хичээл бүрээр</b><small>${d.lessons.length} хичээл · ${noted ? `${noted}-д нь тэмдэглэлтэй` : "тэмдэглэл алга"}${fcOn ? ` · 🃏 ${S.cards || 0} карт` : ""}</small>${topL ? `<small class="nsl-t-warn">❓ Анхаарах: ${esc(String(topL.position).padStart(2, "0") + " " + topL.title)} — ${topL.colors.r} «ойлгоогүй»</small>` : ""}</span>
+        <span class="nsl-t-go">Харах${ico("chevron", 16)}</span></button>` : ""}
+      <section class="ns-card"><h3>Суралцагч бүрээр${nsRecent ? ` <small class="jr-live-n"><i class="jr-live"></i>${nsRecent} идэвхтэй — эхэнд харагдана</small>` : ""}</h3>${(d.students_total ?? 0) > d.students.length ? `<p class="muted small">Нийт ${d.students_total} суралцагчаас хамгийн их тэмдэглэлтэй ${d.students.length}-г харуулж байна.</p>` : ""}${d.students.length ? `<div class="jr-wrap"><table class="tbl ns-t"><thead><tr><th>Суралцагч</th><th>Тэмдэглэл</th><th>Хичээл</th><th>Төрөл</th><th>Өнгө</th><th>Story үзсэн</th>${fcOn ? `<th title="Асуулт + санах хэсэгтэй тэмдэглэл">🃏 Карт</th><th title="Карт эргүүлж давтсан тоо · «Санасан» гэсэн хувь">Давтсан</th>` : ""}<th>Сүүлд</th></tr></thead><tbody>
         ${d.students.map((s) => `<tr><td>${s.recent ? `<i class="jr-live" title="Сүүлийн 7 хоногт тэмдэглэл хөтөлсөн / story үзсэн"></i>` : ""}<b>${esc(s.name)}</b>${s.username ? `<small class="muted"> @${esc(s.username)}</small>` : ""}</td><td><b>${s.notes}</b></td><td>${s.lessons}</td>
           <td class="ns-kinds">${NS_KIND.map(([k, t]) => s.kinds[k] ? `<span title="${t}">${{ text: "🖍", time: "▶", page: "📄", box: "▢" }[k]} ${s.kinds[k]}</span>` : "").join("") || "—"}</td>
           <td>${dots(s.colors) || "—"}</td><td>${s.story_views ? `${s.story_views}${s.story_done ? ` <small class="muted">(${s.story_done} бүрэн)</small>` : ""}` : "—"}</td>
-          <td class="muted small">${when(s.last_view && (!s.last_note || s.last_view > s.last_note) ? s.last_view : s.last_note)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted small">Одоогоор суралцагч тэмдэглэл хөтлөөгүй байна. Хичээлийн текстийг маркераар тодруулах, видеоны мөч, баримтын хуудсанд тэмдэглэх боломжтойг суралцагчиддаа сануулаарай.</p>`}</section>`;
+          ${fcOn ? `<td>${s.cards || "—"}</td><td>${fcCell(s)}</td>` : ""}<td class="muted small">${when(s.last_view && (!s.last_note || s.last_view > s.last_note) ? s.last_view : s.last_note)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted small">Одоогоор суралцагч тэмдэглэл хөтлөөгүй байна. Хичээлийн текстийг маркераар тодруулж, видеоны мөч, баримтын хуудсанд тэмдэглэл хийж, асуулттай flash card болгон давтаж болохыг суралцагчдадаа сануулаарай.</p>`}</section>`;
+    // «Хичээл бүрээр» — баруун талаас гарах цонх: хичээл бүр карт (өнгөний зурвас + тоо), эрэмбэлж болно.
+    const NSL_SORT = [["pos", "Дарааллаар"], ["red", "❓ Ойлгоогүй"], ["notes", "📝 Тэмдэглэл"], ...(fcOn ? [["cards", "🃏 Карт"]] : [])];
+    const nslSort = (k) => [...d.lessons].sort((a, b) => (k === "red" ? (b.colors.r || 0) - (a.colors.r || 0) : k === "notes" ? (b.notes || 0) - (a.notes || 0) : k === "cards" ? (b.cards || 0) - (a.cards || 0) || (b.cards_seen || 0) - (a.cards_seen || 0) : 0) || a.position - b.position);
+    const nslRow = (l) => { const w = warnL(l), has = l.notes || l.story_views || l.cards_seen;
+      return `<li class="nsl-row${w ? " warn" : ""}${has ? "" : " nsl-empty"}"><div class="nsl-top"><b class="nsl-pos">${String(l.position).padStart(2, "0")}</b><strong title="${esc(l.title)}">${esc(l.title)}</strong>${w ? `<span class="chip chip-coral">Анхаарах</span>` : ""}<a class="icon-btn nsl-go" href="/c/${esc(c.id)}#l=${esc(l.id)}" target="_blank" rel="noopener" title="Хичээлийг нээх" aria-label="Хичээлийг нээх">${ico("ext", 15)}</a></div>
+        ${has ? `${l.notes ? `<div class="ns-bar nsl-bar">${NS_COL.map(([k, t, col]) => l.colors[k] ? `<i style="flex:${l.colors[k]};background:${col}" title="${t}: ${l.colors[k]}"></i>` : "").join("")}</div>` : ""}
+        <dl class="nsl-stats"><div><dt>Тэмдэглэл</dt><dd>${l.notes || "—"}</dd></div><div><dt>Суралцагч</dt><dd>${l.students || "—"}</dd></div><div class="${l.colors.r ? "red" : ""}"><dt>❓ Ойлгоогүй</dt><dd>${l.colors.r || "—"}</dd></div><div><dt>Story үзэлт</dt><dd>${l.story_views || "—"}</dd></div>${fcOn ? `<div><dt>🃏 Карт</dt><dd>${l.cards || "—"}</dd></div><div><dt>Давтсан</dt><dd>${fcCell(l)}</dd></div>` : ""}</dl>` : `<p class="muted small nsl-none">Тэмдэглэл, story үзэлт алга</p>`}</li>`; };
+    $("[data-ns-lessons]", box)?.addEventListener("click", () => {
+      const [m] = mkModal("nsLessons", 560, `<div class="nsl"><div class="nsl-head"><h3 class="h3">${ico("book", 18)}Хичээл бүрээр</h3>
+        <p class="muted small">${d.lessons.length} хичээл · ${noted}-д нь тэмдэглэлтэй. «Ойлгоогүй» олонтой хичээлд тайлбар, жишээгээ нэмээрэй — агуулга хувийнх тул зөвхөн тоо харагдана.</p>
+        <div class="nsl-sort" role="group" aria-label="Эрэмбэлэх">${NSL_SORT.map(([k, t], i) => `<button type="button" data-nsl-sort="${k}" aria-pressed="${i === 0}">${t}</button>`).join("")}</div></div>
+        <ol class="nsl-list">${nslSort("pos").map(nslRow).join("")}</ol></div>`, true);
+      m.setAttribute("aria-label", "Хичээл бүрээр");
+      m.addEventListener("click", (e) => { const b = e.target.closest("[data-nsl-sort]"); if (!b) return; $$("[data-nsl-sort]", m).forEach((x) => x.setAttribute("aria-pressed", String(x === b))); const list = $(".nsl-list", m); list.innerHTML = nslSort(b.dataset.nslSort).map(nslRow).join(""); list.scrollTop = 0; });
+      setTimeout(() => $(".modal-x", m)?.focus(), 60);
+    });
   };
 
-  /* ---------- Журнал: суралцагч × хичээл (сургуулийн журнал шиг) — нүд, нэр дээр дарахад дэлгэрэнгүй ---------- */
+  /* ---------- Журнал: суралцагч × хичээл (сургуулийн журнал шиг) — нүд, нэр дээр дарахад дэлгэрэнгүй ----------
+     Багшид (journal_meta.go): нэр дээр хоёр товшиж (F2/Enter) зөвхөн журналд харагдах нэр өгнө; «Бүлэг» нүдэнд бичээд
+     Enter — хадгалж, дараагийн мөр рүү шилжинэ (Excel шиг хурдан); бүлгээр шүүх, бүлгийн нэр солих/тараах; архивлах,
+     сэргээх; архивласан суралцагчийн суралцахуйн өгөгдлийг (зөвхөн эзэмшигч) бүрмөсөн устгах. Хүрэлтээр — суралцагчийн цонхноос. */
   let jr = null, jrSort = "active";
   try { if (localStorage.getItem("sg_jr_sort") === "name") jrSort = "name"; } catch {}
   const dur2 = (s) => !s ? "0" : s < 60 ? s + " сек" : s < 3600 ? Math.round(s / 60) + " мин" : Math.floor(s / 3600) + " ц " + Math.round((s % 3600) / 60) + " мин";
@@ -1667,52 +1704,299 @@ async function courseEditor(id) {
     if (x.viewed) return [String(x.pts), x.done ? "ok" : "part"];
     return ["", ""];
   };
-  const loadJournal = async () => {
-    const box = $("#journal"); if (!box) return;
-    try { jr = await api(`/api/me/courses/${c.id}/journal`); } catch (e) { box.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
-    jrAll = jr; drawJournal();
+  // jrAll — шүүлтгүй жагсаалт (архивлаагүй), jrArc — архив (нээх үед ачаална), jr — одоо харуулж буй өгөгдөл (олон мянган
+  // суралцагчтай үед серверээс шүүсэн хуудас). jrCnt — бүлэг/бүлэггүй/архивын тоо (бүх суралцагчаар, хамгийн сүүлийн хариунаас).
+  // jrView: group — бүлгийн нэр, none — бүлэггүй, archived — архив. jrEd — нүдэн дэх засварлагч {uid, kind, el, cell, orig}.
+  let jrAll = null, jrArc = null, jrCnt = null, jrView = { group: null, none: false, archived: false };
+  let jrFindT = 0, jrTok = 0, jrSeq = 0, jrCntSeq = 0, jrClickT = 0, jrRT = 0, jrEd = null, jrDirty = false, jrShown = [];
+  const jrLast = {}; // uid → сүүлийн хадгалалтын дугаар (хариу дараалал алдагдвал хуучин нь шинийг дарахгүй)
+  const jrBase = () => (jrView.archived ? jrArc : jrAll);
+  // Олон мянган суралцагчтай сургалтад сервер эхний 300-г өгнө; бусдыг нэр, бүлгээр серверээс шүүнэ.
+  const capped = () => { const b = jrBase(); return (b?.students_total ?? 0) > (b?.students.length ?? 0); };
+  const jrFind = (uid) => { for (const d of [jr, jrAll, jrArc]) { const s = d?.students.find((x) => x.user_id === uid); if (s) return s; } return null; };
+  const jrCellsOf = (uid) => { for (const d of [jr, jrAll, jrArc]) if (d?.cells?.[uid]) return d.cells[uid]; return {}; };
+  const jrNorm = (v) => String(v ?? "").split(/\s+/).filter(Boolean).join(" "); // сервертэй адил: илүү зайг шахна
+  const jrLow = (v) => String(v || "").toLowerCase();
+  const jrQ = () => $("#journal .jr-search input")?.value || "";
+  const jrGroups = () => [...(jrCnt?.groups || [])].sort((a, b) => a.name.localeCompare(b.name, "mn"));
+  const jrGroupOpts = () => jrGroups().map((g) => `<option value="${esc(g.name)}"></option>`).join("");
+  const jrSetCnt = (d, k) => { if (Array.isArray(d?.groups) && k >= jrCntSeq) { jrCntSeq = k; jrCnt = { groups: d.groups, ungrouped: +d.ungrouped || 0, archived: +d.archived || 0 }; } };
+  const jrURL = (p) => {
+    const u = new URLSearchParams();
+    if (p.archived) u.set("archived", "1");
+    if (p.none) u.set("nogroup", "1"); else if (p.group) u.set("group", p.group);
+    if (p.q) u.set("q", p.q);
+    const s = u.toString(); return `/api/me/courses/${c.id}/journal${s ? "?" + s : ""}`;
   };
-  // Олон мянган суралцагчтай сургалтад сервер эхний 300-г өгнө; бусдыг нэрээр серверээс хайна.
-  let jrAll = null, jrFindT = 0;
-  const capped = () => (jrAll?.students_total ?? 0) > (jrAll?.students.length ?? 0);
-  const drawJournal = (q = "") => {
-    const box = $("#journal"); if (!box || !jr) return;
-    // Сервер идэвхтэй суралцагчдыг дээр нь эрэмбэлж өгнө; «Нэрээр» сонговол цагаан толгойн дарааллаар.
-    const L = jr.lessons, C = jr.cells, S = jr.students.filter((s) => capped() || !q || s.name.toLowerCase().includes(q.toLowerCase()));
-    if (jrSort === "name") S.sort((a, b) => a.name.localeCompare(b.name, "mn"));
-    const nRecent = jr.students.filter((s) => s.recent).length;
-    const secs = []; for (const l of L) { const k = l.section || ""; const last = secs[secs.length - 1]; if (last && last.name === k) last.n++; else secs.push({ name: k, n: 1 }); }
-    const hasSecs = secs.some((x) => x.name);
-    const head = `<thead>${hasSecs ? `<tr class="jr-secs"><th class="jr-name" rowspan="2">Суралцагч</th>${secs.map((x) => `<th colspan="${x.n}" title="${esc(x.name || "Бүлэггүй")}">${esc(x.name || "—")}</th>`).join("")}<th rowspan="2">Дууссан</th><th rowspan="2">Дундаж</th><th rowspan="2">Цол</th></tr>` : ""}
-      <tr>${hasSecs ? "" : `<th class="jr-name">Суралцагч</th>`}${L.map((l) => `<th class="jr-l ${l.hidden ? "is-hidden" : ""}" title="${esc(l.title)}${l.hidden ? " (хаалттай)" : ""}">${String(l.position).padStart(2, "0")}${l.kind === "exam" ? `<i>${ico("exam", 14)}</i>` : l.kind === "assignment" ? "<i>📎</i>" : ""}</th>`).join("")}${hasSecs ? "" : "<th>Дууссан</th><th>Дундаж</th><th>Цол</th>"}</tr></thead>`;
-    const body = S.map((s) => `<tr data-uid="${esc(s.user_id)}"><th class="jr-name" data-jr-student><span class="jr-who">${s.recent ? `<i class="jr-live" title="Сүүлийн 7 хоногт хичээллэсэн"></i>` : ""}${esc(s.name)}</span><small>${s.enrolled ? (s.username ? "@" + esc(s.username) : "") : "элсээгүй · үнэгүй хичээл"}</small></th>
+  const jrGet = async (p = {}) => { const k = ++jrSeq, d = await api(jrURL(p)); jrSetCnt(d, k); return d; };
+  // Одоогийн харагдацын өгөгдөл: бүгдийг ачаалсан бол шүүлтийг энд (drawJournal) хийнэ; хязгаарлагдсан бол серверээс.
+  const jrViewData = async (q = "") => {
+    q = q.trim();
+    if (jrView.archived) { jrArc ||= await jrGet({ archived: true }); return capped() && q ? jrGet({ archived: true, q }) : jrArc; }
+    return capped() && (jrView.group || jrView.none || q) ? jrGet({ group: jrView.group, none: jrView.none, q }) : jrAll;
+  };
+  const loadJournal = async () => {
+    if (!$("#journal")) return;
+    const q = jrQ(), t = ++jrTok, had = !!$("#journal .jr-head");
+    clearTimeout(jrClickT); jrEd = null; jrDirty = false;
+    try {
+      const all = await jrGet(); if (t !== jrTok) return;
+      jrAll = all; jrArc = null;
+      // Алга болсон бүлэг, хоосорсон архив дээр байсан бол «Бүгд» рүү буцна.
+      const gs = jrCnt?.groups || [], g = jrView.group && gs.find((x) => jrLow(x.name) === jrLow(jrView.group));
+      if ((jrView.archived && !jrCnt?.archived) || (jrView.none && !gs.length) || (jrView.group && !g)) jrView = { group: null, none: false, archived: false };
+      else if (g) jrView.group = g.name;
+      const d = await jrViewData(q); if (t !== jrTok) return;
+      jr = d;
+    } catch (e) {
+      if (t !== jrTok) return;
+      if (had) toast(e.message, true); else if ($("#journal")) $("#journal").innerHTML = `<p class="form-error">${esc(e.message)}</p>`;
+      return;
+    }
+    drawJournal(q);
+  };
+  const jrInView = (s) => !!s.archived === jrView.archived && (jrView.archived || (jrView.none ? !s.group : !jrView.group || jrLow(s.group) === jrLow(jrView.group)));
+  const jrMatch = (s, ql) => !ql || [s.name, s.account_name, s.username, s.alias].some((v) => jrLow(v).includes(ql));
+  // Хоёр дахь мөр: @нэр, журналд өөр нэр өгсөн бол бүртгэлийн нэр, архивласан огноо.
+  const jrSub = (s) => [s.enrolled ? (s.username ? "@" + s.username : "") : "элсээгүй · үнэгүй хичээл", s.alias && s.account_name && s.alias !== s.account_name ? s.account_name : "", s.archived && s.archived_at ? "архивласан " + fmtDay(s.archived_at) : ""].filter(Boolean).join(" · ");
+  const jrNameHTML = (s) => `<span class="jr-who">${s.recent ? `<i class="jr-live" title="Сүүлийн 7 хоногт хичээллэсэн"></i>` : ""}${esc(s.name)}</span><small>${esc(jrSub(s))}</small>`;
+  const jrRowHTML = (s, L, C, nVis) => `<tr data-uid="${esc(s.user_id)}"><th class="jr-name" data-jr-student tabindex="0" title="Нэрийг засах бол хоёр товшино уу">${jrNameHTML(s)}</th><td class="jr-g" data-jr-group tabindex="0" title="Бүлгийн нэрээ бичээд Enter дарна уу — дараагийн суралцагч руу шилжинэ">${esc(s.group || "")}</td>
       ${L.map((l) => { const [t, k] = jrCell(l, C[s.user_id]?.[l.id]); return `<td class="jr-c ${k}" data-lid="${esc(l.id)}">${t}</td>`; }).join("")}
-      <td class="jr-sum">${s.done}/${L.filter((l) => !l.hidden).length}</td><td class="jr-sum">${s.avg || "—"}</td><td class="jr-rank" title="${s.rank.points} оноо">${esc(s.rank.insignia || "")} ${esc(s.rank.name)}</td></tr>`).join("");
-    const foot = `<tfoot><tr><th class="jr-name">Дууссан</th>${L.map((l) => { const n = S.filter((s) => { const x = C[s.user_id]?.[l.id]; return l.kind === "exam" ? x?.exam?.passed : l.kind === "assignment" ? x?.asg : x?.done; }).length; return `<td>${S.length ? n + "/" + S.length : ""}</td>`; }).join("")}<td colspan="3"></td></tr></tfoot>`;
-    box.innerHTML = `<div class="jr-head"><div><h2>Журнал</h2><span class="muted small">${jrAll?.students_total ?? jr.students.length} суралцагч${capped() && !q ? ` (сүүлд идэвхтэй ${jr.students.length}-г харуулж байна — бусдыг нэрээр хайна уу)` : ""}${nRecent ? ` · <b class="jr-live-n"><i class="jr-live"></i>${nRecent} идэвхтэй</b>` : ""} · ${L.length} хичээл · нүд дээр дарж дэлгэрэнгүйг харна</span></div>
+      <td class="jr-sum">${s.done ?? 0}/${nVis}</td><td class="jr-sum">${s.avg || "—"}</td><td class="jr-rank" title="${+s.rank?.points || 0} оноо">${esc(s.rank?.insignia || "")} ${esc(s.rank?.name || "")}</td></tr>`;
+  const jrGrpHTML = (name, n, span) => `<tr class="jr-grp"><th class="jr-name" scope="rowgroup">${name ? esc(name) : "Бүлэггүй"}<small>${n}</small></th><td colspan="${span}"></td></tr>`;
+  // Шүүлтүүр: Бүгд, бүлэг бүр (идэвхтэйд нь нэр солих, тараах), Бүлэггүй (бүлэг байвал), Архив (архивласан байвал).
+  const jrChipsHTML = () => {
+    if (!jrCnt) return "";
+    const v = jrView, gs = jrGroups(), hint = `<span class="muted small jr-hint">Анги, бүлгээр ялгах бол «Бүлэг» нүдэнд нэрийг нь бичээд Enter дарна уу — дараагийн суралцагч руу шилжинэ.</span>`;
+    const chip = (kind, label, n, on, g) => `<button type="button" class="jr-chip"${g != null ? ` data-jr-g="${esc(g)}"` : ""} data-jr-chip="${kind}" aria-pressed="${on}">${label} <span>(${n})</span></button>`;
+    const isOn = (name) => !v.archived && !!v.group && jrLow(v.group) === jrLow(name);
+    const acts = (name) => `<button type="button" class="jr-chip-act" data-jr-grename title="Нэр солих" aria-label="«${esc(name)}» бүлгийн нэр солих">${ico("edit", 14)}<span>Нэр солих</span></button><button type="button" class="jr-chip-act" data-jr-gdel title="Бүлгийг тараах" aria-label="«${esc(name)}» бүлгийг тараах">${ico("x", 14)}<span>Бүлгийг тараах</span></button>`;
+    const list = gs.map((g) => isOn(g.name) ? `<span class="jr-chip-on">${chip("g", esc(g.name), g.count, true, g.name)}${acts(g.name)}</span>` : chip("g", esc(g.name), g.count, false, g.name));
+    if (v.group && !v.archived && !gs.some((g) => isOn(g.name))) list.push(`<span class="jr-chip-on">${chip("g", esc(v.group), 0, true, v.group)}</span>`); // сүүлчийн суралцагч нь гарсан бүлэг
+    return `<div class="jr-chips" role="group" aria-label="Бүлгээр шүүх">${chip("all", "Бүгд", gs.reduce((n, g) => n + g.count, 0) + jrCnt.ungrouped, !v.archived && !v.group && !v.none)}${list.join("")}${gs.length ? chip("none", "Бүлэггүй", jrCnt.ungrouped, !v.archived && v.none) : ""}${jrCnt.archived || v.archived ? chip("arc", `${ico("files", 14)}Архив`, jrCnt.archived, v.archived) : ""}${gs.length ? "" : hint}</div>`;
+  };
+  // Дахин зурахад гол (focus) буцаж очих элемент: хайлт, нэр/бүлгийн нүд, шүүлтүүр, товч.
+  const jrFocusSel = (a) => {
+    if (a.closest(".jr-search")) return ".jr-search input";
+    const tr = a.closest("tr[data-uid]");
+    if (tr && a.matches("th.jr-name, td.jr-g")) return `tr[data-uid="${CSS.escape(tr.dataset.uid)}"] > ${a.matches("td") ? "td.jr-g" : "th.jr-name"}`;
+    const k = ["data-jr-g", "data-jr-chip", "data-jr-sort", "data-jr-csv", "data-jr-grename", "data-jr-gdel"].find((x) => a.hasAttribute(x));
+    return k ? `[${k}="${CSS.escape(a.getAttribute(k))}"]` : null;
+  };
+  const jrEmpty = (ql) => ql ? "Хайлтад тохирох суралцагч алга." : jrView.archived ? "Архив хоосон байна." : jrView.none ? "Бүх суралцагч бүлэгт орсон байна ✓" : jrView.group ? "Энэ бүлэгт суралцагч алга." : "Одоогоор суралцагч алга.";
+  const drawJournal = (q = "", top = false) => {
+    const box = $("#journal"); if (!box || !jr) return;
+    // Дахин зурахад хүснэгтийн гүйлгэлт, гол (хайлт, нүд, шүүлтүүр) болон нээлттэй засварлагч хэвээр үлдэнэ.
+    const a = document.activeElement, fsel = a && a !== document.body && box.contains(a) ? jrFocusSel(a) : null;
+    const caret = fsel && a.matches("input") ? [a.selectionStart, a.selectionEnd] : null;
+    const w0 = $(".jr-wrap", box), sc = w0 && !top ? [w0.scrollTop, w0.scrollLeft] : null;
+    const ed = jrEd && { uid: jrEd.uid, kind: jrEd.kind, value: jrEd.el.value, s0: jrEd.el.selectionStart, s1: jrEd.el.selectionEnd };
+    if (jrEd) { jrEd.el._done = true; jrEd = null; }
+    jrDirty = false; clearTimeout(jrRT);
+    // Сервер идэвхтэй суралцагчдыг дээр нь эрэмбэлж өгнө; «Нэрээр» сонговол цагаан толгойн дарааллаар.
+    const ql = jrLow(q.trim()), L = jr.lessons, C = jr.cells || {}, nVis = L.filter((l) => !l.hidden).length;
+    const V = jr.students.filter(jrInView), S = capped() || !ql ? V.slice() : V.filter((s) => jrMatch(s, ql));
+    if (jrSort === "name") S.sort((x, y) => (x.name || "").localeCompare(y.name || "", "mn"));
+    // Бүлэгтэй, шүүлтгүй үед бүлэг бүр толгой мөртэй (нэрээр), бүлэггүй нь хамгийн сүүлд.
+    const grouped = !!jrCnt?.groups.length && !jrView.archived && !jrView.group && !jrView.none, gl = new Map();
+    if (grouped) {
+      for (const g of jrCnt.groups) gl.set(jrLow(g.name), { name: g.name, n: g.count });
+      for (const s of S) if (s.group && !gl.has(jrLow(s.group))) gl.set(jrLow(s.group), { name: s.group, n: S.filter((x) => jrLow(x.group) === jrLow(s.group)).length });
+      const ord = new Map([...gl.entries()].sort((x, y) => x[1].name.localeCompare(y[1].name, "mn")).map(([k], i) => [k, i]));
+      const at = (s) => (s.group ? ord.get(jrLow(s.group)) : ord.size);
+      S.sort((x, y) => at(x) - at(y));
+    }
+    jrShown = S;
+    const rows = []; let prev = null;
+    for (const s of S) {
+      if (grouped && jrLow(s.group) !== prev) { prev = jrLow(s.group); const g = gl.get(prev); rows.push(jrGrpHTML(g?.name || "", g ? g.n : jrCnt.ungrouped, L.length + 4)); }
+      rows.push(jrRowHTML(s, L, C, nVis));
+    }
+    const nRecent = V.filter((s) => s.recent).length;
+    const secs = []; for (const l of L) { const k = l.section || ""; const last = secs[secs.length - 1]; if (last && last.name === k) last.n++; else secs.push({ name: k, n: 1 }); }
+    const hasSecs = secs.some((x) => x.name), gh = `<th class="jr-gh"${hasSecs ? ` rowspan="2"` : ""}>Бүлэг</th>`;
+    const head = `<thead>${hasSecs ? `<tr class="jr-secs"><th class="jr-name" rowspan="2">Суралцагч</th>${gh}${secs.map((x) => `<th colspan="${x.n}" title="${esc(x.name || "Бүлэггүй")}">${esc(x.name || "—")}</th>`).join("")}<th rowspan="2">Дууссан</th><th rowspan="2">Дундаж</th><th rowspan="2">Эрэмбэ</th></tr>` : ""}
+      <tr>${hasSecs ? "" : `<th class="jr-name">Суралцагч</th>${gh}`}${L.map((l) => `<th class="jr-l ${l.hidden ? "is-hidden" : ""}" title="${esc(l.title)}${l.hidden ? " (хаалттай)" : ""}">${String(l.position).padStart(2, "0")}${l.kind === "exam" ? `<i>${ico("exam", 14)}</i>` : l.kind === "assignment" ? "<i>📎</i>" : ""}</th>`).join("")}${hasSecs ? "" : "<th>Дууссан</th><th>Дундаж</th><th>Эрэмбэ</th>"}</tr></thead>`;
+    const foot = `<tfoot><tr><th class="jr-name">Дууссан</th><td></td>${L.map((l) => { const n = S.filter((s) => { const x = C[s.user_id]?.[l.id]; return l.kind === "exam" ? x?.exam?.passed : l.kind === "assignment" ? x?.asg : x?.done; }).length; return `<td>${S.length ? n + "/" + S.length : ""}</td>`; }).join("")}<td colspan="3"></td></tr></tfoot>`;
+    // Тоо: бүлэг/архивын тоолол (бүх суралцагчаар) байвал түүгээр; хуудас хязгаарлагдсан бол хэлнэ.
+    const gc = jrView.group && jrGroups().find((g) => jrLow(g.name) === jrLow(jrView.group));
+    const tot = !jrCnt ? jrAll?.students_total ?? jr.students.length : jrView.archived ? jrCnt.archived : jrView.none ? jrCnt.ungrouped : jrView.group ? gc?.count ?? V.length : jrCnt.groups.reduce((n, g) => n + g.count, 0) + jrCnt.ungrouped;
+    const what = jrView.archived ? "архивласан суралцагч" : jrView.none ? "бүлэггүй суралцагч" : jrView.group ? `суралцагч «${esc(jrView.group)}» бүлэгт` : "суралцагч";
+    const more = (jr.students_total ?? 0) > jr.students.length && !ql;
+    box.innerHTML = `<div class="jr-head"><div><h2>Журнал</h2><span class="muted small">${tot} ${what}${more ? ` (сүүлд идэвхтэй ${V.length}-г харуулж байна — бусдыг нэрээр хайна уу)` : ""}${nRecent ? ` · <b class="jr-live-n"><i class="jr-live"></i>${nRecent} идэвхтэй</b>` : ""} · ${L.length} хичээл · нүдийг дарж дэлгэрэнгүйг харна уу</span></div>
         <div class="jr-sort" role="group" aria-label="Эрэмбэлэх"><button type="button" data-jr-sort="active" aria-pressed="${jrSort !== "name"}">${ico("chart", 14)}Идэвхээр</button><button type="button" data-jr-sort="name" aria-pressed="${jrSort === "name"}">А–Я</button></div>
         <label class="rail-search jr-search">${ico("search", 15)}<input type="search" placeholder="Нэрээр шүүх…" value="${esc(q)}" aria-label="Нэрээр шүүх"></label>
         <button class="btn btn-glass btn-sm" data-jr-csv>${ico("files", 15)}Excel</button></div>
+      ${jrChipsHTML()}
+      ${jrView.archived ? `<p class="muted small jr-note">Архивласан суралцагч үндсэн журналд харагдахгүй ч өгөгдөл нь хадгалагдсан хэвээр. Нэр дээр нь дарж журналд сэргээнэ${shared ? "" : " эсвэл суралцахуйн өгөгдлийг нь бүрмөсөн устгана"}.</p>` : ""}
       <div class="jr-legend"><span class="jr-c ok">68</span>дууссан<span class="jr-c part">24</span>үзэж байна<span class="jr-c bad">40%</span>тэнцээгүй<span class="jr-c wait">✓</span>дүгнээгүй<span class="jr-c disq">⛔</span>хуулах оролдлого</div>
-      ${S.length ? `<div class="jr-wrap"><table class="jr-t">${head}<tbody>${body}</tbody>${foot}</table></div>` : `<div class="empty">${q ? "Хайлтад тохирох суралцагч алга." : "Одоогоор суралцагч алга."}</div>`}`;
+      <datalist id="jrGroups">${jrGroupOpts()}</datalist>
+      ${S.length ? `<div class="jr-wrap"><table class="jr-t">${head}<tbody>${rows.join("")}</tbody>${foot}</table></div>` : `<div class="empty">${jrEmpty(ql)}</div>`}`;
+    const w1 = $(".jr-wrap", box); if (w1 && sc) { w1.scrollTop = sc[0]; w1.scrollLeft = sc[1]; }
+    if (!(ed && jrEdit(ed.uid, ed.kind, ed)) && fsel) { const el = $(fsel, box); if (el) { el.focus({ preventScroll: true }); if (caret) try { el.setSelectionRange(caret[0], caret[1]); } catch {} } }
     const inp = $(".jr-search input", box);
-    const refocus = (p) => { const i2 = $(".jr-search input"); if (i2) { i2.focus(); i2.setSelectionRange(p, p); } };
     inp.oninput = () => {
-      const p = inp.selectionStart, v = inp.value;
-      if (!capped()) { drawJournal(v); refocus(p); return; }
-      clearTimeout(jrFindT); // серверээс нэрээр хайна
+      const v = inp.value;
+      if (!capped()) return drawJournal(v);
+      clearTimeout(jrFindT); // серверээс нэрээр хайна (одоогийн бүлэг/архив дотроо)
       jrFindT = setTimeout(async () => {
-        try { const d = await api(`/api/me/courses/${c.id}/journal${v.trim() ? "?q=" + encodeURIComponent(v.trim()) : ""}`); jr = { ...d, students_total: jrAll.students_total }; drawJournal(v); refocus(p); } catch {}
+        const t = ++jrTok;
+        try { const d = await jrViewData(v); if (t === jrTok) { jr = d; drawJournal(jrQ()); } } catch (e) { if (t === jrTok) toast(e.message, true); }
       }, 400);
     };
   };
+  const jrRedraw = () => drawJournal(jrQ());
+  // Засвар дуусаад (гол өөр газар шилжсэн) — дарсан товчны үйлдлийг тасалдуулахгүйн тулд түр хүлээж дахин зурна.
+  const jrRedrawSoon = () => { clearTimeout(jrRT); jrRT = setTimeout(() => { if (!jrEd && jrDirty) jrRedraw(); }, 400); };
+  // Шүүлтүүр солих (бүлэг, бүлэггүй, архив) — хязгаарлагдсан бол серверээс шүүнэ.
+  const jrSwitch = async (v) => {
+    const prev = jrView, q = jrQ(), t = ++jrTok;
+    jrView = { group: null, none: false, archived: false, ...v };
+    $("#journal")?.classList.add("jr-busy");
+    try { const d = await jrViewData(q); if (t !== jrTok) return; jr = d; drawJournal(q, true); }
+    catch (e) { if (t === jrTok) { jrView = prev; toast(e.message, true); } }
+    finally { if (t === jrTok) $("#journal")?.classList.remove("jr-busy"); }
+  };
+  // Хадгалсан суралцагчийг ачаалсан бүх жагсаалтад шинэчилнэ; архивлах/сэргээхэд нөгөө жагсаалтад нь (нүднийх нь хамт) нэмнэ.
+  const jrPatch = (st) => {
+    const fix = { alias: st.alias || "", group: st.group || "", archived: !!st.archived, archived_at: st.archived_at || "" }; // omitempty талбарууд
+    if (st.name) fix.name = st.name;
+    if (st.account_name) fix.account_name = st.account_name;
+    let src = null;
+    for (const d of [jr, jrAll, jrArc]) { const s = d?.students.find((x) => x.user_id === st.user_id); if (s) { Object.assign(s, fix); src ||= s; } }
+    const home = fix.archived ? jrArc : jrAll;
+    if (src && home && !home.students.some((x) => x.user_id === st.user_id)) {
+      home.students.push({ ...src });
+      const cl = jrCellsOf(st.user_id); if (Object.keys(cl).length) (home.cells ||= {})[st.user_id] = cl;
+    }
+  };
+  // PUT …/journal/students/{uid} — {alias?, group?, archived?}. Хариугаар өгөгдөл, тоог шинэчилж, зурна (засварлаж байвал мөрийг л).
+  const jrSave = async (uid, patch) => {
+    const k = ++jrSeq; jrLast[uid] = k;
+    try {
+      const r = await api(`/api/me/courses/${c.id}/journal/students/${encodeURIComponent(uid)}`, { method: "PUT", body: patch });
+      if (jrLast[uid] === k && r?.student) jrPatch(r.student);
+      jrSetCnt(r, k);
+      return r;
+    } finally { jrRefresh(uid); }
+  };
+  const jrRefresh = (uid) => { if (jrEd) { jrPaintRow(uid); jrPaintChips(); jrDirty = true; } else jrRedraw(); };
+  const jrPaintCell = (cell, kind, s, saving) => { cell.classList.remove("jr-editing"); cell.classList.toggle("jr-saving", !!saving); cell.innerHTML = kind === "alias" ? jrNameHTML(s) : esc(s.group || ""); };
+  // Засварлаж байх үед мөрүүд байрандаа үлдэнэ (хурдан оруулахад үсрэхгүй): зөвхөн нүд, шүүлтүүрийн тоо шинэчлэгдэнэ.
+  const jrPaintRow = (uid) => {
+    const s = jrFind(uid), tr = s && $(`#journal tr[data-uid="${CSS.escape(uid)}"]`); if (!tr) return;
+    const nm = $(":scope > th.jr-name", tr), g = $(":scope > td.jr-g", tr);
+    if (nm && !nm.contains(jrEd?.el || null)) jrPaintCell(nm, "alias", s, false);
+    if (g && !g.contains(jrEd?.el || null)) jrPaintCell(g, "group", s, false);
+    tr.classList.toggle("jr-gone", !jrInView(s)); // одоогийн шүүлтээс гарсан — засвар дуусахад алга болно
+  };
+  const jrPaintChips = () => {
+    const el = $("#journal .jr-chips"), html = jrChipsHTML();
+    if (el && html) el.outerHTML = html; else if (html) $("#journal .jr-head")?.insertAdjacentHTML("afterend", html);
+    const dl = $("#jrGroups"); if (dl) dl.innerHTML = jrGroupOpts();
+  };
+  // Нүдэн дэх засварлагч: kind "alias" (журнал дахь нэр) | "group" (бүлэг). keep — дахин зурахын өмнөх утга, курсор.
+  const jrEdit = (uid, kind, keep) => {
+    if (jrEd) jrCommit(0);
+    const tr = $(`#journal tr[data-uid="${CSS.escape(uid)}"]`), s = jrFind(uid);
+    const cell = tr && $(kind === "alias" ? ":scope > th.jr-name" : ":scope > td.jr-g", tr);
+    if (!cell || !s) return false;
+    clearTimeout(jrClickT); clearTimeout(jrRT);
+    const orig = kind === "alias" ? s.name || "" : s.group || "", inp = document.createElement("input");
+    Object.assign(inp, { className: "jr-edit", value: keep ? keep.value : orig, maxLength: kind === "alias" ? 80 : 40, autocomplete: "off", spellcheck: false, enterKeyHint: "next", placeholder: kind === "alias" ? s.account_name || s.name || "" : "Бүлгийн нэр…" });
+    if (kind === "group") inp.setAttribute("list", "jrGroups");
+    inp.setAttribute("aria-label", `${s.name || ""} — ${kind === "alias" ? "журнал дахь нэр" : "бүлэг"} (Enter — хадгалж дараагийнх руу, Esc — болих)`);
+    const who = kind === "alias" ? $(".jr-who", cell) : null;
+    if (who) who.replaceWith(inp); else cell.replaceChildren(inp);
+    cell.classList.add("jr-editing");
+    jrEd = { uid, kind, el: inp, cell, orig };
+    inp.addEventListener("keydown", (e) => {
+      if (jrEd?.el !== inp || e.isComposing) return;
+      if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); jrCommit(e.shiftKey ? -1 : 1); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); jrCancel(); }
+    });
+    // Өөр цонх руу шилжихэд (жагсаалтаас хуулах г.м.) засварлагч нээлттэй үлдэнэ; хуудсан дотор өөр газар дарвал хадгална.
+    inp.addEventListener("blur", () => { if (!inp._done && jrEd?.el === inp && document.hasFocus()) jrCommit(0); });
+    inp.focus({ preventScroll: !!keep });
+    try { if (keep) inp.setSelectionRange(keep.s0, keep.s1); else inp.select(); } catch {}
+    return true;
+  };
+  // Хадгалах (утга өөрчлөгдсөн бол): move 1/-1 — дараагийн/өмнөх мөрийн ижил нүд рүү (Enter / Shift+Enter), 0 — гол өөр тийш.
+  const jrCommit = (move) => {
+    const ed = jrEd; if (!ed) return;
+    ed.el._done = true; jrEd = null;
+    const s = jrFind(ed.uid), v = jrNorm(ed.el.value);
+    let patch = null, view = s;
+    if (s && ed.kind === "group" && v !== ed.orig) { patch = { group: v }; view = { ...s, group: v }; }
+    if (s && ed.kind === "alias" && v !== ed.orig) {
+      const acc = s.account_name || s.name, want = !v || v === acc ? "" : v; // хоосон эсвэл бүртгэлийн нэр — бүртгэлийн нэр рүүгээ буцна
+      if (want !== (s.alias || "")) { patch = { alias: want }; view = { ...s, alias: want, name: want || acc }; }
+    }
+    const dl = $("#jrGroups"); // шинэ бүлгийг дараагийн мөрийн санал болголтод шууд нэмнэ
+    if (patch?.group && dl && ![...dl.options].some((o) => jrLow(o.value) === jrLow(v))) dl.insertAdjacentHTML("beforeend", `<option value="${esc(v)}"></option>`);
+    let next = null;
+    if (move) { let r = ed.cell.closest("tr"); do r = move > 0 ? r.nextElementSibling : r.previousElementSibling; while (r && !r.dataset.uid); next = r?.dataset.uid; }
+    if (s) jrPaintCell(ed.cell, ed.kind, view, !!patch); else jrDirty = true;
+    if (patch) jrSave(ed.uid, patch).catch((e) => toast(e.message, true));
+    if (next && jrEdit(next, ed.kind)) return;
+    if (move) ed.cell.focus({ preventScroll: true }); // сүүлийн мөр — нүдэн дээрээ үлдэнэ
+    if (jrDirty) { if (move) jrRedraw(); else jrRedrawSoon(); }
+  };
+  const jrCancel = () => {
+    const ed = jrEd; if (!ed) return;
+    ed.el._done = true; jrEd = null;
+    const s = jrFind(ed.uid); if (s) jrPaintCell(ed.cell, ed.kind, s, false);
+    ed.cell.focus({ preventScroll: true });
+    if (jrDirty) jrRedraw();
+  };
+  // Гарнаас: нэр/бүлгийн нүдэн дээр F2 эсвэл Enter — засах; Space — нэр дээр дэлгэрэнгүй цонх, бүлэг дээр засах.
+  const jrKey = (e) => {
+    const cell = jr && e.target.matches?.("#journal tbody th.jr-name[data-jr-student], #journal tbody td.jr-g[data-jr-group]") ? e.target : null;
+    if (!cell || e.altKey || e.ctrlKey || e.metaKey) return false;
+    const uid = cell.closest("tr").dataset.uid, isName = cell.matches("th");
+    if (e.key === "F2" || e.key === "Enter") { e.preventDefault(); jrEdit(uid, isName ? "alias" : "group"); return true; }
+    if (e.key === " ") { e.preventDefault(); if (isName) jrStudentModal(uid, true); else jrEdit(uid, "group"); return true; }
+    if (!isName && e.key.length === 1 && !e.repeat) { e.preventDefault(); jrEdit(uid, "group", { value: e.key, s0: 1, s1: 1 }); return true; } // бүлгийн нүдэнд шууд бичиж эхэлнэ (Excel шиг)
+    return false;
+  };
+  // Нэр дээр хоёр товшвол журнал дахь нэрийг засна (нэг товшилтын дэлгэрэнгүй цонхыг цуцална).
+  const onJrDblClick = (e) => {
+    const nm = jr && !e.target.closest(".jr-edit") && e.target.closest("#journal tbody th.jr-name[data-jr-student]"); if (!nm) return;
+    clearTimeout(jrClickT); jrClickT = 0; getSelection()?.removeAllRanges();
+    jrEdit(nm.closest("tr").dataset.uid, "alias");
+  };
+  // Идэвхтэй бүлгийн нэр солих (өөр байгаа бүлгийн нэр бол нэгтгэнэ) эсвэл тараах — PUT …/journal/groups {from, to}.
+  const jrGroupOp = async (dissolve) => {
+    const from = jrView.group; if (!from) return;
+    const n = jrGroups().find((g) => jrLow(g.name) === jrLow(from))?.count ?? 0;
+    let to = "";
+    if (!dissolve) {
+      const v = prompt(`«${from}» бүлгийн шинэ нэр:`, from); if (v == null) return;
+      to = jrNorm(v); if (to === from) return;
+      if (!to) dissolve = true;
+      else {
+        const ex = jrGroups().find((g) => g.name !== from && jrLow(g.name) === jrLow(to));
+        if (ex && !confirm(`«${ex.name}» бүлэг аль хэдийн байна. «${from}» бүлгийн ${n} суралцагчийг «${ex.name}» бүлэгт нэгтгэх үү?`)) return;
+      }
+    }
+    if (dissolve && !confirm(`«${from}» бүлгийг тараах уу? ${n} суралцагч бүлэггүй болно — өгөгдөл устахгүй.`)) return;
+    try {
+      const k = ++jrSeq, r = await api(`/api/me/courses/${c.id}/journal/groups`, { method: "PUT", body: { from, to } });
+      jrSetCnt(r, k);
+      const ng = to && (r?.groups || []).find((g) => jrLow(g.name) === jrLow(to));
+      jrView = { group: ng ? ng.name : null, none: false, archived: false };
+      toast(dissolve ? `«${from}» бүлэг тарлаа — суралцагчид бүлэггүй боллоо` : `Бүлгийн нэр «${ng?.name || to}» боллоо ✓`);
+    } catch (e) { toast(e.message, true); if (e.status !== 404) return; }
+    loadJournal();
+  };
   const jrCellModal = (uid, lid) => {
-    const s = jr.students.find((x) => x.user_id === uid), l = jr.lessons.find((x) => x.id === lid), x = jr.cells[uid]?.[lid] || {};
+    const s = jrFind(uid), l = jr.lessons.find((x) => x.id === lid), x = jrCellsOf(uid)[lid] || {};
+    if (!s || !l) return;
     const rows = [];
-    rows.push(["Төлөв", (x.disq ? "⛔ Зөрчилтэй (хуулах оролдлого / хичээлээс гарч зогссон) — оноо тооцогдоогүй · дахин 10+ мин судалбал тооцогдоно" : x.done ? "✓ Дууссан" : x.viewed ? "Үзэж байна" : "Үзээгүй") + (x.improved ? " · ↻ дахин судалж сайжруулсан" : "")]);
-    if (x.viewed) rows.push(["Нэгдсэн цолд нэмсэн оноо", x.disq ? "0" : "+" + x.pts]);
+    rows.push(["Төлөв", (x.disq ? "⛔ Зөрчилтэй (хуулах оролдлого / хичээлээс гарч зогссон) — оноо тооцогдоогүй · дахин 10-аас дээш минут судалбал тооцогдоно" : x.done ? "✓ Дууссан" : x.viewed ? "Үзэж байна" : "Үзээгүй") + (x.improved ? " · ↻ дахин судалж сайжруулсан" : "")]);
+    if (x.viewed) rows.push(["Нэгдсэн эрэмбэд нэмсэн оноо", x.disq ? "0" : "+" + x.pts]);
     if (x.viewed) rows.push(["Идэвхтэй хугацаа", `${dur2(x.active)}${x.total ? ` (нийт ${dur2(x.total)}, ${x.sessions || 0} удаа)` : ""}`]);
-    if (x.q_n) rows.push(["Асуулга", `${x.q_ok}/${x.q_n} зөв`]);
+    if (x.q_n) rows.push(["Асуулт", `${x.q_ok}/${x.q_n} зөв`]);
     if (x.has_video) rows.push(["Видео үзэлт", x.video + "%"]);
     if (x.viewed) rows.push(["Дүгнэлт", x.refl ? "✍️ Бичсэн" : "Бичээгүй"]);
     if (x.tabs) rows.push(["Таб солилт", x.tabs + " удаа"]);
@@ -1726,31 +2010,107 @@ async function courseEditor(id) {
       ${l.kind === "assignment" && x.asg ? `<div class="hero-cta" style="margin:14px 0 0"><button class="btn btn-gold btn-sm" data-jr-grade="${esc(l.id)}">${ico("users", 15)}Дүгнэх</button></div>` : ""}
       ${l.kind === "exam" && x.exam ? `<div class="hero-cta jr-reopen" style="margin:14px 0 0"><button class="btn btn-gold btn-sm" data-reopen-exam="${esc(l.id)}" data-reopen-user="${esc(uid)}">🔓 Шалгалтыг дахин нээх (+1 оролдлого)</button><span class="muted small">${x.exam.terminated ? "Хаагдсан шалгалтыг" : "Оролдлого дууссан ч"} дахин өгөх боломж олгоно — суралцагчид мэдэгдэл очно.</span></div>` : ""}`, l.rubric && x.asg?.rubric ? 900 : 640);
   };
-  const jrStudentModal = (uid) => {
-    const s = jr.students.find((x) => x.user_id === uid), row = jr.cells[uid] || {};
-    jrModal(`<span class="eyebrow">Суралцагч</span><h3 class="h3">${esc(s.name)}</h3>
-      <div class="an-tiles"><div class="an-tile"><small>Цол</small><b>${esc(s.rank.insignia || "")} ${esc(s.rank.name)}</b><span class="muted small">${s.rank.points} оноо</span></div>
-        <div class="an-tile"><small>Дууссан</small><b>${s.done}/${jr.lessons.filter((l) => !l.hidden).length}</b></div>
+  // Суралцагчийн цонх (хүрэлтээр засах зам): журнал дахь нэр, бүлэг; архивлах эсвэл (архивт) сэргээх, бүрмөсөн устгах.
+  const jrStudentModal = (uid, kbd) => {
+    const s = jrFind(uid); if (!s) return;
+    const row = jrCellsOf(uid), acc = s.account_name || s.name || "", nVis = jr.lessons.filter((l) => !l.hidden).length;
+    const m = jrModal(`<span class="eyebrow">${s.archived ? "Архивласан суралцагч" : "Суралцагч"}</span><h3 class="h3">${esc(s.name)}</h3>
+      ${s.alias || s.username ? `<p class="muted small jr-acc">${esc([s.alias ? "Бүртгэлийн нэр: " + acc : "", s.username ? "@" + s.username : ""].filter(Boolean).join(" · "))}</p>` : ""}
+      <form class="jr-meta" novalidate>
+        <div class="jr-meta-f"><label>Журнал дахь нэр<input name="alias" maxlength="80" value="${esc(s.name)}" placeholder="${esc(acc)}" autocomplete="off"></label>
+          <label>Бүлэг<input name="group" maxlength="40" list="jrGroupsM" value="${esc(s.group || "")}" placeholder="Бүлгийн нэр…" autocomplete="off"></label></div>
+        <datalist id="jrGroupsM">${jrGroupOpts()}</datalist>
+        <p class="muted small">Нэр зөвхөн энэ журналд харагдана — суралцагчийн бүртгэлийн нэр өөрчлөгдөхгүй. Хоосон орхивол бүртгэлийн нэр нь харагдана.</p>
+        <div class="jr-acts"><button class="btn btn-gold btn-sm">Хадгалах</button>${s.archived
+          ? `<button type="button" class="btn btn-glass btn-sm" data-jr-restore>${ico("undo", 15)}Сэргээх</button>${shared ? "" : `<button type="button" class="btn btn-danger btn-sm" data-jr-wipe>${ico("trash", 15)}Бүрмөсөн устгах</button>`}`
+          : `<button type="button" class="btn btn-ghost btn-sm" data-jr-archive>${ico("files", 15)}Архивлах</button>`}</div>
+        <p class="form-error" aria-live="polite"></p></form>
+      <div class="an-tiles"><div class="an-tile"><small>Эрэмбэ</small><b>${esc(s.rank?.insignia || "")} ${esc(s.rank?.name || "—")}</b><span class="muted small">${+s.rank?.points || 0} оноо</span></div>
+        <div class="an-tile"><small>Дууссан</small><b>${s.done ?? 0}/${nVis}</b></div>
         <div class="an-tile"><small>Дундаж оноо</small><b>${s.avg || "—"}</b></div>
         <div class="an-tile"><small>Идэвхтэй</small><b>${dur2(s.active)}</b>${s.last ? `<span class="muted small">сүүлд ${fmtDate(s.last)}</span>` : ""}</div></div>
       <table class="tbl"><thead><tr><th>Хичээл</th><th>Төлөв</th><th>Оноо / дүн</th></tr></thead><tbody>${jr.lessons.map((l) => { const x = row[l.id], [t, k] = jrCell(l, x);
         return `<tr><td>${String(l.position).padStart(2, "0")} · ${esc(l.title)}</td><td>${!x ? `<span class="muted">Үзээгүй</span>` : x.disq ? "⛔ Зөрчилтэй" : x.done || x.exam?.passed ? "✓ Дууссан" : x.asg ? "Илгээсэн" : "Үзэж байна"}</td><td><span class="jr-c ${k}">${t || "—"}</span></td></tr>`; }).join("")}</tbody></table>`);
+    const f = $("form.jr-meta", m), F = f.elements, err = $(".form-error", f);
+    // Зөвхөн өөрчилсөн талбарыг илгээнэ; архивлах/сэргээхэд бичсэн нэр, бүлэг хамт хадгалагдана.
+    const patchOf = () => {
+      const p = {}, a = jrNorm(F.alias.value), g = jrNorm(F.group.value), want = !a || a === acc ? "" : a;
+      if (want !== (s.alias || "")) p.alias = want;
+      if (g !== (s.group || "")) p.group = g;
+      return p;
+    };
+    const run = async (b, extra, msg) => {
+      const p = { ...patchOf(), ...extra };
+      if (!Object.keys(p).length) return jrClose(m);
+      b.disabled = true; err.textContent = "";
+      try { await jrSave(uid, p); jrClose(m); toast(msg); } catch (x) { err.textContent = x.message; b.disabled = false; }
+    };
+    f.addEventListener("submit", (e) => { e.preventDefault(); run($("button.btn-gold", f), {}, "Хадгалагдлаа ✓"); });
+    f.addEventListener("click", (e) => {
+      const b = e.target.closest("button[type=button]"); if (!b || b.disabled) return;
+      if (b.hasAttribute("data-jr-archive")) run(b, { archived: true }, "Архивлагдлаа — «Архив» хэсгээс сэргээж болно");
+      else if (b.hasAttribute("data-jr-restore")) run(b, { archived: false }, "Журналд сэргээлээ ✓");
+      else if (b.hasAttribute("data-jr-wipe")) jrWipeModal(uid);
+    });
+    if (kbd) F.alias.focus();
+    return m;
+  };
+  // Архивласан суралцагчийн энэ сургалт дахь суралцахуйн өгөгдлийг бүрмөсөн устгах (зөвхөн эзэмшигч; сервер дахин шалгана).
+  const jrWipeModal = (uid) => {
+    const s = jrFind(uid); if (!s) return;
+    const nVis = jr.lessons.filter((l) => !l.hidden).length;
+    // Журнал дахь нэрээр өөр хүүхдийн нэрийг дуурайж болох тул нэр өгсөн бол бүртгэлийн нэр, @нэрийг заавал хамт харуулна.
+    const idn = [s.account_name, s.username ? "@" + s.username : ""].filter(Boolean).join(", ");
+    const who = s.alias ? `«${esc(s.alias)}»${idn ? ` (${esc(idn)})` : ""}` : `«${esc(s.name)}»`;
+    const m = jrModal(`<span class="eyebrow">Архив · ${esc(c.title)}</span><h3 class="h3">Суралцахуйн өгөгдлийг бүрмөсөн устгах уу?</h3>
+      <p class="jr-wipe-txt">${who}-ийн энэ сургалт дахь явц, оноо, үзсэн хугацаа, асуултын хариу, шалгалтын оролдлого, даалгаврын хариу ба дүн, дүгнэлт, тэмдэглэл бүгд устана. <b>Сэргээх боломжгүй.</b> Элсэлт, төлбөр, худалдаж авсан хичээл хэвээр үлдэнэ — дахин ороход бүгд эхнээсээ эхэлнэ.</p>
+      <dl class="jr-dl"><dt>Суралцагч</dt><dd>${esc(s.name)}${s.alias && s.account_name ? ` <small class="muted">(${esc(s.account_name)})</small>` : ""}${s.username ? ` <small class="muted">@${esc(s.username)}</small>` : ""}</dd>
+        <dt>Сүүлд идэвхтэй</dt><dd>${s.last ? fmtDate(s.last) : "—"}</dd>
+        <dt>Явц</dt><dd>${s.done ?? 0}/${nVis} дууссан · ${dur2(s.active)} идэвхтэй · ${+s.rank?.points || 0} оноо</dd></dl>
+      <div class="jr-wipe-save"><button type="button" class="btn btn-glass btn-sm" data-jr-xls>${ico("files", 15)}Excel-ээр хадгалах</button><span class="muted small">Устгахаас өмнө энэ суралцагчийн журналын мөрийг хадгалж авна уу.</span></div>
+      <label class="check jr-wipe-ok"><input type="checkbox" data-jr-ok> Сэргээх боломжгүйг ойлголоо</label>
+      <p class="form-error" aria-live="polite"></p>
+      <div class="jr-acts jr-acts-end"><button type="button" class="btn btn-ghost btn-sm" data-close>Болих</button><button type="button" class="btn btn-sm jr-wipe-go" data-jr-go disabled>${ico("trash", 15)}Бүрмөсөн устгах</button></div>`, 560);
+    const ok = $("[data-jr-ok]", m), go = $("[data-jr-go]", m), err = $(".form-error", m);
+    ok.addEventListener("change", () => { go.disabled = !ok.checked; });
+    m.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-jr-xls]")) return jrCSV([s], s.name);
+      if (!e.target.closest("[data-jr-go]") || go.disabled || !ok.checked) return;
+      const label = go.innerHTML;
+      go.disabled = true; ok.disabled = true; err.textContent = ""; go.textContent = "Устгаж байна…"; m.setAttribute("aria-busy", "true");
+      try {
+        const k = ++jrSeq, r = await api(`/api/me/courses/${c.id}/journal/students/${encodeURIComponent(uid)}/reset`, { method: "POST", body: { confirm: true } });
+        jrSetCnt(r, k); jrClose(m);
+        toast("Өгөгдөл устлаа — суралцагч журналд шинээр эхэлсэн байдлаар харагдана");
+        loadJournal();
+      } catch (x) {
+        // 429 (түр хүлээх), 503 (дутуу устсан — дахин оролдоно) г.м.: серверийн мессеж; суралцагч архивт хэвээр, товч дахин идэвхтэй.
+        err.textContent = x.message; go.innerHTML = label; ok.disabled = false; go.disabled = !ok.checked; m.removeAttribute("aria-busy");
+      }
+    });
   };
   const jrModal = (html, w = 640) => {
+    $("#jrModal")?.remove(); // Esc-ээр хаагдаад DOM-д үлдсэн (эсвэл одоо нээлттэй) өмнөх цонх
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="jrModal"><div class="modal-card" style="width:min(${w}px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}</div></div>`);
     const m = $("#jrModal"); SG.openModal(m);
     m.addEventListener("click", (e) => {
-      const g = e.target.closest("[data-jr-grade]"); if (g) { SG.closeModal(m); setTimeout(() => m.remove(), 300); return gradeModal(g.dataset.jrGrade); }
+      const g = e.target.closest("[data-jr-grade]"); if (g) { jrClose(m); return gradeModal(g.dataset.jrGrade); }
       const ro = e.target.closest("[data-reopen-exam]"); if (ro) return reopenExam(ro, loadJournal);
-      if (e.target === m || e.target.closest("[data-close]")) { SG.closeModal(m); setTimeout(() => m.remove(), 300); }
+      if (e.target === m || e.target.closest("[data-close]")) jrClose(m);
     });
+    return m;
   };
-  const jrCSV = () => {
-    const L = jr.lessons, cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const lines = [["Суралцагч", ...L.map((l) => `${String(l.position).padStart(2, "0")} ${l.title}`), "Дууссан", "Дундаж", "Цол", "Оноо"].map(cell).join(",")];
-    for (const s of jr.students) lines.push([s.name, ...L.map((l) => jrCell(l, jr.cells[s.user_id]?.[l.id])[0]), `${s.done}/${L.filter((l) => !l.hidden).length}`, s.avg || "", s.rank.name, s.rank.points].map(cell).join(","));
-    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
-    a.download = `zhurnal-${c.title.replace(/[\\/:*?"<>|]+/g, "_")}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  const jrClose = (m) => { SG.closeModal(m); setTimeout(() => m.remove(), 300); };
+  // CSV (Excel): одоо харагдаж буй мөрүүд (эсвэл өгсөн суралцагчид). Томьёо болж ажиллахаас сэргийлж = + - @ (таб, CR)-ээр
+  // эхэлсэн нүдний өмнө ' залгана.
+  const jrCSV = (list = jrShown, tag = jrView.archived ? "архив" : jrView.none ? "бүлэггүй" : jrView.group || "") => {
+    const L = jr.lessons, n = L.filter((l) => !l.hidden).length;
+    const cell = (v) => { let x = String(v ?? ""); if (/^[=+\-@\t\r]/.test(x)) x = "'" + x; return `"${x.replace(/"/g, '""')}"`; };
+    // «@»-ээр эхэлсэн гарчгийг Excel томьёо гэж уншдаг тул «Хэрэглэгчийн @нэр».
+    const lines = [["Суралцагч", "Бүлэг", "Бүртгэлийн нэр", "Хэрэглэгчийн @нэр", ...L.map((l) => `${String(l.position).padStart(2, "0")} ${l.title}`), "Дууссан", "Дундаж", "Эрэмбэ", "Оноо"].map(cell).join(",")];
+    for (const s of list) { const row = jrCellsOf(s.user_id); lines.push([s.name, s.group || "", s.account_name || s.name, s.username || "", ...L.map((l) => jrCell(l, row[l.id])[0]), `${s.done ?? 0}/${n}`, s.avg || "", s.rank?.name || "", s.rank?.points ?? ""].map(cell).join(",")); }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
+    a.download = `zhurnal-${(c.title + (tag ? "-" + tag : "")).replace(/[\\/:*?"<>|]+/g, "_")}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   };
 
   // Даалгаврын хариунууд: багш оноо, тайлбар өгнө.
@@ -1758,14 +2118,14 @@ async function courseEditor(id) {
   // эсвэл (сургалтаар, эзэмшигч) «Хамт хөгжүүлэх». Доор нь одоогийн хуваалцалтууд, буцаах товчтой.
   const shareDialog = async (l) => {
     $("#shareModal")?.remove();
-    const lid = l?.id || "", kind = l ? (l.exam ? "шалгалт" : l.assignment ? "даалгавар" : "хичээл") : "сургалт";
+    const lid = l?.id || "", kind = l ? (l.exam ? "шалгалтыг" : l.assignment ? "даалгаврыг" : "хичээлийг") : "сургалтыг";
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="shareModal"><div class="modal-card" style="width:min(600px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
-      <h3>${ico("link", 20)} ${l ? "Хичээл" : "Сургалт"} хуваалцах</h3><p class="muted small">«${esc(l ? l.title : c.title)}» ${kind}ыг өөр багштай хуваалцана. Багш нь surgalt.mn-д бүртгэлтэй байх ёстой.</p>
+      <h3>${ico(l ? "link" : "users", 20)} ${l ? "Хичээл хуваалцах" : "Хамтарч ажиллах"}</h3><p class="muted small">«${esc(l ? l.title : c.title)}» ${kind} өөр багштай хуваалцана. Багш нь surgalt.mn-д бүртгэлтэй байх ёстой.</p>
       <form id="shareForm" class="form"><label>Багшийн имэйл эсвэл @нэр<input name="who" required maxlength="120" placeholder="bagsh@gmail.com" autocomplete="off"></label>
         ${l || shared ? `<input type="hidden" name="mode" value="view">` : `<div class="seg share-seg" role="radiogroup" aria-label="Эрх">
           <label><input type="radio" name="mode" value="view" checked><span>${ico("eye", 15)}Харах, хадгалах</span></label>
           <label><input type="radio" name="mode" value="edit"><span>${ico("edit", 15)}Хамт хөгжүүлэх</span></label></div>`}
-        <p class="muted small share-hint">${l ? "Багш хичээлийг студидээ урьдчилан харж, өөрийн сургалтад хуулбарлан хадгална (файлууд өөрийнх нь файлын сан руу хуулагдана)." : "«Харах, хадгалах» — сургалтын хичээлүүдийг харж, өөрийн сургалтад хуулбарлан хадгална. «Хамт хөгжүүлэх» — энэ сургалтыг студидээ нээж хичээл оруулж, засна (үнэ, нийтлэх, орлого таных хэвээр)."}</p>
+        <p class="muted small share-hint">${l ? "Багш хичээлийг студидээ урьдчилан харж, өөрийн сургалтад хуулбарлан хадгална (файлууд өөрийнх нь файлын сан руу хуулагдана)." : "«Харах, хадгалах» — сургалтын хичээлүүдийг харж, өөрийн сургалтад хуулбарлан хадгална. «Хамт хөгжүүлэх» — энэ сургалтыг студидээ нээж, хичээл оруулж засна (үнэ, нийтлэх эрх, орлого танд хэвээр үлдэнэ)."}</p>
         <div class="dr-acts"><button class="btn btn-gold btn-sm">${ico("send", 15)}Хуваалцах</button></div><p class="form-error" aria-live="polite"></p></form>
       <div class="share-list" id="shareList"><p class="muted small">Ачаалж байна…</p></div></div></div>`);
     const m = $("#shareModal"); SG.openModal(m);
@@ -1799,10 +2159,10 @@ async function courseEditor(id) {
     // Рубрикаар: мөр бүрээс нэг нүд сонгоно — нийт оноо шууд бодогдоно.
     const rbForm = (s) => `<form class="sub-grade sub-grade-rb"><div class="rb-wrap"><table class="rb-grade"><thead><tr><th>Шалгуур</th>${rub.levels.map((lv) => `<th>${esc(lv)}</th>`).join("")}</tr></thead>
       <tbody>${rub.criteria.map((cr) => `<tr><th>${esc(cr.name)}</th>${rub.levels.map((_, j) => `<td><label class="rb-cell ${s.rubric?.[cr.id] === j ? "on" : ""}"><input type="radio" name="rb_${esc(cr.id)}" value="${j}" ${s.rubric?.[cr.id] === j ? "checked" : ""} required><b>${cr.points[j]} оноо</b>${cr.desc[j] ? `<small>${esc(cr.desc[j])}</small>` : ""}</label></td>`).join("")}</tr>`).join("")}</tbody></table></div>
-      <div class="rb-grade-foot"><span class="rb-total">Нийт <b>${s.score ?? 0}</b>/${max}</span><label class="grow">Тайлбар<input name="feedback" maxlength="5000" value="${esc(s.feedback || "")}" placeholder="Юу сайн, юуг сайжруулах вэ?"></label><button class="btn btn-gold btn-sm">${s.graded_at ? "Шинэчлэх" : "Дүгнэх"}</button></div></form>`;
+      <div class="rb-grade-foot"><span class="rb-total">Нийт <b>${s.score ?? 0}</b>/${max}</span><label class="grow">Эргэх холбоо<input name="feedback" maxlength="5000" value="${esc(s.feedback || "")}" placeholder="Юу сайн болсон, юуг сайжруулах вэ?"></label><button class="btn btn-gold btn-sm">${s.graded_at ? "Шинэчлэх" : "Дүгнэх"}</button></div></form>`;
     const row = (s) => `<article class="sub-item" data-uid="${esc(s.user_id)}"><header><b>${esc(s.user_name)}</b><small class="muted">${fmtDate(s.submitted_at)}${s.late ? ` · <span class="an-bad">хоцорсон</span>` : ""}${s.tab_switches ? ` · <span class="${s.tab_switches > 3 ? "an-bad" : "an-warn"}" title="Хариу бичих явцад таб/цонх сольсон тоо">↔ таб ${s.tab_switches} удаа</span>` : ""}${s.text ? ` · ${(s.text.trim().match(/\S+/g) || []).length} үг` : ""}</small></header>
       ${s.html ? `<div class="sub-text rb-text">${s.html}</div>` : s.text ? `<p class="sub-text">${SG.linkify(s.text)}</p>` : ""}${s.links?.length ? `<p class="sub-files">${s.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 70))}</a>`).join("<br>")}</p>` : ""}${s.files?.length ? `<p class="sub-files">${s.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${ico("doc", 14)} ${esc(f.name)}</a>`).join(" ")}</p>` : ""}
-      ${rub ? rbForm(s) : `<form class="sub-grade"><label>Оноо (0-${max})<input name="score" type="number" min="0" max="${max}" value="${s.score ?? ""}" required></label><label class="grow">Тайлбар<input name="feedback" maxlength="5000" value="${esc(s.feedback || "")}" placeholder="Юу сайн, юуг сайжруулах вэ?"></label><button class="btn btn-gold btn-sm">${s.graded_at ? "Шинэчлэх" : "Дүгнэх"}</button>${s.graded_at ? `<small class="muted">✓ ${fmtDate(s.graded_at)}</small>` : ""}</form>`}</article>`;
+      ${rub ? rbForm(s) : `<form class="sub-grade"><label>Оноо (0-${max})<input name="score" type="number" min="0" max="${max}" value="${s.score ?? ""}" required></label><label class="grow">Эргэх холбоо<input name="feedback" maxlength="5000" value="${esc(s.feedback || "")}" placeholder="Юу сайн болсон, юуг сайжруулах вэ?"></label><button class="btn btn-gold btn-sm">${s.graded_at ? "Шинэчлэх" : "Дүгнэх"}</button>${s.graded_at ? `<small class="muted">✓ ${fmtDate(s.graded_at)}</small>` : ""}</form>`}</article>`;
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="gradeModal"><div class="modal-card" style="width:min(820px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
       <h3 class="h3">${esc(d.lesson)} — хариунууд (${d.total ?? d.submissions.length})</h3>${d.assignment?.due?.at || d.assignment?.due?.start_at ? `<p class="muted small">${d.assignment.due.start_at ? `Эхлэх: ${fmtDate(d.assignment.due.start_at)} · ` : ""}${d.assignment.due.at ? `Дуусах: ${fmtDate(d.assignment.due.at)} · хоцорвол ${d.assignment.due.late === "paid" ? money(d.assignment.due.late_fee) : d.assignment.due.late === "closed" ? "хаалттай" : "төлбөргүй"}` : ""}${d.assignment.due.fee ? ` · оролцооны төлбөр ${money(d.assignment.due.fee)}` : ""}</p>` : ""}
       <div class="sub-list">${d.submissions.map(row).join("") || `<p class="muted">Хариу ирээгүй байна.</p>`}</div>${(d.total ?? 0) > d.submissions.length ? `<button type="button" class="btn btn-ghost btn-sm btn-block" data-sub-more>Цааш ачаалах (${d.total - d.submissions.length} үлдсэн)</button>` : ""}</div></div>`);
@@ -1831,7 +2191,7 @@ async function courseEditor(id) {
         : { score: +f.score.value, feedback: f.feedback.value };
       try {
         const r = await api(`/api/courses/${c.id}/lessons/${lid}/submissions/${uid}`, { method: "PUT", body });
-        toast(`Дүгнэлээ ✓ ${r.score}/${max} — суралцагч ба журналд орлоо`); b.textContent = "Шинэчлэх";
+        toast(`Дүгнэлээ ✓ ${r.score}/${max} — дүн суралцагчид болон журналд харагдана`); b.textContent = "Шинэчлэх";
         if ($("#journal")) loadJournal(); // журнал автоматаар шинэчлэгдэнэ
       } catch (err) { toast(err.message, true); } finally { b.disabled = false; }
     });
@@ -1840,7 +2200,7 @@ async function courseEditor(id) {
   // Одоогийн тохиргоог хэвээр нь, нэг талбарыг солих (толгойн зураг г.м.). Нийтийн courseBody(f) формоос уншдаг — нэр давхцуулахгүй.
   const coursePatch = (extra) => ({ title: c.title, description: c.description, price: c.price, published: !!c.published, drip: !!c.drip, unlock_all_paid: !!c.unlock_all_paid, certificate: !!c.certificate, camera: c.camera || "optional", max_warnings: c.max_warnings || 0, block_hours: c.block_hours || 0, block_minutes: c.block_minutes || 0, ...extra });
   // Толгойн зургийн загвар: 120 SVG (салбар бүрээр 100 + хөдөлгөөнт 20, /static/covers) эсвэл өнгөт градиент — нийтлэг цонх (app.js).
-  const coverPicker = () => SG.coverPicker({ title: "Толгойн зураг", lead: "Сургалтын хуудас, картын толгойд харагдана: 120 загвар (салбар бүрээр, абстракт, хөдөлгөөнт), компьютерээсээ зураг, зургийн холбоос эсвэл embed (YouTube, Canva, Google Slides…).", current: c.cover || "", allowNone: true, hue: hueOfName(c.title), sources: true,
+  const coverPicker = () => SG.coverPicker({ title: "Толгойн зураг", lead: "Сургалтын хуудас, картын толгойд харагдана. 120 загвараас (салбар бүрээр, абстракт, хөдөлгөөнт) сонгох, компьютерээсээ зураг оруулах эсвэл зургийн холбоос, embed (YouTube, Canva, Google Slides…) ашиглаж болно.", current: c.cover || "", allowNone: true, hue: hueOfName(c.title), sources: true,
     onPick: async (id) => { await saveCourse(coursePatch({ cover: id })); toast(id ? "Толгойн зураг солигдлоо ✓" : "Градиент болгов ✓"); render(); } });
   const lessonBody = (f, l) => {
     const isFree = f.mode.value === "free";
@@ -1854,7 +2214,7 @@ async function courseEditor(id) {
     if (exam && !blocks.some((b) => b.type === "quiz")) throw new Error("Шалгалтад дор хаяж нэг асуулт нэмнэ үү");
     for (const d of [exam?.due, assignment?.due]) {
       if (d?.late === "paid" && !d.late_fee) throw new Error("Хоцролтын төлбөрийг оруулна уу");
-      if (d?.start_at && d?.at && d.at <= d.start_at) throw new Error("Дуусах цаг эхлэх цагаас хойш байна");
+      if (d?.start_at && d?.at && d.at <= d.start_at) throw new Error("Дуусах цаг эхлэх цагаас хойш байх ёстой");
     }
     return { title: f.title.value, content: blocksSummary(blocks), video_url: "", blocks, active_min: +f.active_min.value || 0, exam, assignment, is_free: isFree, price: isFree ? 0 : +f.price.value || 0,
       unlock_after_h: f.unlock_after_h ? +f.unlock_after_h.value || 0 : l?.unlock_after_h || 0, always_open: f.always_open ? f.always_open.checked : !!l?.always_open,
@@ -1940,6 +2300,7 @@ async function courseEditor(id) {
   };
   // Гараар зөөх: зөөх товч дээр ↑ ↓ (бүлгийн хил давж шилжинэ).
   const onKeyDown = (e) => {
+    if (jrKey(e)) return; // журнал: нэр/бүлгийн нүдийг гарнаас засах
     const inp = e.target.closest(".ol-sec-name");
     if (inp && e.key === "Enter") { e.preventDefault(); inp.blur(); return; }
     if (inp && e.key === "Escape") { inp.value = inp.closest(".ol-sec").dataset.sec; inp.blur(); return; }
@@ -1962,7 +2323,7 @@ async function courseEditor(id) {
   // Нэг л хичээл дээр ажиллана: өөр хичээл (эсвэл шинэ хичээлийн маягт) нээхэд бусад засварлагч хаагдана.
   const editingNow = () => $$(".post.editing, .ol-row.editing", main).length > 0 || ($("#composerBody") && !$("#composerBody").hidden);
   const closeEditors = () => {
-    if ($$(".post-editor[data-dirty]", main).some((f) => f.offsetParent) && !confirm("Нээлттэй хичээлд хадгалаагүй өөрчлөлт байна. Хаагаад үргэлжлүүлэх үү?")) return false;
+    if ($$(".post-editor[data-dirty]", main).some((f) => f.offsetParent) && !confirm("Засаж буй хичээлд хадгалаагүй өөрчлөлт байна. Хаагаад үргэлжлүүлэх үү?")) return false;
     render(); return true;
   };
   const onClick = async (e) => {
@@ -1988,9 +2349,27 @@ async function courseEditor(id) {
     if (t.closest("[data-sec-add]") && sec) return kindMenu(t.closest("[data-sec-add]"), sec.dataset.sec);
     if (t.closest("[data-grade]")) { const lid = t.closest("[data-lid]")?.dataset.lid; if (lid) return gradeModal(lid); }
     if (jr && t.closest("#journal")) {
-      const td = t.closest("td.jr-c[data-lid]"), nm = t.closest("[data-jr-student]");
+      if (t.closest(".jr-edit")) return; // нүдэн дэх засварлагч дотор дарсан
+      const td = t.closest("td.jr-c[data-lid]"), nm = t.closest("[data-jr-student]"), gc = t.closest("td.jr-g[data-jr-group]");
       if (td) return jrCellModal(td.closest("tr").dataset.uid, td.dataset.lid);
-      if (nm) return jrStudentModal(nm.closest("tr").dataset.uid);
+      if (gc) return jrEdit(gc.closest("tr").dataset.uid, "group");
+      if (nm) { // нэг дарвал дэлгэрэнгүй цонх — хоёр товшвол (dblclick) нэр засах тул түр хүлээнэ
+        const uid = nm.closest("tr").dataset.uid;
+        clearTimeout(jrClickT); jrClickT = 0;
+        if (e.detail > 1) return;
+        if (!e.detail) return jrStudentModal(uid);
+        jrClickT = setTimeout(() => {
+          jrClickT = 0; if (jrEd) return;
+          const at = Date.now(), m = jrStudentModal(uid);
+          // Удаан хоёр товшилт (2 дахь нь 250–500 мс-д цонхон дээр буусан): цонхыг хааж нэрийг засна.
+          m?.addEventListener("dblclick", () => { if (Date.now() - at > 400) return; jrClose(m); getSelection()?.removeAllRanges(); jrEdit(uid, "alias"); });
+        }, 250);
+        return;
+      }
+      const ch = t.closest("[data-jr-chip]");
+      if (ch) { const k = ch.dataset.jrChip, on = ch.getAttribute("aria-pressed") === "true"; return jrSwitch(on || k === "all" ? {} : k === "none" ? { none: true } : k === "arc" ? { archived: true } : { group: ch.dataset.jrG }); }
+      if (t.closest("[data-jr-grename]")) return jrGroupOp(false);
+      if (t.closest("[data-jr-gdel]")) return jrGroupOp(true);
       if (t.closest("[data-jr-csv]")) return jrCSV();
       const so = t.closest("[data-jr-sort]");
       if (so) { jrSort = so.dataset.jrSort; try { localStorage.setItem("sg_jr_sort", jrSort); } catch {} return drawJournal($("#journal .jr-search input")?.value || ""); }
@@ -2009,6 +2388,7 @@ async function courseEditor(id) {
       return;
     }
     if (t.closest("#gpSettings")) { SG.openModal($("#gpModal")); return; }
+    if (t.closest("[data-gp-copy]")) { const u = location.origin + "/c/" + c.id; try { await navigator.clipboard.writeText(u); toast("Холбоос хуулагдлаа ✓"); } catch { toast(u); } return; }
     if (t.closest("#gpRoster")) { SG.openModal($("#gpRosterModal")); return; }
     if (t.closest("#gpTeachers")) { courseTeachersModal(c, teacherList, (ls) => { teacherList = ls; render(); }); return; }
     if (t.closest("#gpLeave")) {
@@ -2031,6 +2411,7 @@ async function courseEditor(id) {
     if (t.closest("[data-cancel]")) return render();
     if (t.closest("[data-share-post]") && l) return shareDialog(l);
     if (t.closest("#gpShare")) return shareDialog(null);
+    if (t.closest("[data-gp-collab]")) { SG.closeModal($("#gpModal")); return shareDialog(null); }
     if (t.closest("[data-cover-pick]")) return coverPicker();
     if (t.closest("[data-lesson-settings]") && l) {
       const f = $("#lsForm"); f.dataset.lsLid = l.id; f.innerHTML = lessonSettingsHTML(l);
@@ -2087,7 +2468,7 @@ async function courseEditor(id) {
       sv.disabled = true;
       try {
         const r = await api(`/api/courses/${c.id}/section-visibility`, { method: "PUT", body: { section: sec.dataset.sec || "", hidden } });
-        toast(hidden ? `Модуль хаагдлаа — ${r.changed} хичээл суралцагчдад харагдахгүй` : `Модуль нээгдлээ ✓ — ${r.changed} хичээл нээгдэв`);
+        toast(hidden ? `Бүлэг хаагдлаа — ${r.changed} хичээл суралцагчдад харагдахгүй` : `Бүлэг нээгдлээ ✓ — ${r.changed} хичээл нээгдэв`);
       } catch (x) { toast(x.message, true); }
       return reload();
     }
@@ -2124,7 +2505,7 @@ async function courseEditor(id) {
         SG.closeModal($("#lsModal")); toast("Хичээлийн тохиргоо хадгалагдлаа ✓"); await reload(); return;
       }
       if (!f.classList.contains("post-editor")) return;
-      if (f._be?.uploading()) { toast("Файл хуулагдаж дуустал түр хүлээнэ үү"); return; }
+      if (f._be?.uploading()) { toast("Файл байршиж дуустал түр хүлээнэ үү"); return; }
       const after = f._afterSave; f._afterSave = null;
       let savedLid = f.dataset.edit;
       if (f.dataset.edit) { await api(`/api/courses/${c.id}/lessons/${f.dataset.edit}`, { method: "PUT", body: lessonBody(f, lessons.find((x) => x.id === f.dataset.edit)) }); toast("Хичээл шинэчлэгдлээ ✓"); }
@@ -2138,7 +2519,7 @@ async function courseEditor(id) {
     } catch (err) { if (errBox) errBox.textContent = err.message; toast(err.message, true); }
   };
   const onEdInput = (e) => { const pe = e.target.closest?.(".post-editor"); if (pe) pe.dataset.dirty = "1"; }; // хадгалаагүй өөрчлөлт
-  const evs = [["click", onClick], ["change", onChange], ["submit", onSubmit], ["pointerdown", onPointerDown], ["keydown", onKeyDown], ["focusout", onFocusOut], ["input", onEdInput]];
+  const evs = [["click", onClick], ["dblclick", onJrDblClick], ["change", onChange], ["submit", onSubmit], ["pointerdown", onPointerDown], ["keydown", onKeyDown], ["focusout", onFocusOut], ["input", onEdInput]];
   evs.forEach(([n, f]) => main.addEventListener(n, f));
   cleanup = () => { evs.forEach(([n, f]) => main.removeEventListener(n, f)); onPointerUp(); };
   render();
@@ -2150,7 +2531,7 @@ async function reopenExam(b, after) {
   if (b.disabled) return; b.disabled = true;
   try {
     const r = await api(`/api/me/students/${b.dataset.reopenUser}/unblock`, { method: "POST", body: { lesson_id: b.dataset.reopenExam } });
-    b.textContent = r.unblocked ? "✓ Нээгдлээ · +1 оролдлого" : "Нээх оролдлого алга"; b.classList.add("done");
+    b.textContent = r.unblocked ? "✓ Нээгдлээ · +1 оролдлого" : "Хаагдсан оролдлого алга"; b.classList.add("done");
     if (r.unblocked) { toast("🔓 Шалгалт дахин нээгдлээ — суралцагчид мэдэгдэл очлоо"); after?.(); }
   } catch (e) { b.disabled = false; toast(e.message, true); }
 }
@@ -2161,7 +2542,7 @@ function scrollRows(box, items, rowFn, step = 20) {
   const more = document.createElement("div"); more.className = "ev-more muted small"; box.appendChild(more);
   const next = () => {
     tb.insertAdjacentHTML("beforeend", items.slice(i, i + step).map(rowFn).join("")); i += step;
-    more.textContent = i < items.length ? `${Math.min(i, items.length)} / ${items.length} · доош гүйлгэвэл цааш` : items.length > step ? `Бүгд · ${items.length}` : "";
+    more.textContent = i < items.length ? `${Math.min(i, items.length)} / ${items.length} · доош гүйлгэвэл цааш ачаална` : items.length > step ? `Бүгд · ${items.length}` : "";
     if (i < items.length && box.isConnected && box.scrollHeight <= box.clientHeight + 60) requestAnimationFrame(next);
   };
   new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting) && i < items.length) next(); }, { root: box, rootMargin: "160px" }).observe(more);
@@ -2187,15 +2568,15 @@ async function books() {
           <div class="grow"><strong>${esc(b.title)}</strong><small class="muted">${b.kind === "article" ? "Өгүүлэл" : "Ном"}${b.author ? " · " + esc(b.author) : ""} · ${b.pages ? b.pages + " хуудас" : "<b style='color:var(--coral)'>файл оруулаагүй</b>"}</small>
             <span class="find-tagrow"><span class="ftag ${b.price ? "ftag-paid" : "ftag-free"}">📖 ${b.price ? money(b.price) : "Үнэгүй"}</span>${b.download ? `<span class="ftag ftag-paid">⬇ ${b.download_price ? money(b.download_price) : "Үнэгүй"}</span>` : ""}<span class="ftag ${b.published ? "ftag-free" : ""}">${b.published ? "Нийтлэгдсэн" : "Ноорог"}</span>${b.price ? `<span class="ftag">Эхний ${b.preview_pages} хуудас үнэгүй</span>` : ""}</span>
             <small class="muted">${ico("eye", 13)} ${b.views} · ${ico("book", 13)} ${b.previews} · ${ico("check", 13)} ${b.reads} · ♥ ${b.interest} · 💰 ${b.sales} (${money(b.revenue)})</small></div>
-          <div class="bk-acts"><button class="btn btn-glass btn-sm" data-edit>${ico("edit", 15)}Засах</button>${b.published ? `<a class="btn btn-glass btn-sm" href="/b/${esc(b.id)}" target="_blank" rel="noopener">${ico("eye", 15)}Харах</a>` : ""}<button class="btn btn-ghost btn-sm" data-log>Лог</button></div></article>`).join("") || `<div class="empty">Ном хараахан алга.<br>PDF, Word (DOC, DOCX) файлаа оруулж зарж эхлээрэй.</div>`}</div>
-      <section class="card"><div class="card-head"><h2>Үйлдлийн лог</h2><select id="bkLogFilter" aria-label="Номоор шүүх"><option value="">Бүх ном</option>${list.map((b) => `<option value="${esc(b.id)}">${esc(b.title)}</option>`).join("")}</select></div>
+          <div class="bk-acts"><button class="btn btn-glass btn-sm" data-edit>${ico("edit", 15)}Засах</button>${b.published ? `<a class="btn btn-glass btn-sm" href="/b/${esc(b.id)}" target="_blank" rel="noopener">${ico("eye", 15)}Харах</a>` : ""}<button class="btn btn-ghost btn-sm" data-log>Бүртгэл</button></div></article>`).join("") || `<div class="empty">Одоогоор ном алга.<br>PDF, Word (DOC, DOCX) файлаа оруулж борлуулж эхлээрэй.</div>`}</div>
+      <section class="card"><div class="card-head"><h2>Үйлдлийн бүртгэл</h2><select id="bkLogFilter" aria-label="Номоор шүүх"><option value="">Бүх ном</option>${list.map((b) => `<option value="${esc(b.id)}">${esc(b.title)}</option>`).join("")}</select></div>
         <div class="bk-log" id="bkLog"></div></section>`;
     mountLog();
   };
   const title = (id) => list.find((b) => b.id === id)?.title || "";
   const logRow = (e) => `<tr class="ev-${esc(e.type)}">
       <td>${fmtDate(e.at)}</td><td>${esc(e.user_name || "Зочин")}</td><td>${(BOOK_EVENTS[e.type] || ["•", e.type]).join(" ")}${e.detail ? ` <small class="muted">${esc(e.detail)}</small>` : ""}</td><td>${esc(title(e.book_id))}</td></tr>`;
-  const logHTML = (evs) => evs.length ? `<table class="tbl"><thead><tr><th>Цаг</th><th>Хэн</th><th>Үйлдэл</th><th>Ном</th></tr></thead><tbody></tbody></table>` : `<p class="muted small" style="margin:0">Одоогоор лог алга.</p>`;
+  const logHTML = (evs) => evs.length ? `<table class="tbl"><thead><tr><th>Цаг</th><th>Хэн</th><th>Үйлдэл</th><th>Ном</th></tr></thead><tbody></tbody></table>` : `<p class="muted small" style="margin:0">Одоогоор бүртгэл алга.</p>`;
   const mountLog = () => { const box = $("#bkLog"); if (box) { box.innerHTML = logHTML(evs); scrollRows(box, evs, logRow); } };
   const reload = async () => { list = await api("/api/me/books"); evs = await api("/api/me/book-events?limit=1000" + ($("#bkLogFilter")?.value ? "&book=" + $("#bkLogFilter").value : "")); render(); };
 
@@ -2209,13 +2590,13 @@ async function books() {
           <label>Үнэгүй үзүүлэх хуудас<input name="preview_pages" type="number" min="1" max="20" value="${b.preview_pages || 3}"></label></div>
         <label class="check"><input type="checkbox" name="download" ${b.download ? "checked" : ""}> ⬇ Татаж авах эрхээр бас зарах</label>
         <div class="bk-dl" ${b.download ? "" : "hidden"}><label>⬇ Татаж авах эрхийн үнэ (₮, 0 = үнэгүй)<input name="download_price" type="number" min="0" step="500" value="${b.download_price ?? 0}"></label>
-          <p class="muted small" style="margin:0">Худалдаж авсан хүн номын эх файлыг (PDF) татаж авахаас гадна онлайн уншина. Онлайн унших эрхтэй хүн зөрүүг л төлж шилжинэ. ${b.file_url ? "✓ Татах файл бэлэн — доор шинэ файл оруулбал солигдоно." : "Татах файлаар доорх номын файл ашиглагдана."}</p></div></fieldset>
+          <p class="muted small" style="margin:0">Худалдаж авсан хүн номын эх файлыг (PDF) татаж авахаас гадна онлайнаар уншиж болно. Онлайн унших эрхтэй хүн зөрүүг л төлөөд энэ эрх рүү шилжинэ. ${b.file_url ? "✓ Татах файл бэлэн — доор шинэ файл оруулбал солигдоно." : "Татах файлаар доорх номын файл ашиглагдана."}</p></div></fieldset>
       <fieldset><legend>Номын файл</legend>
         <p class="muted small" style="margin:0 0 8px">PDF, Word (DOC, DOCX) эсвэл PowerPoint. Хуудас бүр зураг болж хамгаалагдана — эх файл зөвхөн «татаж авах эрх» худалдаж авсан хүнд очно.${b.pages ? ` Одоо: <b>${b.pages} хуудас</b>.` : ""}</p>
         <input type="file" name="file" accept=".pdf,.doc,.docx,.odt,.rtf,.ppt,.pptx">
         <div class="progress" hidden><i></i></div><p class="muted small bk-prog" aria-live="polite"></p></fieldset>
-      <fieldset><legend>Нүүр зураг (заавал биш)</legend><input type="file" name="cover" accept="image/*"><small class="muted">Оруулахгүй бол эхний хуудас нүүр болно.</small></fieldset>
-      <label class="check"><input type="checkbox" name="published" ${b.published ? "checked" : ""}> Нийтлэх — профайл дээр харагдаж, зарагдана</label>
+      <fieldset><legend>Нүүр зураг (заавал биш)</legend><input type="file" name="cover" accept="image/*"><small class="muted">Оруулахгүй бол эхний хуудас нүүр зураг болно.</small></fieldset>
+      <label class="check"><input type="checkbox" name="published" ${b.published ? "checked" : ""}> Нийтлэх — профайл дээр харагдаж, худалдаанд гарна</label>
       <p class="form-error" role="alert"></p>
       <div class="hero-cta" style="margin:0;justify-content:space-between">${b.id ? `<button type="button" class="btn btn-ghost" data-del>Устгах</button>` : "<span></span>"}
         <span style="display:flex;gap:8px"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></span></div></form>`;
@@ -2258,7 +2639,7 @@ async function books() {
     const bar = $(".progress", f), fill = $("i", bar), msg = $(".bk-prog", f);
     const say = (t, pct) => { msg.textContent = t; bar.hidden = pct == null; if (pct != null) fill.style.width = pct + "%"; };
     const word = !/\.pdf$/i.test(file.name);
-    say(word ? "Word файлыг PDF болгож байна…" : "Татах файлыг хуулж байна…", 10);
+    say(word ? "Word файлыг PDF болгож байна…" : "Татах файлыг байршуулж байна…", 10);
     const fd = new FormData(); fd.append("file", file);
     let info = await api(`/api/me/files?visibility=private${word ? "&convert=pdf" : ""}`, { method: "POST", body: fd });
     if (word && !/\.pdf$/i.test(info.path)) throw new Error("Сервер дээр LibreOffice суугаагүй тул Word файлыг хөрвүүлэх боломжгүй — PDF болгож оруулна уу");
@@ -2277,7 +2658,7 @@ async function books() {
     if (/\.pdf$/i.test(file.name)) src = { data: new Uint8Array(await file.arrayBuffer()) };
     else src = { url: (pre || await uploadOriginal(file, f)).url }; // Word/PowerPoint: сервер PDF болгоно (LibreOffice)
     const pdf = await (await SG.pdfLib()).getDocument(src).promise, n = pdf.numPages;
-    if (n > 3000) throw new Error("3000-аас олон хуудастай");
+    if (n > 3000) throw new Error("3000-аас олон хуудастай файл оруулах боломжгүй");
     let done = 0;
     const one = async (p) => {
       const page = await pdf.getPage(p), base = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: Math.min(3, 1400 / base.width) });
@@ -2483,8 +2864,8 @@ function fileCard(f, perMB, used) {
 const SC = { kind: "slot", week: 0, dur: 60, mode: "online", price: 0, loc: "", weeks: 1 }; // таб солиход тохиргоо хадгалагдана
 const LIVE = { courses: [] }; // шууд хичээл товлох цонхонд сургалтын жагсаалт
 const SC_HINT = {
-  slot: "Хүснэгтэн дээр дарж сул цаг нэмнэ, чирж хүрээ сонговол (10:00–14:00 г.м.) олон цаг нэг дор · «Давтах»-аар улирал, жилээр долоо хоног бүр · сул цаг дээр дахин дарж хасна · захиалсан цаг дээр дарж дэлгэрэнгүйг харна.",
-  live: "Хүснэгтэн дээр эхлэх цагаа дарна (чирвэл үргэлжлэх хугацаа) — сэдэв, сургалт, үнэ, Meet холбоосоо оруулаад «Товлох» · шууд хичээл дээр дарж дэлгэрэнгүйг харна.",
+  slot: "Хүснэгтийн нүдийг дарж сул цаг нэмнэ; чирж хүрээ сонговол (ж: 10:00–14:00) олон цагийг нэг дор нэмнэ · «Давтах» сонголтоор улирал, жилээр долоо хоног бүр давтана · сул цагийг дахин дарж хасна · захиалсан цагийг дарж дэлгэрэнгүйг харна.",
+  live: "Хүснэгтэд эхлэх цагаа дарна (чирвэл үргэлжлэх хугацааг сонгоно) — сэдэв, сургалт, үнэ, Meet холбоосоо оруулаад «Товлох» дарна · шууд хичээлийг дарж дэлгэрэнгүйг харна.",
 };
 const SC_FROM = 7, SC_TO = 22, SC_ROW = 22; // 07:00–22:00, 30 минут тутам нэг мөр
 const scDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -2506,7 +2887,7 @@ function slotsPanel() {
       <label>Давтах<select id="scWeeks">${[[1, "Давтахгүй"], [13, "Улирал · 13 долоо хоног"], [52, "Жил · 52 долоо хоног"]].map(([v, t]) => `<option value="${v}" ${v === SC.weeks ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       <label class="sc-loc" ${SC.mode === "offline" ? "" : "hidden"}>Уулзах газар<input id="scLoc" maxlength="120" value="${esc(SC.loc || me.location || "")}" placeholder="Номын сан, 2 давхар"></label>
     </div>
-    ${me.meet_connected ? "" : `<p class="sc-warn">${ico("live", 15)}Google Meet холбоогүй тул холбоос автоматаар үүсэхгүй — «Шинэ Google Meet үүсгэх» товчоор үүсгэхэд хуулсан холбоос автоматаар орж ирнэ (эсвэл дээрээс холбоно уу).</p>`}
+    ${me.meet_connected ? "" : `<p class="sc-warn">${ico("live", 15)}Google Meet холбогдоогүй тул холбоос автоматаар үүсэхгүй. «Шинэ Google Meet үүсгэх» товчоор уулзалт үүсгээд холбоосыг нь хуулбал энд автоматаар орж ирнэ (эсвэл дээрээс Google Meet-ээ холбоно уу).</p>`}
     <div class="sc-nav"><button type="button" class="icon-btn" data-wk="-1" aria-label="Өмнөх долоо хоног">${ico("chevron", 16)}</button><b id="scRange"></b><button type="button" class="icon-btn" data-wk="1" aria-label="Дараагийн долоо хоног">${ico("chevron", 16)}</button>
       <button type="button" class="btn btn-ghost btn-sm" data-wk="0">Энэ долоо хоног</button>
       <span class="sc-legend"><i class="free"></i>Сул <i class="held"></i>Төлбөр хүлээгдэж буй <i class="booked"></i>Захиалсан <i class="meet"></i>Шууд хичээл</span></div>
@@ -2548,7 +2929,7 @@ async function mountSlots(meetings) {
     if (b) {
       const x = slots.find((y) => y.id === b.dataset.slot); if (!x) return;
       if (x.student_id) return slotInfo(x, meetings);
-      if (x.held) return toast("Энэ цагийг захиалж, төлбөрөө төлж байна — түр хүлээнэ үү");
+      if (x.held) return toast("Энэ цагийг суралцагч захиалж, төлбөрөө төлж байна — түр хүлээнэ үү");
       if (SC.kind === "live") return toast("Сул цагийг засахын тулд дээрээс «Сул цаг»-ыг сонгоно уу");
       if (x.series_id) return seriesAsk(x, meetings);
       try { await api(`/api/me/slots/${x.id}`, { method: "DELETE" }); toast("Сул цаг хасагдлаа"); mountSlots(meetings); } catch (err) { toast(err.message, true); }
@@ -2633,7 +3014,7 @@ function meetLinkModal({ title, sub = "", value = "", onSave }) {
     <button type="button" class="btn btn-gold btn-lg btn-block ml-big" data-new>${ico("live", 22)}Шинэ Google Meet үүсгэх</button>
     <p class="ml-wait" hidden><span class="loader"></span><span>Meet шинэ цонхонд нээгдлээ. Тэнд холбоосыг <b>хуулаад</b> (⧉ товч) энд буцаж ирэхэд автоматаар орж ирнэ.</span></p>
     <p class="ml-got" hidden></p>
-    <div class="ml-or"><span>эсвэл холбоосоо гараар тавина</span></div>
+    <div class="ml-or"><span>эсвэл холбоосоо гараар оруулна уу</span></div>
     <form class="ml-form" id="mlForm"><input name="url" inputmode="url" autocomplete="off" value="${esc(value)}" placeholder="https://meet.google.com/abc-defg-hij" required>
       <button type="button" class="btn btn-ghost" data-paste>Тавих</button><button class="btn btn-gold">Хадгалах</button></form>
     <p class="form-error" role="alert"></p><p class="muted small" style="margin:0">Zoom, Teams-ийн холбоос ч болно.</p></div></div>`);
@@ -2678,7 +3059,7 @@ function liveModal({ start, dur = 60 } = {}) {
       <div class="form-row"><label>Эхлэх цаг<input name="start" type="datetime-local" value="${local}" required></label>
       <label>Үргэлжлэх (мин)<input name="dur" type="number" min="10" max="480" value="${dur}"></label></div>
       <label>Сургалт (элссэн суралцагчид харна)<select name="course"><option value="">— Ерөнхий —</option>${LIVE.courses.map((c) => `<option value="${c.id}" ${c.shared ? "data-shared" : ""}>${esc(c.title)}${c.shared ? ` · ${esc(c.org?.display_name || "байгууллага")}` : ""}</option>`).join("")}</select></label>
-      <div class="form-row"><label>Үнэ (₮, 0 = үнэгүй)<input name="price" type="number" min="0" step="500" value="0"><small class="muted">Төлбөртэй бол зөвхөн худалдаж авсан хүн холбоосыг харна. Сургалттай холбоно.</small></label>
+      <div class="form-row"><label>Үнэ (₮, 0 = үнэгүй)<input name="price" type="number" min="0" step="500" value="0"><small class="muted">Төлбөртэй бол зөвхөн худалдаж авсан хүн холбоосыг харна. Сонгосон сургалттай холбогдоно.</small></label>
         <label class="check" style="align-self:center"><input type="checkbox" name="members_free"> Сургалтад элссэн суралцагчдад үнэгүй</label></div>
       ${me.meet_connected ? `<p class="muted small" style="margin:0">${ico("live", 14)} Google Meet холбоос автоматаар үүснэ.</p>` : `<div class="ml-row"><label>Meet холбоос<input name="meet_url" inputmode="url" autocomplete="off" placeholder="https://meet.google.com/abc-defg-hij" required></label>
         <button type="button" class="btn btn-gold" data-new>${ico("live", 16)}Шинэ Google Meet үүсгэх</button><button type="button" class="btn btn-ghost" data-paste>Тавих</button></div>
@@ -2692,7 +3073,7 @@ function liveModal({ start, dur = 60 } = {}) {
     const sh = !!f.course.selectedOptions[0]?.hasAttribute("data-shared");
     f.price.disabled = f.members_free.disabled = sh;
     if (sh) { f.price.value = 0; f.members_free.checked = false; }
-    $("small", f.price.parentElement).textContent = sh ? "Байгууллагын сургалт — элссэн суралцагчдад үнэгүй. Төлбөртэйг байгууллага товлоно." : "Төлбөртэй бол зөвхөн худалдаж авсан хүн холбоосыг харна. Сургалттай холбоно.";
+    $("small", f.price.parentElement).textContent = sh ? "Байгууллагын сургалт тул элссэн суралцагчдад үнэгүй. Төлбөртэй шууд хичээлийг байгууллага товлоно." : "Төлбөртэй бол зөвхөн худалдаж авсан хүн холбоосыг харна. Сонгосон сургалттай холбогдоно.";
   };
   let stop = null;
   const close = () => { stop?.(); SG.closeModal(md); setTimeout(() => md.remove(), 300); };
@@ -2759,7 +3140,7 @@ async function mountBookings() {
   let list = [];
   try { list = await api("/api/me/bookings"); } catch (e) { box.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
   $("#abN").textContent = list.length || "";
-  if (!list.length) { box.innerHTML = `<div class="empty">Одоогоор захиалга алга. Сул цагаа тэмдэглэхэд суралцагчид профайлаас тань захиална.</div>`; return; }
+  if (!list.length) { box.innerHTML = `<div class="empty">Одоогоор захиалга алга. Сул цагаа тэмдэглэвэл суралцагчид таны профайлаас захиална.</div>`; return; }
   box.innerHTML = `<div class="ab-tools"><label class="check"><input type="checkbox" id="abAll"> Бүгдийг сонгох</label>
       <button type="button" class="btn btn-ghost btn-sm" id="abSel" disabled>Сонгосныг цуцлах</button>
       <button type="button" class="btn btn-danger btn-sm" id="abEvery">Бүгдийг цуцлах (${list.length})</button></div>
@@ -2840,7 +3221,7 @@ async function live() {
   const [meetings, list] = await Promise.all([api("/api/me/meetings"), api("/api/me/courses?shared=1")]);
   const fresh = await api("/api/me"); me = fresh; LIVE.courses = list;
   main.innerHTML = panel(slotsPanel(), 0, "sc-panel") +
-    panel(`<div class="panel-head"><h2>${ico("users", 20)}Захиалгууд<i class="ab-n" id="abN"></i></h2><span class="muted small">Нэг нэгээр, сонгож эсвэл бүгдийг нь цуцалж болно</span></div><div id="abBox"><div class="pw-load"><span class="loader"></span></div></div>`, 1) +
+    panel(`<div class="panel-head"><h2>${ico("users", 20)}Захиалгууд<i class="ab-n" id="abN"></i></h2><span class="muted small">Захиалгыг нэг бүрчлэн, сонгож эсвэл бүгдийг нь цуцалж болно</span></div><div id="abBox"><div class="pw-load"><span class="loader"></span></div></div>`, 1) +
     panel(`<h2>Удахгүй болох</h2><div class="meet-list" id="meetMine">${meetings.map((m) => `<div class="meet-item"><time>${fmtDate(m.starts_at)}</time><span style="flex:1">${esc(m.title)} · ${m.duration_min} мин
         ${m.title.startsWith("Цаг захиалга: ") && !m.course_id ? `<span class="chip chip-teal">${m.title.endsWith("биечлэн") ? "Биечлэн" : "Онлайн"}</span>`
           : m.price ? `<span class="chip chip-amber">${money(m.price)}${m.members_free ? " · элссэнд үнэгүй" : ""}</span> <span class="muted small">${m.buyers || 0} худалдаж авсан</span>` : `<span class="chip">Үнэгүй</span>`}</span>
@@ -2881,19 +3262,34 @@ async function chat(openId) {
   main.innerHTML = `<div class="inbox panel" style="padding:0">
     <div class="inbox-list" id="ibList">${convs.map(convItem).join("") || `<div class="empty" style="margin:14px">Одоогоор чат алга. Профайлаа түгээгээрэй!</div>`}</div>
     <div class="inbox-thread"><div class="chat-head" id="ibHead"><span class="muted">Яриа сонгоно уу</span></div>
+      <div class="peer-strip" id="ibPeer" role="region" aria-label="Хамтын ажиллагааны рейтинг" hidden></div>
       <div class="chat-body"><ol class="chat-msgs" id="ibMsgs"></ol></div>
       <form class="chat-input" id="ibForm" hidden><button type="button" id="ibMeet" data-plus>📹 Google Meet үүсгээд илгээх</button></form></div></div>`;
-  let cur = null, curGroup = false;
+  let cur = null, curGroup = false, curCourse = "", curTitle = "";
   const list = $("#ibList"), msgs = $("#ibMsgs"), form = $("#ibForm"), body = msgs.parentElement;
-  const thread = new SG.ChatThread({ ol: msgs, body, form, token: () => SG.Auth.token, convId: () => cur, role: () => "teacher", group: () => curGroup });
+  const thread = new SG.ChatThread({ ol: msgs, body, form, token: () => SG.Auth.token, convId: () => cur, role: () => "teacher", group: () => curGroup, course: () => curCourse });
+  // ⭐ Сургалтын бүлэг чат: хүүхдүүд бие биеэ хэрхэн үнэлснийг толгойн доор байнга (шилдэг 5, дундаж), мессежийн нэрийн хажууд «⭐ 82 · 5».
+  const peerStrip = () => {
+    const el = $("#ibPeer"), d = curCourse && SG.Peer?.peek(curCourse)?.data;
+    if (!el) return;
+    if (!d || d.role !== "teacher") { el.hidden = true; el.innerHTML = ""; return; }
+    el.innerHTML = SG.peerStripHTML(d); el.hidden = false;
+  };
+  const peerSub = (cid) => { if (cid === curCourse) { thread.rerender(); peerStrip(); } };
+  SG.Peer?.on(peerSub);
+  $("#ibPeer").addEventListener("click", (e) => { const b = e.target.closest("[data-peer-more], [data-peer-uid]"); if (b && curCourse) SG.peerPanel(curCourse, { title: curTitle, opener: b, uid: b.dataset.peerUid || "" }); });
+  $("#ibHead").addEventListener("click", (e) => { const b = e.target.closest("[data-peer-open]"); if (b && curCourse) SG.peerPanel(curCourse, { title: curTitle, opener: b }); });
   const open = async (id) => {
     cur = id;
     $$(".inbox-item", list).forEach((x) => x.classList.toggle("active", x.dataset.id === id));
     $(`.inbox-item[data-id="${id}"]`)?.classList.remove("unread");
     const d = await api(`/api/chat/${id}/messages`);
     curGroup = d.conversation.kind === "group";
-    $("#ibHead").innerHTML = `<strong>${esc(d.conversation.visitor_name)}</strong><span class="muted small">${curGroup ? "Бүлэг чат" : d.conversation.user_id ? "Бүртгэлтэй" : "Зочин"}</span>`;
+    curCourse = curGroup && SG.Peer ? d.conversation.course_id || "" : ""; curTitle = d.conversation.visitor_name || "";
+    $("#ibHead").innerHTML = `<strong>${esc(d.conversation.visitor_name)}</strong><span class="muted small">${curGroup ? "Бүлэг чат" : d.conversation.user_id ? "Бүртгэлтэй" : "Зочин"}</span>${curCourse ? `<button type="button" class="peer-open" data-peer-open aria-haspopup="dialog"><span aria-hidden="true">⭐</span><span class="peer-open-t">Үнэлгээ</span></button>` : ""}`;
+    peerStrip();
     form.hidden = false; thread.set(d); form.body.focus();
+    if (curCourse) SG.Peer.get(curCourse, true).catch(() => {}); // нээх бүрт шинэчилнэ
     history.replaceState(null, "", "#chat=" + id);
   };
   list.onclick = (e) => { const it = e.target.closest(".inbox-item"); if (it) open(it.dataset.id); };
@@ -2913,7 +3309,7 @@ async function chat(openId) {
     if (it) { $("small", it).textContent = m.body; list.prepend(it); if (m.conversation_id !== cur) it.classList.add("unread"); it.animate([{ background: "rgba(31,60,143,.18)" }, { background: "transparent" }], { duration: 1200 }); }
   };
   Live.on(handler);
-  cleanup = () => Live.handlers.delete(handler);
+  cleanup = () => { Live.handlers.delete(handler); SG.Peer?.off(peerSub); };
   if (openId) open(openId);
 }
 
@@ -2958,13 +3354,43 @@ async function chatWithStudent(el) {
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-chat-student]"); if (b) chatWithStudent(b.closest(".student")); });
 
 // 8 хэмжүүрийн radar (analytics.go dimScores): суралцагч бүр ба анги бүхэлдээ. −1 = өгөгдөлгүй («—», 0-д зурна).
-const DIM_LABELS = ["Идэвх", "Анхаарал", "Ойлголт", "Видео", "Шалгалт", "Эргэцүүлэл", "Багаар", "Санах ой"];
-const DIM_HINTS = ["идэвхтэй хувь, суралцсан өдөр", "анхаарлын индекс", "зөв хариулт, анх удаад зөв, таамаг", "видео үзсэн хувь", "шилдэг оролдлогын хувь", "дүгнэлт бичсэн хичээл, үгийн тоо", "самбар, багийн чат, дуу", "мартах муруйн дагуу давтсан хувь"];
+// Суралцахуйн оролцооны хүрээ: зан үйлийн (идэвх, анхаарал), танин мэдэхүйн (ойлголт, хэрэглээ), метатанин
+// мэдэхүйн (өөрийн зохицуулалт, эргэцүүлэл), нийгмийн (хамтын ажиллагаа) оролцоо ба суралцахуйн үр дүн.
+const DIM_LABELS = ["Идэвх", "Анхаарал", "Ойлголт", "Хэрэглээ", "Үр дүн", "Өөрийн зохицуулалт", "Эргэцүүлэл", "Хамтын ажиллагаа"];
+const DIM_HINTS = [
+  "идэвхтэй суралцсан хугацааны хувь ба суралцсан өдрийн тоо",
+  "хичээлийн үеийн төвлөрөл (60%) ба видеог хэр бүрэн үзсэн (40%)",
+  "зөв хариултын хувь, эхний оролдлогоор зөв хариулсан нь; таамаглан хариулбал хасна",
+  "даалгаврын үнэлгээ (70%) ба нээсэн даалгавраа гүйцэтгэж илгээсэн хувь (30%)",
+  "шалгалтын хамгийн сайн гүйцэтгэл (60%) ба хичээл дуусгалт (40%)",
+  "мартах муруйн дагуу давтсан (50%), тогтмол суралцсан (30%), даалгавраа хугацаандаа илгээсэн (20%)",
+  "«Юу сурсан бэ?» эргэцүүллийг хэр тогтмол, дэлгэрэнгүй бичсэн",
+  "самбар, багийн чат, дуут өрөөнд хамтран суралцсан байдал",
+];
+// Хураангуй самбарын 2 гол үзүүлэлтийн тайлбар — analytics.go-ийн attentionScore(), learnScore() тооцоололтой яг таарна.
+// Анхаарлын индекс нь суралцах үйл явц (төвлөрөл + видео үзэлт), Суралцахуйн оноо нь үр дүн ба зуршлыг хэмжинэ.
+const KPI_INFO = {
+  attention: ["Төвлөрөл 60% + видео үзэлт 40% — ангийн дундаж",
+    "Хоёр бүрэлдэхүүнийг жигнэж тооцно: <b>① Төвлөрөл (60%)</b> — хичээлийн цонх нээлттэй байсан хугацааны хэдэн хувьд нь идэвхтэй байсан; өөр таб, цонх руу шилжсэн болон 2 минутаас удаан хөдөлгөөнгүй байсан хугацаа орохгүй, таб сольсон, хуулах гэсэн зэрэг зөрчил олон бол 30 хүртэл оноо хасна. <b>② Видео үзэлт (40%)</b> — эхлүүлсэн видеоны дунджаар хэдэн хувийг үзсэн. Видео үзээгүй суралцагчид зөвхөн төвлөрлөөр тооцно. Камер, микрофон ашигладаггүй.<br><b>70–100</b> сайн · <b>40–69</b> дунд · <b>0–39</b> анхаарах"],
+  learn: ["Ойлголт, эргэцүүлэл, тогтмол байдлын нэгдсэн оноо",
+    "Суралцахуйн үр дүн ба зуршлыг нэгтгэсэн үзүүлэлт. Гурван бүрэлдэхүүний дундаж: ① хичээлийн асуултад зөв хариулсан хувь; ② үзсэн хичээлийн хэдэн хувьд «Юу сурсан бэ?» эргэцүүлэл бичсэн; ③ дараалан суралцсан өдөр (5 өдөр = 100). Видео үзэлт Анхаарлын индекст орно. Өгөгдөлгүй бүрэлдэхүүнийг тооцохгүй. 1.5 секундээс хурдан, таамаглан хариулсан асуулт олон бол 25 хүртэл оноо хасна. Аль бүрэлдэхүүн сул байгааг доорх «Суралцахуйн 8 хэмжүүр»-ээс харна уу.<br><b>70–100</b> сайн · <b>40–69</b> дунд · <b>0–39</b> анхаарах"],
+};
+// Сул (40-өөс доош) хэмжүүрт багшид өгөх сургалтын арга зүйн зөвлөмж (төлөвшүүлэх үнэлгээний зарчмаар).
+const DIM_TIPS = [
+  "Богино, тогтмол суралцах хуваарь санал болгож, суралцаагүй хүмүүст сануулга илгээгээрэй.",
+  "Видео, текстийг 5–7 минутын хэсгүүдэд хувааж, дунд нь асуулт оруулаарай; видеоны эхэнд зорилгыг нь хэлбэл бүрэн үзэх нь нэмэгдэнэ.",
+  "Олон хүн алдсан асуултын агуулгыг өөр жишээгээр дахин тайлбарлаж, дасгал нэмээрэй.",
+  "Бодит нөхцөлд хэрэглэх даалгавар (кейс, төсөл) өгч, үнэлгээний шалгуурыг рубрикээр урьдчилан тодорхой болгоорой; илгээгээгүй хүмүүст сануулаарай.",
+  "Шалгалтын өмнө ижил төрлийн сорил өгч, алдаан дээр эргэх холбоо өгөөрэй; дуусгаагүй хичээлүүдээ үргэлжлүүлэхийг сануулаарай.",
+  "Суралцах зорилго, хуваариа өөрөө тавихыг дэмжиж, давтлагын сануулгыг идэвхжүүлж, даалгаврын хугацааг урьдчилан сануулаарай.",
+  "«Юуг шинээр ойлгосон бэ? Юу тодорхойгүй хэвээр байна вэ?» гэх мэт чиглүүлэх асуулт өгөөрэй.",
+  "Хос, багийн даалгавар өгч, самбар дээр хамтран ажиллах үүрэг хуваарилаарай.",
+];
 function radarSVG(series) {
   const cx = 200, cy = 150, R = 100, n = DIM_LABELS.length, P = (i, r) => [cx + Math.sin((i / n) * Math.PI * 2) * r, cy - Math.cos((i / n) * Math.PI * 2) * r];
   const pts = (f) => Array.from({ length: n }, (_, i) => P(i, f(i)).map((v) => v.toFixed(1)).join(",")).join(" ");
   const main = series[0]?.vals || [];
-  let s = `<svg class="radar" viewBox="0 0 400 300" role="img" aria-label="${esc(DIM_LABELS.map((l, i) => `${l} ${main[i] >= 0 ? main[i] : "—"}`).join(", "))}">`;
+  let s = `<svg class="radar" viewBox="-50 0 500 300" role="img" aria-label="${esc(DIM_LABELS.map((l, i) => `${l} ${main[i] >= 0 ? main[i] : "—"}`).join(", "))}">`;
   [0.25, 0.5, 0.75, 1].forEach((k) => { s += `<polygon class="rd-grid" points="${pts(() => R * k)}"/>`; });
   for (let i = 0; i < n; i++) { const [x, y] = P(i, R); s += `<line class="rd-axis" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }
   series.slice().reverse().forEach((se) => {
@@ -2983,7 +3409,15 @@ function dimsBlock(dims, cmp, title) {
   const series = [{ vals: dims, fill: "rgba(20,184,166,.22)", stroke: "#0d9488" }];
   if (cmp && cmp.some((v) => v >= 0)) series.push({ vals: cmp, fill: "rgba(31,60,143,.06)", stroke: "#1f3c8f", dash: true });
   return `<div class="dims"><div class="dims-chart">${radarSVG(series)}${series[1] ? `<div class="an-legend dims-legend"><span><i style="background:#0d9488"></i>${esc(title || "Суралцагч")}</span><span><i style="background:#1f3c8f"></i>Ангийн дундаж</span></div>` : ""}</div>
-    <ul class="dims-list">${DIM_LABELS.map((l, i) => { const v = dims[i], c = cmp?.[i]; return `<li><span><b>${l}</b><small>${DIM_HINTS[i]}</small></span><span class="dims-bar"><i style="width:${Math.max(0, v)}%;background:${v >= 70 ? "var(--teal)" : v >= 40 ? "var(--accent)" : "#e5484d"}"></i>${c >= 0 && series[1] ? `<em style="left:${c}%" title="Ангийн дундаж ${c}"></em>` : ""}</span><b class="dims-v">${v >= 0 ? v : "—"}</b></li>`; }).join("")}</ul></div>`;
+    <ul class="dims-list">${DIM_LABELS.map((l, i) => { const v = dims[i], c = cmp?.[i]; return `<li${v >= 0 ? "" : ` title="Энэ хэмжүүрт өгөгдөл хараахан алга"`}><span><b>${l}</b><small>${DIM_HINTS[i]}</small></span><span class="dims-bar"><i style="width:${Math.max(0, v)}%;background:${v >= 70 ? "var(--teal)" : v >= 40 ? "var(--accent)" : "#e5484d"}"></i>${c >= 0 && series[1] ? `<em style="left:${c}%" title="Ангийн дундаж ${c}"></em>` : ""}</span><b class="dims-v">${v >= 0 ? v : "—"}</b></li>`; }).join("")}</ul>
+    <p class="dims-scale"><span><i style="background:var(--teal)"></i>70–100 сайн</span><span><i style="background:var(--accent)"></i>40–69 дунд</span><span><i style="background:#e5484d"></i>0–39 анхаарах</span><span>— өгөгдөл алга</span></p>
+    ${dimTips(dims)}</div>`;
+}
+// Хамгийн сул 2 хэмжүүр (40-өөс доош) — багш юунд анхаарч, юу хийж болохыг санал болгоно.
+function dimTips(dims) {
+  const weak = dims.map((v, i) => [v, i]).filter(([v]) => v >= 0 && v < 40).sort((a, b) => a[0] - b[0]).slice(0, 2);
+  if (!weak.length) return "";
+  return `<div class="dims-tips"><b>Анхаарах хэмжүүр — арга зүйн зөвлөмж</b><ul>${weak.map(([v, i]) => `<li><strong>${DIM_LABELS[i]} (${v})</strong> — ${esc(DIM_TIPS[i])}</li>`).join("")}</ul></div>`;
 }
 async function students() {
   // Олон мянган суралцагчтай үед эхний 200-г л ачаална; бусдыг нь «Бүх суралцагчид» дээр нэрээр хайна.
@@ -3038,11 +3472,12 @@ async function students() {
     const y = feed.box.scrollTop; $("#anFeed")?.replaceWith(feed.box); feed.box.scrollTop = y;
   };
   // Хүснэгтэд: суралцсан оноог юунаас бүрдсэнийг нэг мөрөөр.
+  // Анхаарлын индексийн бүрэлдэхүүн: төвлөрөл ба видео үзэлт.
+  const attnHint = (x) => `👁 ${x.focus ?? x.attention}%${x.video_clips ? ` · ▶ ${x.video_coverage}%` : ""}`;
   const learnHint = (x) => {
     const p = [];
     if (x.quiz_total) p.push(`✅ ${x.quiz_accuracy}% (${x.quiz_total})`);
     if (x.quiz_lessons) p.push(`🎯 ${x.quiz_mastered}/${x.quiz_lessons} хичээл`);
-    if (x.video_clips) p.push(`▶ ${x.video_coverage}%`);
     if (x.reflections) p.push(`✍️ ${x.reflections}`);
     if (x.streak_days > 1) p.push(`🔥 ${x.streak_days} өдөр`);
     if (x.board_days) p.push(`🧩 багаар ${x.collab_score}%`);
@@ -3056,10 +3491,10 @@ async function students() {
     const rows = list.filter((x) => x.board_days).sort((a, b) => b.collab_score - a.collab_score);
     const pctAct = (x) => (x.board_sec ? Math.min(100, Math.round(x.board_active_sec / x.board_sec * 100)) : 0);
     const stat = (label, value) => `<div class="anx-stat"><small>${label}</small><b>${value}</b></div>`;
-    return `<section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Багаар ажилласан нь <span class="chip">${rows.length}</span></h3><span class="muted small">цагаан самбар · багийн чат · дуут өрөө</span></div>
-      ${rows.length ? `<div class="anx-stats anx-collab">${stat("Багаар ажилласан оноо", t.collab_score + "%")}${stat("Самбарт идэвхтэй", dur(t.board_active_sec || 0))}${stat("Самбарын засвар", t.board_ops || 0)}${stat("Багийн чат", t.board_msgs || 0)}${stat("Ярьсан", dur(t.board_voice_sec || 0))}</div>` : ""}
+    return `<section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Хамтын ажил <span class="chip">${rows.length}</span></h3><span class="muted small">цагаан самбар · багийн чат · дуут өрөө</span></div>
+      ${rows.length ? `<div class="anx-stats anx-collab">${stat("Хамтын ажлын оноо", t.collab_score + "%")}${stat("Самбарт идэвхтэй", dur(t.board_active_sec || 0))}${stat("Самбарын засвар", t.board_ops || 0)}${stat("Багийн чат", t.board_msgs || 0)}${stat("Ярьсан", dur(t.board_voice_sec || 0))}</div>` : ""}
       <p class="muted small anx-hint">Оноо = самбар дээр идэвхтэй байсан хувь (40%) + зурж, бичсэн засвар (30%) + багтайгаа чатаар, дуугаар харилцсан (30%). Багш тайлбарлаж байх үе, түр зогсоосон хугацааг тооцохгүй.</p>
-      <div class="an-table-wrap"><table class="tbl an-table anx-table"><thead><tr><th>Суралцагч</th><th>Баг</th><th>Самбар дээр</th><th>Идэвхтэй</th><th>Засвар</th><th>Чат</th><th>Ярьсан</th><th>Багаар ажилласан</th></tr></thead><tbody>
+      <div class="an-table-wrap"><table class="tbl an-table anx-table"><thead><tr><th>Суралцагч</th><th>Баг</th><th>Самбар дээр</th><th>Идэвхтэй</th><th>Засвар</th><th>Чат</th><th>Ярьсан</th><th>Хамтын ажил</th></tr></thead><tbody>
       ${rows.map((x) => `<tr class="an-row" data-uid="${esc(x.user_id)}"><td><div class="anx-who"><span class="anx-av" style="--h:${hueOfName(x.name)}">${esc((x.name || "?").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase())}</span><div><b>${esc(x.name)}</b><small class="muted">${x.board_days} самбарын өдөр</small></div></div></td>
         <td data-label="Баг">${esc(teamName(x.board_team))}</td><td data-label="Самбар дээр">${dur(x.board_sec)}</td>
         <td data-label="Идэвхтэй"><b>${dur(x.board_active_sec)}</b><small class="muted">${pctAct(x)}%</small></td>
@@ -3086,7 +3521,7 @@ async function students() {
     const top = [30, 60, 120, 300, 600, 1200, 1800, 3600, 7200, 10800, 18000, 36000, 86400].find((x) => x >= max) || max;
     const sumA = daily.reduce((a, d) => a + d.active_sec, 0), best = daily.reduce((m, d) => (tot(d) > tot(m) ? d : m), daily[0]);
     const lbl = (day) => (day || "").slice(5).replace("-", "/"), mid = daily[Math.floor((daily.length - 1) / 2)];
-    return `<div class="anx-chart-sum"><span><b>${dur(sumA)}</b>идэвхтэй</span><span><b>${dur(Math.round(sumA / daily.length))}</b>өдрийн дундаж</span><span><b>${lbl(best.day)}</b>хамгийн идэвхтэй өдөр</span></div>
+    return `<div class="anx-chart-sum"><span><b>${dur(sumA)}</b>нийт идэвхтэй</span><span><b>${dur(Math.round(sumA / daily.length))}</b>өдрийн дундаж</span><span><b>${lbl(best.day)}</b>хамгийн идэвхтэй өдөр</span></div>
       <div class="anx-chart" role="img" aria-label="Өдөр бүрийн идэвхтэй ба идэвхгүй хугацаа">
         <div class="anx-y" aria-hidden="true"><span>${dur(top)}</span><span>${dur(Math.round(top / 2))}</span><span>0</span></div>
         <div class="anx-plot"><div class="anx-cols">${daily.map((d) => `<div class="anx-col" title="${esc(d.day)}: идэвхтэй ${dur(d.active_sec)}, идэвхгүй ${dur(d.inactive_sec)}"><i class="ia" style="height:${d.inactive_sec / top * 100}%"></i><i class="ac" style="height:${d.active_sec / top * 100}%"></i></div>`).join("")}</div></div>
@@ -3096,7 +3531,8 @@ async function students() {
     const t = data.totals, list = data.students, course = courseList.find((c) => c.id === st.course);
     const pct = (v) => Math.max(0, Math.min(100, +v || 0));
     const meter = (v) => `<span class="anx-meter"><i style="width:${pct(v)}%;background:${v >= 70 ? "var(--teal)" : v >= 40 ? "var(--accent)" : "var(--coral)"}"></i></span>`;
-    const kpi = (ic, label, value, sub) => `<div class="anx-kpi"><span class="anx-ic">${ico(ic, 18)}</span><small>${label}</small><b>${value}</b><div class="anx-sub">${sub || ""}</div></div>`;
+    // info — [товч тайлбар, «Хэрхэн тооцдог вэ?» дэлгэрэнгүй]: үзүүлэлт юуг хэмждэгийг багш тэр дор нь харна (утсанд ч ажиллана).
+    const kpi = (ic, label, value, sub, info) => `<div class="anx-kpi"><span class="anx-ic">${ico(ic, 18)}</span><small>${label}</small><b>${value}</b><div class="anx-sub">${sub || ""}${info ? `<span class="anx-hint">${info[0]}</span><details class="anx-info"><summary>Хэрхэн тооцдог вэ?</summary><p>${info[1]}</p></details>` : ""}</div></div>`;
     const stat = (label, value, cls = "") => `<div class="anx-stat ${cls}"><small>${label}</small><b>${value}</b></div>`;
     const risk = t.risk || { ok: 0, watch: 0, risk: 0 }; if (!t.risk) list.forEach((x) => (risk[x.risk] = (risk[x.risk] || 0) + 1));
     const ranks = Object.entries(t.rank_dist || {}).sort((a, b) => b[1] - a[1]).slice(0, 4), rankMax = Math.max(1, ...ranks.map(([, v]) => v));
@@ -3111,31 +3547,31 @@ async function students() {
         </div>
       </header>
       <div class="anx-kpis">
-        ${kpi("users", "Суралцагч", t.students, t.live ? `<span class="an-live">● ${t.live} одоо үзэж байна</span>` : `${rowsTotal} хүн элссэн / хичээл авсан`)}
-        ${kpi("clock", "Идэвхтэй хугацаа", dur(t.active_sec), `нийт ${dur(t.total_sec)}-аас · ${t.active_pct}%`)}
-        ${kpi("eye", "Анхаарлын индекс", t.attention + "%", meter(t.attention))}
-        ${kpi("target", "Суралцсан оноо", t.learn_score + "%", meter(t.learn_score))}
+        ${kpi("users", "Суралцсан хүн", t.students, t.live ? `<span class="an-live">● ${t.live} одоо суралцаж байна</span>` : `элссэн, хичээл авсан: ${rowsTotal}`)}
+        ${kpi("clock", "Идэвхтэй суралцсан хугацаа", dur(t.active_sec), `нийт ${dur(t.total_sec)} — үүний ${t.active_pct}% нь идэвхтэй`)}
+        ${kpi("eye", "Анхаарлын индекс", t.attention + "%", meter(t.attention) + `<span class="anx-parts"><span>Төвлөрөл <b>${t.focus ?? t.attention}%</b></span><span>Видео үзэлт <b>${t.video_students ? t.video_coverage + "%" : "—"}</b></span></span>`, KPI_INFO.attention)}
+        ${kpi("target", "Суралцахуйн оноо", t.learn_score + "%", meter(t.learn_score), KPI_INFO.learn)}
       </div>
       <div class="anx-stats">
-        ${stat("Идэвхтэй хувь", t.active_pct + "%")}${stat("Зөрчил", t.violations, t.violations ? "bad" : "")}${stat("Шалгалт", t.exams)}
-        ${stat("Асуулга дуусгасан", `${t.quiz_mastered}<em>/${t.quiz_lessons}</em>`)}${stat("Бичсэн дүгнэлт", t.reflections)}${stat("Дээд цол", t.top_rank?.lessons ? esc(t.top_rank.name) : "—")}
-        ${stat("Багаар ажилласан оноо", t.board_students ? `${t.collab_score}%<em> · ${t.board_students} хүн</em>` : "—")}
+        ${stat("Хамгаалалтын зөрчил", t.violations, t.violations ? "bad" : "")}${stat("Өгсөн шалгалт", t.exams)}
+        ${stat("Асуултыг бүрэн эзэмшсэн хичээл", `${t.quiz_mastered}<em>/${t.quiz_lessons}</em>`)}${stat("Бичсэн эргэцүүлэл", t.reflections)}${stat("Ангийн дээд эрэмбэ", t.top_rank?.lessons ? esc(t.top_rank.name) : "—")}
+        ${stat("Хамтын ажлын оноо", t.board_students ? `${t.collab_score}%<em> · ${t.board_students} суралцагч</em>` : "—")}
       </div>
       <div class="anx-grid">
-        <section class="anx-card anx-wide"><div class="anx-card-head"><h3>${ico("pulse", 18)}Өдөр бүрийн идэвх</h3><div class="an-legend"><span><i style="background:var(--brand)"></i>Идэвхтэй</span><span><i style="background:var(--accent)"></i>Идэвхгүй, өөр цонхонд</span></div></div>${chart2(data.daily || [])}</section>
-        <section class="anx-card"><div class="anx-card-head"><h3>${ico("alert", 18)}Эрсдэлийн тойм</h3></div>
+        <section class="anx-card anx-wide"><div class="anx-card-head"><h3>${ico("pulse", 18)}Өдөр бүрийн суралцах хугацаа</h3><div class="an-legend"><span><i style="background:var(--brand)"></i>Идэвхтэй суралцсан</span><span><i style="background:var(--accent)"></i>Идэвхгүй эсвэл өөр цонхонд</span></div></div>${chart2(data.daily || [])}</section>
+        <section class="anx-card"><div class="anx-card-head"><h3>${ico("alert", 18)}Эрт сэрэмжлүүлэг</h3></div>
           ${list.length ? `<div class="anx-riskbar">${["ok", "watch", "risk"].map((k) => (risk[k] ? `<i class="${k}" style="flex:${risk[k]}" title="${RISK[k][0]}: ${risk[k]}"></i>` : "")).join("")}</div>` : ""}
-          <ul class="anx-risks">${[["ok", "Идэвхтэй, анхааралтай"], ["watch", "Идэвх, анхаарал буурсан"], ["risk", "Зөрчил ихтэй эсвэл идэвхгүй"]].map(([k, hint]) => `<li><span class="an-risk ${k}">${RISK[k][0]}</span><small>${hint}</small><b>${risk[k] || 0}</b></li>`).join("")}</ul>
-          <h4 class="anx-sub-h">Цолын тархалт</h4>
-          ${ranks.length ? `<ul class="anx-ranks">${ranks.map(([k, v]) => `<li><span>${esc(k)}</span><i style="width:${v / rankMax * 100}%"></i><b>${v}</b></li>`).join("")}</ul>` : `<p class="muted small">Цол олгогдоогүй байна.</p>`}
-          ${t.cheated_lessons ? `<p class="anx-warn">⛔ ${t.cheated_lessons} хичээлд хуулах оролдлого — оноо тооцогдоогүй</p>` : ""}</section>
+          <ul class="anx-risks">${[["ok", "Тогтмол, төвлөрч суралцаж байна"], ["watch", "Идэвх, анхаарал нь буурсан — дэмжлэг хэрэгтэй"], ["risk", "Суралцахаа больсон эсвэл зөрчил олонтой — ярилцах хэрэгтэй"]].map(([k, hint]) => `<li><span class="an-risk ${k}">${RISK[k][0]}</span><small>${hint}</small><b>${risk[k] || 0}</b></li>`).join("")}</ul>
+          <h4 class="anx-sub-h">Эрэмбийн тархалт</h4>
+          ${ranks.length ? `<ul class="anx-ranks">${ranks.map(([k, v]) => `<li><span>${esc(k)}</span><i style="width:${v / rankMax * 100}%"></i><b>${v}</b></li>`).join("")}</ul>` : `<p class="muted small">Одоогоор эрэмбэ олгогдоогүй байна.</p>`}
+          ${t.cheated_lessons ? `<p class="anx-warn">⛔ ${t.cheated_lessons} хичээлд хуулах оролдлого гарсан тул оноог нь тооцоогүй</p>` : ""}</section>
       </div>
-      ${t.dims?.some((v) => v >= 0) ? `<section class="anx-card"><div class="anx-card-head"><h3>${ico("target", 18)}8 хэмжүүр — анги бүхэлдээ</h3><span class="muted small">${t.students} суралцагчийн дундаж · мөр дээр дарж хүн бүрийнхийг харна</span></div>${dimsBlock(t.dims, null)}</section>` : ""}
+      ${t.dims?.some((v) => v >= 0) ? `<section class="anx-card"><div class="anx-card-head"><h3>${ico("target", 18)}Суралцахуйн 8 хэмжүүр — ангийн дүр зураг</h3><span class="muted small">${t.students} суралцагчийн дундаж · суралцагч бүрийнхийг харахдаа жагсаалтын мөрийг дарна уу</span></div>${dimsBlock(t.dims, null)}</section>` : ""}
       <section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Суралцагч бүрээр <span class="chip">${data.total ?? list.length}</span></h3><label class="rail-search anx-search">${ico("search", 16)}<input type="search" id="anSearch" placeholder="Нэрээр хайх…" aria-label="Хайх" value="${esc(st.q || "")}"></label></div>
-        <p class="muted small anx-hint">Мөр дээр дарж дэлгэрэнгүйг (бичсэн дүгнэлт, асуултын хариулт, видео үзэлтийн зураглал) харна.</p>
-        <div class="an-table-wrap"><table class="tbl an-table anx-table"><thead><tr><th>Суралцагч</th><th>Идэвхтэй</th><th>Анхаарал</th><th>Суралцсан</th><th>Зөрчил</th><th>Шалгалт</th><th>Төлөв</th><th><span class="sr-only">Үйлдэл</span></th></tr></thead><tbody>
-        ${list.map((x) => `<tr class="an-row" data-uid="${esc(x.user_id)}"><td><div class="anx-who"><span class="anx-av" style="--h:${hueOfName(x.name)}">${esc(initials(x.name))}</span><div><b>${esc(x.name)}</b>${x.live ? ` <span class="an-live">●</span>` : ""}<small class="muted">${x.lessons} хичээл · ${fmtDate(x.last_at)}</small><span class="an-rank ${x.rank?.cheated ? "bad" : ""}" title="${x.rank?.points || 0} оноо">🎖 ${esc(x.rank?.name || "Шинэ цэрэг")}${x.rank?.cheated ? ` · ⛔${x.rank.cheated}` : ""}</span></div></div></td>
-          <td data-label="Идэвхтэй"><b>${dur(x.active_sec)}</b><small class="muted">нийт ${dur(x.total_sec)}</small></td><td data-label="Анхаарал">${bar(x.attention)}</td>
+        <p class="muted small anx-hint">Мөрийг дарж дэлгэрэнгүй мэдээллийг (бичсэн эргэцүүлэл, асуултын хариулт, видео үзэлтийн зураглал) харна уу.</p>
+        <div class="an-table-wrap"><table class="tbl an-table anx-table"><thead><tr><th>Суралцагч</th><th>Идэвхтэй</th><th title="${KPI_INFO.attention[0]}">Анхаарал</th><th title="Суралцахуйн оноо: ${KPI_INFO.learn[0]}">Суралцахуй</th><th>Зөрчил</th><th>Шалгалт</th><th>Төлөв</th><th><span class="sr-only">Үйлдэл</span></th></tr></thead><tbody>
+        ${list.map((x) => `<tr class="an-row" data-uid="${esc(x.user_id)}"><td><div class="anx-who"><span class="anx-av" style="--h:${hueOfName(x.name)}">${esc(initials(x.name))}</span><div><b>${esc(x.name)}</b>${x.live ? ` <span class="an-live">●</span>` : ""}<small class="muted">${x.lessons} хичээл · ${fmtDate(x.last_at)}</small><span class="an-rank ${x.rank?.cheated ? "bad" : ""}" title="${x.rank?.points || 0} оноо">🎖 ${esc(x.rank?.name || "Оч")}${x.rank?.cheated ? ` · ⛔${x.rank.cheated}` : ""}</span></div></div></td>
+          <td data-label="Идэвхтэй"><b>${dur(x.active_sec)}</b><small class="muted">нийт ${dur(x.total_sec)}</small></td><td data-label="Анхаарал">${bar(x.attention)}<small class="muted">${attnHint(x)}</small></td>
           <td data-label="Суралцсан">${bar(x.learn_score)}<small class="muted">${learnHint(x)}</small></td>
           <td data-label="Зөрчил">${x.violations ? `<b class="an-bad">${x.violations}</b><small class="muted">${["tab_switch", "copy", "auto_block"].filter((k) => x.counts[k]).map((k) => `${esc(labels[k] || k)}: ${x.counts[k]}`).join(", ")}</small>` : `<span class="muted">0</span>`}</td>
           <td data-label="Шалгалт">${x.exam_best >= 0 ? `<b>${x.exam_best}%</b>${x.terminated ? `<small class="an-bad">${x.terminated} хаагдсан</small>` : ""}` : `<span class="muted">—</span>`}</td>
@@ -3146,7 +3582,7 @@ async function students() {
       <div class="anx-grid">
         <section class="anx-card anx-wide"><div class="anx-card-head"><h3>${ico("clock", 18)}Сүүлийн үйл явдал</h3><span class="muted small">зөрчил, сануулга, шалгалт</span></div><div id="anFeed"></div></section>
         <section class="anx-card"><div class="anx-card-head"><h3>${ico("users", 18)}Бүх суралцагчид <span class="chip">${rowsTotal}</span></h3></div>
-          <p class="muted small anx-hint">Элссэн эсвэл хичээл худалдаж авсан хүмүүс. «Чат» дарахад баруун талд яриа нээгдэнэ.${rowsTotal > rows.length ? ` Сүүлд элссэн ${rows.length}-г харуулж байна — бусдыг нь нэрээр хайна уу.` : ""}</p>
+          <p class="muted small anx-hint">Элссэн эсвэл хичээл худалдаж авсан суралцагчид. «Чат» дарахад баруун талд яриа нээгдэнэ.${rowsTotal > rows.length ? ` Сүүлд элссэн ${rows.length}-г харуулж байна — бусдыг нь нэрээр хайна уу.` : ""}</p>
           ${rowsTotal > rows.length ? `<input type="search" class="input" id="stuFind" placeholder="Нэрээр хайх…" aria-label="Суралцагч хайх" style="margin:0 0 8px">` : ""}
           <div class="anx-roster" id="stuList">${rows.map(studentMini).join("") || `<div class="anx-empty">${ico("users", 26)}<p>Одоогоор суралцагч алга. Профайлаа түгээж, үнэгүй хичээл нийтлээрэй.</p></div>`}</div></section>
       </div></div>`;
@@ -3155,7 +3591,7 @@ async function students() {
     mountFeed();
   };
   const load = async () => {
-    const d = await api(`/api/me/analytics?${qs()}`); data = d.data; labels = d.labels; data.total = d.students_total ?? data.students.length;
+    const d = await api(`/api/me/analytics?${qs()}`); data = d.data; labels = { story_view: "Тэмдэглэлийн story үзсэн", review_done: "Хичээлээ давтсан", ...(d.labels || {}) }; data.total = d.students_total ?? data.students.length;
     const had = document.activeElement?.id === "anSearch"; render();
     if (had) { const i = $("#anSearch"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } // хайж байхад курсор алдагдахгүй
   };
@@ -3166,7 +3602,7 @@ async function students() {
     const a = document.createElement("a"); a.href = URL.createObjectURL(await res.blob()); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   };
   const printReport = (title, html) => {
-    const w = open("", "_blank"); if (!w) return toast("Шинэ цонх нээгдсэнгүй — хөтчийн popup зөвшөөрнө үү", true);
+    const w = open("", "_blank"); if (!w) return toast("Шинэ цонх нээгдсэнгүй — хөтөч дээрээ popup цонхыг зөвшөөрнө үү", true);
     w.document.write(`<!doctype html><html lang="mn"><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font:13px system-ui,sans-serif;color:#121829;margin:28px}h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d6dbe6;padding:6px 8px;text-align:left;vertical-align:top}th{background:#eef2fb}.m{color:#59637a}</style></head><body>${html}<p class="m">surgalt.mn · ${new Date().toLocaleString()}</p></body></html>`);
     w.document.close(); setTimeout(() => w.print(), 300);
   };
@@ -3184,32 +3620,32 @@ async function students() {
     const lastTry = new Set(Object.values((d.exams || []).reduce((o, a) => (a.status !== "active" && (!o[a.lesson_id] || a.started_at > o[a.lesson_id].started_at) && (o[a.lesson_id] = a), o), {})).map((a) => a.id));
     const html = `<h3 class="h3">${esc(x.name)}</h3>
       <div class="an-tiles"><div class="an-tile"><small>Идэвхтэй</small><b>${dur(x.active_sec)}</b></div><div class="an-tile"><small>Идэвхтэй хувь</small><b>${x.active_pct}%</b></div>
-        <div class="an-tile"><small>Анхаарал</small><b>${x.attention}%</b></div><div class="an-tile ${x.violations ? "warn" : ""}"><small>Зөрчил</small><b>${x.violations}</b></div>
-        <div class="an-tile learn"><small>Суралцсан оноо</small><b>${x.learn_score}%</b></div>
+        <div class="an-tile" title="${KPI_INFO.attention[0]}"><small>Анхаарлын индекс</small><b>${x.attention}%</b><span class="muted small">төвлөрөл ${x.focus ?? x.attention}%${x.video_clips ? ` · видео үзэлт ${x.video_coverage}%` : " · видео үзээгүй"}</span></div><div class="an-tile ${x.violations ? "warn" : ""}"><small>Хамгаалалтын зөрчил</small><b>${x.violations}</b></div>
+        <div class="an-tile learn" title="${KPI_INFO.learn[0]}"><small>Суралцахуйн оноо</small><b>${x.learn_score}%</b></div>
         <div class="an-tile"><small>Тогтмол байдал</small><b>${x.streak_days}</b><span class="muted small">дараалсан өдөр · ${x.active_days} нийт өдөр</span></div>
-        <div class="an-tile ${x.rank?.cheated ? "warn" : "learn"}"><small>Нэгдсэн цол</small><b>${esc(x.rank?.name || "Шинэ цэрэг")} ${esc(x.rank?.insignia || "")}</b><span class="muted small">${x.rank?.points || 0} оноо${x.rank?.integration?.bonus ? ` (интеграц +${x.rank.integration.bonus})` : ""}${x.rank?.next ? ` · дараагийнх ${x.rank.next}` : ""}${x.rank?.cheated ? ` · ⛔ ${x.rank.cheated} хичээл тооцогдоогүй` : ""}</span></div></div>
-      ${x.dims?.some((v) => v >= 0) ? `<h4>8 хэмжүүр</h4><p class="muted small" style="margin:0 0 8px">Будсан — ${esc(x.name)}, тасархай — ангийн дундаж (ижил сургалт, хугацаагаар).</p>${dimsBlock(x.dims, data.totals?.dims, x.name)}` : ""}
-      ${x.lesson_ranks?.length ? `<h4>Нэгдсэн цолд нэмсэн оноо — хичээл бүрээр</h4><p class="muted small" style="margin:0 0 8px">Цолыг хичээл бүрт биш, бүх хичээлийг нэгтгэж олгоно. Хичээл бүр 0-100 оноо нэмнэ (дууссан, идэвхтэй хугацаа, асуулга, дүгнэлт, видео; таб солилт хасна). Бүлэг, сургалтын бүх хичээлийг дуусгавал интеграцын нэмэлт оноо${x.rank?.integration ? ` — одоо +${x.rank.integration.bonus || 0} (${x.rank.integration.sections || 0}/${x.rank.integration.sections_all || 0} бүлэг, ${x.rank.integration.courses || 0}/${x.rank.integration.courses_all || 0} сургалт бүтэн)` : ""}. Зөрчилтэй (хуулах оролдлого, хичээлээс гарч зогссон) хичээлийн оноо тооцогдохгүй — дахин 10+ минут судалбал тооцогдоно.</p>
+        <div class="an-tile ${x.rank?.cheated ? "warn" : "learn"}"><small>Нэгдсэн эрэмбэ</small><b>${esc(x.rank?.name || "Оч")} ${esc(x.rank?.insignia || "")}</b><span class="muted small">${x.rank?.points || 0} оноо${x.rank?.integration?.bonus ? ` (интеграц +${x.rank.integration.bonus})` : ""}${x.rank?.next ? ` · дараагийнх ${x.rank.next}` : ""}${x.rank?.cheated ? ` · ⛔ ${x.rank.cheated} хичээл тооцогдоогүй` : ""}</span></div></div>
+      ${x.dims?.some((v) => v >= 0) ? `<h4>Суралцахуйн 8 хэмжүүр</h4><p class="muted small" style="margin:0 0 8px">Будсан хэсэг — ${esc(x.name)}, тасархай шугам — ангийн дундаж (ижил сургалт, ижил хугацаагаар).</p>${dimsBlock(x.dims, data.totals?.dims, x.name)}` : ""}
+      ${x.lesson_ranks?.length ? `<h4>Нэгдсэн эрэмбэд нэмсэн оноо — хичээл бүрээр</h4><p class="muted small" style="margin:0 0 8px">Эрэмбийг хичээл тус бүрээр биш, бүх хичээлийн оноог нэгтгэж олгоно. Хичээл бүр 0-100 оноо нэмнэ (дуусгасан эсэх, идэвхтэй хугацаа, асуулт, дүгнэлт, видео; таб солилт оноо хасна). Бүлэг, сургалтын бүх хичээлийг дуусгавал интеграцын нэмэлт оноо${x.rank?.integration ? ` — одоо +${x.rank.integration.bonus || 0} (${x.rank.integration.sections || 0}/${x.rank.integration.sections_all || 0} бүлэг, ${x.rank.integration.courses || 0}/${x.rank.integration.courses_all || 0} сургалт бүтэн)` : ""}. Зөрчилтэй (хуулах оролдлого, хичээлээс гарч зогссон) хичээлийн оноо тооцогдохгүй — дахин 10-аас дээш минут судалбал тооцогдоно.</p>
         ${x.rank?.tips?.length ? `<ul class="muted small" style="margin:0 0 8px 18px">${x.rank.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
         <table class="tbl"><thead><tr><th>Хичээл</th><th>Нэмсэн оноо</th><th>Үндэслэл</th></tr></thead><tbody>${x.lesson_ranks.map((r) => `<tr class="${r.disqualified ? "an-wrongq" : ""}"><td>${esc(r.title)}</td><td>${r.disqualified ? "⛔ тооцогдоогүй" : "+" + r.points}</td><td class="muted small">${(r.reasons || []).map(esc).join(", ")}</td></tr>`).join("")}</tbody></table>` : ""}
       ${chart(d.daily)}
       <h4>Идэвхтэй суралцсаны нотолгоо</h4>
       <div class="an-tiles">
         <div class="an-tile"><small>Асуултад зөв хариулсан</small><b>${x.quiz_total ? x.quiz_accuracy + "%" : "—"}</b><span class="muted small">${x.quiz_total} асуулт${x.quiz_total ? `, дундаж ${Math.round(x.quiz_avg_ms / 1000)} сек` : ""}</span></div>
-        <div class="an-tile ${x.quiz_guesses > 2 ? "warn" : ""}"><small>Хэт хурдан хариулсан</small><b>${x.quiz_guesses}</b><span class="muted small">1.5 сек-ээс богино (таамаг)</span></div>
-        <div class="an-tile"><small>Асуулга дуусгасан</small><b>${x.quiz_lessons ? `${x.quiz_mastered}/${x.quiz_lessons}` : "—"}</b><span class="muted small">хичээл · анх удаад зөв ${x.quiz_questions ? x.quiz_first_try + "%" : "—"} · ${x.quiz_questions ? (x.quiz_attempts / 10).toFixed(1) + " оролдлого/асуулт" : ""}</span></div>
+        <div class="an-tile ${x.quiz_guesses > 2 ? "warn" : ""}"><small>Хэт хурдан хариулсан</small><b>${x.quiz_guesses}</b><span class="muted small">1.5 секундээс богино хугацаанд (таамагласан байж болзошгүй)</span></div>
+        <div class="an-tile"><small>Асуултыг бүрэн эзэмшсэн</small><b>${x.quiz_lessons ? `${x.quiz_mastered}/${x.quiz_lessons}` : "—"}</b><span class="muted small">хичээл · анх удаад зөв ${x.quiz_questions ? x.quiz_first_try + "%" : "—"} · ${x.quiz_questions ? (x.quiz_attempts / 10).toFixed(1) + " оролдлого/асуулт" : ""}</span></div>
         <div class="an-tile"><small>▶ Видео үзэлт</small><b>${x.video_clips ? x.video_coverage + "%" : "—"}</b><span class="muted small">${x.video_clips} видео</span></div>
-        <div class="an-tile"><small>Дүгнэлт бичсэн</small><b>${x.reflections}</b><span class="muted small">${x.reflections ? `дундаж ${x.reflection_words} үг` : "одоогоор алга"}</span></div>
-        <div class="an-tile ${x.review_due && x.review_done * 2 < x.review_due ? "warn" : ""}"><small>🧠 Мартах муруйн давталт</small><b>${x.review_due ? Math.round((x.review_done * 100) / x.review_due) + "%" : "—"}</b><span class="muted small">${x.review_due ? `${x.review_done}/${x.review_due} үе шатанд эргэж давтсан` : "давтах үе шат болоогүй"}</span></div>
-        <div class="an-tile ${x.board_days ? "learn" : ""}"><small>🧩 Багаар ажилласан</small><b>${x.board_days ? x.collab_score + "%" : "—"}</b><span class="muted small">${x.board_days ? `${esc(teamName(x.board_team))} · идэвхтэй ${dur(x.board_active_sec)} · ${x.board_ops} засвар · ${x.board_msgs} чат${x.board_voice_sec ? ` · ${dur(x.board_voice_sec)} ярьсан` : ""}` : "самбар дээр ажиллаагүй"}</span></div></div>
+        <div class="an-tile"><small>Эргэцүүлэл бичсэн</small><b>${x.reflections}</b><span class="muted small">${x.reflections ? `дундаж ${x.reflection_words} үг` : "одоогоор алга"}</span></div>
+        <div class="an-tile ${x.review_due && x.review_done * 2 < x.review_due ? "warn" : ""}"><small>🧠 Мартах муруйн давталт</small><b>${x.review_due ? Math.round((x.review_done * 100) / x.review_due) + "%" : "—"}</b><span class="muted small">${x.review_due ? `${x.review_done}/${x.review_due} үе шатанд эргэж давтсан` : "давтах үе шат хараахан ирээгүй"}</span></div>
+        <div class="an-tile ${x.board_days ? "learn" : ""}"><small>🧩 Хамтын ажил</small><b>${x.board_days ? x.collab_score + "%" : "—"}</b><span class="muted small">${x.board_days ? `${esc(teamName(x.board_team))} · идэвхтэй ${dur(x.board_active_sec)} · ${x.board_ops} засвар · ${x.board_msgs} чат${x.board_voice_sec ? ` · ${dur(x.board_voice_sec)} ярьсан` : ""}` : "самбар дээр ажиллаагүй"}</span></div></div>
       ${d.watches?.length ? `<h4>Видеоны үзэлтийн зураглал</h4><p class="muted small" style="margin:0 0 8px">Бараан хэсэг = давтаж үзсэн, цайвар саарал = алгассан хэсэг.</p><div class="vh">${d.watches.map(heatmap).join("")}</div>` : ""}
-      ${d.reflections?.length ? `<h4>Бичсэн дүгнэлтүүд</h4><div class="refl-list">${d.reflections.map((r) => `<div class="refl-item"><b>${esc(r.lesson)}</b><small class="muted">${fmtDate(r.at)}</small><p>${esc(r.text)}</p></div>`).join("")}</div>` : ""}
-      ${d.quiz_lessons?.length ? `<h4>Асуулгын үнэлгээ — хичээл бүрээр</h4><p class="muted small" style="margin:0 0 8px">Хичээл доторх өөрийгөө сорих асуултууд. Бүгдэд нь зөв хариулсан хичээлийн дараагийнх нээгдэнэ.</p>
+      ${d.reflections?.length ? `<h4>Бичсэн эргэцүүллүүд</h4><div class="refl-list">${d.reflections.map((r) => `<div class="refl-item"><b>${esc(r.lesson)}</b><small class="muted">${fmtDate(r.at)}</small><p>${esc(r.text)}</p></div>`).join("")}</div>` : ""}
+      ${d.quiz_lessons?.length ? `<h4>Шалгах асуултын үр дүн — хичээл бүрээр</h4><p class="muted small" style="margin:0 0 8px">Хичээл доторх өөрийгөө шалгах асуултууд. Бүх асуултад зөв хариулсан хичээлийн дараагийн хичээл нээгдэнэ.</p>
         <table class="tbl"><thead><tr><th>Хичээл</th><th>Зөв / асуулт</th><th>Төлөв</th><th>Оролдлого</th><th>Анх удаад зөв</th><th>Дундаж</th></tr></thead><tbody>${d.quiz_lessons.map((q) => `<tr class="${q.done ? "" : "an-wrongq"}"><td>${esc(q.title)}</td><td>${q.correct}/${q.total}</td><td>${q.done ? `✓ Дууссан${q.done_at ? " · " + fmtDate(q.done_at) : ""}` : `${q.total - q.correct} үлдсэн`}</td><td>${q.attempts}${q.questions ? ` (${(q.attempts / q.questions).toFixed(1)}/асуулт)` : ""}</td><td>${q.questions ? q.first_try + "/" + q.questions : "—"}</td><td>${q.avg_ms ? (q.avg_ms / 1000).toFixed(1) + " сек" : "—"}${q.guesses ? ` · ⚡${q.guesses}` : ""}</td></tr>`).join("")}</tbody></table>` : ""}
-      ${d.quiz_logs?.length ? `<h4>Асуултын хариултын лог</h4><div class="bk-log" id="anQuizLog"><table class="tbl"><thead><tr><th>Огноо</th><th>Хичээл</th><th>Асуулт</th><th>Хариулт</th><th>Хугацаа</th></tr></thead><tbody></tbody></table></div>` : ""}
+      ${d.quiz_logs?.length ? `<h4>Асуултын хариултын түүх</h4><div class="bk-log" id="anQuizLog"><table class="tbl"><thead><tr><th>Огноо</th><th>Хичээл</th><th>Асуулт</th><th>Хариулт</th><th>Хугацаа</th></tr></thead><tbody></tbody></table></div>` : ""}
       <h4>Хичээл тус бүрээр</h4><table class="tbl"><thead><tr><th>Хичээл</th><th>Идэвхтэй</th><th>Нийт</th><th>Удаа</th><th>Зөрчил</th></tr></thead><tbody>${d.lessons.map((l) => `<tr><td>${esc(l.title)}</td><td>${dur(l.active_sec)}</td><td>${dur(l.total_sec)}</td><td>${l.sessions}</td><td>${l.violations}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">Алга</td></tr>`}</tbody></table>
       <h4>Шалгалтууд</h4><table class="tbl"><thead><tr><th>Огноо</th><th>Шалгалт</th><th>Оноо</th><th>Төлөв</th><th>Зөрчил</th><th></th></tr></thead><tbody>${d.exams.map((a) => `<tr><td>${fmtDate(a.started_at)}</td><td>${esc(d.lesson_titles?.[a.lesson_id] || "")}</td><td>${a.pct}%${a.passed ? " ✓" : ""}</td><td>${a.status === "terminated" ? `<b class="an-bad">Хаагдсан</b> · ${esc(a.reason || "")}` : a.status === "submitted" ? "Өгсөн" : a.status === "expired" ? "Хугацаа хэтэрсэн" : "Явагдаж байна"}</td><td>${a.violations}</td><td>${lastTry.has(a.id) ? `<button class="btn btn-glass btn-sm an-reopen" data-reopen-exam="${esc(a.lesson_id)}" data-reopen-user="${esc(uid)}" title="Дахин өгөх боломж олгоно (+1 оролдлого), суралцагчид мэдэгдэл очно">🔓 Дахин нээх</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">Алга</td></tr>`}</tbody></table>
-      <h4>Лог</h4><div id="anStuFeed"></div>`;
+      <h4>Үйлдлийн түүх</h4><div id="anStuFeed"></div>`;
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="anModal"><div class="modal-card" style="width:min(900px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>${html}
       <div class="hero-cta" style="margin:16px 0 0;justify-content:flex-end"><button class="btn btn-glass" data-x="csv">${ico("files", 16)}Excel</button><button class="btn btn-glass" data-x="pdf">${ico("book", 16)}PDF</button><button class="btn btn-gold" data-x="remind">${ico("chat", 16)}Сануулга илгээх</button></div></div></div>`);
     const m = $("#anModal"), sf = makeFeed(`&student=${encodeURIComponent(uid)}`, false); $("#anStuFeed", m).replaceWith(sf.box);
@@ -3231,7 +3667,7 @@ async function students() {
     const opts = (cs.length ? cs.map((c) => [c.course_id, c.course_title]) : courseList.map((c) => [c.id, c.title]));
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="rmModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">${ico("x", 18)}</button>
       <h3 class="h3">${esc(name)}-д сануулга</h3><form class="form" id="rmForm"><label>Сургалт<select name="course">${opts.map(([id, t]) => `<option value="${esc(id)}" ${id === st.course ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
-      <div class="find-chips" style="justify-content:flex-start">${["Хичээлээ анхааралтай, бусад цонхоо хаагаад үзээрэй.", "Даалгавраа хугацаанд нь хийгээрэй.", "Шалгалтдаа сайн бэлдээрэй, амжилт!"].map((t) => `<button type="button" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+      <div class="find-chips" style="justify-content:flex-start">${["Бусад цонхоо хаагаад хичээлээ анхааралтай үзээрэй.", "Даалгавраа хугацаанд нь хийгээрэй.", "Шалгалтдаа сайн бэлдээрэй, амжилт хүсье!"].map((t) => `<button type="button" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>
       <label>Мессеж<textarea name="message" rows="3" maxlength="500" required></textarea></label><p class="form-error" role="alert"></p>
       <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Илгээх</button></div></form></div></div>`);
     const m = $("#rmModal"), f = $("#rmForm", m); SG.openModal(m); f.message.focus();
@@ -3275,7 +3711,7 @@ async function students() {
 /* ---------- Данс: банкны данс холбох, орлого татах (гараар / хуваариар), орлогын статистик ---------- */
 const PAY_ST = { pending: ["Хүлээгдэж буй", "chip-amber"], sending: ["Шилжүүлж байна", "chip-amber"], review: ["Шалгаж байна", "chip-amber"], paid: ["Шилжүүлсэн", "chip-teal"], rejected: ["Татгалзсан", "chip-coral"] };
 const SCH_HELP = {
-  manual: "Та доорх «Татах» товчоор хүссэн үедээ татна.",
+  manual: "Доорх «Татах» товчоор хүссэн үедээ орлогоо татна.",
   instant: "Борлуулалт бүрийн дараа үлдэгдлийг автоматаар татах хүсэлт илгээнэ.",
   daily: "Өдөрт нэг удаа үлдэгдлийг автоматаар татна.",
   weekly: "7 хоногт нэг удаа (Даваа гарагаас эхлэн) үлдэгдлийг автоматаар татна.",
@@ -3310,7 +3746,7 @@ async function wallet() {
         <form class="form wl-form" id="wlAcct">
           <div class="form-row"><label>Банк<select name="bank" required><option value="">— Банкаа сонгоно уу —</option>${pay.banks.map((x) => `<option value="${esc(x.key)}" ${a?.bank === x.key ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>
           <label>Дансны дугаар<input name="account_no" required inputmode="numeric" autocomplete="off" maxlength="34" placeholder="ж: 5000123456 эсвэл MN…" value="${esc(a?.account_no || "")}"></label></div>
-          <label>Данс эзэмшигчийн нэр<input name="account_name" required maxlength="100" placeholder="Банкан дахь нэрээр (ж: Бат Болд)" value="${esc(a?.account_name || "")}"></label>
+          <label>Данс эзэмшигчийн нэр<input name="account_name" required maxlength="100" placeholder="Банкинд бүртгэлтэй нэрээр (ж: Бат Болд)" value="${esc(a?.account_name || "")}"></label>
           <div class="wl-sch"><span class="wl-lbl">Татах хуваарь</span>
             <div class="anx-seg wl-seg" role="radiogroup" aria-label="Татах хуваарь">${pay.schedules.map((x) => `<button type="button" role="radio" data-sch="${x.key}" aria-pressed="${x.key === sch}" aria-checked="${x.key === sch}">${esc(x.name)}</button>`).join("")}</div>
             <p class="muted small" id="wlSchHelp">${SCH_HELP[sch]}</p></div>

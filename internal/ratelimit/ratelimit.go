@@ -57,10 +57,21 @@ func (l *Limiter) Allow(key string) bool {
 	return true
 }
 
-// Janitor нь удаан идэвхгүй байсан bucket-уудыг устгаж санах ойг хэмнэнэ.
+// idle — bucket-ийг устгаж болох идэвхгүй хугацаа: дор хаяж 3 минут, мөн дахин дүүрэх хугацаанаас (burst/rate)
+// багагүй — урт цонхтой хязгаар (ж: цагт 30) устгагдаад шинээр бүтэн burst авахгүй.
+func (l *Limiter) idle() time.Duration {
+	d := 3 * time.Minute
+	if l.rate > 0 {
+		d = max(d, time.Duration(l.burst/l.rate*float64(time.Second)))
+	}
+	return d
+}
+
+// Janitor нь удаан идэвхгүй байсан (дахин дүүрсэн) bucket-уудыг устгаж санах ойг хэмнэнэ.
 func (l *Limiter) Janitor(ctx context.Context) {
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
+	idle := l.idle()
 	for {
 		select {
 		case <-ctx.Done():
@@ -70,7 +81,7 @@ func (l *Limiter) Janitor(ctx context.Context) {
 				s := &l.shards[i]
 				s.mu.Lock()
 				for k, b := range s.m {
-					if now.Sub(b.last) > 3*time.Minute {
+					if now.Sub(b.last) > idle {
 						delete(s.m, k)
 					}
 				}

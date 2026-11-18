@@ -109,14 +109,14 @@ func (s *Server) bankSend(ctx context.Context, id, by string) (*store.Payout, er
 			return nil, err
 		}
 	}
-	errState := errors.New("энэ хүсэлт хүлээгдэж буй төлөвт биш")
+	errState := errors.New("энэ хүсэлт хүлээгдэж буй төлөвт байхгүй байна")
 	ref := "SG" + strings.ToUpper(fmt.Sprintf("%x", time.Now().UnixNano()))[:14]
 	p, err := s.store.UpdatePayout(ctx, id, func(p *store.Payout) error {
 		if p.Status != store.PayoutPending {
 			return errState
 		}
 		if _, ok := bankInfo[p.Bank]; !ok {
-			return fmt.Errorf("банк %q-ийн кодыг мэдэхгүй", p.Bank)
+			return fmt.Errorf("%q банкны код тодорхойгүй байна", p.Bank)
 		}
 		p.Status, p.BankRef = store.PayoutSending, ref
 		return nil
@@ -171,7 +171,7 @@ func (s *Server) bankSend(ctx context.Context, id, by string) (*store.Payout, er
 	default:
 		s.log.Warn("Хаан банкны шилжүүлэг амжилтгүй", "payout", id, "status", final.Status, "err", err)
 		s.notifyAdmins(ctx, &store.Notification{Type: NotifPayout, Link: s.adminPath() + "#payouts",
-			Title: "⚠️ Банкны шилжүүлэг амжилтгүй · " + money(final.Amount), Body: final.Note})
+			Title: "⚠️ Банкны шилжүүлэг амжилтгүй боллоо · " + money(final.Amount), Body: final.Note})
 	}
 	return final, nil
 }
@@ -242,7 +242,7 @@ func (s *Server) handleAdminPayoutSend(w http.ResponseWriter, r *http.Request) {
 	p, err := s.bankSend(r.Context(), r.PathValue("id"), admin.DisplayName)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 	case err != nil:
 		writeErr(w, http.StatusConflict, err.Error())
 	default:
@@ -261,7 +261,7 @@ func (s *Server) handleAdminPayoutHolder(w http.ResponseWriter, r *http.Request)
 	}
 	i := slices.IndexFunc(ps, func(p store.Payout) bool { return p.ID == r.PathValue("id") })
 	if i < 0 {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	if s.Khan == nil {
@@ -274,7 +274,7 @@ func (s *Server) handleAdminPayoutHolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if h == nil {
-		writeErr(w, http.StatusConflict, "энэ банкны кодыг мэдэхгүй")
+		writeErr(w, http.StatusConflict, "энэ банкны код тодорхойгүй байна")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"name": h.Name, "iban": h.IBAN, "entered": ps[i].AccountName})

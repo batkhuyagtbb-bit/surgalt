@@ -140,7 +140,7 @@ func (s *Server) handleBoardImages(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.searchLim.Allow(c.UID) {
 		w.Header().Set("Retry-After", "2")
-		writeErr(w, http.StatusTooManyRequests, "хэт олон хайлт, түр хүлээнэ үү")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон удаа хайлаа — түр хүлээнэ үү")
 		return
 	}
 	q := strings.Join(strings.Fields(r.URL.Query().Get("q")), " ")

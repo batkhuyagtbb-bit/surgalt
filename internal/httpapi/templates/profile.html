@@ -26,7 +26,7 @@
       <span class="pf-cover-hint" hidden>↕ Зургийг дээш, доош чирж байрлуулна уу</span>
       <button class="pf-cover-qr" data-open-qr aria-label="QR код томруулах" title="Профайлын QR код">
         <span class="pf-cover-qr-img"><img src="/t/{{$t.Username}}/qr.png?size=320" alt="" width="132" height="132"><i class="qr-scan"></i></span>
-        <span class="pf-cover-qr-txt"><b>Уншуулаад шууд нэвтэр</b><small>surgalt.mn/t/{{$t.Username}}</small></span>
+        <span class="pf-cover-qr-txt"><b>Уншуулаад шууд ороорой</b><small>surgalt.mn/t/{{$t.Username}}</small></span>
       </button>
       <div class="pf-cover-tools">
         <button class="pf-cover-btn" data-owner data-cover-pos hidden title="Нүүр зургийг дээш, доош чирж байрлуулах">{{icon "layers"}}<span>Байрлал тохируулах</span></button>
@@ -58,7 +58,7 @@
       </div>
       <div class="pf-actions" data-owner hidden>
         <button class="btn btn-gold" data-edit-profile>{{icon "edit"}}Профайл засах</button>
-        <button class="btn btn-glass" data-view-as title="Зочид таны профайлыг хэрхэн харахыг үзэх">{{icon "eye"}}Зочны нүдээр</button>
+        <button class="btn btn-glass" data-view-as title="Зочид таны профайлыг хэрхэн харж байгааг үзэх">{{icon "eye"}}Зочны нүдээр</button>
       </div>
     </div>
     <nav class="pf-tabs" id="pfTabs" aria-label="Профайлын хэсгүүд">
@@ -117,7 +117,7 @@
 
         {{if .D.Meetings}}{{with index .D.Meetings 0}}
         <a class="card pf-next" href="/c/{{.CourseID}}#meet={{.ID}}"><span class="item-ico">{{icon "live" 20}}</span>
-          <span class="grow"><span class="eyebrow">Удахгүй шууд хичээл</span><strong>{{.Title}}</strong><small class="muted"><time datetime="{{rfc .StartsAt}}" data-dt>{{.StartsAt.Format "01/02 15:04"}}</time> · {{.DurationMin}} мин · {{.CourseTitle}}</small></span>
+          <span class="grow"><span class="eyebrow">Удахгүй болох шууд хичээл</span><strong>{{.Title}}</strong><small class="muted"><time datetime="{{rfc .StartsAt}}" data-dt>{{.StartsAt.Format "01/02 15:04"}}</time> · {{.DurationMin}} мин · {{.CourseTitle}}</small></span>
           {{if .Price}}<span class="chip chip-amber">{{money .Price}}</span>{{else}}<span class="chip chip-gold">Сургалт руу</span>{{end}}</a>
         {{end}}{{end}}
 
@@ -172,7 +172,7 @@
             <div><dt>Мэргэжил</dt><dd>{{or $t.Headline "—"}}</dd></div>
             <div><dt>Байршил</dt><dd>{{or $t.Location "—"}}</dd></div>
             <div><dt>Заадаг чиглэл</dt><dd>{{if $t.Subjects}}{{range $i, $s := $t.Subjects}}{{if $i}}, {{end}}{{$s}}{{end}}{{else}}—{{end}}</dd></div>
-            <div><dt>Элссэн</dt><dd>{{$t.JoinedYear}} он</dd></div>
+            <div><dt>Бүртгүүлсэн</dt><dd>{{$t.JoinedYear}} он</dd></div>
             <div><dt>Хэрэглэгчийн нэр</dt><dd>@{{$t.Username}}</dd></div>
           </dl>
           {{if $t.Links}}<div class="socials">{{range $t.Links}}<a class="social-link" data-k="{{.Key}}" href="{{.URL}}" target="_blank" rel="noopener nofollow ugc"><i>{{first .Label}}</i>{{.Label}}</a>{{end}}</div>{{end}}
@@ -184,10 +184,10 @@
           <a class="book-card" href="/b/{{.ID}}"><span class="bc-cover"><img src="{{.Cover}}" alt="" loading="lazy" draggable="false"></span>
             <strong>{{.Title}}</strong>{{with .Author}}<small class="muted">{{.}}</small>{{end}}
             <span class="find-tagrow"><span class="ftag {{if .Price}}ftag-paid{{else}}ftag-free{{end}}">📖 {{if .Price}}{{money .Price}}{{else}}Үнэгүй{{end}}</span>{{if .Download}}<span class="ftag ftag-paid">⬇ {{if .DownloadPrice}}{{money .DownloadPrice}}{{else}}Үнэгүй{{end}}</span>{{end}}{{if eq .Kind "article"}}<span class="ftag">Өгүүлэл</span>{{end}}<span class="ftag">{{.Pages}} х.</span></span></a>
-        {{else}}<p class="empty">Ном, өгүүлэл хараахан алга.</p>{{end}}</div>
+        {{else}}<p class="empty">Ном, өгүүлэл хараахан нэмэгдээгүй байна.</p>{{end}}</div>
       </div>
       <div class="pf-panel" data-panel="live" id="live" hidden>
-        {{if $t.SlotCount}}<div class="ap-card"><span class="ap-ico">{{icon "cal" 22}}</span><span class="grow"><strong>Багштай уулзах цаг авах</strong><small>{{$t.SlotCount}} сул цаг · онлайн эсвэл биечлэн</small></span><button class="btn btn-gold" data-appt>Цаг сонгох</button></div>{{end}}
+        {{if $t.SlotCount}}<div class="ap-card"><span class="ap-ico">{{icon "cal" 22}}</span><span class="grow"><strong>Багштай уулзах цаг авах</strong><small>{{$t.SlotCount}} сул цаг · онлайнаар эсвэл биечлэн</small></span><button class="btn btn-gold" data-appt>Цаг сонгох</button></div>{{end}}
         {{if .D.Meetings}}
         <div class="meet-list">
           {{range .D.Meetings}}
@@ -196,9 +196,9 @@
             {{if .Price}}<span class="chip chip-amber">{{money .Price}}</span>{{else}}<span class="chip chip-gold">Сургалт руу</span>{{end}}</a>
           {{end}}
         </div>
-        <p class="muted small">Үнэгүй шууд хичээлд сургалтад элссэн суралцагчид, төлбөртэйд худалдаж авсан хүн Google Meet-ээр нэгдэнэ.</p>
+        <p class="muted small">Үнэгүй шууд хичээлд тухайн сургалтад элссэн суралцагчид, төлбөртэйд нь эрх худалдаж авсан хүмүүс Google Meet-ээр нэгдэнэ.</p>
         {{else}}
-        <div class="empty">Одоогоор товлосон шууд хичээл алга</div>
+        <div class="empty">Одоогоор товлосон шууд хичээл алга байна</div>
         {{end}}
       </div>
 
@@ -216,8 +216,8 @@
           <div class="qr-frame"><img src="/t/{{$t.Username}}/qr.png?size=512" alt="Профайлын QR" width="220" height="220" loading="lazy"><span class="qr-scan"></span></div>
           <div>
             <span class="eyebrow">QR код</span>
-            <h2 class="h2">Утсаараа уншуулаад шууд нээ</h2>
-            <p class="muted">Ангидаа, зурагт хуудас, нэрийн хуудсан дээрээ хэвлээд суралцагчиддаа түгээгээрэй.</p>
+            <h2 class="h2">Утсаараа уншуулаад шууд нээгээрэй</h2>
+            <p class="muted">Зурагт хуудас, нэрийн хуудсандаа хэвлэж, ангидаа байрлуулан суралцагчиддаа түгээгээрэй.</p>
             <div class="hero-cta">
               <a class="btn btn-gold" href="/t/{{$t.Username}}/qr.png?size=1024&download=1">{{icon "down"}}QR татах</a>
               <button class="btn btn-ghost" data-copy-link>{{icon "link"}}Холбоос хуулах</button>
@@ -234,7 +234,7 @@
   <div class="modal-card qr-modal">
     <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
     <img src="/t/{{$t.Username}}/qr.png?size=512" alt="QR" width="280" height="280" loading="lazy">
-    <p><strong>{{$t.DisplayName}}</strong><br><span class="muted small">Камераа чиглүүлээд уншуулна уу — эсвэл доорх холбоосоор орно</span></p>
+    <p><strong>{{$t.DisplayName}}</strong><br><span class="muted small">Камераа чиглүүлж уншуулна уу, эсвэл доорх холбоосоор орно уу</span></p>
     <a class="qr-link" href="/t/{{$t.Username}}" title="Профайл руу орох">{{icon "link" 20}}<span>surgalt.mn/t/<b>{{$t.Username}}</b></span></a>
     <a class="btn qr-fb" href="https://www.facebook.com/sharer/sharer.php?u={{printf "%s/t/%s" $.PublicURL $t.Username}}" target="_blank" rel="noopener" data-fb-share><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M24 12.07C24 5.41 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.8-4.7 4.54-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.5c-1.5 0-1.96.93-1.96 1.89v2.26h3.32l-.53 3.5h-2.8V24C19.62 23.1 24 18.1 24 12.07"/></svg>Facebook-т хуваалцах</a>
     <div class="qr-acts"><button type="button" class="btn btn-ghost" data-copy-link>{{icon "link"}}Холбоос хуулах</button><a class="btn btn-gold" href="/t/{{$t.Username}}/qr.png?size=1024&download=1">{{icon "down"}}QR татах</a></div>
@@ -245,7 +245,7 @@
 <div class="modal" id="editModal" aria-hidden="true">
   <div class="modal-card edit-modal">
     <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
-    <div class="em-head"><span class="em-ring" id="emRing"></span><div><h3 class="h3">Профайл засах</h3><p class="muted small" id="emLevel">Мэдээллээ бүрдүүлэх тусам суралцагчид танд илүү итгэнэ.</p></div></div>
+    <div class="em-head"><span class="em-ring" id="emRing"></span><div><h3 class="h3">Профайл засах</h3><p class="muted small" id="emLevel">Мэдээллээ бүрэн бөглөх тусам суралцагчид танд илүү итгэнэ.</p></div></div>
     <div class="em-tabs" role="tablist" aria-label="Профайл засах хэсгүүд">
       <button type="button" class="em-tab on" role="tab" aria-selected="true" data-em="info">Мэдээлэл</button>
       <button type="button" class="em-tab" role="tab" aria-selected="false" data-em="link"><span class="em-long">Профайлын холбоос</span><span class="em-short">Холбоос</span></button>
@@ -256,19 +256,19 @@
         <button type="button" class="btn btn-glass btn-sm" data-upload="avatar">{{icon "camera"}}Профайл зураг солих</button>
         <button type="button" class="btn btn-glass btn-sm" data-upload="cover">{{icon "camera"}}Нүүр зураг солих</button>
         <button type="button" class="btn btn-glass btn-sm" data-cover-template>{{icon "layers"}}Толгойн зураг</button>
-        <span class="muted small">WebP болж, автоматаар багасна</span>
+        <span class="muted small">Зургийг WebP болгож, автоматаар багасгана</span>
       </div>
       <form class="form" id="editForm">
         <label>Нэр<input name="display_name" required maxlength="80"></label>
         <label>Мэргэжил / гарчиг<input name="headline" maxlength="120" placeholder="Математикийн багш · 12 жилийн туршлага"></label>
         <label><span class="em-lbl">Танилцуулга <small class="muted" id="bioCount"></small></span><textarea name="bio" maxlength="4000" rows="5" placeholder="Туршлага, заах арга барил, суралцагчдын амжилт…"></textarea></label>
         <div class="form-row">
-          <label><span class="em-lbl">Заадаг чиглэлүүд <small class="muted">таслалаар, 8 хүртэл</small></span><input name="subjects" placeholder="Математик, ЭЕШ бэлтгэл, Геометр"></label>
+          <label><span class="em-lbl">Заадаг чиглэлүүд <small class="muted">таслалаар тусгаарлан, 8 хүртэл</small></span><input name="subjects" placeholder="Математик, ЭЕШ бэлтгэл, Геометр"></label>
           <label>Байршил<input name="location" maxlength="60" placeholder="Улаанбаатар"></label>
         </div>
         <div class="tags" id="subjPreview"></div>
-        <label><span class="em-lbl">Утасны дугаар <small class="muted">зочдод эхний 4 орон харагдана, дарж нээхэд танд мэдэгдэнэ</small></span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="9911 2233"></label>
-        <fieldset class="em-links"><legend>Сошиал холбоос</legend><div class="form-row">
+        <label><span class="em-lbl">Утасны дугаар <small class="muted">зочдод эхний 4 орон харагдана; бүтэн дугаарыг нээхэд танд мэдэгдэл очно</small></span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="9911 2233"></label>
+        <fieldset class="em-links"><legend>Олон нийтийн сүлжээ</legend><div class="form-row">
           <label>Вэб сайт<input name="link_website" maxlength="300" inputmode="url" placeholder="https://"></label>
           <label>Facebook<input name="link_facebook" maxlength="300" inputmode="url" placeholder="facebook.com/…"></label>
           <label>Instagram<input name="link_instagram" maxlength="300" inputmode="url" placeholder="instagram.com/…"></label>
@@ -279,7 +279,7 @@
       </form>
     </section>
     <section class="em-pane" data-em-pane="link" hidden>
-      <p class="muted small">Бүртгүүлэхэд автоматаар үүссэн. Суралцагчдад санахад амар нэрээр сольж болно. Солибол хуучин холбоос болон хэвлэсэн QR код ажиллахгүй болно.</p>
+      <p class="muted small">Бүртгүүлэх үед автоматаар үүссэн. Суралцагчдад санахад хялбар нэрээр сольж болно. Сольсон тохиолдолд хуучин холбоос болон хэвлэсэн QR код ажиллахгүй болно.</p>
       <form class="link-form" id="unForm" novalidate>
         <label class="link-field"><span id="unHost"></span><input name="username" maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Профайлын холбоос"></label>
         <button class="btn btn-gold" disabled>Солих</button><button type="button" class="btn btn-ghost" id="unCopy">{{icon "link"}}Хуулах</button>

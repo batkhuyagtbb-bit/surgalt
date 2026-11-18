@@ -134,7 +134,7 @@ func (s *Server) handleDeleteCourse(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if n > 0 {
-		s.apiErr(w, r, apiError(http.StatusConflict, "Энэ сургалтад "+itoa(n)+" суралцагч байгаа тул устгах боломжгүй — «Тохиргоо»-оос ноорог болгож нуугаарай.", map[string]any{"students": n}))
+		s.apiErr(w, r, apiError(http.StatusConflict, "Энэ сургалтад "+itoa(n)+" суралцагч элссэн тул устгах боломжгүй — «Тохиргоо» хэсгээс ноорог болгож нууна уу.", map[string]any{"students": n}))
 		return
 	}
 	lessons, _ := s.store.LessonsByCourse(ctx, course.ID)

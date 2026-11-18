@@ -23,7 +23,13 @@ type Highlight struct {
 	// Box — хуудас дээр хүрээлсэн хэсэг (хувиар: x, y, өргөн, өндөр); Img — тэр хэсгийн зураг (/note-img/...).
 	Box []float64 `json:"box,omitempty"`
 	Img string    `json:"img,omitempty"`
+	// Flash card (заавал биш): Q — асуулт, A — санах хэсэг. Хоёулаа бөглөгдсөн үед л карт болно (story, давталт).
+	Q string `json:"q,omitempty"`
+	A string `json:"a,omitempty"`
 }
+
+// IsCard — тэмдэглэл flash card эсэх (асуулт ба санах хэсэг хоёулаа бөглөгдсөн).
+func (h *Highlight) IsCard() bool { return h.Q != "" && h.A != "" }
 
 // HighlightColors — маркерын өнгө: y чухал, g ойлгосон, r ойлгоогүй, b нэр томьёо.
 var HighlightColors = map[string]bool{"y": true, "g": true, "r": true, "b": true}

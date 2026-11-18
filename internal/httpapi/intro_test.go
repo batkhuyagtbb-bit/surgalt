@@ -1,29 +1,42 @@
 package httpapi
 
 import (
-	"io"
+	"log/slog"
 	"net/http"
-	"strings"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
-// /intro2 — танилцуулгын кино интро бүтэн HTML хуудсаар (template-гүй) үйлчлэгдэнэ.
-func TestIntroPage(t *testing.T) {
-	srv, _ := newTestServer(t)
-	defer srv.Close()
-	res, err := http.Get(srv.URL + "/intro2")
-	if err != nil {
+// Танилцуулга видео дискнээс (IntroDir): Range-ээр хэсэгчлэн, video/mp4; буруу нэр, хавтаснаас гарах оролдлого дискийг уншихгүй.
+func TestIntroDisk(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "tour-hd.mp4"), []byte("0123456789abcdef"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
-	b, _ := io.ReadAll(res.Body)
-	body := string(b)
-	if res.StatusCode != 200 || !strings.HasPrefix(res.Header.Get("Content-Type"), "text/html") {
-		t.Fatalf("intro: %d %s", res.StatusCode, res.Header.Get("Content-Type"))
+	if err := os.WriteFile(filepath.Join(filepath.Dir(dir), "secret.mp4"), []byte("x"), 0o644); err == nil {
+		defer os.Remove(filepath.Join(filepath.Dir(dir), "secret.mp4"))
 	}
-	for _, want := range []string{"<!doctype html>", "Surgalt.mn Intro 2", "gsap.min.js", "Өнөөдрийн ойлголт", "${"} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("intro хуудсанд %q алга", want)
+	h := staticHandler(false, dir, slog.Default())
+	req := httptest.NewRequest("GET", "/static/intro/tour-hd.mp4?v=3", nil)
+	req.Header.Set("Range", "bytes=4-7")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusPartialContent || rec.Body.String() != "4567" || rec.Header().Get("Content-Type") != "video/mp4" || rec.Header().Get("Content-Range") != "bytes 4-7/16" {
+		t.Fatalf("range: %d %q %q %q", rec.Code, rec.Body.String(), rec.Header().Get("Content-Type"), rec.Header().Get("Content-Range"))
+	}
+	for _, p := range []string{"/static/intro/..%2fsecret.mp4", "/static/intro/../secret.mp4", "/static/intro/Tour.MP4", "/static/intro/none.mp4"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", p, nil))
+		if rec.Code == http.StatusOK || rec.Code == http.StatusPartialContent {
+			t.Fatalf("%s: %d — дискнээс уншиж болохгүй", p, rec.Code)
 		}
+	}
+	// embed-ийн бусад файл хэвээр
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/static/ar.js", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ar.js: %d", rec.Code)
 	}
 }

@@ -63,7 +63,7 @@ func (s *Server) handleReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.chatLim.Allow("report|" + c.VisitorKey()) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон оролдлого")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон удаа оролдлоо — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	var in struct {
@@ -81,7 +81,7 @@ func (s *Server) handleReport(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "шалтгаанаа сонгоно уу")
 		return
 	case utf8.RuneCountInString(in.Note) > 500:
-		writeErr(w, http.StatusBadRequest, "тайлбар 500 тэмдэгтээс ихгүй")
+		writeErr(w, http.StatusBadRequest, "тайлбар 500 тэмдэгтээс хэтрэхгүй байх ёстой")
 		return
 	}
 	ctx := r.Context()
@@ -174,7 +174,7 @@ func (s *Server) handleBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !oneToOne(conv) {
-		writeErr(w, http.StatusBadRequest, "бүлэг чатад хориглохгүй — мессежийг мэдүүлнэ үү")
+		writeErr(w, http.StatusBadRequest, "бүлэг чатад хэрэглэгчийг хориглох боломжгүй — оронд нь мессежийг мэдүүлнэ үү")
 		return
 	}
 	if err := s.store.SetConversationBlock(r.Context(), conv.ID, role, r.Method == http.MethodPost); s.storeErr(w, r, err) {
@@ -208,7 +208,7 @@ func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (*store.Us
 	// Тусдаа замаар нууц үгээр нэвтэрсэн хянагч (admin.go): cookie-гоор баталгаажих тул өөрчлөх хүсэлтийн эх сурвалжийг шалгана.
 	if s.adminCookieOK(r) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead && !s.sameOrigin(r) {
-			writeErr(w, http.StatusForbidden, "хүсэлтийн эх сурвалж буруу")
+			writeErr(w, http.StatusForbidden, "хүсэлт зөвшөөрөгдөөгүй эх сурвалжаас ирлээ — хуудсаа сэргээгээд дахин оролдоно уу")
 			return nil, false
 		}
 		return &store.User{ID: "admin", DisplayName: "Хянагч (" + s.cfg.AdminLogin + ")", Email: s.cfg.AdminLogin}, true
@@ -219,7 +219,7 @@ func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (*store.Us
 	}
 	u, err := s.store.UserByID(r.Context(), c.UID)
 	if err != nil || !s.isAdmin(u) {
-		writeErr(w, http.StatusForbidden, "зөвхөн хянагч")
+		writeErr(w, http.StatusForbidden, "энэ үйлдлийг зөвхөн хянагч хийнэ")
 		return nil, false
 	}
 	return u, true
@@ -289,7 +289,7 @@ func (s *Server) handleAdminResolve(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Resolution = strings.TrimSpace(in.Resolution)
 	if utf8.RuneCountInString(in.Resolution) > 500 {
-		writeErr(w, http.StatusBadRequest, "тайлбар 500 тэмдэгтээс ихгүй")
+		writeErr(w, http.StatusBadRequest, "тайлбар 500 тэмдэгтээс хэтрэхгүй байх ёстой")
 		return
 	}
 	ctx, now := r.Context(), time.Now()

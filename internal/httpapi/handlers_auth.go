@@ -28,7 +28,7 @@ type authResp struct {
 
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if !s.authLim.Allow(s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон оролдлого")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон удаа оролдлоо — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	var in struct {
@@ -48,13 +48,13 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	auto := in.Username == ""
 	switch {
 	case !auto && !usernameRe.MatchString(in.Username):
-		writeErr(w, http.StatusBadRequest, "username: 3-32 тэмдэгт, a-z 0-9 _")
+		writeErr(w, http.StatusBadRequest, "хэрэглэгчийн нэр 3-32 тэмдэгт байх бөгөөд зөвхөн a-z, 0-9, _ тэмдэгт ашиглана")
 		return
 	case func() bool { _, err := mail.ParseAddress(in.Email); return err != nil }():
-		writeErr(w, http.StatusBadRequest, "имэйл буруу")
+		writeErr(w, http.StatusBadRequest, "имэйл хаягаа зөв бичнэ үү")
 		return
 	case len(in.Password) < minPassword || len(in.Password) > 72:
-		writeErr(w, http.StatusBadRequest, "нууц үг 6-72 тэмдэгт")
+		writeErr(w, http.StatusBadRequest, "нууц үг 6-72 тэмдэгт байх ёстой")
 		return
 	case !in.AcceptTerms:
 		writeErr(w, http.StatusBadRequest, "үйлчилгээний нөхцөл, нууцлалын бодлогыг зөвшөөрнө үү")
@@ -70,12 +70,12 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		in.DisplayName = base
 	}
 	if utf8.RuneCountInString(in.DisplayName) > 80 {
-		writeErr(w, http.StatusBadRequest, "нэр хэт урт")
+		writeErr(w, http.StatusBadRequest, "нэр хэт урт байна")
 		return
 	}
 	hash, err := auth.HashPassword(r.Context(), in.Password)
 	if err != nil {
-		writeErr(w, http.StatusServiceUnavailable, "түр ачаалалтай байна")
+		writeErr(w, http.StatusServiceUnavailable, "систем түр ачаалалтай байна — дахин оролдоно уу")
 		return
 	}
 	if auto {
@@ -112,7 +112,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 func (s *Server) issue(w http.ResponseWriter, status int, u *store.User) {
 	tok, err := s.tokens.SignUser(u.ID, string(u.Role), u.Username)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "токен үүсгэж чадсангүй")
+		writeErr(w, http.StatusInternalServerError, "нэвтрэхэд алдаа гарлаа — дахин оролдоно уу")
 		return
 	}
 	writeJSON(w, status, authResp{Token: tok, User: s.me(u)})
@@ -142,7 +142,7 @@ func (s *Server) asTeacher(r *http.Request, u *store.User) *store.User {
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !s.authLim.Allow(s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон оролдлого")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон удаа оролдлоо — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	var in struct {
@@ -162,11 +162,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	ok, err := auth.CheckPassword(r.Context(), hash, in.Password)
 	if err != nil {
-		writeErr(w, http.StatusServiceUnavailable, "түр ачаалалтай байна")
+		writeErr(w, http.StatusServiceUnavailable, "систем түр ачаалалтай байна — дахин оролдоно уу")
 		return
 	}
 	if !ok {
-		writeErr(w, http.StatusUnauthorized, "имэйл эсвэл нууц үг буруу")
+		writeErr(w, http.StatusUnauthorized, "имэйл эсвэл нууц үг буруу байна")
 		return
 	}
 	s.issue(w, http.StatusOK, s.asTeacher(r, u))
@@ -209,19 +209,19 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	in.Location = strings.Join(strings.Fields(in.Location), " ")
 	switch {
 	case in.DisplayName == "" || utf8.RuneCountInString(in.DisplayName) > 80:
-		writeErr(w, http.StatusBadRequest, "нэр 1-80 тэмдэгт")
+		writeErr(w, http.StatusBadRequest, "нэр 1-80 тэмдэгт байх ёстой")
 		return
 	case utf8.RuneCountInString(in.Headline) > 120:
-		writeErr(w, http.StatusBadRequest, "мэргэжил/гарчиг 120 тэмдэгтээс ихгүй")
+		writeErr(w, http.StatusBadRequest, "мэргэжил, гарчиг 120 тэмдэгтээс хэтрэхгүй байх ёстой")
 		return
 	case utf8.RuneCountInString(in.Bio) > 4000:
-		writeErr(w, http.StatusBadRequest, "танилцуулга хэт урт")
+		writeErr(w, http.StatusBadRequest, "танилцуулга хэт урт байна")
 		return
 	case !ownImage(in.AvatarURL, c.UID) || !(ownImage(in.CoverURL, c.UID) || coverTemplate(in.CoverURL)):
-		writeErr(w, http.StatusBadRequest, "зураг: http(s) холбоос, өөрийн public файл эсвэл толгойн зургийн загвар")
+		writeErr(w, http.StatusBadRequest, "зураг нь http(s) холбоос, өөрийн нээлттэй (public) файл эсвэл толгойн зургийн загвар байх ёстой")
 		return
 	case utf8.RuneCountInString(in.Location) > maxLocationLen:
-		writeErr(w, http.StatusBadRequest, "байршил 60 тэмдэгтээс ихгүй")
+		writeErr(w, http.StatusBadRequest, "байршил 60 тэмдэгтээс хэтрэхгүй байх ёстой")
 		return
 	}
 	subjects, msg := cleanSubjects(in.Subjects)
@@ -242,7 +242,7 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if in.Phone != nil {
 		var ok bool
 		if phone, ok = cleanPhone(*in.Phone); !ok {
-			writeErr(w, http.StatusBadRequest, "утасны дугаар: 8 оронтой (9911 2233) эсвэл «+»-ээр эхэлсэн олон улсын дугаар")
+			writeErr(w, http.StatusBadRequest, "утасны дугаараа 8 оронтойгоор (9911 2233) эсвэл «+»-ээр эхэлсэн олон улсын хэлбэрээр бичнэ үү")
 			return
 		}
 	}
@@ -301,7 +301,7 @@ func (s *Server) handleUpdateName(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.Join(strings.Fields(in.DisplayName), " ")
 	if name == "" || utf8.RuneCountInString(name) > 80 {
-		writeErr(w, http.StatusBadRequest, "нэр 1-80 тэмдэгт")
+		writeErr(w, http.StatusBadRequest, "нэр 1-80 тэмдэгт байх ёстой")
 		return
 	}
 	cur, err := s.store.UserByID(r.Context(), c.UID)
@@ -330,7 +330,7 @@ func (s *Server) handleUpdateUsername(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.authLim.Allow(s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон оролдлого")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон удаа оролдлоо — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	var in struct {
@@ -341,7 +341,7 @@ func (s *Server) handleUpdateUsername(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Username = strings.ToLower(strings.TrimSpace(in.Username))
 	if !usernameRe.MatchString(in.Username) {
-		writeErr(w, http.StatusBadRequest, "холбоос: 3-32 тэмдэгт, зөвхөн a-z, 0-9, _")
+		writeErr(w, http.StatusBadRequest, "холбоосын нэр 3-32 тэмдэгт байх бөгөөд зөвхөн a-z, 0-9, _ тэмдэгт ашиглана")
 		return
 	}
 	old, err := s.store.UserByID(r.Context(), c.UID)
@@ -350,7 +350,7 @@ func (s *Server) handleUpdateUsername(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.store.UpdateUsername(r.Context(), c.UID, in.Username); err != nil {
 		if errors.Is(err, store.ErrConflict) {
-			writeErr(w, http.StatusConflict, "энэ холбоос эзэнтэй байна — өөр нэр сонгоно уу")
+			writeErr(w, http.StatusConflict, "энэ холбоосыг өөр хүн ашиглаж байна — өөр нэр сонгоно уу")
 			return
 		}
 		s.storeErr(w, r, err)

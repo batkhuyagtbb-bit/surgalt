@@ -379,7 +379,7 @@ a.tip:hover{border-color:var(--brand);background:var(--brand-soft)}
 .modal.open .modal-card{transform:none}
 .modal-x{position:absolute;top:12px;right:12px}
 .qr-modal{text-align:center;display:grid;gap:16px;justify-items:center}
-.qr-modal img{border-radius:16px;background:#fff;padding:12px;border:1px solid var(--line)}
+.qr-modal img{border-radius:16px;background:#fff;padding:12px;border:1px solid var(--line);height:auto}
 /* QR цонх: профайл руу орох холбоос тод */
 .qr-link{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 16px;border:2px solid var(--brand);border-radius:14px;background:var(--brand-soft);color:var(--brand);font:800 1.12rem/1.3 var(--sans);text-decoration:none;overflow-wrap:anywhere;transition:background .2s,color .2s}
 .qr-link b{color:var(--brand-2);font-weight:900}
@@ -391,6 +391,7 @@ a.tip:hover{border-color:var(--brand);background:var(--brand-soft)}
 .qr-modal .btn.qr-fb{width:100%;padding-top:13px;padding-bottom:13px;font-size:1rem}
 .qr-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
 .qr-acts .btn{justify-content:center}
+.qr-acts > :not([hidden]):last-child:nth-child(odd){grid-column:1/-1}
 @media (max-width:480px){.qr-acts{grid-template-columns:1fr}}
 .lesson-modal{width:min(960px,100%)}
 .player{border-radius:var(--radius);overflow:hidden;background:#0b0d16;margin-bottom:18px}
@@ -2211,6 +2212,46 @@ html.reader-open{overflow:hidden}
 .dp-steps i{width:56px;height:3px;border-radius:3px;background:repeating-linear-gradient(90deg,var(--line) 0 6px,transparent 6px 10px)}
 .dp-card .dp-steps{margin-bottom:26px}
 .dp-acts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+/* 👁 Суралцагчаар үзэх (багш): доод талын тогтмол зурвас (хичээл үзэх горимд ч харагдана), тайлбар цонхнууд */
+.svp-bar{position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));z-index:65;display:flex;align-items:center;gap:10px;width:min(880px,calc(100% - 24px));padding:9px 10px 9px 12px;border:1px solid rgba(255,255,255,.16);border-radius:16px;background:#1e1b4b;color:#fff;box-shadow:0 18px 40px -14px rgba(15,23,42,.6);transform:translateX(-50%)}
+.svp-ico{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.14);font-size:18px}
+.svp-bar[aria-busy="true"] .svp-ico{animation:pulse 1.4s infinite}
+.svp-txt{flex:1;min-width:0;margin:0;font-size:.88rem;line-height:1.35}
+.svp-txt span{opacity:.9}
+.svp-txt small{font-size:.8rem;opacity:.75}
+.svp-bar .svp-x{flex:none;border:0;background:#fff;color:#1e1b4b;font-weight:800}
+.svp-bar .svp-x:hover{background:#ffd60a}
+.svp-bar .svp-x:focus-visible{outline:3px solid #ffd60a;outline-offset:2px}
+html.svp-on body{padding-bottom:84px}
+html.svp-on .toast-stack{bottom:96px}
+html.svp-on .chat-fab{bottom:96px}
+/* бусад тогтмол товчийг зурвасын дээр гаргана: хүртээмжийн товч/самбар (зүүн доод), байгууллагын нэрийн өмнөөс ажиллах зурвас */
+html.svp-on .a11y-fab{bottom:84px}
+html.svp-on .a11y-panel{bottom:156px;max-height:calc(100vh - 180px);max-height:calc(100svh - 180px)}
+html.svp-on .org-acting{bottom:84px}
+@media (max-width:640px){html.svp-on .a11y-fab{bottom:80px}html.svp-on .a11y-panel{bottom:146px}html.svp-on .org-acting{bottom:150px}}
+.dp-card .svp-note,.watch-card .svp-note{margin:-6px 0 14px;color:#5b21b6;font-size:.82rem;font-weight:600}
+.svp-code{margin-top:12px;padding:10px 12px;border-radius:12px;background:#f3efff;color:#4c1d95;font-size:.86rem;text-align:center}
+.svp-code p{margin:0 0 8px}
+.wb-dry{padding:1px 8px;border-radius:99px;background:#ede9fe;color:#5b21b6;font-size:.72rem;font-weight:700}
+@media (max-width:560px){.svp-bar{left:0;bottom:0;width:100%;transform:none;border-radius:14px 14px 0 0;padding:8px 10px calc(8px + env(safe-area-inset-bottom))}.svp-txt span{display:none}.svp-ico{width:28px;height:28px;font-size:15px}.svp-bar .svp-x{padding:7px 10px}html.svp-on body{padding-bottom:72px}html.svp-on .toast-stack,html.svp-on .chat-fab{bottom:84px}}
+@media (prefers-reduced-motion:reduce){.svp-bar .svp-ico{animation:none}}
+/* 🙋 Багшаас нээлгэх хүсэлт (нууц үгийн цонх, «багш гараар нээнэ» хичээл) */
+.acc-req{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line-2);text-align:center}
+.dp-card .acc-req{margin:-4px 0 16px}
+.acc-req .acc-req-lead{margin:0 0 6px;color:var(--muted);font-size:.86rem}
+.acc-req-open{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:8px 14px;border:1px solid var(--line-2);border-radius:999px;background:var(--surface);color:var(--brand);font:700 .88rem var(--sans);cursor:pointer;transition:.15s}
+.acc-req-open:hover,.acc-req-open[aria-expanded="true"]{border-color:var(--brand);background:var(--brand-soft)}
+.acc-req-open[hidden]{display:none}
+.acc-req-form{display:flex;flex-direction:column;gap:8px;margin-top:10px;text-align:left}
+.acc-req-form[hidden]{display:none}
+.acc-req-lbl{display:flex;flex-direction:column;gap:4px;font:700 .82rem var(--sans);color:var(--text-2)}
+.acc-req-form textarea{width:100%;padding:9px 11px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface);color:var(--text);font:500 .9rem/1.45 var(--sans);resize:vertical}
+.acc-req-acts{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}
+.acc-req .acc-req-msg{margin:10px 0 0;font-weight:700;font-size:.88rem;line-height:1.45}
+.acc-req .acc-req-msg.ok{color:var(--teal)}
+.acc-req .acc-req-msg.bad{color:var(--coral)}
+@media (max-width:560px){.acc-req-acts .btn{flex:1}}
 .lesson-nav .ln.is-lock{opacity:.75}
 /* Наалдсан табын цэс: багшийн удирдлага (.manage) дээр ч бүтэн өргөнөөр, агуулгатай ижил тэнхлэгт */
 .pf-stuck .pf-tabs,.pf-stuck.pf .pf-tabs,.pf.manage.pf-stuck .pf-tabs,.pf-stuck .pf.manage .pf-tabs{max-width:none;margin:0;width:auto}
@@ -2843,6 +2884,58 @@ html.dv-locked,html.dv-locked body{overflow:hidden}
 .jr-dl dt{color:var(--muted);font-size:.84rem;font-weight:600}
 .jr-dl dd{margin:0;font-weight:600}
 @media (max-width:560px){.jr-t .jr-name{min-width:130px;max-width:150px}}
+/* Журнал: бүлгийн шүүлтүүр, «Бүлэг» багана, нүдэн дэх засвар (нэр, бүлэг), архив, өгөгдөл устгах */
+.jr-chips{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-width:0}
+.jr-chip{display:inline-flex;align-items:center;gap:5px;min-height:32px;max-width:100%;padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--text-2);font:inherit;font-size:.82rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.jr-chip span{color:var(--muted);font-weight:600}
+.jr-chip svg{flex:none}
+.jr-chip:hover{border-color:var(--brand-tint);color:var(--brand)}
+.jr-chip[aria-pressed="true"]{border-color:var(--brand);background:var(--brand);color:#fff}
+.jr-chip[aria-pressed="true"] span{color:rgba(255,255,255,.82)}
+.jr-chip-on{display:inline-flex;align-items:center;gap:2px;min-width:0;max-width:100%;padding-right:3px;border-radius:999px;background:var(--brand-soft)}
+.jr-chip-on .jr-chip{min-width:0}
+.jr-chip-act{display:inline-flex;align-items:center;justify-content:center;gap:4px;flex:none;height:30px;padding:0 10px;border:0;border-radius:999px;background:none;color:var(--brand);font:inherit;font-size:.78rem;font-weight:700;white-space:nowrap;cursor:pointer}
+.jr-chip-act svg{flex:none}
+.jr-chip-act:hover{background:var(--surface)}
+.jr-chip:focus-visible,.jr-chip-act:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.jr-hint{flex:1 1 260px}
+.jr-note{margin:0}
+.jr.jr-busy .jr-wrap{opacity:.55;pointer-events:none;transition:opacity .15s}
+.jr-t .jr-gh{min-width:90px}
+.jr-t td.jr-g{min-width:90px;max-width:150px;overflow:hidden;text-overflow:ellipsis;text-align:left;font-weight:700;color:var(--brand);cursor:text}
+.jr-t td.jr-g:hover{box-shadow:inset 0 0 0 2px var(--brand-tint)}
+.jr-t td.jr-g:empty:is(:hover,:focus-visible)::after{content:"+ бүлэг";color:var(--muted);font-weight:500}
+.jr-t tbody th.jr-name:focus-visible,.jr-t td.jr-g:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+.jr-t .jr-editing,.jr-t td.jr-g.jr-editing{padding:2px 4px;overflow:visible;box-shadow:none}
+.jr-edit{display:block;width:100%;min-width:0;height:30px;padding:3px 8px;border-radius:8px;font:inherit;font-weight:700;color:var(--text)}
+.jr-t .jr-saving,.jr-t td.jr-g.jr-saving{color:var(--muted)}
+.jr-t tr.jr-gone td{opacity:.4}
+.jr-t tr.jr-gone th.jr-name{color:var(--muted)}
+.jr-t tr.jr-grp th,.jr-t tr.jr-grp td{height:30px;background:var(--brand-soft);color:var(--brand);font-size:.78rem;font-weight:800;cursor:default}
+.jr-t tr.jr-grp th small{display:inline;margin-left:6px;color:var(--muted);font-weight:700}
+.jr-acc{margin:-2px 0 10px}
+.jr-meta{display:grid;gap:10px;margin:6px 0 16px;padding:14px;border:1px solid var(--line);border-radius:14px;background:#f8f9fc}
+.jr-meta-f{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.jr-meta>p{margin:0}
+.jr-meta .form-error{min-height:0}
+.jr-acts{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.jr-acts-end{justify-content:flex-end;margin-top:6px}
+.jr-wipe-txt{margin:10px 0 0;line-height:1.55}
+.jr-wipe-save{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:14px 0}
+.jr-wipe-ok{margin:4px 0 0}
+.jr-wipe-go{background:var(--coral);border-color:var(--coral);color:#fff}
+.jr-wipe-go:hover:not(:disabled){background:#be123c;border-color:#be123c;color:#fff}
+.jr-wipe-go:disabled,.jr-wipe-go:disabled:hover{background:var(--coral);border-color:var(--coral);color:#fff;opacity:.45}
+@media (pointer:coarse){.jr-edit{font-size:16px}} /* iOS: 16px-ээс бага талбарыг томруулдаг */
+@media (max-width:560px){
+  .jr-chip{min-height:36px}
+  .jr-chip-act{width:36px;height:36px;padding:0}
+  .jr-chip-act span{display:none}
+  .jr-t .jr-gh,.jr-t td.jr-g{min-width:64px;max-width:96px}
+  .jr-meta{padding:12px}
+  .jr-meta-f{grid-template-columns:minmax(0,1fr)}
+  .jr-acts .btn{flex:1 1 auto}
+}
 /* Шалгалтыг багш гараар дахин нээх (+1 оролдлого) */
 .jr-reopen{flex-direction:column;align-items:flex-start;gap:6px}
 .jr-reopen .btn.done,.an-reopen.done{background:var(--teal);border-color:var(--teal);color:#fff;opacity:1;box-shadow:none;cursor:default}
@@ -3438,7 +3531,13 @@ html.lp-focus .rail-tab{display:none!important}
 .gp-rn{font-size:.86rem;font-weight:600;color:var(--text-2)}
 .gp-rn b{color:var(--text)}
 .gp-acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-@media (max-width:900px){.gp-head .gp-bar{grid-template-columns:minmax(0,1fr)}.gp-hside{justify-items:start;width:100%}.gp-acts{justify-content:flex-start}}
+/* Студийн сургалтын толгой: нэр | суралцагчид, доор нь үйлдлийн товчнууд бүтэн өргөнөөр — товч олшрох тусам нэрийг шахаж
+   давхцахгүй. */
+.gp-head .gp-bar>.gp-hside{display:contents}
+.gp-head .gp-bar>.gp-hside>.gp-roster{grid-column:2;grid-row:1;justify-self:end;align-self:start}
+.gp-head .gp-bar>.gp-hside>.gp-acts{grid-column:1/-1;justify-content:flex-start}
+@media (max-width:900px){.gp-head .gp-bar{grid-template-columns:minmax(0,1fr)}.gp-hside{justify-items:start;width:100%}.gp-acts{justify-content:flex-start}
+  .gp-head .gp-bar>.gp-hside>.gp-roster{grid-column:auto;grid-row:auto;justify-self:start}}
 @media (max-width:560px){.gp-head .gp-bar{padding:16px}.gp-acts .btn{flex:1 1 calc(50% - 8px);justify-content:center}}
 /* Хөтөлбөрийн мөр утсан дээр: гарчиг эхний мөрөнд, нээх/хаах, засах, устгах доор баруун талд */
 .ol-acts{display:flex;align-items:center;gap:4px;flex:none}
@@ -4183,6 +4282,44 @@ html.stv-on,html.stv-on body{overflow:hidden}
 @keyframes st-flip{from{opacity:0;transform:perspective(600px) rotateX(70deg)}}
 @media (max-width:640px){.stv{background:#000;gap:0}.stv-card{height:100%;width:100%;aspect-ratio:auto;border-radius:0}.stv-side{display:none}}
 @media (prefers-reduced-motion:reduce){.stv *,.st-ring{animation:none!important}.stv-quote mark{background-size:100% 100%}}
+/* 🃏 Flash card story: нүүр — асуулт, ар — санах хэсэг (эргэдэг карт); «Санасан / Санасангүй» */
+.st-cards .st-av{background:conic-gradient(from 200deg,#7c3aed,#2f55c0,#06b6d4,#34c759,#7c3aed)}
+.st-cards .st-av>span{--st-bg:linear-gradient(135deg,#ede9fe,#dbeafe)}
+.stv-fc-cover{background:linear-gradient(160deg,#312e81 0%,#6d28d9 55%,#06b6d4 135%)}
+.stv-fc-how{max-width:32ch;font-size:.92rem;line-height:1.45}
+.stv-fc-how small{display:inline-block;margin-top:6px;opacity:.85}
+.stv-fc-slide{gap:12px;background:linear-gradient(165deg,#e0e7ff 0%,#818cf8 52%,#3730a3 100%);color:#1e1b4b}
+.stv-fc{position:relative;flex:0 1 auto;width:min(100%,440px);height:min(50vh,400px);min-height:150px;perspective:1400px;border-radius:22px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.stv-fc:focus{outline:none}
+.stv-fc:focus-visible{box-shadow:0 0 0 3px #fff,0 0 0 6px #ffd60a}
+.stv-fc-in{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.stv-fc.flipped .stv-fc-in{transform:rotateY(180deg)}
+.stv-fc-face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:12px;padding:22px 20px;border-radius:22px;background:#fff;color:#121829;text-align:center;box-shadow:0 24px 50px -18px rgba(0,0,0,.5);-webkit-backface-visibility:hidden;backface-visibility:hidden;overflow:auto;overscroll-behavior:contain;touch-action:pan-y}
+.stv-fc-back{transform:rotateY(180deg);background:linear-gradient(170deg,#fffdf6,#fff4d6)}
+.stv-fc-face>:first-child{margin-top:auto}.stv-fc-face>:last-child{margin-bottom:auto} /* ихэвчлэн голд; урт бол дээрээс нь гүйлгэнэ */
+.stv-fc-face small{font:800 .72rem/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:#4f46e5}
+.stv-fc-back small{color:#b45309}
+.stv-fc-q{margin:0;font:800 clamp(1.15rem,3.2vh,1.6rem)/1.35 var(--sans);white-space:pre-wrap;overflow-wrap:anywhere}
+.stv-fc-q.long{font-size:clamp(1rem,2.4vh,1.2rem)}
+.stv-fc-a{margin:0;font:700 clamp(1.05rem,2.8vh,1.4rem)/1.45 var(--sans);white-space:pre-wrap;overflow-wrap:anywhere}
+.stv-fc-a.long{font-size:clamp(.92rem,2.1vh,1.05rem);font-weight:600;text-align:left}
+.stv-fc-src{margin:0;max-width:100%;padding:7px 11px;border-left:3px solid #eaa02e;border-radius:8px;background:rgba(18,24,41,.05);color:#4b5568;font:500 .8rem/1.45 var(--sans);text-align:left;overflow-wrap:anywhere}
+.stv-fc-img{display:block;max-width:100%;max-height:28%;border-radius:10px;object-fit:contain}
+.stv-fc-tap{font:700 .78rem var(--sans);color:#6b7280;animation:stv-bob 2.4s ease-in-out infinite}
+.stv-stage .stv-slide .stv-fc.stv-fc-ok{animation:stv-fc-ok .32s ease-in forwards}
+.stv-stage .stv-slide .stv-fc.stv-fc-no{animation:stv-fc-no .32s ease-in forwards}
+@keyframes stv-fc-ok{to{transform:translateX(55%) rotate(8deg);opacity:0}}
+@keyframes stv-fc-no{to{transform:translateX(-55%) rotate(-8deg);opacity:0}}
+.stv-cta.stv-fc-yes{background:#34c759;color:#fff}
+.stv-cta.stv-fc-go{padding:11px 15px}
+.stv-fc-score{position:relative;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:0}
+.stv-fc-score span{padding:7px 14px;border-radius:99px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);font-weight:700}
+.stv-bars-one{align-items:center}
+.stv-count{flex:none;font:800 .62rem/1 var(--sans);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45);font-variant-numeric:tabular-nums}
+.stv-foot .stv-cta:focus-visible,.stv-x:focus-visible,.stv-pause:focus-visible,.stv-side:focus-visible{outline:3px solid #ffd60a;outline-offset:2px}
+@media (max-width:640px){.stv-fc{height:min(54vh,440px)}.stv-foot{gap:6px}.stv-foot .stv-cta{padding:11px 14px;font-size:.86rem}}
+@media (max-width:360px){.stv-fc-face{padding:16px 14px}.stv-foot .stv-cta{padding:10px 11px;font-size:.8rem}}
+@media (prefers-reduced-motion:reduce){.stv-fc-in{transition:none}}
 /* Маркер: видео/аудио (мөчөөр), PDF/PowerPoint/Word (хуудсаар) дээрх тэмдэглэл */
 .mn-box{border-style:solid;border-color:var(--accent);color:#8a5a00;background:var(--accent-soft)}
 .mn-box:hover{border-color:var(--accent-2);background:#ffe6b8}
@@ -4290,6 +4427,40 @@ mark.hl.flash{animation:hl-flash 1.2s ease}
 .hl-ask .hl-ask-hint{margin:6px 0 0}
 .hl-ask textarea{min-height:60px}
 .hl-ask>b{display:flex;align-items:center;gap:6px}
+/* 🃏 Flash card: тодруулга / медиа тэмдэглэл → асуулт + санах хэсэг (хоёуланг нь бөглөсөн үед л хадгална) */
+.hl-fc-offer{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.hl-fc-ask{flex:1 1 220px;min-width:0}
+.hl-fc-ask .muted{display:inline-block}
+.hl-fc-btns{display:inline-flex;gap:6px;margin-left:auto}
+.hl-ask .hl-fc-quote{border-left-color:var(--brand)}
+.hl-fc-f{display:flex;flex-direction:column;gap:4px;margin-top:8px;font:700 .8rem var(--sans);color:var(--text-2)}
+.hl-fc-f textarea,.hl-ask .hl-fc-f textarea{width:100%;min-height:0;margin:0;padding:8px 10px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface);color:var(--text);font:500 .88rem/1.45 var(--sans);resize:vertical}
+.hl-fc-f textarea:focus{border-color:var(--brand);outline:none;box-shadow:0 0 0 3px var(--brand-glow)}
+.hl-fc-hint{margin:6px 0 0}
+.hl-fc-hint.warn{color:var(--amber);font-weight:700}
+.hl-fc-hint.ok{color:var(--teal);font-weight:700}
+.hl-fc-tog{display:inline-flex;align-items:center;gap:4px;margin-top:8px;padding:5px 12px;border:1px dashed var(--line-2);border-radius:999px;background:var(--surface);color:var(--brand);font:700 .8rem var(--sans);cursor:pointer;transition:.15s}
+.hl-fc-tog:hover{border-style:solid;border-color:var(--brand);background:var(--brand-soft)}
+.hl-fc-tog[aria-expanded="true"]{border-style:solid;border-color:var(--brand);background:var(--brand-soft)}
+.hl-fc-box{padding:2px 0}
+.hl-fc-clear{display:inline-block;margin-top:6px;padding:2px 0;border:0;background:none;color:var(--coral);font:600 .78rem var(--sans);text-decoration:underline;cursor:pointer}
+.hl-fc-clear[hidden]{display:none}
+.hl-item .hl-fc-li{color:#5b21b6;font-weight:600}
+.hl-fc-sum{margin:0 0 8px;padding:6px 10px;border-radius:10px;background:#f3efff;color:#4c1d95}
+.mn-fc{font-style:normal;font-size:.8rem}
+.mn-form .hl-fc-tog{align-self:flex-start}
+/* карттай тодруулга: төгсгөлд нь 🃏; «🧠 Давтах» горимд асуулт нуусан хэсгийн өмнө, ил болгоход санах хэсэг төгсгөлд */
+mark.hl.has-card::after{content:"🃏";margin-left:2px;font-size:.72em;vertical-align:.18em;color:var(--muted)}
+.lesson-content.hl-quiz mark.hl[data-q]::before{content:"❓ " attr(data-q);margin-right:5px;padding:1px 7px;border-radius:7px;background:var(--brand-soft);color:var(--brand);font-weight:700;font-size:.9em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.lesson-content.hl-quiz mark.hl.shown[data-a]::after{content:"💡 " attr(data-a);margin-left:5px;padding:1px 7px;border-radius:7px;background:rgba(52,199,89,.18);color:#065f46;font-weight:600;font-size:.9em;vertical-align:baseline;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.lesson-content.hl-quiz mark.hl[tabindex]:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+@media (max-width:560px){.hl-fc-btns{width:100%;justify-content:flex-end}.hl-fc-btns .btn{flex:1}}
+/* «🧠 Давтах» + HTML embed доторх карт: асуулт / санах хэсгийг embed-ийн дээр эх хуудас харуулна (embed-д хувийн текст орохгүй) */
+.hl-qbub{position:absolute;z-index:41;width:min(320px,calc(100% - 16px));padding:10px 38px 10px 12px;border:1px solid var(--brand);border-radius:12px;background:var(--surface);box-shadow:var(--shadow-lg);font-size:.9rem;line-height:1.45}
+.hl-qbub-x{position:absolute;top:4px;right:4px;width:30px;height:30px}
+.hl-qbub-q{margin:0;color:var(--brand);font-weight:700;white-space:pre-wrap;overflow-wrap:anywhere}
+.hl-qbub-a{margin:8px 0 0;padding:6px 9px;border-radius:8px;background:rgba(52,199,89,.15);color:#065f46;font-weight:600;white-space:pre-wrap;overflow-wrap:anywhere}
+.hl-qbub-hint{margin:6px 0 0;color:var(--muted);font-size:.8rem}
 .rb-embed-link iframe{height:420px}
 /* Гадны холбоос: хичээлийн цонх дотор нээгдэнэ */
 .lw{position:fixed;inset:0;z-index:1650;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.55)}
@@ -4304,8 +4475,8 @@ mark.hl.flash{animation:hl-flash 1.2s ease}
 @media (max-width:640px){.lw{padding:0}.lw-card{height:100%;border-radius:0}}
 /* Үүлэн үг (word cloud) */
 /* багш: тэмдэглэлийн статистик */
-.ns{display:grid;gap:14px}
-.ns-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.ns{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;min-width:0} /* minmax(0,…): өргөн хүснэгт баганыг тэлж утсан дээр халихгүй — хүснэгт өөрөө гүйлгэгдэнэ */
+.ns-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:10px}
 .ns-kpi{display:flex;flex-direction:column;gap:2px;padding:14px 16px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
 .ns-kpi b{font:800 1.7rem/1.1 var(--sans);color:var(--brand)}
 .ns-kpi span{font-weight:700;font-size:.85rem;color:var(--text-2)}
@@ -4325,6 +4496,49 @@ mark.hl.flash{animation:hl-flash 1.2s ease}
 .ns-kinds span{margin-right:8px}
 .ns-dot{display:inline-flex;align-items:center;gap:4px;margin-right:8px;font-weight:700}
 .ns-dot i{width:9px;height:9px;border-radius:50%}
+.ns-kpi.ns-fc b{color:#6d28d9}
+.ns-fc-pct{margin-left:4px;padding:1px 7px;border-radius:99px;background:var(--ink-2);color:var(--text-2);font-weight:700}
+.ns-fc-pct.ok{background:var(--teal-soft);color:var(--teal)}
+.ns-fc-pct.low{background:var(--amber-soft,#fff3d6);color:var(--amber,#b45309)}
+/* «Хичээл бүрээр» — товч карт (дарахад баруун талын цонх) */
+.nsl-teaser{display:flex;align-items:center;gap:14px;width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;transition:border-color .15s,background .15s}
+.nsl-teaser:hover{border-color:var(--brand-tint);background:var(--brand-soft)}
+.nsl-teaser:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.nsl-t-ico{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:12px;background:var(--brand-soft);color:var(--brand)}
+.nsl-t-main{flex:1;min-width:0;display:grid;gap:2px}
+.nsl-t-main b{font:800 1rem var(--sans)}
+.nsl-t-main small{color:var(--text-2);font-size:.84rem}
+.nsl-t-main .nsl-t-warn{color:var(--coral);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nsl-t-go{flex:none;display:inline-flex;align-items:center;gap:2px;font-weight:700;font-size:.88rem;color:var(--brand)}
+/* Баруун талаас гулсаж гарах цонх (mkModal(..., side)) — утсан дээр бүтэн дэлгэц */
+.modal.modal-side{place-items:stretch end;padding:0}
+.modal.modal-side .modal-card{height:100%;max-height:none;padding:22px 20px 20px;border-radius:24px 0 0 24px;border-right:0;transform:translateX(56px);transition:transform .35s var(--ease)}
+.modal.modal-side.open .modal-card{transform:none}
+@media (max-width:560px){.modal.modal-side .modal-card{border-radius:0;padding:16px 14px}}
+.nsl{display:flex;flex-direction:column;height:100%;min-height:0}
+.nsl-head{flex:none;padding:0 40px 12px 0;border-bottom:1px solid var(--line);margin-bottom:12px}
+.nsl-head .h3{display:flex;align-items:center;gap:8px;margin:0 0 4px}
+.nsl-head p{margin:0 0 10px}
+.nsl-sort{display:inline-flex;flex-wrap:wrap;gap:3px;padding:3px;border-radius:12px;background:var(--ink-2)}
+.nsl-sort button{border:0;background:none;font:inherit;font-size:.82rem;font-weight:700;padding:6px 10px;border-radius:9px;color:var(--text-2);cursor:pointer}
+.nsl-sort button[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm)}
+.nsl-list{flex:1;min-height:0;overflow:auto;list-style:none;margin:0 -4px;padding:0 4px 8px;display:grid;align-content:start;gap:10px;overscroll-behavior:contain}
+.nsl-row{padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.nsl-row.warn{border-color:rgba(225,29,72,.35);background:var(--coral-soft)}
+.nsl-row.nsl-empty{background:var(--surface-2)}
+.nsl-top{display:flex;align-items:center;gap:8px;min-width:0}
+.nsl-top strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nsl-pos{flex:none;font-variant-numeric:tabular-nums;color:var(--muted)}
+.nsl-go{flex:none;width:30px;height:30px}
+.nsl-bar{height:8px;margin:10px 0 0}
+.nsl-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px;margin:10px 0 0}
+.nsl-stats div{padding:6px 9px;border-radius:10px;background:var(--surface-2);min-width:0}
+.nsl-row.warn .nsl-stats div{background:rgba(255,255,255,.75)}
+.nsl-stats dt{font-size:.72rem;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nsl-stats dd{margin:0;font-weight:800;font-size:1rem}
+.nsl-stats dd .ns-fc-pct{display:inline-block;margin:2px 0 0;font-size:.7rem}
+.nsl-stats .red dd{color:var(--coral)}
+.nsl-none{margin:6px 0 0}
 /* засварлагч: самбар нээх, үүлэн үгийн шууд хариу */
 .be-live{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
 .be-cloud-live{margin-top:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
@@ -4479,7 +4693,16 @@ ol.thread .msg-day{letter-spacing:.03em}
 .hf-poster:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 .hf-frame.wait .hf-poster i::before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
 .hf-frame.loaded .hf-poster{opacity:0;pointer-events:none}
-.home-film figcaption{text-align:center;font-size:.82rem;color:var(--muted);font-weight:600}
+.hf-frame.hf-video{padding-bottom:56.25%}
+.hf-frame video{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;background:#060914}
+.hf-play{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;width:100%;margin:0;padding:0 16px 22px;border:0;cursor:pointer;font:inherit;color:#e9edff;background:linear-gradient(180deg,rgba(6,9,20,0) 45%,rgba(6,9,20,.72))}
+.hf-play i{display:inline-flex;align-items:center;gap:10px;padding:12px 26px;border-radius:999px;background:#f0a83a;color:#1a1205;font-style:normal;font-weight:800;font-size:clamp(14px,1.6vw,17px);box-shadow:0 12px 40px -10px rgba(240,168,58,.75);transition:transform .2s var(--ease)}
+.hf-play small{font-size:.8rem;font-weight:700;color:#cfd8ff}
+.hf-play:hover i{transform:translateY(-2px) scale(1.04)}
+.hf-play:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.hf-play[hidden]{display:none}
+.hf-frame.hf-video.tall{width:auto;max-width:100%;height:min(78vh,calc((100vw - 32px) * 16 / 9));padding-bottom:0;aspect-ratio:9/16;margin:0 auto}
+.hf-frame.tall video{object-fit:contain}
 .authed .home-film{display:none}
 @media (min-width:1024px){
   .home-inner.home-hero{max-width:1200px;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);align-items:center;gap:48px;text-align:left;justify-items:stretch}
@@ -5148,3 +5371,425 @@ iframe.cv-img{border:0;pointer-events:auto}.gp-cover iframe.cv-img{pointer-event
    талбарт фокус хийхэд 16px-ээс жижиг үсэгтэй бол хуудсыг томруулдаг тул утсанд оролтын үсгийг 16px болгоно. */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @media (max-width:820px){input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea,.rt-ans,[contenteditable=true]{font-size:16px!important}}
+
+/* Амьтны цол, системийн бэлэг (зоос, бэлгийн хайрцаг, амьтдын цуглуулга) */
+.rank-emo{font-style:normal;font-size:1.6em;line-height:1}
+.rank-ring-in .rank-emo{font-size:2.1rem}
+.rank-emo-sm{font-size:1.25rem;line-height:1}
+.rank-ladder small i{font-style:normal}
+.rank-title small{font-size:.8rem;opacity:.8}
+.rank-meaning{margin:2px 0 6px;font-size:.92rem;font-weight:600;opacity:.9}
+.salute-emo{font-size:4.2rem;line-height:1}
+.salute-meaning{margin:-2px 0 8px;font-weight:700;color:var(--brand)}
+.tile-gift em{background:var(--accent-soft)}
+.gifts-head{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff}
+.gifts-head small{display:block;opacity:.8;font-size:.82rem}
+.gifts-head strong{font-size:1.35rem}
+.gift-coin{font-size:2rem;line-height:1;filter:drop-shadow(0 4px 10px rgba(234,160,46,.6))}
+.gifts-lede{margin:12px 2px;color:var(--text-2);font-size:.92rem;line-height:1.55}
+.gift-boxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.gift-box{--gb:#b07a45;--gb2:#7a5230;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 12px 12px;border:1px solid var(--line);border-radius:16px;background:var(--surface);text-align:center}
+.gift-box.gb-silver,.gr-card.gb-silver{--gb:#c3cad8;--gb2:#7f889c}
+.gift-box.gb-gold,.gr-card.gb-gold{--gb:#f6c56f;--gb2:#d98a14}
+.gift-box.gb-legend,.gr-card.gb-legend{--gb:#8b5cf6;--gb2:#4c1d95}
+.gr-card.gb-wood{--gb:#b07a45;--gb2:#7a5230}
+.gift-box.locked{opacity:.7}
+.gift-box.locked .gb-art{filter:grayscale(.8)}
+.gift-box small.gb-range{color:var(--muted);font-size:.8rem}
+.gb-art{position:relative;width:74px;height:64px}
+.gb-art .gb-body,.gr-box .gb-body{position:absolute;left:4px;right:4px;bottom:0;height:44px;display:grid;place-items:center;border-radius:8px;background:linear-gradient(180deg,var(--gb),var(--gb2));color:#fff;font-weight:800;font-size:1.3rem;box-shadow:inset 0 -6px 0 rgba(0,0,0,.15)}
+.gb-art .gb-lid,.gr-box .gb-lid{position:absolute;left:0;right:0;top:6px;height:16px;border-radius:6px;background:var(--gb2);box-shadow:0 3px 0 rgba(0,0,0,.12)}
+.gb-art .gb-body::before,.gr-box .gb-body::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:10px;margin-left:-5px;background:rgba(255,255,255,.35)}
+.gift-box .btn{width:100%}
+.gb-odds{width:100%;font-size:.82rem;text-align:left}
+.gb-odds summary{cursor:pointer;color:var(--muted);text-align:center}
+.gb-odds ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:2px}
+.gb-odds li{display:flex;justify-content:space-between;gap:8px}
+.gb-odds em{font-style:normal;color:var(--accent-2);font-weight:700;font-size:.75rem}
+.gift-album{margin-top:16px}
+.gift-album ul{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.gift-album li{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border:1px dashed var(--line-2);border-radius:14px;color:var(--muted);text-align:center}
+.gift-album li.own{border-style:solid;border-color:var(--line);background:var(--surface);color:var(--text)}
+.gift-album .ga-emo{font-size:1.8rem;line-height:1}
+.gift-album li:not(.own) .ga-emo{font-weight:800;opacity:.45}
+.gift-album .ga-name{font-size:.76rem;font-weight:700;line-height:1.2}
+.gift-album em{position:absolute;top:4px;right:6px;font-style:normal;font-size:.7rem;font-weight:800;color:var(--accent-2)}
+.gift-reveal{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:16px;background:radial-gradient(ellipse at 50% 30%,rgba(10,16,40,.78),rgba(5,8,20,.92));animation:fade-in .25s ease}
+.gift-reveal.out{opacity:0;transition:opacity .3s}
+.gr-card{position:relative;width:min(420px,100%);padding:26px 22px 22px;border-radius:22px;background:#fff;color:#0f172a;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.45)}
+.gr-box{position:relative;width:120px;height:104px;margin:10px auto;animation:gr-shake .9s ease-in-out infinite}
+.gr-box .gb-body{height:70px;font-size:2rem}
+.gr-box .gb-lid{height:24px;top:8px}
+.gr-animal{display:none}
+.gift-reveal.open .gr-box{display:none}
+.gift-reveal.open .gr-animal{display:block;animation:salute-pop .6s cubic-bezier(.2,1.4,.4,1)}
+.gr-emo{display:block;font-size:5rem;line-height:1.1;filter:drop-shadow(0 10px 20px rgba(0,0,0,.25))}
+.gr-animal h2{margin:4px 0 2px;font-size:1.6rem}
+.gr-animal h2 small{font-size:.9rem;opacity:.75}
+.gr-meaning{margin:0 0 8px;font-weight:700;color:var(--brand)}
+.gr-cheer{margin:0 0 12px;font-size:1rem;line-height:1.5;color:#334155}
+@keyframes gr-shake{0%,100%{transform:rotate(0)}20%{transform:rotate(-7deg) scale(1.04)}40%{transform:rotate(6deg)}60%{transform:rotate(-4deg) scale(1.06)}80%{transform:rotate(3deg)}}
+@media (prefers-reduced-motion:reduce){.gr-box{animation:none}}
+
+/* Амьтны цолын медаль (түвшний өнгө) ба цол ахих хувирал */
+[data-tier="bronze"]{--m1:#f6d6b4;--m2:#b07a45;--m3:#e8b989}
+[data-tier="silver"]{--m1:#f4f6fa;--m2:#8e98ad;--m3:#d5dae5}
+[data-tier="jade"]{--m1:#c9f5e8;--m2:#1f9e86;--m3:#8fe3cf}
+[data-tier="gold"]{--m1:#fff0c2;--m2:#e0a21f;--m3:#f6c56f}
+[data-tier="ruby"]{--m1:#ffd3d8;--m2:#c2334a;--m3:#f08a99}
+[data-tier="legend"]{--m1:#ece2ff;--m2:#6d3fd6;--m3:#b99cff}
+.medal{display:inline-grid;place-items:center;width:1.9em;height:1.9em;border-radius:50%;line-height:1;font-style:normal;
+  background:radial-gradient(circle at 34% 28%,rgba(255,255,255,.85),rgba(255,255,255,0) 52%),linear-gradient(145deg,var(--m1,#fff),var(--m2,#ccc));
+  box-shadow:0 0 0 3px var(--m3,#eee),0 8px 18px -8px var(--m2,#999)}
+.rank-ladder .medal{font-size:1rem}
+.rank-ladder li:not(.done):not(.cur) .medal{filter:grayscale(.85);opacity:.55}
+.rank-ring-in .medal{font-size:1.6rem}
+.tile-rank em.medal{font-size:1.05rem}
+.gift-album li.own[data-tier]{border-color:var(--m3)}
+.gift-album .ga-emo.medal{font-size:1.25rem}
+.gr-emo.medal{width:1.5em;height:1.5em;margin:0 auto 6px;font-size:4.2rem}
+.salute-evo{display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0 4px}
+.salute-evo .medal{font-size:2.3rem}
+.salute-evo .evo-from{font-size:1.5rem;animation:evo-out 1.4s ease forwards}
+.salute-evo .evo-arrow{font-size:1.4rem;color:var(--accent-2);animation:evo-arrow 1s ease-in-out infinite}
+.salute-evo .evo-to{animation:evo-in .9s cubic-bezier(.2,1.5,.4,1) .5s both}
+@keyframes evo-out{0%{transform:scale(1);opacity:1}60%{transform:scale(1.08);opacity:1}100%{transform:scale(.85);opacity:.45;filter:grayscale(.7)}}
+@keyframes evo-in{0%{transform:scale(.2) rotate(-25deg);opacity:0}100%{transform:none;opacity:1}}
+@keyframes evo-arrow{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
+@media (prefers-reduced-motion:reduce){.salute-evo .evo-from,.salute-evo .evo-arrow,.salute-evo .evo-to{animation:none}}
+
+/* Суралцахуйн зоос (тэмдэгт фонтоос хамаарахгүй), дүрүүдийн цуглуулга үеэр */
+.coin{display:inline-block;width:1em;height:1em;vertical-align:-.15em;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff6d6 0 18%,#f6c56f 19% 55%,#d98a14 56% 100%);box-shadow:inset 0 0 0 .09em #b06d0a,0 .08em .2em rgba(0,0,0,.25)}
+.gift-coin .coin{width:2rem;height:2rem;vertical-align:middle}
+.gr-emo.medal{display:grid}
+.gr-en{margin:-2px 0 4px;font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ga-era{margin-top:12px;padding:10px;border-radius:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--m1) 45%,transparent),transparent)}
+.ga-era-h{display:block;font-size:.78rem;font-weight:800;letter-spacing:.04em;color:var(--m2)}
+.ga-era ul{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.gift-album .ga-meaning{font-size:.68rem;line-height:1.25;color:var(--muted);font-weight:500}
+.gift-album li:not(.own) .ga-meaning{opacity:.7}
+@media (min-width:900px){.gift-album{display:grid;grid-template-columns:repeat(3,1fr);gap:0 12px}.gift-album>b{grid-column:1/-1}}
+
+/* Суралцахуйн 8 хэмжүүр: түвшний тайлбар, арга зүйн зөвлөмж */
+.dims-scale{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 14px;margin:2px 0 0;font-size:.78rem;color:var(--muted)}
+.dims-scale span{display:inline-flex;align-items:center;gap:6px}
+.dims-scale i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.dims-tips{grid-column:1/-1;padding:12px 14px;border-radius:14px;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
+.dims-tips b{display:block;margin-bottom:6px;font-size:.88rem}
+.dims-tips ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:.86rem;line-height:1.5}
+/* Хураангуй KPI: товч тайлбар ба «Хэрхэн тооцдог вэ?» */
+.anx-hint{display:block;margin-top:6px;font-size:.78rem;line-height:1.35;color:var(--muted)}
+.anx-info{margin-top:4px;font-size:.78rem}
+.anx-info summary{display:inline-flex;align-items:center;gap:4px;cursor:pointer;color:var(--brand);font-weight:600;list-style:none}
+.anx-info summary::-webkit-details-marker{display:none}
+.anx-info summary::before{content:"?";display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1.5px solid currentColor;font-size:.66rem;font-weight:800}
+.anx-info[open] summary{margin-bottom:6px}
+.anx-info p{margin:0;padding:10px 12px;border-radius:12px;background:var(--surface-2,var(--bg));border:1px solid var(--line);line-height:1.5;color:var(--text)}
+.anx-kpi .anx-info p b{font-size:inherit;line-height:inherit;letter-spacing:0;font-weight:700;color:var(--text)}
+.anx-parts{display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:6px;font-size:.78rem;color:var(--muted)}
+.anx-kpi .anx-parts b{font-size:inherit;line-height:inherit;letter-spacing:0;font-weight:700;color:var(--text)}
+/* Системийн бэлэг · Миний эрэмбэ: суралцахуйн зам — давсан үе ил, хүрээгүй нь нууц хайрцаг */
+.gifts+.rank-hero{margin-top:16px}
+.gift-album li.reached,.gift-album li.found{border-style:solid;border-color:var(--m3,var(--line));background:var(--surface);color:var(--text)}
+.gift-album li.reached .ga-emo,.gift-album li.found .ga-emo,.gift-album li.reached .ga-meaning,.gift-album li.found .ga-meaning{opacity:1}
+.gift-album li.cur{box-shadow:0 0 0 2px var(--m2),0 10px 22px -12px var(--m2)}
+.gift-album .ga-st{font-size:.64rem;font-weight:800;letter-spacing:.02em;color:var(--m2,var(--muted))}
+.gift-album li.found .ga-st{color:var(--accent-2)}
+.ga-qbox{--gb:#5b6b8f;--gb2:#2c3654;position:relative;display:block;width:44px;height:38px}
+.ga-qbox .gb-lid{position:absolute;left:0;right:0;top:3px;height:10px;border-radius:4px;background:var(--gb2);box-shadow:0 2px 0 rgba(0,0,0,.12)}
+.ga-qbox .gb-body{position:absolute;left:3px;right:3px;bottom:0;height:26px;display:grid;place-items:center;border-radius:6px;background:linear-gradient(180deg,var(--gb),var(--gb2));color:#fff;font-weight:800;font-size:.95rem}
+.ga-qbox .gb-body::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:6px;margin-left:-3px;background:rgba(255,255,255,.3)}
+.ga-qbox.big{width:64px;height:56px;flex:0 0 auto}
+.ga-qbox.big .gb-lid{height:14px;top:5px}
+.ga-qbox.big .gb-body{height:38px;font-size:1.3rem}
+.gift-album li.secret{background:color-mix(in srgb,var(--surface) 60%,transparent)}
+.gift-album li.secret.next{border-color:var(--accent)}
+.gift-album li.secret.next .ga-qbox{--gb:#f6c56f;--gb2:#d98a14;animation:gr-shake 2.4s ease-in-out infinite}
+.ga-era.ga-secret{display:flex;align-items:center;gap:14px;padding:14px;border:1px dashed var(--line-2);background:linear-gradient(135deg,color-mix(in srgb,#2c3654 12%,transparent),transparent)}
+.ga-era.ga-secret small{display:block;margin-top:2px;color:var(--muted);font-size:.78rem}
+.ga-era.ga-secret .ga-era-h,.ga-era.ga-partial .ga-era-h{color:var(--text-2)}
+@media (prefers-reduced-motion:reduce){.gift-album li.secret.next .ga-qbox{animation:none}}
+/* Нүүрний хөл: бренд + сургалт захиалах | Бүртгэл | Хууль | Холбоо барих | Газрын зураг */
+.footer.footer-x{grid-template-columns:minmax(0,1.35fr) minmax(0,.7fr) minmax(0,.8fr) minmax(0,1.15fr) minmax(0,1.5fr);gap:32px 36px}
+.fx-brand a.fx-mail{color:var(--muted);font-weight:600}
+.fx-cta{display:grid;justify-items:start;gap:4px;margin-top:10px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.fx-cta b{font-size:.95rem;color:var(--text)}
+.fx-cta span{font-size:.82rem;color:var(--muted)}
+.fx-brand .fx-cta a.btn{margin-top:8px;color:#fff}
+.fx-contact{gap:10px}
+.fx-contact .fx-co{font-weight:800;color:var(--text)}
+.fx-tels{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.fx-tels li{display:flex;align-items:center;gap:10px}
+.fx-contact a.fx-num{min-width:84px;color:var(--text);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fx-contact a.fx-vb{padding:1px 9px;border:1px solid rgba(115,96,242,.45);border-radius:999px;color:#6a55e8;font-size:.74rem;font-weight:800;line-height:1.6}
+.fx-contact a.fx-vb:hover{background:#7360f2;border-color:#7360f2;color:#fff}
+.fx-contact address{margin:0;font-style:normal;line-height:1.55;color:var(--muted)}
+.fx-contact a.fx-fb{display:inline-flex;align-items:center;gap:6px}
+.fx-contact a.fx-fb svg{color:#1877f2}
+.fx-mapbox{display:grid;align-content:start;gap:8px}
+.fx-map{display:block;width:100%;height:210px;border:1px solid var(--line);border-radius:14px;background:var(--line)}
+.fx-mapbox a{display:inline-flex;align-items:center;gap:6px;justify-self:start;color:var(--muted);font-weight:600;font-size:.86rem}
+.fx-mapbox a:hover,.fx-contact a.fx-fb:hover{color:var(--brand)}
+.pr-group .btn.pr-call{max-width:100%;white-space:normal;text-align:left;line-height:1.35}
+.pr-group .btn.pr-call svg{flex:none}
+@media (max-width:1100px){.footer.footer-x{grid-template-columns:repeat(3,minmax(0,1fr))}.fx-brand,.fx-mapbox{grid-column:1/-1}.fx-cta{max-width:420px}}
+@media (max-width:760px){.footer.footer-x{grid-template-columns:repeat(2,minmax(0,1fr))}.fx-contact{grid-column:1/-1}}
+/* Дарж болох мэдэгдэл (шинэ мессеж → чат нээх) */
+.toast.act{pointer-events:auto;cursor:pointer;max-width:min(92vw,520px)}
+.toast.act::after{content:"  · Нээх →";opacity:.75;font-weight:800}
+.toast.act:hover{filter:brightness(1.15)}
+.toast.act:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.fx-contact .nw{white-space:nowrap}
+/* Нүүр: Facebook Messenger-ээр шууд бичих хөвөгч товч (баруун доод буланд) */
+.fb-chat{position:fixed;right:22px;bottom:22px;z-index:70;display:inline-flex;align-items:center;gap:8px;padding:12px 18px 12px 14px;border-radius:999px;background:linear-gradient(135deg,#0a7cff 0%,#a033ff 60%,#ff5280 100%);color:#fff;font-weight:800;font-size:.92rem;box-shadow:0 12px 30px -10px rgba(120,60,255,.65);transition:transform .2s var(--ease),box-shadow .2s}
+.fb-chat:hover{color:#fff;transform:translateY(-2px);box-shadow:0 16px 34px -10px rgba(120,60,255,.8)}
+.fb-chat:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.fb-chat svg{flex:none}
+html.has-rail .fb-chat{right:calc(22px + var(--rail-w))}
+html:is(.intro-on,.lbx-open) .fb-chat{display:none}
+@media (max-width:640px){.fb-chat{right:12px;bottom:12px;width:54px;height:54px;padding:0;justify-content:center}.fb-chat span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}
+@media print{.fb-chat{display:none}}
+/* Студи → сургалтын тохиргоо: QR, Facebook-т хуваалцах, суралцагчаар үзэх */
+.gp-share{display:flex;gap:14px;align-items:center;margin:4px 0 16px;padding:12px;border:1px solid var(--line);border-radius:16px;background:var(--brand-soft)}
+.gp-share img{display:block;width:104px;height:104px;border-radius:12px;background:#fff;padding:6px;border:1px solid var(--line)}
+.gp-share-txt{display:grid;gap:6px;min-width:0}
+.gp-share-txt b{display:flex;align-items:center;gap:6px}
+.gp-share-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.gp-share-off{display:flex;align-items:center;gap:6px;margin:0 0 12px}
+@media (max-width:560px){.gp-share{flex-direction:column;align-items:stretch;text-align:center}.gp-share>a{align-self:center}.gp-share-txt b{justify-content:center}.gp-share-acts .btn{flex:1 1 calc(50% - 6px);justify-content:center}}
+.gp-collab{display:flex;gap:12px;align-items:center;margin:0 0 16px;padding:12px;border:1px solid var(--line);border-radius:16px}
+.gp-collab>div{display:grid;gap:2px;flex:1;min-width:0}
+.gp-collab-ico{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:12px;background:var(--brand-soft);color:var(--brand)}
+@media (max-width:560px){.gp-collab{flex-wrap:wrap}.gp-collab .btn{flex:1 1 100%;justify-content:center}}
+/* ⭐ Бүлэг чатын харилцан үнэлгээ (peer-): мессежийн нэрийн хажууд дундаж, толгойн товч, үнэлэх / рейтингийн цонх */
+.peer-badge{display:inline-flex;align-items:center;margin-left:6px;padding:0 6px;border-radius:99px;background:var(--accent-soft);color:var(--amber);font-size:.68rem;font-weight:800;line-height:1.55;vertical-align:middle;white-space:nowrap}
+.peer-open{flex:none;display:inline-flex;align-items:center;gap:4px;min-height:34px;padding:0 11px;border:1px solid var(--line-2);border-radius:99px;background:var(--surface);color:var(--text);font:800 .8rem/1 var(--sans);white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s}
+.peer-open:hover{background:var(--accent-soft);border-color:var(--accent)}
+.peer-open:focus-visible{outline:3px solid var(--brand-glow);outline-offset:2px}
+.chat-head .peer-open{margin-left:auto}
+.rail-head .peer-open.compact{width:38px;padding:0;justify-content:center}
+.rail-head .peer-open.compact .peer-open-t{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.peer-card{width:min(640px,100%)}
+.peer-card .h3:focus{outline:none}
+.peer-sub{margin:2px 0 0;color:var(--muted);font-size:.9rem;overflow-wrap:anywhere}
+.peer-body{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:14px}
+.peer-load{display:grid;place-items:center;min-height:160px}
+.peer-load .loader{margin:0}
+.peer-empty{display:grid;justify-items:center;gap:8px;padding:24px 14px;border:1px dashed var(--line-2);border-radius:16px;text-align:center;color:var(--text-2)}
+.peer-empty small{color:var(--muted)}
+.peer-me{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:14px 16px;border-radius:16px;background:var(--accent-soft)}
+.peer-me-l{flex-basis:100%;font-size:.8rem;font-weight:700;color:var(--text-2)}
+.peer-me b{font-size:1.5rem;font-weight:800;color:var(--text);line-height:1.2}
+.peer-me b.few{font-size:.98rem;color:var(--text-2)}
+.peer-me small{color:var(--muted);font-weight:700}
+.peer-note{margin:0;padding:10px 12px;border-left:3px solid var(--brand);border-radius:0 10px 10px 0;background:var(--surface-2);color:var(--text-2);font-size:.86rem;line-height:1.45}
+.peer-prog{margin:0;color:var(--muted);font-size:.86rem;font-weight:700}
+.peer-prog b{color:var(--brand)}
+.peer-search{display:flex;align-items:center;gap:8px;padding:0 12px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface);color:var(--muted)}
+.peer-search:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.peer-search input{flex:1;min-width:0;min-height:42px;border:0;outline:0;background:none;color:var(--text)}
+.peer-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.peer-none{padding:10px 4px}
+.peer-row{border:1px solid var(--line);border-radius:14px;background:var(--surface);transition:border-color .2s,box-shadow .2s}
+.peer-row.open{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.peer-line{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.peer-line>.avatar{flex:none}
+.peer-nm{flex:1;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:3px;justify-items:start}
+.peer-nm b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
+.peer-avg{padding:1px 8px;border-radius:99px;background:var(--accent-soft);color:var(--amber);font-size:.76rem;font-weight:800;line-height:1.5}
+.peer-avg.few{background:var(--ink-2);color:var(--muted);font-weight:700}
+.peer-edit{flex:none;min-height:38px;padding:0 14px;border:1px solid var(--brand);border-radius:99px;background:var(--brand);color:var(--on-brand);font:800 .82rem/1 var(--sans);white-space:nowrap;cursor:pointer;transition:background .15s,color .15s}
+.peer-edit.has{background:var(--surface);color:var(--brand)}
+.peer-edit.has:hover{background:var(--brand-soft)}
+.peer-edit b{font-size:.98rem}
+.peer-edit:focus-visible,.peer-quick button:focus-visible,.peer-x:focus-visible{outline:3px solid var(--brand-glow);outline-offset:2px}
+.peer-ed{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:2px 12px 12px;border-top:1px solid var(--line)}
+.peer-val{display:flex;align-items:baseline;gap:8px;padding-top:8px}
+.peer-out{min-width:2.4ch;font-size:1.7rem;font-weight:800;color:var(--brand);line-height:1.1}
+.peer-lvl{font-weight:700;color:var(--text-2)}
+.peer-rg{width:100%;height:32px;margin:0;accent-color:var(--brand);cursor:pointer}
+.peer-rg:focus-visible{outline:3px solid var(--brand-glow);outline-offset:3px;border-radius:8px}
+.peer-quick{display:flex;flex-wrap:wrap;gap:6px}
+.peer-quick button{flex:1 1 0;min-width:48px;min-height:38px;padding:0 8px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface);color:var(--text);font-weight:800;cursor:pointer}
+.peer-quick button:hover{border-color:var(--brand)}
+.peer-quick button[aria-pressed=true]{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.peer-acts{display:flex;flex-wrap:wrap;gap:8px}
+.btn.peer-del{color:var(--coral);border-color:var(--coral-soft)}
+.btn.peer-del:hover{background:var(--coral-soft)}
+.peer-err{margin:0;color:var(--coral);font-size:.86rem;font-weight:700}
+.peer-err:empty{display:none}
+/* Багшийн хүснэгт: байр, нэр, рейтинг, дундаж, үнэлсэн, өгсөн; мөрийг дэлгэхэд хэн хэдийг өгсөн */
+.peer-sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.peer-sum span{display:grid;gap:2px;padding:12px 8px;border-radius:14px;background:var(--surface-2);text-align:center}
+.peer-sum small{color:var(--muted);font-size:.76rem;font-weight:700}
+.peer-sum b{font-size:1.25rem;font-weight:800}
+.peer-tw{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+.peer-tbl{width:100%;border-collapse:collapse;font-size:.88rem}
+.peer-tbl th{padding:9px 8px;background:var(--surface-2);color:var(--muted);font-size:.74rem;font-weight:800;text-align:center;white-space:nowrap}
+.peer-tbl td{padding:8px;border-top:1px solid var(--line);text-align:center;vertical-align:middle}
+.peer-tbl th:nth-child(2),.peer-tbl td:nth-child(2){text-align:left}
+.peer-tr.open td{background:var(--brand-soft)}
+.peer-rank{width:36px;font-weight:800;color:var(--muted)}
+.peer-x{display:flex;align-items:center;gap:8px;width:100%;min-width:0;min-height:40px;padding:4px 6px;border:0;border-radius:10px;background:none;color:var(--text);text-align:left;cursor:pointer}
+.peer-x:hover{background:var(--ink-2)}
+.peer-x>.avatar{flex:none}
+.peer-x>span{flex:1;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);line-height:1.25}
+.peer-x b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
+.peer-x small{color:var(--muted);font-size:.74rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.peer-x svg{flex:none;color:var(--muted);transition:transform .2s}
+.peer-tr.open .peer-x svg{transform:rotate(180deg)}
+.peer-collab{display:inline-block;min-width:42px;padding:2px 8px;border-radius:99px;background:var(--brand-soft);color:var(--brand);font-weight:800}
+.peer-collab.none{background:none;color:var(--muted)}
+.peer-det>td{padding:0 10px 12px;border-top:0;background:var(--brand-soft);text-align:left}
+.peer-dd{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding-top:4px}
+.peer-dh{font-size:.82rem;color:var(--text-2)}
+.peer-dm{display:none;margin:0;color:var(--text-2);font-size:.84rem}
+.peer-rl{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
+.peer-rl li{display:flex;align-items:center;gap:10px;padding:6px 8px 6px 12px;border-radius:12px;background:var(--surface)}
+.peer-rn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.peer-sc{min-width:38px;padding:1px 6px;border-radius:8px;background:var(--brand-soft);color:var(--brand);font-weight:800;text-align:center}
+.peer-sc.low{background:var(--coral-soft);color:var(--coral)}
+.peer-rl time{color:var(--muted);font-size:.76rem;white-space:nowrap}
+@media (max-width:560px){
+  .peer-c2{display:none}.peer-dm{display:block}
+  .peer-tbl td,.peer-tbl th{padding:8px 5px}.peer-x small{display:none}
+  .peer-rl li{flex-wrap:wrap;gap:4px 10px}.peer-rl time{order:3;flex-basis:100%}
+  .peer-line{flex-wrap:wrap}.peer-edit{margin-left:auto}
+  .peer-sum b{font-size:1.05rem}
+  .rail-head .peer-open{padding:0 9px}
+}
+@media (max-width:400px){.rail-head .peer-open{width:38px;padding:0;justify-content:center}.rail-head .peer-open-t{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
+
+/* 🧠 Давтах сануулгын цонх (rv-): мартах муруй, давтах хичээлүүд, хойшлуулах (1 цаг / маргааш) */
+html.rv-open{overflow:hidden}
+.rv{position:fixed;inset:0;z-index:2050;display:grid;grid-template-columns:minmax(0,1fr);place-items:center;padding:16px;background:rgba(15,23,42,.52);backdrop-filter:blur(3px);animation:rv-fade .25s var(--ease)}
+.rv-card{position:relative;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;width:min(480px,100%);max-height:calc(100vh - 32px);max-height:calc(100svh - 32px);overflow:auto;overscroll-behavior:contain;padding:24px;border-radius:var(--radius-lg);background:var(--surface);color:var(--text);box-shadow:var(--shadow-lg);animation:rv-rise .5s var(--spring)}
+.rv-x{position:absolute;top:10px;right:10px}
+.rv-x:focus-visible,.rv-cards:focus-visible,.rv-card .btn:focus-visible{outline:3px solid var(--brand-glow);outline-offset:2px}
+.rv-head{display:flex;align-items:center;gap:12px;padding-right:36px}
+.rv-brain{flex:none;display:grid;place-items:center;width:54px;height:54px;border-radius:16px;background:var(--accent-soft);font-size:1.85rem;line-height:1;animation:rv-wig 1.1s ease .45s 2}
+.rv-head h2{margin:0;font-size:1.3rem;font-weight:800;line-height:1.2}
+.rv-head p{margin:3px 0 0;color:var(--text-2);font-size:.92rem;line-height:1.4}
+.rv-fig{margin:0;padding:10px 10px 8px;border:1px solid var(--line);border-radius:16px;background:var(--surface-2);color:var(--muted)}
+.rv-fig svg{display:block;width:100%;height:auto;max-height:160px;overflow:visible}
+.rv-area{fill:var(--brand-soft)}
+.rv-line{fill:none;stroke:var(--brand);stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:rv-draw 1.4s var(--ease) .2s forwards}
+.rv-miss{fill:none;stroke:var(--coral);stroke-width:1.7;stroke-dasharray:4 4;opacity:.75}
+.rv-ax{fill:none;stroke:currentColor;stroke-width:1.2;opacity:.4}
+.rv-guide{stroke:var(--amber);stroke-width:1.2;stroke-dasharray:2 3;opacity:.7}
+.rv-dot.done{fill:var(--brand)}
+.rv-dot.next{fill:var(--surface);stroke:var(--brand);stroke-width:1.8}
+.rv-dot.cur{fill:var(--accent);stroke:var(--surface);stroke-width:2}
+.rv-ring{fill:none;stroke:var(--accent);stroke-width:2;transform-box:fill-box;transform-origin:center;animation:rv-pulse 1.6s ease-out infinite}
+.rv-t{fill:currentColor;font:700 9px var(--sans)}
+.rv-t.cur{fill:var(--amber);font-weight:800}
+.rv-unit{font-weight:600}
+.rv-fig figcaption{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin-top:4px;color:var(--text-2);font-size:.78rem;font-weight:700}
+.rv-lg{display:inline-flex;align-items:center;gap:6px}
+.rv-lg i{display:inline-block;width:18px;border-top:3px solid var(--brand);border-radius:2px}
+.rv-lg i.rv-lg-b{border-top:2px dashed var(--coral)}
+.rv-lg i.rv-lg-c{width:9px;height:9px;border:0;border-radius:50%;background:var(--accent)}
+.rv-lg-now{color:var(--amber)}
+.rv-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.rv-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.rv-step{flex:none;display:grid;place-items:center;min-width:40px;height:28px;padding:0 6px;border-radius:99px;background:var(--brand-soft);color:var(--brand);font-size:.76rem;font-weight:800}
+.rv-txt{flex:1;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:1px;line-height:1.3}
+.rv-txt b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:800;overflow-wrap:anywhere}
+.rv-txt small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--muted);font-size:.8rem;overflow-wrap:anywhere}
+.rv-do{flex:none;color:var(--brand);font-weight:800}
+.rv-cards{display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border:1px dashed var(--accent-2);border-radius:14px;background:var(--accent-soft);color:var(--text);font:700 .92rem/1.35 var(--sans);text-align:left;cursor:pointer;transition:transform .15s var(--ease)}
+.rv-cards:hover{transform:translateY(-1px)}
+.rv-cards-i{font-size:1.3rem;line-height:1}
+.rv-cards .grow{flex:1;min-width:0}
+.rv-cards .rv-go{font-size:1.4rem;line-height:1;color:var(--amber)}
+.rv-acts{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.rv-now{width:100%;min-height:48px;font-size:1rem}
+.rv-later{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rv-later .btn{width:100%;min-height:42px}
+@keyframes rv-fade{from{opacity:0}}
+@keyframes rv-rise{from{opacity:0;transform:translateY(26px) scale(.96)}}
+@keyframes rv-sheet{from{transform:translateY(100%)}}
+@keyframes rv-wig{0%,100%{transform:none}25%{transform:rotate(-12deg) scale(1.1)}75%{transform:rotate(12deg) scale(1.1)}}
+@keyframes rv-pulse{from{opacity:.9;transform:scale(.7)}to{opacity:0;transform:scale(2)}}
+@keyframes rv-draw{to{stroke-dashoffset:0}}
+@media (max-width:560px){
+  .rv{place-items:end stretch;padding:0}
+  .rv-card{width:100%;max-height:92vh;max-height:92svh;gap:12px;padding:20px 16px calc(16px + env(safe-area-inset-bottom));border-radius:24px 24px 0 0;animation-name:rv-sheet;animation-duration:.4s}
+  .rv-head h2{font-size:1.15rem}.rv-brain{width:44px;height:44px;font-size:1.5rem;border-radius:14px}
+  .rv-item{padding:9px 10px;gap:8px}.rv-step{min-width:34px}
+}
+@media (max-width:560px){html.rv-open .a11y-fab,html:has(#peerWin.open) .a11y-fab{display:none}} /* цонхны товчийг халхлахгүй */
+@media (prefers-reduced-motion:reduce){
+  .rv,.rv-card,.rv-brain,.rv-ring{animation:none}
+  .rv-line{animation:none;stroke-dashoffset:0}
+  .rv-cards{transition:none}.rv-cards:hover{transform:none}
+}
+.peer-badge.few{background:var(--ink-2);color:var(--text-2)}
+/* Багшийн бүлэг чат: толгойн доорх «⭐ Хамтын ажиллагаа» зурвас (шилдэг 5, дундаж, нийт үнэлгээ) */
+.peer-strip{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0;padding:8px 14px;border-top:1px solid var(--line);background:var(--accent-soft);font-size:.8rem;line-height:1.3}
+#railPeerStrip{margin:-4px -14px -12px}
+#ibPeer{border-top:0;border-bottom:1px solid var(--line)} /* студийн чат */
+.peer-strip-t{display:inline-flex;align-items:center;gap:5px;font-weight:800;color:var(--text);white-space:nowrap}
+.peer-strip-s{flex:none;color:var(--text-2);font-weight:600;white-space:nowrap}
+.peer-strip-s b{color:var(--text)}
+.peer-strip-e{flex:1 1 150px;min-width:0;color:var(--text-2);font-weight:600}
+.peer-strip-more{flex:none;margin-left:auto;min-height:30px;padding:0 11px;border:1px solid var(--accent-2);border-radius:99px;background:var(--surface);color:var(--amber);font:800 .76rem/1 var(--sans);white-space:nowrap;cursor:pointer}
+.peer-strip-more:hover{background:var(--accent-soft)}
+.peer-strip-row{order:3;flex:1 1 100%;display:flex;align-items:center;gap:8px;min-width:0;padding-bottom:2px;overflow-x:auto;scrollbar-width:none}
+.peer-strip-row::-webkit-scrollbar{display:none}
+.peer-strip-top{flex:none;display:flex;gap:6px;margin:0;padding:0;list-style:none}
+.peer-strip-top li{flex:none}
+.peer-strip-top button{display:inline-flex;align-items:center;gap:5px;min-height:30px;padding:0 9px 0 4px;border:1px solid var(--line-2);border-radius:99px;background:var(--surface);color:var(--text);font:700 .78rem/1 var(--sans);white-space:nowrap;cursor:pointer}
+.peer-strip-top button:hover{border-color:var(--brand)}
+.peer-strip-top i{display:grid;place-items:center;min-width:20px;height:20px;padding:0 4px;border-radius:99px;background:var(--brand-soft);color:var(--brand);font-style:normal;font-size:.7rem;font-weight:800}
+.peer-strip-top li:first-child i{background:var(--accent);color:#3d2600}
+.peer-strip-top b{color:var(--brand);font-weight:800}
+.peer-strip-more:focus-visible,.peer-strip-top button:focus-visible,.peer-tabs button:focus-visible,.peer-mx-w:focus-visible{outline:3px solid var(--brand-glow);outline-offset:2px}
+@media (max-width:560px){ /* утсанд нэг мөр: ⭐ · шилдгүүд (хажуу тийш гүйлгэнэ) · Дэлгэрэнгүй */
+  .peer-strip{flex-wrap:nowrap;padding:6px 12px}
+  .peer-strip-tl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .peer-strip-s{display:none}
+  .peer-strip-row{order:1;flex:1 1 auto;padding:0}
+  .peer-strip-more{order:2;margin-left:0}
+  .peer-strip-e{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
+/* Багшийн цонх: «Рейтинг» / «Хэн хэнийг» таб, оноон хүснэгт (мөр — үнэлэгч, багана — үнэлэгдэгч) */
+.peer-tabs{display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--surface-2)}
+.peer-tabs button{flex:1;min-height:40px;padding:0 12px;border:0;border-radius:10px;background:none;color:var(--text-2);font:800 .88rem/1.2 var(--sans);cursor:pointer}
+.peer-tabs button.on{background:var(--surface);color:var(--brand);box-shadow:var(--shadow-sm)}
+.peer-view{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.peer-mx-help{margin:0;color:var(--text-2);font-size:.84rem;line-height:1.5}
+.peer-mx-lg{display:inline-flex;gap:4px;margin-left:4px;vertical-align:middle}
+.peer-mx-lg i{padding:0 7px;border-radius:6px;font-style:normal;font-size:.74rem;font-weight:800}
+.peer-mx-w{max-height:min(62vh,560px);overflow:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:14px}
+.peer-mx{border-collapse:separate;border-spacing:0;font-size:.82rem}
+.peer-mx th,.peer-mx td{border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.peer-mx thead th{position:sticky;top:0;z-index:2;max-width:74px;padding:8px 6px;background:var(--surface-2);color:var(--text-2);font-size:.74rem;font-weight:800;text-align:center;white-space:nowrap}
+.peer-mx thead th span{display:block;overflow:hidden;text-overflow:ellipsis}
+.peer-mx tbody th{position:sticky;left:0;z-index:1;max-width:130px;padding:6px 10px;background:var(--surface);font-weight:700;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.peer-mx thead .peer-mx-c{left:0;z-index:3;max-width:130px;font-size:.68rem;font-weight:700;color:var(--muted);text-align:left;white-space:normal}
+.peer-mx td{min-width:44px;height:34px;padding:0 6px;text-align:center;font-weight:800}
+.peer-mx-lo{background:var(--coral-soft);color:var(--coral)}
+.peer-mx-mid{background:var(--amber-soft);color:var(--amber)}
+.peer-mx-hi{background:var(--teal-soft);color:var(--teal)}
+.peer-mx-self{background:var(--ink-2);color:var(--muted)}
+.peer-mx-no{background:var(--surface)}
+@media (max-width:560px){.peer-mx tbody th,.peer-mx thead .peer-mx-c{max-width:96px}.peer-tabs button{font-size:.82rem;padding:0 8px}}
+/* Багшид: тоологдоогүй үнэлгээ (шинэ эсвэл идэвхгүй суралцагч) — бүдэг, «тоологдоогүй» шошготой; хүснэгтэд судалтай */
+.peer-rl li.unc{opacity:.72;background:repeating-linear-gradient(135deg,var(--surface) 0 8px,var(--surface-2) 8px 16px)}
+.peer-unc{flex:none;padding:1px 7px;border-radius:99px;background:var(--ink-2);color:var(--muted);font-size:.7rem;font-weight:700;white-space:nowrap;cursor:help}
+.peer-rl li.unc .peer-sc{background:var(--ink-2);color:var(--muted)}
+.peer-mx td.peer-mx-unc,.peer-mx-lg i.peer-mx-unc{background:repeating-linear-gradient(135deg,var(--surface-2) 0 5px,var(--line) 5px 7px);color:var(--muted);font-weight:600}
+.peer-mx td.peer-mx-unc{text-decoration:line-through;text-decoration-color:rgba(89,99,122,.5)}
+.peer-daily{display:inline-block;margin-top:4px;font-weight:700;color:var(--text-2)}
+/* Хичээл бүрээр үнэлэх: самбарын хичээл сонгогч, хичээлийн нэр, хичээл үзэх хуудасны холбоос */
+.peer-lbar{display:grid;gap:4px;margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
+.peer-lsel{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.peer-lsel span{font-size:.82rem;font-weight:800;color:var(--text-2);white-space:nowrap}
+.peer-lsel select{flex:1 1 200px;min-width:0;min-height:42px;padding:0 12px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface);color:var(--text);font:700 .9rem var(--sans);cursor:pointer}
+.peer-lsel select:focus-visible{outline:3px solid var(--brand-glow);outline-offset:2px;border-color:var(--brand)}
+.peer-lhint{color:var(--muted);font-size:.8rem;line-height:1.4}
+.peer-rn .peer-rlsn{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:.74rem;font-weight:600}
+.peer-mx td sup{margin-left:1px;font-size:.62rem;font-weight:700;opacity:.7}
+.peer-lesson-link{margin:14px 0 0;text-align:center}
+.peer-lesson-link .btn{white-space:normal;line-height:1.3}

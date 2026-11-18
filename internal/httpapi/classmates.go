@@ -149,7 +149,7 @@ func (s *Server) handleStartDM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.isClassmate(r.Context(), c.UID, other) {
-		writeErr(w, http.StatusForbidden, "зөвхөн нэг багшид дагадаг ангийн найзтайгаа чатлана")
+		writeErr(w, http.StatusForbidden, "зөвхөн нэг багшийн сургалтад суралцдаг ангийн найзтайгаа чатлах боломжтой")
 		return
 	}
 	u, err := s.store.UserByID(r.Context(), other)
@@ -184,7 +184,7 @@ func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Title = strings.TrimSpace(in.Title)
 	if n := utf8.RuneCountInString(in.Title); n < 2 || n > 60 {
-		writeErr(w, http.StatusBadRequest, "бүлгийн нэр 2-60 тэмдэгт")
+		writeErr(w, http.StatusBadRequest, "бүлгийн нэр 2-60 тэмдэгт байх ёстой")
 		return
 	}
 	if len(in.Members) == 0 || len(in.Members) > 100 {
@@ -205,7 +205,7 @@ func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, m := range in.Members {
 		if !allowed(m) {
-			writeErr(w, http.StatusForbidden, "зөвхөн ангийн найзуудаа бүлэгт нэмнэ")
+			writeErr(w, http.StatusForbidden, "бүлэгт зөвхөн ангийн найзуудаа нэмэх боломжтой")
 			return
 		}
 	}

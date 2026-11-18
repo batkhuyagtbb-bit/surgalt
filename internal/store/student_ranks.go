@@ -10,7 +10,7 @@ import (
 type StudentRank struct {
 	ID        string
 	Courses   int64 // суралцсан (хичээл үзсэн) сургалт
-	Points    int64 // цолын оноо — сургалтуудын онооны дундаж
+	Points    int64 // эрэмбийн оноо — сургалтуудын онооны дундаж
 	Creative  int64 // бүтээл: хичээлийн дүгнэлт + даалгавар + үүлэн үгийн хариулт + тодруулга
 	ActiveMin int64 // хичээл дээрх нийт идэвхтэй минут
 	CleanMin  int64 // сануулгагүй (зөрчилгүй) хичээлийн идэвхтэй минут
@@ -56,9 +56,9 @@ func (m *Memory) StudentRanks(_ context.Context, warn []string) (map[string]*Stu
 		}
 	}
 	seen := map[[2]string]bool{}
-	for k := range m.progress {
+	for k, p := range m.progress {
 		cid := lessonC[k[1]]
-		if cid != "" && courseT[cid] != k[0] && !seen[[2]string{k[0], cid}] {
+		if cid != "" && p.Viewed() && courseT[cid] != k[0] && !seen[[2]string{k[0], cid}] { // зөвхөн эрхийн мөр тооцогдохгүй
 			seen[[2]string{k[0], cid}] = true
 			at(k[0]).Courses++
 		}

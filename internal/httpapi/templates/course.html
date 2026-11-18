@@ -1,5 +1,5 @@
 {{$c := .D.Course}}{{$t := .D.Teacher}}{{$paid := sub $c.LessonCount $c.FreeLessonCount}}
-{{template "head" (dict "Title" (pageTitle $c.Title $t.DisplayName) "Desc" (courseDesc .D) "Image" (printf "%s/t/%s/og.jpg" .PublicURL $t.Username) "ImageW" 1200 "ImageH" 630 "ImageAlt" (printf "%s — %s" $c.Title $t.DisplayName) "URL" (printf "%s/c/%s" .PublicURL $c.ID) "Page" "course")}}
+{{template "head" (dict "Title" (pageTitle $c.Title $t.DisplayName) "Desc" (courseDesc .D) "Image" (printf "%s/c/%s/og.jpg?v=%s" .PublicURL $c.ID (courseOGv .D)) "ImageW" 1200 "ImageH" 630 "ImageAlt" (printf "%s — %s" $c.Title $t.DisplayName) "URL" (printf "%s/c/%s" .PublicURL $c.ID) "Page" "course")}}
 <script type="application/ld+json">{{ldCourse .D .PublicURL}}</script>
 <main class="course-page" data-course="{{$c.ID}}" data-locked="{{if $c.Locked}}1{{end}}" data-price="{{$c.Price}}" data-drip="{{if $c.Drip}}1{{else}}0{{end}}" data-mode="{{if $c.Price}}bundle{{else if gt $paid 0}}lessons{{else}}free{{end}}">
   <section class="lp" id="lessonStage" hidden aria-label="Хичээл үзэх">
@@ -30,6 +30,7 @@
           <button class="btn btn-gold btn-lg magnetic" id="buyBtn">{{if $c.Locked}}🔑 Нууц үгээр нээх{{else if $c.Price}}Бүх хичээл багцаар · {{money $c.Price}}{{else if gt $paid 0}}Хичээлүүдийг сонгох ↓{{else}}Үнэгүй элсэх{{end}}</button>
           <button class="btn btn-glass btn-lg magnetic" data-open-chat>{{icon "chat"}}Багшаас асуух</button>
           <button class="btn btn-glass btn-lg" data-open-group title="Сургалтад элссэн суралцагчдын бүлэг">{{icon "users"}}Бүлэг чат</button>
+          <button class="btn btn-glass btn-lg" data-course-share title="QR код, Facebook-т хуваалцах">{{icon "qr"}}Хуваалцах</button>
         </div>
       </div>
       <div class="hero-card glass tilt reveal">
@@ -49,7 +50,7 @@
 
   <section class="section">
     <div class="section-head reveal"><span class="eyebrow">Хөтөлбөр</span><h2 class="h2">Хичээлүүд</h2>
-      {{if $c.Drip}}<p class="muted">Хичээлүүд дарааллаар нээгдэнэ: өмнөх хичээлээ үзсэний дараа дараагийнх нь тохируулсан хугацаанд нээгдэнэ.{{if and $c.UnlockAllPaid $c.Price}} Багцаар авсан бол бүгд шууд нээлттэй.{{end}}</p>{{end}}
+      {{if $c.Drip}}<p class="muted">Хичээлүүд дарааллаар нээгдэнэ: өмнөх хичээлээ үзсэнээс хойш тогтоосон хугацаа өнгөрөхөд дараагийнх нь нээгдэнэ.{{if and $c.UnlockAllPaid $c.Price}} Багцаар худалдаж авсан бол бүх хичээл шууд нээлттэй.{{end}}</p>{{end}}
       <div class="progress-line" id="courseProgress" hidden><div class="meter"><i></i></div><span class="muted small"></span></div></div>
     {{if .D.Grouped}}
     <ol class="lessons lessons-grouped" id="lessons">
@@ -75,6 +76,18 @@
   </section>
 </main>
 
+{{/* Сургалтыг хуваалцах: QR (уншуулбал сургалт руу нэвтэрнэ — course_share.go), Facebook, холбоос. */}}
+<div class="modal" id="courseShareModal" aria-hidden="true">
+  <div class="modal-card qr-modal" role="dialog" aria-modal="true" aria-label="Сургалтыг хуваалцах">
+    <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
+    <img src="/c/{{$c.ID}}/qr.png?size=512" alt="Сургалтын QR код" width="280" height="280" loading="lazy">
+    <p><strong>{{$c.Title}}</strong><br><span class="muted small">Утасныхаа камераар уншуулаад сургалт руу шууд нэвтэрнэ — хичээлийн танхимд хэвлэж наах, самбарт харуулахад тохиромжтой</span></p>
+    <a class="qr-link" href="/c/{{$c.ID}}" title="Сургалтын хуудас">{{icon "link" 20}}<span>surgalt.mn/c/<b>{{$c.ID}}</b></span></a>
+    <a class="btn qr-fb" href="https://www.facebook.com/sharer/sharer.php?u={{printf "%s/c/%s" $.PublicURL $c.ID}}" target="_blank" rel="noopener" data-fb-share><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M24 12.07C24 5.41 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.8-4.7 4.54-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.5c-1.5 0-1.96.93-1.96 1.89v2.26h3.32l-.53 3.5h-2.8V24C19.62 23.1 24 18.1 24 12.07"/></svg>Facebook-т хуваалцах</a>
+    <div class="qr-acts"><button type="button" class="btn btn-ghost" data-copy-course>{{icon "link"}}Холбоос хуулах</button><a class="btn btn-gold" href="/c/{{$c.ID}}/qr.png?size=1024&download=1">{{icon "down"}}QR татах</a><button type="button" class="btn btn-ghost" data-native-share hidden>{{icon "share"}}Илгээх</button></div>
+  </div>
+</div>
+
 <div class="modal" id="lessonModal" aria-hidden="true">
   <div class="modal-card lesson-modal">
     <button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
@@ -84,7 +97,7 @@
     <div class="lesson-content pre" id="lessonContent"></div>
     <section class="discuss" id="lessonDiscuss" hidden aria-label="Хэлэлцүүлэг"></section>
     <nav class="lesson-nav" id="lessonNav" hidden aria-label="Өмнөх, дараагийн хичээл"></nav>
-    <div class="lesson-done" id="lessonDone" hidden><span class="active-need" hidden></span><button class="btn btn-gold" data-complete>✓ Энэ хичээлийг дууслаа</button><span class="muted small">Дууссан гэж тэмдэглэхэд явц тань хадгалагдана.</span></div>
+    <div class="lesson-done" id="lessonDone" hidden><span class="active-need" hidden></span><button class="btn btn-gold" data-complete>✓ Энэ хичээлийг дуусгалаа</button><span class="muted small">Дууссан гэж тэмдэглэхэд явц тань хадгалагдана.</span></div>
   </div>
 </div>
 

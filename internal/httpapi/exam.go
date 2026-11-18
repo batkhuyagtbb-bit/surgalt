@@ -28,11 +28,11 @@ func validateExam(e *store.Exam) string {
 	}
 	switch {
 	case e.TimeMin < 0 || e.TimeMin > 600:
-		return "шалгалтын хугацаа 0-600 минут"
+		return "шалгалтын хугацаа 0-600 минут байх ёстой"
 	case e.Attempts < 0 || e.Attempts > 100:
-		return "оролдлогын тоо 0-100"
+		return "оролдлогын тоо 0-100 хооронд байх ёстой"
 	case e.PassPct < 0 || e.PassPct > 100:
-		return "тэнцэх хувь 0-100"
+		return "тэнцэх хувь 0-100 хооронд байх ёстой"
 	}
 	return validateDue(&e.Due)
 }
@@ -116,7 +116,7 @@ func (s *Server) handleExamStart(w http.ResponseWriter, r *http.Request) {
 	}
 	qs := examQuestions(l, nil)
 	if len(qs) == 0 {
-		writeErr(w, http.StatusConflict, "шалгалтад асуулт алга")
+		writeErr(w, http.StatusConflict, "энэ шалгалтад асуулт нэмэгдээгүй байна")
 		return
 	}
 	if dueBlocked(w, s.dueFor(r, c.UID, course, l)) { // хугацаа: хаалттай 423, хоцорсон төлбөр 402
@@ -138,7 +138,7 @@ func (s *Server) handleExamStart(w http.ResponseWriter, r *http.Request) {
 		s.finishAttempt(r, a, l, course, nil, store.AttemptExpired, "хугацаа дууссан")
 	}
 	if allowed := l.Exam.Attempts + s.reopenCount(r, c.UID, l.ID); l.Exam.Attempts > 0 && len(atts) >= allowed && !teaches(course, c.UID) {
-		writeErr(w, http.StatusConflict, fmt.Sprintf("оролдлогын тоо дууссан (%d)", allowed))
+		writeErr(w, http.StatusConflict, fmt.Sprintf("боломжит бүх оролдлогоо (%d) ашигласан байна — нэмэлт оролдлого хэрэгтэй бол багшдаа хандана уу", allowed))
 		return
 	}
 	a := &store.ExamAttempt{UserID: c.UID, UserName: s.displayName(r.Context(), c.UID, c.Name), CourseID: course.ID, LessonID: l.ID, TeacherID: course.TeacherID,
@@ -189,7 +189,7 @@ func (s *Server) handleExamSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if a.Status != store.AttemptActive {
-		writeErr(w, http.StatusConflict, "энэ оролдлого аль хэдийн дууссан")
+		writeErr(w, http.StatusConflict, "энэ оролдлого аль хэдийн дууссан байна")
 		return
 	}
 	status, reason := store.AttemptSubmitted, ""
@@ -199,7 +199,7 @@ func (s *Server) handleExamSubmit(w http.ResponseWriter, r *http.Request) {
 		status, reason = store.AttemptExpired, "хугацаа хэтэрсэн"
 	}
 	if !s.finishAttempt(r, a, l, course, in.Answers, status, reason) {
-		writeErr(w, http.StatusConflict, "энэ оролдлого аль хэдийн дууссан")
+		writeErr(w, http.StatusConflict, "энэ оролдлого аль хэдийн дууссан байна")
 		return
 	}
 	out := map[string]any{"attempt": a}

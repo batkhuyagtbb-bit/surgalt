@@ -17,6 +17,7 @@ type learnMem struct {
 	events   []ActivityEvent
 	rankPts  map[[2]string]int // (user, course) → оноо
 	rankLvl  map[string]int    // user → олгосон түвшин
+	boxes    map[string][]BoxOpen // user → бэлгийн хайрцаг нээлт
 	subs     map[string]*Submission
 }
 
@@ -106,7 +107,7 @@ func (m *Memory) SaveRankPoints(_ context.Context, userID, courseID string, poin
 		l.rankPts = map[[2]string]int{}
 	}
 	l.rankPts[[2]string{userID, courseID}] = points
-	total, n := 0, 0 // нэгдсэн цол — сургалт бүрийн онооны дундаж
+	total, n := 0, 0 // нэгдсэн эрэмбэ — сургалт бүрийн онооны дундаж
 	for k, v := range l.rankPts {
 		if k[0] == userID {
 			total, n = total+v, n+1
@@ -116,6 +117,37 @@ func (m *Memory) SaveRankPoints(_ context.Context, userID, courseID string, poin
 		return 0, nil
 	}
 	return int(math.Round(float64(total) / float64(n))), nil
+}
+
+func (m *Memory) RankPointsSum(_ context.Context, userID string) (int, error) {
+	l := &m.learn
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	sum := 0
+	for k, v := range l.rankPts {
+		if k[0] == userID && v > 0 {
+			sum += v
+		}
+	}
+	return sum, nil
+}
+
+func (m *Memory) BoxOpens(_ context.Context, userID string) ([]BoxOpen, error) {
+	l := &m.learn
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return slices.Clone(l.boxes[userID]), nil
+}
+
+func (m *Memory) AddBoxOpen(_ context.Context, b *BoxOpen) error {
+	l := &m.learn
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.boxes == nil {
+		l.boxes = map[string][]BoxOpen{}
+	}
+	l.boxes[b.UserID] = append(l.boxes[b.UserID], *b)
+	return nil
 }
 
 func (m *Memory) UserRankLevel(_ context.Context, userID string) (int, error) {

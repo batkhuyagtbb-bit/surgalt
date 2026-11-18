@@ -257,7 +257,7 @@ type Lesson struct {
 	// гүйцмэгц, "quiz" өмнөхийн асуултууд бүгд зөв, "exam" өмнөх шалгалтад тэнцмэгц, "manual" багш гараар нээнэ.
 	UnlockRule string `json:"unlock_rule,omitempty"`
 	// Hidden — багш бэлтгэж дуусаагүй тул хаасан: суралцагчдад огт харагдахгүй (жагсаалт, хайлт, тоо,
-	// дараалал, цол, шууд холбоос). Багш өөрөө харж, засна.
+	// дараалал, эрэмбэ, шууд холбоос). Багш өөрөө харж, засна.
 	Hidden    bool      `json:"hidden,omitempty"`
 	Position  int       `json:"position"`
 	CreatedAt time.Time `json:"created_at"`
@@ -478,6 +478,17 @@ type LessonProgress struct {
 	QuizDoneAt *time.Time `json:"quiz_done_at,omitempty"`
 }
 
+// notViewedAt — зөвхөн төлсөн эрх (late_pass/fee_pass) хадгалсан, хичээлийг нээгээгүй мөрийн viewed_at (GrantLessonPass).
+var notViewedAt = time.Unix(0, 0).UTC()
+
+// Viewed — хичээлийг үнэхээр нээсэн эсэх. Суралцагчийн өгөгдлийг устгасны дараа сэргээсэн төлсөн эрхийн мөр (viewed_at
+// = 1970 эсвэл тэг) үзээгүйд тооцогдоно: LessonProgress/CourseProgress ийм мөрийг буцаахгүй (эрэмбэ, дараалсан нээлт,
+// журнал, давтах сануулга «эхлээгүй» гэж харна); эрхийг LessonPasses уншина.
+func (p LessonProgress) Viewed() bool { return p.ViewedAt.Unix() > 0 || p.CompletedAt != nil }
+
+// isPassKey — Quiz доторх төлсөн эрхийн тэмдэг (асуултын хариулт биш).
+func isPassKey(k string) bool { return k == LatePassKey || k == FeePassKey }
+
 type OrderStatus string
 
 const (
@@ -663,9 +674,13 @@ type Store interface {
 	PayoutStore
 	HighlightStore
 	CourseUnlockStore
+	LessonGrantStore
+	NotificationProof
+	JournalMetaStore
 	ChatHideStore
 	CloudStore
 	ReviewStore
+	PeerRatingStore
 	BoardStore
 	AdminStore
 	CreateUser(ctx context.Context, u *User) error
@@ -681,7 +696,7 @@ type Store interface {
 	UsersByIDs(ctx context.Context, ids []string) ([]User, error)
 	// TeacherRanks — багш бүрийн үзэлт, сургалт, суралцагч, харилцааны тоо (нүүр хуудасны зэрэглэлд; багш бус ID байж болно).
 	TeacherRanks(ctx context.Context) (map[string]*TeacherRank, error)
-	// StudentRanks — суралцагч бүрийн сургалт, цол, бүтээл, идэвхтэй минут, сануулга, харилцааны тоо (warn — сануулгын төрлүүд).
+	// StudentRanks — суралцагч бүрийн сургалт, эрэмбэ, бүтээл, идэвхтэй минут, сануулга, харилцааны тоо (warn — сануулгын төрлүүд).
 	StudentRanks(ctx context.Context, warn []string) (map[string]*StudentRank, error)
 	TeacherStudentCount(ctx context.Context, teacherID string) (int64, error)
 	SetGoogleToken(ctx context.Context, userID, encrypted string) error
@@ -795,6 +810,10 @@ type Store interface {
 	// CourseProgress нь сургалтын бүх суралцагчийн явц: user_id → lesson_id → явц (багшийн статистикт).
 	CourseProgress(ctx context.Context, courseID string) (map[string]map[string]LessonProgress, error)
 	LessonProgress(ctx context.Context, userID, courseID string) (map[string]LessonProgress, error)
+	// LessonPasses — хичээл бүрийн төлсөн эрхийн тэмдгүүд (LatePassKey, FeePassKey → true), үзээгүй мөрийнх ч.
+	LessonPasses(ctx context.Context, userID, courseID string) (map[string]map[string]bool, error)
+	// GrantLessonPass — төлсөн эрхийн тэмдгүүдийг тавина; мөр байхгүй бол хичээлийг «үзээгүй» мөр үүсгэнэ (Viewed() false).
+	GrantLessonPass(ctx context.Context, userID, courseID, lessonID string, keys ...string) error
 
 	IsEnrolled(ctx context.Context, userID, courseID string) (bool, error)
 	Enroll(ctx context.Context, userID string, c *Course) error

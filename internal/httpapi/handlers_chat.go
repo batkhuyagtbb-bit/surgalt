@@ -88,7 +88,7 @@ func (s *Server) loadConv(w http.ResponseWriter, r *http.Request) (auth.Claims, 
 	}
 	role, ok := s.convRole(r.Context(), c, conv)
 	if !ok {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return c, nil, "", false
 	}
 	return c, conv, role, true
@@ -187,7 +187,7 @@ func (s *Server) handleReact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Emoji != "" && !allowedReactions[in.Emoji] {
-		writeErr(w, http.StatusBadRequest, "реакц: 👍 ❤️ 😂 😮 😢 🙏")
+		writeErr(w, http.StatusBadRequest, "зөвхөн эдгээрээс сонгоно уу: 👍 ❤️ 😂 😮 😢 🙏")
 		return
 	}
 	if _, err := s.store.MessageByID(r.Context(), conv.ID, in.MessageID); err != nil {
@@ -259,7 +259,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.chatLim.Allow(c.VisitorKey()) {
-		writeErr(w, http.StatusTooManyRequests, "хэт хурдан бичиж байна")
+		writeErr(w, http.StatusTooManyRequests, "хэт хурдан бичиж байна — түр хүлээнэ үү")
 		return
 	}
 	if s.convBlock(r.Context(), conv).any() { // 1:1 ярианд аль нэг тал хориглосон
@@ -276,14 +276,14 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Body = strings.TrimSpace(in.Body)
 	if in.Attachment != "" && !(files.OwnedBy(in.Attachment, conv.TeacherID) && strings.Contains(in.Attachment, "/"+files.Private+"/") && strings.Contains(in.Attachment, "__chat_")) {
-		writeErr(w, http.StatusBadRequest, "хавсралт буруу")
+		writeErr(w, http.StatusBadRequest, "хавсралт буруу байна")
 		return
 	}
 	if in.Attachment != "" && in.Body == "" {
 		in.Body = "📷 Зураг"
 	}
 	if n := utf8.RuneCountInString(in.Body); n < 1 || n > 2000 {
-		writeErr(w, http.StatusBadRequest, "мессеж 1-2000 тэмдэгт")
+		writeErr(w, http.StatusBadRequest, "мессеж 1-2000 тэмдэгт байх ёстой")
 		return
 	}
 	m := &store.Message{ConversationID: conv.ID, Sender: role, Body: in.Body, SenderName: c.Name, Attachment: in.Attachment}
@@ -334,7 +334,7 @@ func (s *Server) handleChatUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.chatLim.Allow(c.VisitorKey()) {
-		writeErr(w, http.StatusTooManyRequests, "хэт хурдан илгээж байна")
+		writeErr(w, http.StatusTooManyRequests, "хэт хурдан илгээж байна — түр хүлээнэ үү")
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 6<<20)
@@ -354,7 +354,7 @@ func (s *Server) handleChatUpload(w http.ResponseWriter, r *http.Request) {
 		}
 		ext := strings.ToLower(filepath.Ext(part.FileName()))
 		if !map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}[ext] {
-			writeErr(w, http.StatusBadRequest, "зөвхөн зураг (JPG, PNG, GIF, WebP)")
+			writeErr(w, http.StatusBadRequest, "зөвхөн зураг (JPG, PNG, GIF, WebP) илгээх боломжтой")
 			return
 		}
 		u, err := s.store.UserByID(r.Context(), conv.TeacherID)
@@ -555,7 +555,7 @@ func (s *Server) handleEditMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if m.Deleted || (m.SenderID != "" && m.SenderID != c.UID) || (m.SenderID == "" && m.Sender != "visitor") || (m.SenderID == "" && c.VisitorKey() != conv.VisitorKey) {
-		writeErr(w, http.StatusForbidden, "зөвхөн өөрийн мессежийг засна")
+		writeErr(w, http.StatusForbidden, "та зөвхөн өөрийн мессежийг засах боломжтой")
 		return
 	}
 	var in struct {
@@ -566,7 +566,7 @@ func (s *Server) handleEditMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Body = strings.TrimSpace(in.Body)
 	if n := utf8.RuneCountInString(in.Body); n < 1 || n > 2000 {
-		writeErr(w, http.StatusBadRequest, "мессеж 1-2000 тэмдэгт")
+		writeErr(w, http.StatusBadRequest, "мессеж 1-2000 тэмдэгт байх ёстой")
 		return
 	}
 	if err := s.store.EditMessage(r.Context(), conv.ID, m.ID, in.Body); s.storeErr(w, r, err) {
@@ -594,7 +594,7 @@ func (s *Server) handleDeleteMessage(w http.ResponseWriter, r *http.Request) {
 	mine := (m.SenderID != "" && m.SenderID == c.UID) || (m.SenderID == "" && m.Sender == role && c.VisitorKey() == conv.VisitorKey)
 	teacherOwner := role == store.SenderTeacher && conv.Kind != store.ConvDM && conv.Kind != store.ConvTeam
 	if !mine && !teacherOwner {
-		writeErr(w, http.StatusForbidden, "зөвхөн өөрийн мессежийг устгана")
+		writeErr(w, http.StatusForbidden, "та зөвхөн өөрийн мессежийг устгах боломжтой")
 		return
 	}
 	if err := s.store.DeleteMessage(r.Context(), conv.ID, m.ID); s.storeErr(w, r, err) {

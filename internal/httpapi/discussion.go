@@ -41,7 +41,7 @@ func (s *Server) discussionLesson(w http.ResponseWriter, r *http.Request, uid st
 		return nil, nil, false
 	}
 	if !l.Discussion {
-		writeErr(w, http.StatusConflict, "энэ хичээлд хэлэлцүүлэг хаалттай")
+		writeErr(w, http.StatusConflict, "энэ хичээлийн хэлэлцүүлэг хаалттай байна")
 		return nil, nil, false
 	}
 	return course, l, true
@@ -136,7 +136,7 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Body = strings.TrimSpace(in.Body)
 	if n := utf8.RuneCountInString(in.Body); n == 0 || n > 2000 {
-		writeErr(w, http.StatusBadRequest, "сэтгэгдэл 1-2000 тэмдэгт")
+		writeErr(w, http.StatusBadRequest, "сэтгэгдэл 1-2000 тэмдэгт байх ёстой")
 		return
 	}
 	var parent *store.Comment
@@ -154,7 +154,7 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
 	commentGate.Lock()
 	if t, ok := commentGate.last[c.UID]; ok && time.Since(t) < 5*time.Second {
 		commentGate.Unlock()
-		writeErr(w, http.StatusTooManyRequests, "түр хүлээгээд дахин бичнэ үү")
+		writeErr(w, http.StatusTooManyRequests, "хэт хурдан бичиж байна — түр хүлээгээд дахин бичнэ үү")
 		return
 	}
 	commentGate.last[c.UID] = time.Now()
@@ -191,7 +191,7 @@ func (s *Server) handleDeleteComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if cm.UserID != c.UID && !teaches(course, c.UID) {
-		writeErr(w, http.StatusForbidden, "зөвхөн өөрийн сэтгэгдлийг устгана")
+		writeErr(w, http.StatusForbidden, "та зөвхөн өөрийн сэтгэгдлийг устгах боломжтой")
 		return
 	}
 	if err := s.store.DeleteComment(r.Context(), cm.ID); s.storeErr(w, r, err) {

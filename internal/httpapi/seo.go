@@ -314,7 +314,7 @@ func ldCourse(pc PublicCourse, base string) template.JS {
 	instructor := map[string]any{"@type": "Person", "name": t.DisplayName, "url": base + "/t/" + t.Username}
 	course := map[string]any{"@type": "Course", "@id": url + "#course", "name": c.Title, "description": courseDesc(pc), "url": url,
 		"inLanguage": "mn", "provider": map[string]any{"@type": "Organization", "name": "surgalt.mn", "sameAs": base + "/"},
-		"creator": instructor, "image": base + "/t/" + t.Username + "/og.jpg"}
+		"creator": instructor, "image": base + "/c/" + c.ID + "/og.jpg?v=" + courseOGVersion(&pc)}
 	if !c.CreatedAt.IsZero() {
 		course["dateCreated"] = c.CreatedAt.UTC().Format(time.RFC3339)
 	}
@@ -403,7 +403,15 @@ func ldHome(base string) template.JS {
 		"potentialAction": map[string]any{"@type": "SearchAction", "target": map[string]any{"@type": "EntryPoint", "urlTemplate": base + "/?q={search_term_string}"},
 			"query-input": "required name=search_term_string"}}
 	org := map[string]any{"@type": "Organization", "@id": base + "/#org", "name": "surgalt.mn", "url": base + "/",
-		"description": "Багш нар онлайн сургалт, ном, шууд хичээлээ зардаг, суралцагчид нэг дороос суралцдаг монгол платформ."}
+		"description": "Багш нар онлайн сургалт, ном, шууд хичээлээ санал болгож, суралцагчид нэг дороос суралцдаг Монголын платформ.",
+		// Холбоо барих — нүүрний хөл (home.html .fx-contact)-тэй ижил.
+		"legalName": "ОРД ДАТА СОФТ ХХК", "telephone": "+976 9985 8233",
+		"address": map[string]any{"@type": "PostalAddress", "streetAddress": "1-р хороо, Тээвэрчдийн гудамж, Flamingo Tower, 503 тоот", "addressLocality": "Улаанбаатар",
+			"addressRegion": "Сүхбаатар дүүрэг", "postalCode": "14210", "addressCountry": "MN"},
+		"contactPoint": []any{map[string]any{"@type": "ContactPoint", "contactType": "customer support", "areaServed": "MN", "availableLanguage": "mn",
+			"telephone": []string{"+976 9985 8233", "+976 9906 2437"}}},
+		"geo":    map[string]any{"@type": "GeoCoordinates", "latitude": 47.9165061, "longitude": 106.9281539},
+		"sameAs": []string{"https://www.facebook.com/profile.php?id=61595289405243"}}
 	return ldJS(map[string]any{"@context": "https://schema.org", "@graph": []any{site, org}})
 }
 

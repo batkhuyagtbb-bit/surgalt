@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -18,6 +19,11 @@ const (
 	highlightsMax    = 1000 // нэг хичээл дээрх тодруулгын дээд тоо
 	highlightTextMax = 5000 // нэг тодруулгын текст (тэмдэгт)
 	highlightNoteMax = 1000 // нэг тэмдэглэл (тэмдэгт)
+	highlightQMax    = 300  // flash card-ийн асуулт (тэмдэгт)
+	highlightAMax    = 1000 // flash card-ийн санах хэсэг (тэмдэгт)
+
+	storyNotesMax = 60  // GET /api/me/notes: хичээл бүрийн сүүлийн тэмдэглэл
+	storyCardsMax = 200 // GET /api/me/notes: хичээл бүрийн flash card (сүүлийн 60-аас өмнөх нь ч)
 )
 
 func (s *Server) handleGetHighlights(w http.ResponseWriter, r *http.Request) {
@@ -162,10 +168,7 @@ func (s *Server) handleMyNotes(w http.ResponseWriter, r *http.Request) {
 	}
 	out := []story{}
 	for _, st := range sets {
-		items := st.Items
-		if len(items) > 60 {
-			items = items[len(items)-60:]
-		}
+		items := storyNotes(st.Items)
 		if bid, ok := strings.CutPrefix(st.LessonID, "book:"); ok {
 			b, err := s.store.BookByID(r.Context(), bid)
 			if err != nil {
@@ -192,6 +195,33 @@ func (s *Server) handleMyNotes(w http.ResponseWriter, r *http.Request) {
 		out = append(out, story{ID: l.ID, Kind: "lesson", Title: l.Title, Sub: co.Title, URL: "/c/" + co.ID + "#l=" + l.ID, Updated: st.UpdatedAt, Notes: items})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"stories": out})
+}
+
+// storyNotes — story-д: сүүлийн 60 тэмдэглэл + түүнээс өмнөх flash card-ууд (хичээл бүрт нийт ≤200 карт, шинэ нь
+// давуу), анхны дарааллаараа.
+func storyNotes(items []store.Highlight) []store.Highlight {
+	if len(items) <= storyNotesMax {
+		return items
+	}
+	start := len(items) - storyNotesMax
+	cards := 0
+	for i := start; i < len(items); i++ {
+		if items[i].IsCard() {
+			cards++
+		}
+	}
+	var early []store.Highlight
+	for i := start - 1; i >= 0 && cards < storyCardsMax; i-- {
+		if items[i].IsCard() {
+			early = append(early, items[i])
+			cards++
+		}
+	}
+	if len(early) == 0 {
+		return items[start:]
+	}
+	slices.Reverse(early)
+	return append(early, items[start:]...)
 }
 
 var noteImgRe = regexp.MustCompile(`^/note-img/[0-9a-f]{24}/[0-9a-f]{32}\.webp$`)
@@ -225,13 +255,13 @@ func (s *Server) handleNoteImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.boardLim.Allow("note-img:" + c.UID) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон зураг, түр хүлээнэ үү")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон зураг оруулж байна — түр хүлээнэ үү")
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 6<<20)
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
-		writeErr(w, http.StatusRequestEntityTooLarge, "зураг хэт том")
+		writeErr(w, http.StatusRequestEntityTooLarge, "зургийн хэмжээ хэт том байна")
 		return
 	}
 	boardImgSem <- struct{}{}
@@ -244,7 +274,7 @@ func (s *Server) handleNoteImage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusRequestEntityTooLarge, err.Error())
 	case err != nil:
 		s.log.Error("тэмдэглэлийн зураг", "err", err)
-		writeErr(w, http.StatusInternalServerError, "зургийг хадгалж чадсангүй")
+		writeErr(w, http.StatusInternalServerError, "зургийг хадгалж чадсангүй — дахин оролдоно уу")
 	default:
 		writeJSON(w, http.StatusOK, map[string]any{"url": "/note-img/" + c.UID + "/" + name})
 	}
@@ -266,7 +296,7 @@ func (s *Server) handleNoteImg(w http.ResponseWriter, r *http.Request) {
 
 func validateHighlights(hs []store.Highlight) string {
 	if len(hs) > highlightsMax {
-		return "нэг хичээл дээр 1000-аас олон тодруулга хийхгүй"
+		return "нэг хичээлд 1000-аас олон тодруулга хийх боломжгүй"
 	}
 	for i := range hs {
 		h := &hs[i]
@@ -287,22 +317,32 @@ func validateHighlights(hs []store.Highlight) string {
 			case h.Start != 0 || h.End != 0 || utf8.RuneCountInString(h.Text) > 200:
 				return "тэмдэглэлийн мэдээлэл буруу"
 			case (len(h.Box) > 0 || h.Img != "") && h.Kind != "page":
-				return "хүрээ зөвхөн хуудсан дээр"
+				return "хүрээг зөвхөн хуудсан дээр зурна"
 			case len(h.Box) > 0 && !validBox(h.Box):
 				return "хүрээлсэн хэсэг буруу"
 			case h.Img != "" && !noteImgRe.MatchString(h.Img):
 				return "тэмдэглэлийн зураг буруу"
 			case utf8.RuneCountInString(h.Note) > highlightNoteMax:
-				return "тэмдэглэл 1000 тэмдэгтээс хэтрэхгүй"
+				return "тэмдэглэл 1000 тэмдэгтээс хэтрэхгүй байх ёстой"
 			}
 		case h.Page != 0 || h.Sec != 0 || len(h.Box) > 0 || h.Img != "":
 			return "тодруулгын мэдээлэл буруу"
 		case h.Start < 0 || h.End <= h.Start || h.End-h.Start > highlightTextMax:
 			return "тодруулгын байрлал буруу"
 		case utf8.RuneCountInString(h.Text) > highlightTextMax:
-			return "тодруулсан текст хэт урт"
+			return "тодруулсан текст хэт урт байна"
 		case utf8.RuneCountInString(h.Note) > highlightNoteMax:
-			return "тэмдэглэл 1000 тэмдэгтээс хэтрэхгүй"
+			return "тэмдэглэл 1000 тэмдэгтээс хэтрэхгүй байх ёстой"
+		}
+		// Flash card: бүх төрөл, өнгөнд; асуулт ба санах хэсэг хоёулаа бөглөгдсөн эсвэл хоёулаа хоосон.
+		h.Q, h.A = strings.TrimSpace(h.Q), strings.TrimSpace(h.A)
+		switch {
+		case (h.Q == "") != (h.A == ""):
+			return "flash card-ийн асуулт ба санах хэсгийг хоёуланг нь бөглөнө үү"
+		case utf8.RuneCountInString(h.Q) > highlightQMax:
+			return "flash card-ийн асуулт 300 тэмдэгтээс хэтрэхгүй байх ёстой"
+		case utf8.RuneCountInString(h.A) > highlightAMax:
+			return "flash card-ийн санах хэсэг 1000 тэмдэгтээс хэтрэхгүй байх ёстой"
 		}
 	}
 	return ""

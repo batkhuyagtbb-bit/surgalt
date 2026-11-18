@@ -17,7 +17,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var ErrNotConnected = errors.New("Google Meet холбогдоогүй эсвэл эрх цуцлагдсан")
+var ErrNotConnected = errors.New("Google Meet холбогдоогүй эсвэл зөвшөөрөл цуцлагдсан байна — дахин холбоно уу")
 
 const calendarScope = "https://www.googleapis.com/auth/calendar.events"
 
@@ -57,7 +57,7 @@ func (c *Client) Exchange(ctx context.Context, code, verifier string) (string, e
 		return "", err
 	}
 	if tok.RefreshToken == "" {
-		return "", errors.New("Google refresh token өгсөнгүй — дахин холбоно уу")
+		return "", errors.New("Google-ээс зөвшөөрлийн түлхүүр ирсэнгүй — Google Meet-ээ дахин холбоно уу")
 	}
 	return tok.RefreshToken, nil
 }
@@ -112,7 +112,7 @@ func (c *Client) Create(ctx context.Context, refreshToken, title, description st
 		return nil, err
 	}
 	if ev.HangoutLink == "" {
-		return nil, errors.New("Google Meet холбоос үүссэнгүй (Workspace тохиргоог шалгана уу)")
+		return nil, errors.New("Google Meet холбоос үүсгэж чадсангүй — Workspace тохиргоогоо шалгана уу")
 	}
 	return &Meeting{EventID: ev.ID, MeetURL: ev.HangoutLink}, nil
 }

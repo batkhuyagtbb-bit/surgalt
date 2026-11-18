@@ -59,6 +59,8 @@ type Config struct {
 	CSPMode string
 	// MinifyStatic — static JS/CSS-ийг minify хийж өгөх (minify.go).
 	MinifyStatic bool
+	// IntroDir — нүүрний танилцуулга видеоны (HD) хавтас дискэнд: /static/intro/<нэр> эндээс (хоосон бол зөвхөн embed).
+	IntroDir string
 }
 
 type Server struct {
@@ -75,9 +77,15 @@ type Server struct {
 	limiter      *ratelimit.Limiter
 	authLim      *ratelimit.Limiter // нэвтрэлт/бүртгэл/зочин токен — илүү чанга
 	codeLim      *ratelimit.Limiter // сургалтын нууц үг таах оролдлого (course_code.go)
+	reqLim       *ratelimit.Limiter // нээлгэх хүсэлт (хэрэглэгч тус бүрт; access_request.go)
+	reqCourseLim *ratelimit.Limiter // нээлгэх хүсэлт (сургалт тус бүрт: олон бүртгэлээс нэг багшийг дарахгүй)
+	grantLim     *ratelimit.Limiter // багш «Нээх» (багш тус бүрт; access_request.go)
+	accessReqs   accessDedup        // нээлгэх хүсэлтийн 12 цагийн давхардал (access_request.go)
 	chatLim      *ratelimit.Limiter // мессеж илгээх
 	phoneLim     *ratelimit.Limiter // багшийн утасны дугаар нээх — дугаар хусуурдахаас сэргийлнэ
 	resetLim     *ratelimit.Limiter // нэг имэйл рүү нууц үг сэргээх захидал (2 минутад 1 орчим)
+	wipeLim      *ratelimit.Limiter // журнал: суралцагчийн өгөгдөл устгах (эзэмшигч тус бүрт; journal_meta.go)
+	wipeSem      chan struct{}      // журнал: процесс дотор нэг удаад нэг устгал
 	capLim       *ratelimit.Limiter // captcha зураг (IP тутам)
 	top          topCache           // нүүр хуудасны «Шилдэг багш нар» (top_teachers.go)
 	topStu       topCache           // нүүр хуудасны «Идэвхтэй суралцагчид» (top_students.go)
@@ -85,6 +93,9 @@ type Server struct {
 	boardLim     *ratelimit.Limiter // цагаан самбарын өөрчлөлт (хэрэглэгч тус бүрт; анги нэг IP-аас орж болно)
 	boards       boardHub           // цагаан самбарын сессүүд (board.go)
 	searchLim    *ratelimit.Limiter // самбарын зураг хайлт (хэрэглэгч тус бүрт)
+	peerLim      *ratelimit.Limiter // бүлэг чатын харилцан үнэлгээ (үнэлэгч тус бүрт; peer_ratings.go)
+	doneLim      *ratelimit.Limiter // «давтлаа» тэмдэг (хэрэглэгч тус бүрт; хэтэрвэл чимээгүй 204 — review_due.go)
+	peerAl       peerAlertDedup     // харилцан үнэлгээний анхааруулга: (сургалт, хүүхэд) бүрт өдөрт нэг (peer_ratings.go)
 	imgs         imgSearch          // зураг хайлтын кэш, орчуулга (board_images.go)
 	hits         hitBuf             // сайтын хандалтын түр сан (admin.go)
 	adm          adminCache         // хянагчийн самбарын агшин зураг
@@ -101,6 +112,8 @@ type Server struct {
 	rosters      *cache.Cache[*roster]        // багшийн суралцагчид (roster.go), 60 секунд
 	analyticsAgg *cache.Cache[*analyticsData] // багшийн хяналтын нэгтгэл (analytics.go), 20 секунд
 	journals     *cache.Cache[*journalAgg]    // сургалтын журнал (journal.go), 30 секунд
+	peers        *cache.Cache[*peerData]      // сургалтын харилцан үнэлгээ + үнэлэгчдийн баримт (peer_ratings.go), 25 секунд
+	reviewDue    *cache.Cache[[]ReviewDue]    // хэрэглэгчийн давтах popup-ийн жагсаалт (review_due.go), 60 секунд
 	blocks       *cache.Cache[*LessonBlock]   // суралцагч × хичээлийн хориг (blocks.go), 15 секунд
 	dripOpen     *cache.Cache[bool]           // дараалсан нээлтээр нээгдсэн хичээл (service.go), 10 минут
 	activeBase   *cache.Cache[int]            // сесс → тухайн хичээлийн бусад сессийн идэвхтэй секунд (activity.go), 2 минут
@@ -142,13 +155,22 @@ func New(cfg Config, st store.Store, tokens *auth.Signer, hub *chat.Hub, fstore 
 		limiter:      ratelimit.New(cfg.RateLimitRPS, cfg.RateBurst),
 		authLim:      ratelimit.New(1, 10),
 		codeLim:      ratelimit.New(1.0/30, 6),
+		reqLim:       ratelimit.New(1.0/60, 5),
+		reqCourseLim: ratelimit.New(30.0/3600, 30),
+		grantLim:     ratelimit.New(0.5, 30),
 		chatLim:      ratelimit.New(2, 10),
 		phoneLim:     ratelimit.New(0.05, 8),
 		resetLim:     ratelimit.New(1.0/120, 2),
+		wipeLim:      ratelimit.New(1.0/60, 3),
+		wipeSem:      make(chan struct{}, 1),
 		capLim:       ratelimit.New(0.5, 15),
 		admLim:       ratelimit.New(1.0/30, 5),
 		boardLim:     ratelimit.New(25, 100),
 		searchLim:    ratelimit.New(0.5, 12),
+		peerLim:      ratelimit.New(0.1, 30),
+		doneLim:      ratelimit.New(0.2, 10),
+		peers:        cache.New[*peerData](peerCacheTTL, 0, nil),
+		reviewDue:    cache.New[[]ReviewDue](reviewDueTTL, 0, nil),
 		profiles:     cache.New[*Rendered[PublicProfile]](30*time.Second, 5*time.Second, isNF),
 		courses:      cache.New[*Rendered[PublicCourse]](30*time.Second, 5*time.Second, isNF),
 		qrs:          cache.New[[]byte](time.Hour, 5*time.Second, isNF),
@@ -189,13 +211,21 @@ func (s *Server) Background(ctx context.Context) {
 	go s.limiter.Janitor(ctx)
 	go s.authLim.Janitor(ctx)
 	go s.codeLim.Janitor(ctx)
+	go s.reqLim.Janitor(ctx)
+	go s.reqCourseLim.Janitor(ctx)
+	go s.grantLim.Janitor(ctx)
 	go s.chatLim.Janitor(ctx)
 	go s.phoneLim.Janitor(ctx)
 	go s.resetLim.Janitor(ctx)
+	go s.wipeLim.Janitor(ctx)
 	go s.capLim.Janitor(ctx)
 	go s.admLim.Janitor(ctx)
 	go s.boardLim.Janitor(ctx)
 	go s.searchLim.Janitor(ctx)
+	go s.peerLim.Janitor(ctx)
+	go s.doneLim.Janitor(ctx)
+	go s.peers.Janitor(ctx, time.Minute)
+	go s.reviewDue.Janitor(ctx, time.Minute)
 	go s.boardLoop(ctx)
 	go s.hitLoop(ctx)
 	go s.notifyLoop(ctx)
@@ -222,6 +252,8 @@ func (s *Server) Handler() http.Handler {
 	// Өөрийн мэдээлэл
 	mux.HandleFunc("GET /api/me", s.handleMe)
 	mux.HandleFunc("GET /api/me/home", s.handleHome)
+	mux.HandleFunc("GET /api/me/gifts", s.handleGifts)          // системийн бэлэг: зоос, бэлгийн хайрцаг, амьтдын цуглуулга
+	mux.HandleFunc("POST /api/me/gifts/open", s.handleGiftOpen) // зоосоор хайрцаг нээх
 	mux.HandleFunc("GET /api/me/profile/insights", s.handleProfileInsights)
 	mux.HandleFunc("PUT /api/me/profile", s.handleUpdateProfile)
 	mux.HandleFunc("PUT /api/me/name", s.handleUpdateName)
@@ -248,6 +280,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/students", s.handleMyStudents)
 	mux.HandleFunc("GET /api/me/courses/{id}/students", s.handleCourseStudents)
 	mux.HandleFunc("GET /api/me/courses/{id}/journal", s.handleCourseJournal)
+	// Журнал (journal_meta.go): багшийн өгсөн нэр, бүлэг, архив; архивласан суралцагчийн өгөгдлийг устгах (эзэмшигч).
+	mux.HandleFunc("PUT /api/me/courses/{id}/journal/students/{uid}", s.handleJournalStudent)
+	mux.HandleFunc("PUT /api/me/courses/{id}/journal/groups", s.handleJournalGroups)
+	mux.HandleFunc("POST /api/me/courses/{id}/journal/students/{uid}/reset", s.handleJournalReset)
 	mux.HandleFunc("POST /api/me/students/{uid}/chat", s.handleStudentChat)
 	mux.HandleFunc("GET /api/me/conversations", s.handleMyConversations)
 	mux.HandleFunc("GET /api/me/notifications", s.handleNotifications)
@@ -278,6 +314,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/courses/{id}/lesson-order", s.handleReorderLessons)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/buy", s.handleBuyLesson)
 	mux.HandleFunc("POST /api/courses/{id}/unlock", s.handleUnlockCourse)
+	mux.HandleFunc("POST /api/courses/{id}/access-request", s.handleAccessRequest)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/complete", s.handleCompleteLesson)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/quiz/{bid}", s.handleAnswerQuiz)
 	mux.HandleFunc("POST /api/courses/{id}/lessons/{lid}/watched/{bid}", s.handleVideoWatched)
@@ -314,6 +351,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/activity/beat", s.handleActivityBeat)
 	mux.HandleFunc("POST /api/me/students/{uid}/remind", s.handleRemindStudent)
 	mux.HandleFunc("POST /api/me/students/{uid}/unblock", s.handleUnblockStudent)
+	mux.HandleFunc("POST /api/me/students/{uid}/grant", s.handleGrantAccess)
 	mux.HandleFunc("GET /api/me/analytics", s.handleAnalytics)
 	mux.HandleFunc("GET /api/me/analytics/students/{uid}", s.handleStudentAnalytics)
 	mux.HandleFunc("GET /api/me/analytics/export", s.handleAnalyticsExport)
@@ -417,6 +455,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/presence", s.handleMyPresence)
 	mux.HandleFunc("DELETE /api/chat/{id}", s.handleHideChat)
 	mux.HandleFunc("POST /api/courses/{id}/chat", s.handleCourseChat)
+	// Бүлэг чатын харилцан үнэлгээ (peer_ratings.go): суралцагчид дундаж л, хэн хэдийг өгсөн нь зөвхөн багшид.
+	mux.HandleFunc("GET /api/courses/{id}/peer-ratings", s.handlePeerRatings)
+	mux.HandleFunc("PUT /api/courses/{id}/peer-ratings/{uid}", s.handleRatePeer)
+	mux.HandleFunc("DELETE /api/courses/{id}/peer-ratings/{uid}", s.handleDeletePeerRating)
+	// Мартах муруйн давтах popup (review_due.go).
+	mux.HandleFunc("GET /api/me/reviews/due", s.handleReviewsDue)
+	mux.HandleFunc("POST /api/me/reviews/{lid}/done", s.handleReviewDone)
 	mux.HandleFunc("GET /api/chat/{id}/messages", s.handleListMessages)
 	mux.HandleFunc("POST /api/chat/{id}/messages", s.handleSendMessage)
 	mux.HandleFunc("PUT /api/chat/{id}/messages/{mid}", s.handleEditMessage)
@@ -464,6 +509,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
 	mux.HandleFunc("GET /t/{username}", s.pageProfile)
 	mux.HandleFunc("GET /c/{id}", s.pageCourse)
+	mux.HandleFunc("GET /c/{id}/qr.png", s.handleCourseQR) // сургалтын QR (course_share.go)
+	mux.HandleFunc("GET /c/{id}/og.jpg", s.handleCourseOG) // сургалтыг хуваалцах зураг
 	mux.HandleFunc("GET /b/{id}", s.pageBook)
 	mux.HandleFunc("GET /login", s.pageStatic("login"))
 	mux.HandleFunc("GET /privacy", s.pageStatic("privacy"))
@@ -476,7 +523,7 @@ func (s *Server) Handler() http.Handler {
 	// /me — нэвтэрсэн хүний өөрийн хуудас руу шилжүүлнэ (багш: /t/<нэр>, суралцагч: /). Хуучин /studio холбоос ч мөн.
 	mux.HandleFunc("GET /me", s.pageStatic("me"))
 	mux.HandleFunc("GET /studio", s.pageStatic("me"))
-	mux.Handle("GET /static/", staticHandler(s.cfg.MinifyStatic, s.log))
+	mux.Handle("GET /static/", staticHandler(s.cfg.MinifyStatic, s.cfg.IntroDir, s.log))
 	mux.HandleFunc("GET /embed-frame", s.pageEmbedFrame)
 	mux.HandleFunc("POST /api/csp-report", s.handleCSPReport)
 
@@ -493,7 +540,7 @@ func (s *Server) recoverMW(next http.Handler) http.Handler {
 					panic(v)
 				}
 				s.log.Error("panic", "err", v, "path", r.URL.Path, "stack", string(debug.Stack()))
-				writeErr(w, http.StatusInternalServerError, "дотоод алдаа")
+				writeErr(w, http.StatusInternalServerError, "системд алдаа гарлаа — түр хүлээгээд дахин оролдоно уу")
 			}
 		}()
 		next.ServeHTTP(w, r)
@@ -524,7 +571,7 @@ func (s *Server) limitMW(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/static/") && !boardHot(r) && !s.limiter.Allow(s.clientIP(r)) {
 			w.Header().Set("Retry-After", "1")
-			writeErr(w, http.StatusTooManyRequests, "хэт олон хүсэлт, түр хүлээнэ үү")
+			writeErr(w, http.StatusTooManyRequests, "хэт олон хүсэлт ирлээ — түр хүлээгээд дахин оролдоно уу")
 			return
 		}
 		next.ServeHTTP(w, r)

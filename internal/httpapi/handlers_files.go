@@ -21,7 +21,7 @@ func (s *Server) filesErr(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusNotFound, err.Error())
 	default:
 		s.log.Error("files", "err", err)
-		writeErr(w, http.StatusInternalServerError, "файлын алдаа")
+		writeErr(w, http.StatusInternalServerError, "файлтай ажиллахад алдаа гарлаа — дахин оролдоно уу")
 	}
 }
 
@@ -106,7 +106,7 @@ func (s *Server) filesOwner(w http.ResponseWriter, r *http.Request) (string, boo
 		return "", false
 	}
 	if !teaches(course, c.UID) {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return "", false
 	}
 	if !s.planOpen(w, r, course.TeacherID) {
@@ -144,7 +144,7 @@ func (s *Server) handleServeFile(w http.ResponseWriter, r *http.Request) {
 			ok = ok || s.files.Verify("/files/"+teacher+"/"+vis+"/"+url.PathEscape(n), q.Get("exp"), q.Get("sig"))
 		}
 		if !ok {
-			writeErr(w, http.StatusForbidden, "холбоосны хугацаа дууссан эсвэл хүчингүй")
+			writeErr(w, http.StatusForbidden, "холбоосын хугацаа дууссан эсвэл хүчингүй болсон байна")
 			return
 		}
 		w.Header().Set("Cache-Control", "private, max-age=3600")

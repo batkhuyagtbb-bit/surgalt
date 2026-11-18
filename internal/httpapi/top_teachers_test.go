@@ -81,7 +81,7 @@ func TestTopTeachers(t *testing.T) {
 	}
 }
 
-// Идэвхтэй суралцагчид: сургалт, цол, бүтээл, сахилга (сануулгагүй минут), харилцаа; өөрийн сургалт дахь үйлдэл
+// Идэвхтэй суралцагчид: сургалт, эрэмбэ, бүтээл, сахилга (сануулгагүй минут), харилцаа; өөрийн сургалт дахь үйлдэл
 // тооцогдохгүй; нэр товчлогдоно; өөрийгөө нуувал жагсаалтаас алга болно.
 func TestTopStudents(t *testing.T) {
 	srv, st := newTestServer(t)
@@ -129,8 +129,8 @@ func TestTopStudents(t *testing.T) {
 	if x := first("courses"); x["name"] != "Анужин Б." || x["value"] != 2.0 || len(boards["courses"].([]any)) != 2 {
 		t.Fatalf("сургалт (багшийн өөрийн сургалт тооцогдохгүй, нэр товчлогдоно): %v", boards["courses"])
 	}
-	if x := first("rank"); x["value"] != 400.0 || x["level"] != "Түрүүч" {
-		t.Fatalf("цол: %v", x)
+	if x := first("rank"); x["value"] != 400.0 || x["level"] != "Зальжин үнэг" {
+		t.Fatalf("эрэмбэ: %v", x)
 	}
 	if x := first("creative"); x["name"] != "Анужин Б." {
 		t.Fatalf("бүтээл: %v", x)

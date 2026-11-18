@@ -64,17 +64,24 @@ type JournalCell struct {
 }
 
 type JournalStudent struct {
-	UserID   string     `json:"user_id"`
-	Name     string     `json:"name"`
-	Username string     `json:"username,omitempty"`
-	Avatar   string     `json:"avatar_url,omitempty"`
-	Enrolled bool       `json:"enrolled"`
-	Rank     RankInfo   `json:"rank"`
-	Done     int        `json:"done"`
-	Avg      int        `json:"avg"`    // үнэлэгдсэн хичээлийн дундаж оноо
-	Active   int        `json:"active"` // нийт идэвхтэй секунд
-	Last     *time.Time `json:"last,omitempty"`
-	Recent   bool       `json:"recent,omitempty"` // сүүлийн 7 хоногт хичээллэсэн
+	UserID string `json:"user_id"`
+	Name   string `json:"name"` // багшийн өгсөн нэр (alias) байвал тэр, эс бөгөөс бүртгэлийн нэр
+	// AccountName — бүртгэлийн нэр (DisplayName) үргэлж. Кэшлэсэн нэгтгэлд хоосон; хуудсыг хуулахад бөглөнө.
+	AccountName string `json:"account_name"`
+	// Alias, Group, Archived — багшийн журналын мэдээлэл (journal_meta.go); суралцагчид хэзээ ч харагдахгүй.
+	Alias      string     `json:"alias,omitempty"`
+	Group      string     `json:"group,omitempty"`
+	Archived   bool       `json:"archived,omitempty"`
+	ArchivedAt *time.Time `json:"archived_at,omitempty"`
+	Username   string     `json:"username,omitempty"`
+	Avatar     string     `json:"avatar_url,omitempty"`
+	Enrolled   bool       `json:"enrolled"`
+	Rank       RankInfo   `json:"rank"`
+	Done       int        `json:"done"`
+	Avg        int        `json:"avg"`    // үнэлэгдсэн хичээлийн дундаж оноо
+	Active     int        `json:"active"` // нийт идэвхтэй секунд
+	Last       *time.Time `json:"last,omitempty"`
+	Recent     bool       `json:"recent,omitempty"` // сүүлийн 7 хоногт хичээллэсэн
 }
 
 // recentDays — журнал, тэмдэглэлд «идэвхтэй» гэж тооцох хугацаа.
@@ -110,7 +117,7 @@ func sortJournal(out []JournalStudent) {
 	})
 }
 
-// handleCourseJournal: GET /api/me/courses/{id}/journal
+// handleCourseJournal: GET /api/me/courses/{id}/journal?q=&group=&nogroup=1&archived=1
 func (s *Server) handleCourseJournal(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.requireTeacherAny(w, r)
 	if !ok {
@@ -121,53 +128,156 @@ func (s *Server) handleCourseJournal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	jr, err := s.journals.GetOrLoad(ctx, course.ID, func(ctx context.Context) (*journalAgg, error) { return s.buildJournal(ctx, course) })
+	jr, err := s.journal(ctx, course)
 	if s.storeErr(w, r, err) {
 		return
 	}
-	// Хуудас: нэрээр хайж, эхний journalStudents-ийг (сүүлд идэвхтэй байснаас) нүднүүдийнх нь хамт.
-	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
-	students := jr.students
-	if q != "" {
-		students = make([]JournalStudent, 0, 64)
-		for _, js := range jr.students {
-			if strings.Contains(strings.ToLower(js.Name), q) || strings.Contains(strings.ToLower(js.Username), q) {
-				students = append(students, js)
-			}
-		}
+	// Багшийн өгсөн нэр, бүлэг, архив — 30 секундын нэгтгэлийн гадна хүсэлт бүрт (засвар бүх хуулбарт шууд харагдана).
+	metas, err := s.store.CourseStudentMetas(ctx, course.ID)
+	if s.storeErr(w, r, err) {
+		return
 	}
-	total := len(students)
-	if len(students) > journalStudents {
-		students = students[:journalStudents]
-	}
-	cells := make(map[string]map[string]*JournalCell, len(students))
-	for _, js := range students {
-		if row := jr.cells[js.UserID]; row != nil {
-			cells[js.UserID] = row
-		}
-	}
+	// Хуудас: нэрээр хайж, бүлэг/архиваар шүүж, эхний journalStudents-ийг (сүүлд идэвхтэй байснаас) нүднүүдийнх нь хамт.
+	qv := r.URL.Query()
+	v := journalPage(jr, metas, journalFilter{
+		q:        strings.ToLower(strings.TrimSpace(qv.Get("q"))),
+		group:    journalName(qv.Get("group")),
+		noGroup:  qv.Get("nogroup") == "1",
+		archived: qv.Get("archived") == "1",
+	}, journalStudents)
 	w.Header().Set("Cache-Control", "private, no-store")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"course":         map[string]any{"id": course.ID, "title": course.Title},
 		"lessons":        jr.lessons,
-		"students":       students,
-		"cells":          cells,
-		"students_total": total,
+		"students":       v.students,
+		"cells":          v.cells,
+		"students_total": v.total,
+		"groups":         v.groups,
+		"ungrouped":      v.ungrouped,
+		"archived":       v.archived,
 	})
+}
+
+// journal — сургалтын нэгтгэл (30 секунд кэштэй).
+func (s *Server) journal(ctx context.Context, course *store.Course) (*journalAgg, error) {
+	return s.journals.GetOrLoad(ctx, course.ID, func(ctx context.Context) (*journalAgg, error) { return s.buildJournal(ctx, course) })
 }
 
 // journalStudents — журналд нэг дор өгөх суралцагчийн дээд тоо (бусдыг нэрээр хайна).
 const journalStudents = 300
 
 // journalAgg — нэг сургалтын бүтэн журнал (бүх суралцагч × хичээл). 30 000 суралцагчтай сургалтад тооцоо хүнд тул
-// 30 секунд кэшилж, хариуд нь зөвхөн хуудсыг өгнө.
+// 30 секунд кэшилж, хариуд нь зөвхөн хуудсыг өгнө. Бүх хүсэлт хуваалцдаг тул ЗӨВХӨН УНШИНА (journalPage хуулбарлана).
 type journalAgg struct {
 	lessons  []JournalLesson
 	students []JournalStudent // sortJournal-ийн дарааллаар
 	cells    map[string]map[string]*JournalCell
+	lower    [][2]string // students-тэй ижил дарааллаар: жижиг үсгээр нэр, username (хайлтад)
+	blank    RankInfo    // эхлээгүй суралцагчийн эрэмбэ (өгөгдөл нь устсан суралцагчийн хоосон мөрөнд)
+	built    time.Time   // тооцоо эхэлсэн мөч — үүнээс хойш өгөгдөл нь устсан суралцагчийн мөр хуучирсан
+}
+
+// journalFilter — журналын хуудасны шүүлт (бүгд AND). q нь жижиг үсгээр.
+type journalFilter struct {
+	q, group          string
+	noGroup, archived bool
+}
+
+// JournalGroup — сургалтын бүлэг ба архивлаагүй суралцагчийн тоо.
+type JournalGroup struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+// journalView — нэг хариуны хуудас: шүүсэн суралцагчид (≤ limit), нүднүүд, шүүлтийн дараах нийт тоо, бүх суралцагчаар
+// тоолсон бүлэг/бүлэггүй/архив.
+type journalView struct {
+	students  []JournalStudent
+	cells     map[string]map[string]*JournalCell
+	total     int
+	groups    []JournalGroup
+	ungrouped int
+	archived  int
+}
+
+// journalPage — кэшлэсэн нэгтгэлийг журналын мэдээлэлтэй нэг давталтаар нийлүүлнэ. jr-ийг өөрчлөхгүй: зөвхөн хуудсанд
+// орох мөрүүдийг хуулна. Бүлэг, бүлэггүй, архивын тоо нь шүүлтээс үл хамааран бүх суралцагчаар. Мэдээлэл нь нэгтгэлээс
+// хойш устгагдсан (ResetAt > built) суралцагчийн мөр хуучирсан тул элссэн бол хоосон мөр (нүдгүй), элсээгүй бол хасна.
+func journalPage(jr *journalAgg, metas map[string]store.CourseStudentMeta, f journalFilter, limit int) journalView {
+	v := journalView{students: make([]JournalStudent, 0, max(0, min(limit, len(jr.students)))), cells: map[string]map[string]*JournalCell{}}
+	type grp struct {
+		name string
+		n    int
+	}
+	groups := map[string]*grp{}
+	for i := range jr.students {
+		js := &jr.students[i]
+		m := metas[js.UserID]
+		stale := m.ResetAt != nil && m.ResetAt.After(jr.built)
+		if stale && !js.Enrolled {
+			continue
+		}
+		switch {
+		case m.Archived:
+			v.archived++
+		case m.Group == "":
+			v.ungrouped++
+		default:
+			k := strings.ToLower(m.Group)
+			if g := groups[k]; g != nil {
+				g.n++
+			} else {
+				groups[k] = &grp{name: m.Group, n: 1}
+			}
+		}
+		if m.Archived != f.archived || (f.group != "" && !strings.EqualFold(m.Group, f.group)) || (f.noGroup && m.Group != "") {
+			continue
+		}
+		if f.q != "" {
+			ln, lu := jr.lowerAt(i)
+			if !strings.Contains(ln, f.q) && !strings.Contains(lu, f.q) && (m.Alias == "" || !strings.Contains(strings.ToLower(m.Alias), f.q)) {
+				continue
+			}
+		}
+		v.total++
+		if len(v.students) >= limit {
+			continue
+		}
+		cp := *js
+		if stale {
+			cp = JournalStudent{UserID: js.UserID, Name: js.Name, Username: js.Username, Avatar: js.Avatar, Enrolled: js.Enrolled, Rank: jr.blank}
+		} else if row := jr.cells[js.UserID]; row != nil {
+			v.cells[js.UserID] = row
+		}
+		cp.AccountName = js.Name
+		if m.Alias != "" {
+			cp.Name = m.Alias
+		}
+		cp.Alias, cp.Group, cp.Archived, cp.ArchivedAt = m.Alias, m.Group, m.Archived, m.ArchivedAt
+		v.students = append(v.students, cp)
+	}
+	keys := make([]string, 0, len(groups))
+	for k := range groups {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	v.groups = make([]JournalGroup, len(keys))
+	for i, k := range keys {
+		v.groups[i] = JournalGroup{Name: groups[k].name, Count: groups[k].n}
+	}
+	return v
+}
+
+// lowerAt — i-р суралцагчийн нэр, username-ийг жижиг үсгээр (нэгтгэлд бэлдсэн; байхгүй бол тооцно).
+func (jr *journalAgg) lowerAt(i int) (string, string) {
+	if i < len(jr.lower) {
+		return jr.lower[i][0], jr.lower[i][1]
+	}
+	return strings.ToLower(jr.students[i].Name), strings.ToLower(jr.students[i].Username)
 }
 
 func (s *Server) buildJournal(ctx context.Context, course *store.Course) (*journalAgg, error) {
+	built := time.Now() // уншилт эхлэхээс өмнө: энэ мөчөөс хойших устгал нэгтгэлд тусаагүй байж болно
 	lessons, err := s.store.LessonsByCourse(ctx, course.ID)
 	if err != nil {
 		return nil, err
@@ -319,5 +429,10 @@ func (s *Server) buildJournal(ctx context.Context, course *store.Course) (*journ
 		}
 	}
 	sortJournal(out)
-	return &journalAgg{lessons: jl, students: out, cells: cells}, nil
+	lower := make([][2]string, len(out))
+	for i := range out {
+		lower[i] = [2]string{strings.ToLower(out[i].Name), strings.ToLower(out[i].Username)}
+	}
+	_, blank := computeRanks(visible, nil, newRankEvidence())
+	return &journalAgg{lessons: jl, students: out, cells: cells, lower: lower, blank: blank, built: built}, nil
 }

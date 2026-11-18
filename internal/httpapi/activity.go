@@ -27,15 +27,15 @@ var eventInfo = map[string]eventMeta{
 	"screenshot":      {"Дэлгэцийн зураг авах оролдлого", true, true},
 	"devtools":        {"Хөгжүүлэгчийн хэрэгсэл нээсэн", true, true},
 	"download":        {"Файл татах оролдлого", true, true},
-	"idle":            {"2 минутаас дээш хөдөлгөөнгүй", false, false},
+	"idle":            {"2 минутаас дээш хөдөлгөөнгүй байсан", false, false},
 	"cursor_out":      {"Курсор хичээлийн цонхноос гарсан", false, false},
-	"ping_missed":     {"Идэвхийн шалгалтад хариу өгөөгүй", true, false},
+	"ping_missed":     {"Идэвх шалгах асуултад хариулаагүй", true, false},
 	"auto_block":      {"Хичээл автоматаар зогссон", true, false},
 	"teacher_unblock": {"Багш дахин нээсэн", false, false},
 	"face_missing":    {"Камерт царай харагдаагүй", false, true},
-	"eyes_closed":     {"Нүдээ аньсан (нойрмоглосон)", false, false},
+	"eyes_closed":     {"Нүдээ аньсан (нойрмоглосон байж магадгүй)", false, false},
 	"look_away":       {"Дэлгэцээс өөр тийш харсан", false, true},
-	"head_down":       {"Толгой доош харсан (утас ашиглаж магадгүй)", false, true},
+	"head_down":       {"Толгойгоо доош харсан (утас ашигласан байж магадгүй)", false, true},
 	"phone":           {"Гар утас илэрсэн", true, true},
 	"camera_off":      {"Камераа унтраасан", true, true},
 	"exam_start":      {"Шалгалт эхэлсэн", false, false},
@@ -193,7 +193,7 @@ func (s *Server) handleRemindStudent(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Message = strings.TrimSpace(in.Message)
 	if n := utf8.RuneCountInString(in.Message); n < 1 || n > 500 {
-		writeErr(w, http.StatusBadRequest, "сануулга 1-500 тэмдэгт")
+		writeErr(w, http.StatusBadRequest, "сануулга 1-500 тэмдэгт байх ёстой")
 		return
 	}
 	uid := r.PathValue("uid")
@@ -211,7 +211,7 @@ func (s *Server) handleRemindStudent(w http.ResponseWriter, r *http.Request) {
 	}
 	if !member {
 		if ss, _ := s.store.Sessions(r.Context(), store.ActivityFilter{UserID: uid, CourseID: course.ID}, 1); len(ss) == 0 {
-			writeErr(w, http.StatusNotFound, "энэ суралцагч таны сургалтад алга")
+			writeErr(w, http.StatusNotFound, "энэ суралцагч таны сургалтад элсээгүй байна")
 			return
 		}
 	}

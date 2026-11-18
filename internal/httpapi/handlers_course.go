@@ -1,11 +1,11 @@
 package httpapi
 
 import (
-	"regexp"
 	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -48,22 +48,22 @@ func (in *courseInput) validate() string {
 	in.Title = strings.TrimSpace(in.Title)
 	switch {
 	case in.Title == "" || utf8.RuneCountInString(in.Title) > 200:
-		return "гарчиг 1-200 тэмдэгт"
+		return "гарчиг 1-200 тэмдэгт байх ёстой"
 	case len(strings.Fields(in.Description)) > maxDescWords:
-		return "товч тайлбар 50 үгэнд багтана"
+		return "товч тайлбар 50 үгэнд багтах ёстой"
 	case utf8.RuneCountInString(in.Description) > 20000:
-		return "тайлбар хэт урт"
+		return "тайлбар хэт урт байна"
 	case in.Price < 0 || in.Price > maxPrice:
-		return "үнэ 0-100,000,000₮"
+		return "үнэ 0-100,000,000₮ хооронд байх ёстой"
 	}
 	if in.MaxWarnings < 0 || in.MaxWarnings > 20 {
-		return "сануулгын тоо 1-20"
+		return "сануулгын тоо 1-20 хооронд байх ёстой"
 	}
 	if in.BlockHours < 0 || in.BlockHours > 24*30 {
-		return "хоригийн хугацаа 0-720 цаг"
+		return "хоригийн хугацаа 0-720 цаг байх ёстой"
 	}
 	if in.BlockMinutes < blockManual || in.BlockMinutes > 60*24*30 {
-		return "хоригийн хугацаа 0-43200 минут (−1 = багш нээх хүртэл)"
+		return "хоригийн хугацаа 0-43200 минут байх ёстой (−1 = багш нээх хүртэл)"
 	}
 	if in.BlockMinutes == 0 && in.BlockHours > 0 { // хуучин талбараар ирвэл минут руу хөрвүүлнэ
 		in.BlockMinutes = in.BlockHours * 60
@@ -72,7 +72,7 @@ func (in *courseInput) validate() string {
 	if in.AccessCode != nil {
 		code := strings.Join(strings.Fields(*in.AccessCode), " ")
 		if n := utf8.RuneCountInString(code); code != "" && (n < minCodeLen || n > maxCodeLen) {
-			return "нууц үг 4-64 тэмдэгт"
+			return "нууц үг 4-64 тэмдэгт байх ёстой"
 		}
 		in.AccessCode = &code
 	}
@@ -111,7 +111,7 @@ func (s *Server) courseProgram(w http.ResponseWriter, r *http.Request, uid strin
 	org, _ := s.orgOf(r.Context(), uid)
 	p, ok := validProgram(org, *id)
 	if !ok {
-		writeErr(w, http.StatusBadRequest, "ийм мэргэжлийн хөтөлбөр алга — хуудсаа сэргээнэ үү")
+		writeErr(w, http.StatusBadRequest, "ийм мэргэжлийн хөтөлбөр олдсонгүй — хуудсаа сэргээнэ үү")
 	}
 	return p, ok
 }
@@ -205,7 +205,7 @@ func (s *Server) ownCourse(w http.ResponseWriter, r *http.Request, uid string) (
 		return nil, false
 	}
 	if course.TeacherID != uid {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return nil, false
 	}
 	if !s.planOpen(w, r, uid) {
@@ -245,18 +245,18 @@ func coverOK(cover, teacherID string) string {
 	case strings.HasPrefix(cover, coverEmbedPrefix):
 		t := strings.TrimSpace(strings.TrimPrefix(cover, coverEmbedPrefix))
 		if t == "" || len(t) > maxCoverEmbed {
-			return "embed 1-20,000 тэмдэгт"
+			return "embed код 1-20,000 тэмдэгт байх ёстой"
 		}
 		return ""
 	case strings.HasPrefix(cover, "/files/"):
 		if !strings.HasPrefix(cover, "/files/"+teacherID+"/"+files.Public+"/") {
-			return "толгойн зураг: өөрийн нээлттэй (public) файл байх ёстой"
+			return "толгойн зураг нь өөрийн нээлттэй (public) файл байх ёстой"
 		}
 		return ""
 	case validURL(cover) && len(cover) <= maxBlockURL:
 		return ""
 	}
-	return "толгойн зураг: загвар, өөрийн файл, https холбоос эсвэл embed"
+	return "толгойн зураг нь загвар, өөрийн файл, https холбоос эсвэл embed байх ёстой"
 }
 
 // coverKind — харагдацад: tpl | img | embed | "" (загвар.html, студи ижил дүрмээр).
@@ -290,31 +290,31 @@ func (in *lessonInput) validate(teacherID string, course *store.Course) string {
 	}
 	switch {
 	case in.Title == "" || utf8.RuneCountInString(in.Title) > 200:
-		return "гарчиг 1-200 тэмдэгт"
+		return "гарчиг 1-200 тэмдэгт байх ёстой"
 	case len(in.Content) > 200_000:
-		return "агуулга хэт урт"
+		return "агуулга хэт урт байна"
 	case in.VideoURL != "" && !validURL(in.VideoURL) && !files.OwnedBy(in.VideoURL, teacherID):
-		return "медиа: http(s) холбоос эсвэл өөрийн файлын сангийн файл"
+		return "медиа нь http(s) холбоос эсвэл өөрийн файлын сангийн файл байх ёстой"
 	case in.Price < 0 || in.Price > maxPrice:
-		return "үнэ 0-100,000,000₮"
+		return "үнэ 0-100,000,000₮ хооронд байх ёстой"
 	case !in.IsFree && in.Price == 0 && course.Price == 0 && !course.Locked: // нууц үгтэй сургалтад нууц үгээр нээгдэнэ
 		return "төлбөртэй хичээлийн үнийг заана уу (эсвэл сургалтад багц үнэ тавина уу)"
 	case in.UnlockAfterH < 0 || in.UnlockAfterH > maxUnlockHours:
-		return "нээгдэх хугацаа 0-8760 цаг"
+		return "нээгдэх хугацаа 0-8760 цаг байх ёстой"
 	case in.Format != "" && store.LessonFormats[in.Format] == "":
-		return "сургалтын хэлбэр: лекц, семинар, дадлага, лаборатори"
+		return "сургалтын хэлбэрээ сонгоно уу: лекц, семинар, дадлага эсвэл лаборатори"
 	case in.Mode != "" && store.LessonModes[in.Mode] == "":
-		return "заах аргын төрөл: танхимын, цахим, холимог"
+		return "заах аргын төрлөө сонгоно уу: танхимын, цахим эсвэл холимог"
 	case utf8.RuneCountInString(in.Section) > 80:
-		return "бүлгийн нэр 80 тэмдэгтээс хэтрэхгүй"
+		return "бүлгийн нэр 80 тэмдэгтээс хэтрэхгүй байх ёстой"
 	case store.UnlockRules[in.UnlockRule] == "":
-		return "нээгдэх нөхцөл буруу"
+		return "нээгдэх нөхцөлөө сонгоно уу"
 	}
 	if in.ActiveMin < 0 || in.ActiveMin > 600 {
-		return "идэвхтэй суралцах хугацаа 0-600 минут"
+		return "идэвхтэй суралцах хугацаа 0-600 минут байх ёстой"
 	}
 	if in.Exam != nil && in.Assignment != nil {
-		return "нэг хичээл шалгалт эсвэл даалгаврын аль нэг нь байна"
+		return "нэг хичээл зэрэг шалгалт, даалгавар байх боломжгүй — аль нэгийг нь сонгоно уу"
 	}
 	if msg := validateExam(in.Exam); msg != "" {
 		return msg
@@ -413,13 +413,13 @@ func (s *Server) handleReorderLessons(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(in.Items) > 2000 {
-		writeErr(w, http.StatusBadRequest, "хэт олон хичээл")
+		writeErr(w, http.StatusBadRequest, "хичээл хэт олон байна")
 		return
 	}
 	for i := range in.Items {
 		in.Items[i].Section = strings.Join(strings.Fields(in.Items[i].Section), " ")
 		if utf8.RuneCountInString(in.Items[i].Section) > 80 {
-			writeErr(w, http.StatusBadRequest, "бүлгийн нэр 80 тэмдэгтээс хэтрэхгүй")
+			writeErr(w, http.StatusBadRequest, "бүлгийн нэр 80 тэмдэгтээс хэтрэхгүй байх ёстой")
 			return
 		}
 	}
@@ -526,12 +526,19 @@ func quizMastery(l *store.Lesson, p *store.LessonProgress) (correct, total int, 
 
 // dripExtra — дарааллын шалгалтад хэрэгтэй нэмэлт баримт: хичээл бүрийн идэвхтэй секунд, тэнцсэн шалгалт.
 type dripExtra struct {
-	active map[string]int
-	passed map[string]bool
+	active  map[string]int
+	passed  map[string]bool
+	granted map[string]bool // «багш гараар нээнэ» хичээлүүдээс багш энэ суралцагчид нээсэн нь (lesson_grants)
 }
 
-func (s *Server) dripFacts(ctx context.Context, uid, courseID string) dripExtra {
-	x := dripExtra{active: map[string]int{}, passed: map[string]bool{}}
+// dripFacts — lessons: сургалтын хичээлүүд (багш гараар нээдэг хичээл байхгүй бол нээсэн эрхийг уншихгүй).
+func (s *Server) dripFacts(ctx context.Context, uid, courseID string, lessons []store.Lesson) dripExtra {
+	x := dripExtra{active: map[string]int{}, passed: map[string]bool{}, granted: map[string]bool{}}
+	if slices.ContainsFunc(lessons, func(l store.Lesson) bool { return l.UnlockRule == "manual" && !l.AlwaysOpen }) {
+		if g, err := s.store.LessonGrants(ctx, uid, courseID); err == nil {
+			x.granted = g
+		}
+	}
 	if ss, err := s.store.Sessions(ctx, store.ActivityFilter{UserID: uid, CourseID: courseID}, 5000); err == nil {
 		for _, v := range ss {
 			x.active[v.LessonID] += v.ActiveSec
@@ -567,7 +574,10 @@ func dripState(course *store.Course, lessons []store.Lesson, l *store.Lesson, pr
 	if prev == nil {
 		return LessonState{Open: true}
 	}
-	if l.UnlockRule == "manual" { // багш гараар нээнэ ("Шууд нээлттэй болгох" = AlwaysOpen)
+	if l.UnlockRule == "manual" { // багш гараар нээнэ ("Шууд нээлттэй болгох" = AlwaysOpen; нэг суралцагчид — lesson_grants)
+		if x.granted[l.ID] {
+			return LessonState{Open: true}
+		}
 		return LessonState{Reason: "manual", PrevTitle: prev.Title}
 	}
 	p, ok := progress[prev.ID]
@@ -636,16 +646,16 @@ func (s *Server) handleCompleteLesson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !has {
-		writeErr(w, http.StatusForbidden, "энэ хичээлд эрхгүй")
+		writeErr(w, http.StatusForbidden, "танд энэ хичээлийг үзэх эрх байхгүй")
 		return
 	}
 	if l.Exam != nil && !teaches(course, c.UID) {
-		writeErr(w, http.StatusConflict, "шалгалтыг өгч тэнцсэнээр дуусна")
+		writeErr(w, http.StatusConflict, "энэ хичээл шалгалтад тэнцсэнээр дуусна")
 		return
 	}
 	if l.Assignment != nil && !teaches(course, c.UID) {
 		if _, err := s.store.SubmissionFor(r.Context(), c.UID, l.ID); err != nil {
-			writeErr(w, http.StatusConflict, "даалгаврын хариугаа илгээснээр дуусна")
+			writeErr(w, http.StatusConflict, "энэ хичээл даалгаврын хариугаа илгээснээр дуусна")
 			return
 		}
 	}
@@ -655,7 +665,7 @@ func (s *Server) handleCompleteLesson(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if done < l.ActiveMin*60 {
-			writeJSON(w, http.StatusConflict, map[string]any{"error": fmt.Sprintf("Идэвхтэй суралцах хугацаа хүрээгүй: %d/%d мин", done/60, l.ActiveMin), "active_done_sec": done, "active_min": l.ActiveMin})
+			writeJSON(w, http.StatusConflict, map[string]any{"error": fmt.Sprintf("Идэвхтэй суралцах хугацаа хараахан хүрээгүй байна: %d/%d мин", done/60, l.ActiveMin), "active_done_sec": done, "active_min": l.ActiveMin})
 			return
 		}
 	}
@@ -676,7 +686,7 @@ func (s *Server) handleBuyLesson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !course.Published {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	l, err := s.store.LessonByID(r.Context(), course.ID, r.PathValue("lid"))
@@ -858,6 +868,10 @@ func (s *Server) handleCourseAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	owner := teaches(course, c.UID)
+	if owner && r.URL.Query().Get("view") == "student" {
+		s.studentPreviewAccess(w, r, course)
+		return
+	}
 	enrolled := owner
 	if !owner {
 		if enrolled, err = s.store.IsEnrolled(r.Context(), c.UID, course.ID); s.storeErr(w, r, err) {
@@ -878,7 +892,7 @@ func (s *Server) handleCourseAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	full := fullAccess(course, c.UID, enrolled)
-	facts := s.dripFacts(r.Context(), c.UID, course.ID)
+	facts := s.dripFacts(r.Context(), c.UID, course.ID, lessons)
 	states := make(map[string]LessonState, len(lessons))
 	done := 0
 	for i := range lessons {
@@ -887,7 +901,7 @@ func (s *Server) handleCourseAccess(w http.ResponseWriter, r *http.Request) {
 			done++
 		}
 	}
-	// Цэргийн цол: энэ сургалт дахь хичээл бүрийн үнэлгээ ба нийлбэр.
+	// Суралцахуйн эрэмбэ: энэ сургалт дахь хичээл бүрийн үнэлгээ ба нийлбэр.
 	ranks, rank := s.courseRanks(r.Context(), c.UID, course.ID, lessons, progress)
 	rankBy := make(map[string]LessonRank, len(ranks))
 	for _, lr := range ranks {
@@ -921,7 +935,7 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !teaches(course, c.UID) && !course.Published {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	l, err := s.store.LessonByID(r.Context(), cid, lid)
@@ -937,7 +951,7 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !has {
-		writeJSON(w, http.StatusPaymentRequired, map[string]any{"error": "энэ хичээл төлбөртэй", "lesson_price": l.Price, "course_price": course.Price})
+		writeJSON(w, http.StatusPaymentRequired, map[string]any{"error": "энэ хичээл төлбөртэй — үзэхийн тулд худалдаж авна уу", "lesson_price": l.Price, "course_price": course.Price})
 		return
 	}
 	// Дараалсан нээлт: өмнөх хичээлээ үзсэн, хүлээх хугацаа нь өнгөрсөн байх ёстой (үнэгүй хичээл үргэлж нээлттэй).
@@ -952,7 +966,7 @@ func (s *Server) handleGetLesson(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		enrolled, _ := s.store.IsEnrolled(r.Context(), c.UID, course.ID)
-		if st := dripState(course, lessons, l, progress, fullAccess(course, c.UID, enrolled), time.Now(), s.dripFacts(r.Context(), c.UID, course.ID)); !st.Open {
+		if st := dripState(course, lessons, l, progress, fullAccess(course, c.UID, enrolled), time.Now(), s.dripFacts(r.Context(), c.UID, course.ID, lessons)); !st.Open {
 			msg := "Эхлээд «" + st.PrevTitle + "» хичээлийг үзнэ үү"
 			if st.Reason == "quiz" {
 				msg = fmt.Sprintf("Эхлээд «%s» хичээлийн асуултуудад бүгдэд нь зөв хариулна уу (%d/%d үлдсэн)", st.PrevTitle, st.QuizLeft, st.QuizTotal)
@@ -1029,7 +1043,7 @@ func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !course.Published {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	if teaches(course, c.UID) {
@@ -1084,7 +1098,7 @@ func (s *Server) handleGetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if o.UserID != c.UID {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	o = s.syncPayment(r.Context(), o, false) // QPay-ээс төлөгдсөн эсэхийг шалгана (callback ирээгүй ч)
@@ -1094,7 +1108,7 @@ func (s *Server) handleGetOrder(w http.ResponseWriter, r *http.Request) {
 // handleDevPay нь зөвхөн DEV_PAYMENTS=1 үед: төлбөрийн системгүйгээр урсгалыг турших.
 func (s *Server) handleDevPay(w http.ResponseWriter, r *http.Request) {
 	if !s.cfg.DevPayments {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	id := r.PathValue("id")
@@ -1112,7 +1126,7 @@ func (s *Server) handleDevPay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !byQR && o.UserID != uid {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	wasPaid := o.Status == store.OrderPaid
@@ -1197,4 +1211,27 @@ func ruleState(l, prev *store.Lesson, p *store.LessonProgress, now time.Time, x 
 		return LessonState{Reason: "timer", PrevTitle: prev.Title, UnlockAt: &at}
 	}
 	return LessonState{Open: true}
+}
+
+// studentPreviewAccess — «👁 Суралцагчаар үзэх» (GET /api/courses/{id}/access?view=student, зөвхөн тухайн сургалтын багш):
+// сургалтыг шинэ суралцагчийн (элсээгүй, төлөөгүй, нууц үг оруулаагүй, явцгүй) нүдээр харуулна — хаалттай хичээл
+// харагдахгүй, дарааллын түгжээ, төлбөр, нууц үг суралцагчийнхтай ижил. Юу ч бичихгүй (явц, эрэмбэ, мэдэгдэл).
+func (s *Server) studentPreviewAccess(w http.ResponseWriter, r *http.Request, course *store.Course) {
+	lessons, err := s.store.LessonsByCourse(r.Context(), course.ID)
+	if s.storeErr(w, r, err) {
+		return
+	}
+	lessons = visibleLessons(lessons, false)
+	progress := map[string]store.LessonProgress{}
+	states := make(map[string]LessonState, len(lessons))
+	now := time.Now()
+	for i := range lessons {
+		states[lessons[i].ID] = dripState(course, lessons, &lessons[i], progress, false, now, dripExtra{})
+	}
+	w.Header().Set("Cache-Control", "private, no-store")
+	writeJSON(w, http.StatusOK, map[string]any{"enrolled": false, "owner": true, "preview": true,
+		"all": false, "lessons": []string{}, "need_code": course.Locked,
+		"states": states, "progress": progress, "done": 0, "total": len(lessons),
+		"ranks": map[string]LessonRank{}, "rank": RankInfo{}, "rank_total": RankInfo{}, "rank_awarded": false,
+		"blocks": map[string]LessonBlock{}, "max_warnings": maxWarnings(course)})
 }

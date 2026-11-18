@@ -18,13 +18,18 @@ type Memory struct {
 	byEmail     map[string]string
 	byUsername  map[string]string
 	courses     map[string]*Course
-	unlocks     map[[2]string]string // (user, course) -> нууц үгийн хэш (course_unlocks.go)
-	lessons     map[string][]*Lesson // course_id -> lessons
+	unlocks     map[[2]string]string            // (user, course) -> нууц үгийн хэш (course_unlocks.go)
+	grants      map[[2]string]map[string]string // (user, course) -> багш гараар нээсэн хичээл -> нээсэн багш (lesson_grants.go)
+	cmeta       map[[2]string]CourseStudentMeta // (course, user) -> журналын нэр, бүлэг, архив (journal_meta.go)
+	cmetaMu     sync.Mutex                      // журналын мэдээллийн «cmeta:» түгжээ (уншаад бичих, устгал)
+	resetFaults func(step string) error         // тестэд: суралцагчийн өгөгдөл устгалын алхамд алдаа оруулах
+	lessons     map[string][]*Lesson            // course_id -> lessons
 	orders      map[string]*Order
 	pending     map[[2]string]string // (user,course) -> order id
 	enrollments map[[2]string]time.Time
 	chatHides   map[[2]string]time.Time // (user, conversation) -> «устгасан» мөч (chat_hides.go)
-	reviews     map[string]bool         // user|lesson|stage — давтах сануулга илгээсэн (reviews.go)
+	reviews     map[string]ReviewItem   // user|lesson|stage → илгээсэн давтах сануулга (SentAt-тай; reviews.go)
+	peers       map[peerKey]PeerRating  // (сургалт, үнэлэгдэгч, үнэлэгч) → бүлэг чатын харилцан үнэлгээ (peer_ratings.go)
 	convs       map[string]*Conversation
 	convByKey   map[string]string // teacherID|visitorKey
 	messages    map[string][]*Message
@@ -330,6 +335,17 @@ func (m *Memory) DeleteCourse(_ context.Context, teacherID, courseID string) err
 		return ErrNotFound
 	}
 	delete(m.courses, courseID)
+	for k := range m.cmeta { // журналд суралцагчдад өгсөн нэр, бүлэг
+		if k[0] == courseID {
+			delete(m.cmeta, k)
+		}
+	}
+	for k := range m.grants { // багш гараар нээсэн хичээлүүд
+		if k[1] == courseID {
+			delete(m.grants, k)
+		}
+	}
+	m.deletePeersLocked(func(k peerKey) bool { return k[0] == courseID }) // бүлэг чатын харилцан үнэлгээ
 	return nil
 }
 
@@ -1230,8 +1246,10 @@ func (m *Memory) MarkLessonViewed(_ context.Context, userID, courseID, lessonID 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	k := [2]string{userID, lessonID}
-	if _, ok := m.progress[k]; !ok {
+	if p, ok := m.progress[k]; !ok {
 		m.progress[k] = &LessonProgress{LessonID: lessonID, ViewedAt: time.Now()}
+	} else if !p.Viewed() { // зөвхөн төлсөн эрхтэй мөрийг анх нээж байна
+		p.ViewedAt = time.Now()
 	}
 	return nil
 }
@@ -1248,6 +1266,9 @@ func (m *Memory) MarkLessonCompleted(_ context.Context, userID, courseID, lesson
 	if p.CompletedAt == nil {
 		now := time.Now()
 		p.CompletedAt = &now
+		if p.ViewedAt.Unix() <= 0 {
+			p.ViewedAt = now
+		}
 	}
 	return nil
 }
@@ -1264,6 +1285,9 @@ func (m *Memory) MarkQuizDone(_ context.Context, userID, courseID, lessonID stri
 	if p.QuizDoneAt == nil {
 		now := time.Now()
 		p.QuizDoneAt = &now
+		if !p.Viewed() {
+			p.ViewedAt = now
+		}
 	}
 	return nil
 }
@@ -1284,11 +1308,42 @@ func (m *Memory) LessonProgress(_ context.Context, userID, courseID string) (map
 	defer m.mu.RUnlock()
 	out := map[string]LessonProgress{}
 	for _, l := range m.lessons[courseID] {
-		if p, ok := m.progress[[2]string{userID, l.ID}]; ok {
+		if p, ok := m.progress[[2]string{userID, l.ID}]; ok && p.Viewed() {
 			out[l.ID] = copyProgress(p)
 		}
 	}
 	return out, nil
+}
+
+func (m *Memory) LessonPasses(_ context.Context, userID, courseID string) (map[string]map[string]bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	rows := map[string]LessonProgress{}
+	for _, l := range m.lessons[courseID] {
+		if p, ok := m.progress[[2]string{userID, l.ID}]; ok {
+			rows[l.ID] = *p
+		}
+	}
+	return passesOf(rows), nil
+}
+
+func (m *Memory) GrantLessonPass(_ context.Context, userID, courseID, lessonID string, keys ...string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.grantPassLocked(userID, lessonID, keys)
+	return nil
+}
+
+// grantPassLocked — m.mu түгжээтэй үед: төлсөн эрх; шинэ мөр нь хичээлийг үзээгүй.
+func (m *Memory) grantPassLocked(userID, lessonID string, keys []string) {
+	k := [2]string{userID, lessonID}
+	p, ok := m.progress[k]
+	if !ok {
+		p = &LessonProgress{LessonID: lessonID, ViewedAt: notViewedAt}
+	}
+	if grantPass(p, keys) && !ok {
+		m.progress[k] = p
+	}
 }
 
 func (m *Memory) CourseProgress(_ context.Context, courseID string) (map[string]map[string]LessonProgress, error) {
@@ -1297,7 +1352,7 @@ func (m *Memory) CourseProgress(_ context.Context, courseID string) (map[string]
 	out := map[string]map[string]LessonProgress{}
 	for _, l := range m.lessons[courseID] {
 		for k, p := range m.progress {
-			if k[1] != l.ID {
+			if k[1] != l.ID || !p.Viewed() {
 				continue
 			}
 			if out[k[0]] == nil {
@@ -1363,6 +1418,10 @@ func (m *Memory) SaveQuizResult(_ context.Context, userID, courseID, lessonID, b
 		p.Quiz = map[string]bool{}
 	}
 	p.Quiz[blockID] = p.Quiz[blockID] || correct // зөв хариулсныг дахин судлахад буруу хариулт дарахгүй
+	// Зөвхөн төлсөн эрхтэй мөрөнд анхны жинхэнэ хариулт — хичээлийг нээсэн.
+	if !p.Viewed() && !isPassKey(blockID) {
+		p.ViewedAt = time.Now()
+	}
 	return nil
 }
 

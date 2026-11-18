@@ -55,7 +55,8 @@ func (c *ClickHouse) StudentRanks(ctx context.Context, warn []string) (map[strin
 	self := func(t string) string { return t }
 	byCourse := func(id string) string { return courseT[id] }
 	byLesson := func(id string) string { return lessonT[id] }
-	if err := rows3("SELECT user_id, course_id, toUInt64(1) FROM lesson_progress FINAL GROUP BY user_id, course_id", nil, byCourse,
+	// Зөвхөн төлсөн эрхтэй (үзээгүй) мөр сургалтад суралцсанд тооцогдохгүй (LessonProgress.Viewed).
+	if err := rows3("SELECT user_id, course_id, toUInt64(1) FROM lesson_progress FINAL WHERE "+progressViewedCond+" GROUP BY user_id, course_id", nil, byCourse,
 		func(r *StudentRank, n int64) { r.Courses += n }); err != nil {
 		return nil, err
 	}

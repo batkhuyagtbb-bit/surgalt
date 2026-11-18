@@ -13,11 +13,15 @@ import (
 var eraseByUser = []struct{ table, col string }{
 	{"activity_events", "user_id"}, {"study_sessions", "user_id"}, {"quiz_logs", "user_id"}, {"reflections", "user_id"},
 	{"video_watches", "user_id"}, {"book_events", "user_id"}, {"lesson_progress", "user_id"}, {"exam_attempts", "user_id"},
-	{"submissions", "user_id"}, {"comments", "user_id"}, {"likes", "user_id"}, {"rank_points", "user_id"}, {"rank_levels", "user_id"},
+	{"submissions", "user_id"}, {"comments", "user_id"}, {"likes", "user_id"}, {"rank_points", "user_id"}, {"rank_levels", "user_id"}, {"box_opens", "user_id"},
 	{"notifications", "user_id"}, {"notification_reads", "user_id"}, {"notification_opens", "user_id"}, {"enrollments", "user_id"}, {"lesson_access", "user_id"},
 	{"book_access", "user_id"}, {"meeting_access", "user_id"}, {"identities", "user_id"}, {"conversation_members", "user_id"},
 	{"page_visits", "visitor_id"}, {"highlights", "user_id"}, {"cloud_answers", "user_id"}, {"course_unlocks", "user_id"}, {"chat_hides", "user_id"}, {"review_reminders", "user_id"},
-	{"payout_accounts", "teacher_id"}, // дансны мэдээлэл (татах хүсэлтүүд санхүүгийн баримт тул үлдэнэ)
+	{"course_student_meta", "user_id"}, // багшийн журналд өгсөн нэр, бүлэг
+	{"lesson_grants", "user_id"},       // багш гараар нээсэн хичээлүүд
+	{"peer_ratings", "rater_id"},       // бүлэг чатад ангийн найздаа өгсөн үнэлгээ
+	{"peer_ratings", "ratee_id"},       // ангийн найзуудаас авсан үнэлгээ
+	{"payout_accounts", "teacher_id"},  // дансны мэдээлэл (татах хүсэлтүүд санхүүгийн баримт тул үлдэнэ)
 }
 
 func (c *ClickHouse) DeleteUserData(ctx context.Context, uid string) error {
@@ -39,6 +43,23 @@ func (c *ClickHouse) DeleteUserData(ctx context.Context, uid string) error {
 	}
 	if err := c.conn.Exec(ctx, "DELETE FROM board_rooms WHERE room = ?", key); err != nil { // цагаан самбар дээрх хувийн самбар
 		return fmt.Errorf("erase board_rooms: %w", err)
+	}
+	// Багшийн өөрийн сургалтуудын журналд суралцагчдад өгсөн нэр, бүлэг (course_student_meta).
+	var owned []string
+	if err := c.query(ctx, "SELECT DISTINCT id FROM courses WHERE teacher_id = ?", []any{uid}, func(r driver.Rows) error {
+		var id string
+		if err := r.Scan(&id); err != nil {
+			return err
+		}
+		owned = append(owned, id)
+		return nil
+	}); err != nil {
+		return err
+	}
+	if len(owned) > 0 {
+		if err := c.conn.Exec(ctx, "DELETE FROM course_student_meta WHERE has(?, course_id)", owned); err != nil {
+			return fmt.Errorf("erase course_student_meta: %w", err)
+		}
 	}
 	for _, t := range []string{"message_reactions", "conversation_reads"} {
 		if err := c.conn.Exec(ctx, "DELETE FROM "+t+" WHERE user_key = ?", key); err != nil {

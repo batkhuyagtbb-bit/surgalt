@@ -49,7 +49,7 @@ func cleanSubjects(in []string) ([]string, string) {
 			continue
 		}
 		if utf8.RuneCountInString(v) > maxSubjectLen || hasControl(v) {
-			return nil, "чиглэл бүр 30 тэмдэгтээс ихгүй"
+			return nil, "чиглэл бүр 30 тэмдэгтээс хэтрэхгүй байх ёстой"
 		}
 		if k := strings.ToLower(v); !seen[k] {
 			seen[k] = true
@@ -57,7 +57,7 @@ func cleanSubjects(in []string) ([]string, string) {
 		}
 	}
 	if len(out) > maxSubjects {
-		return nil, "хамгийн ихдээ 8 чиглэл"
+		return nil, "дээд тал нь 8 чиглэл нэмэх боломжтой"
 	}
 	return out, ""
 }
@@ -80,10 +80,10 @@ func cleanLinks(in map[string]string) (map[string]string, string) {
 		u, err := url.Parse(v)
 		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Hostname() == "" || u.User != nil ||
 			len(v) > maxLinkLen || hasControl(v) || !strings.Contains(u.Hostname(), ".") {
-			return nil, linkLabels[k] + ": холбоос буруу"
+			return nil, linkLabels[k] + ": холбоос буруу байна"
 		}
 		if len(hosts) > 0 && !hostAllowed(strings.ToLower(u.Hostname()), hosts) {
-			return nil, linkLabels[k] + ": зөвхөн " + hosts[0] + " холбоос"
+			return nil, linkLabels[k] + ": зөвхөн " + hosts[0] + " холбоос оруулна уу"
 		}
 		out[k] = u.String()
 	}
@@ -135,18 +135,18 @@ func (s *Server) profileInsights(u *store.User, courses []store.Course) ProfileI
 		weight int
 	}
 	items := []item{
-		{ProfileTip{"avatar", "Профайл зураг", "Нүүр царайтай профайлд суралцагч илүү итгэдэг.", "#profile", u.AvatarURL != ""}, 15},
+		{ProfileTip{"avatar", "Профайл зураг", "Нүүр царай нь харагдах зурагтай профайлд суралцагчид илүү итгэдэг.", "#profile", u.AvatarURL != ""}, 15},
 		{ProfileTip{"course", "Нийтэлсэн сургалт", "Дор хаяж нэг сургалтаа нийтэлж профайл дээрээ гаргаарай.", "#courses", published > 0}, 15},
-		{ProfileTip{"bio", "Дэлгэрэнгүй танилцуулга", "Туршлага, арга барилаа 120+ тэмдэгтээр бичээрэй.", "#profile", utf8.RuneCountInString(strings.TrimSpace(u.Bio)) >= 120}, 15},
-		{ProfileTip{"headline", "Мэргэжил / гарчиг", "Нэг өгүүлбэрээр юу заадгаа хэлээрэй.", "#profile", u.Headline != ""}, 10},
-		{ProfileTip{"free", "Үнэгүй хичээл", "Үнэгүй хичээл үзсэн хүн худалдан авах магадлал өндөр.", "#courses", free > 0}, 10},
-		{ProfileTip{"subjects", "Заадаг чиглэлүүд", "Чиглэлээ нэмбэл суралцагч таныг хурдан ойлгоно.", "#profile", len(u.Subjects) > 0}, 10},
+		{ProfileTip{"bio", "Дэлгэрэнгүй танилцуулга", "Туршлага, заах арга барилаа 120-оос дээш тэмдэгтээр бичээрэй.", "#profile", utf8.RuneCountInString(strings.TrimSpace(u.Bio)) >= 120}, 15},
+		{ProfileTip{"headline", "Мэргэжил / гарчиг", "Юу заадгаа нэг өгүүлбэрээр бичээрэй.", "#profile", u.Headline != ""}, 10},
+		{ProfileTip{"free", "Үнэгүй хичээл", "Үнэгүй хичээл үзсэн хүн сургалтыг худалдан авах магадлал өндөр байдаг.", "#courses", free > 0}, 10},
+		{ProfileTip{"subjects", "Заадаг чиглэлүүд", "Заадаг чиглэлээ нэмбэл суралцагчид таныг хурдан олж, ойлгоно.", "#profile", len(u.Subjects) > 0}, 10},
 		{ProfileTip{"cover", "Нүүр зураг", "Профайлын дээд талын өргөн зураг хуудсыг амьд болгоно.", "#profile", u.CoverURL != ""}, 5},
 		{ProfileTip{"lessons", "3+ хичээл", "Агуулга баялаг байх тусам профайл үнэ цэнтэй харагдана.", "#courses", lessons >= 3}, 5},
 		{ProfileTip{"paid", "Төлбөртэй агуулга", "Багц үнэ эсвэл хичээлийн үнэ тавьж орлого олж эхлээрэй.", "#courses", paid > 0}, 5},
-		{ProfileTip{"links", "Сошиал холбоос", "Facebook, Instagram, YouTube эсвэл вэб сайтаа холбоорой.", "#profile", len(u.Links) > 0}, 5},
-		{ProfileTip{"location", "Байршил", "Хаана байдгаа заавал танхимын сургалтад хэрэгтэй.", "#profile", u.Location != ""}, 5},
-		{ProfileTip{"phone", "Утасны дугаар", "Зочид нэг товшилтоор залгана; хэн дугаарыг тань харсныг мэдэгдэнэ.", "#profile", u.Phone != ""}, 5},
+		{ProfileTip{"links", "Олон нийтийн сүлжээ", "Facebook, Instagram, YouTube эсвэл вэб сайтаа холбоорой.", "#profile", len(u.Links) > 0}, 5},
+		{ProfileTip{"location", "Байршил", "Танхимын сургалт явуулдаг бол байршлаа заах нь чухал.", "#profile", u.Location != ""}, 5},
+		{ProfileTip{"phone", "Утасны дугаар", "Зочид нэг товшилтоор залгана; дугаарыг тань хэн харсныг танд мэдэгдэнэ.", "#profile", u.Phone != ""}, 5},
 	}
 	if s.Meet != nil {
 		items = append(items, item{ProfileTip{"meet", "Google Meet холболт", "Шууд хичээлийг нэг товчоор товлох боломжтой болно.", "#live", u.MeetConnected}, 5})
@@ -256,9 +256,8 @@ type Home struct {
 	Teachers []TeacherBrief    `json:"teachers"`
 	Chats    []HomeChat        `json:"chats"`
 	Teacher  *HomeTeacherPanel `json:"teacher,omitempty"`
-	// Суралцагчийн өөрийн хэсэг: систем олгосон цол, сургалт бүрийн цол, даалгавар/шалгалтын төлөв.
+	// Суралцагчийн өөрийн хэсэг: систем олгосон эрэмбэ, сургалт бүрийн эрэмбэ, даалгавар/шалгалтын төлөв.
 	Rank        *RankInfo        `json:"rank,omitempty"`
-	RankLadder  []RankStep       `json:"rank_ladder,omitempty"`
 	CourseRanks []HomeCourseRank `json:"course_ranks"`
 	Tasks       []HomeTask       `json:"tasks"`
 	RankAwarded bool             `json:"rank_awarded,omitempty"`
@@ -278,7 +277,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	// lite=1 — чатын самбарт зөвхөн чат, багш нар хэрэгтэй: шууд хичээл, багшийн самбар, цол тооцохгүй.
+	// lite=1 — чатын самбарт зөвхөн чат, багш нар хэрэгтэй: шууд хичээл, багшийн самбар, эрэмбэ тооцохгүй.
 	lite := r.URL.Query().Get("lite") == "1"
 	// Бие биеэсээ хамааралгүй асуулгуудыг зэрэг явуулна (алсын ClickHouse руу дараалан 7 удаа хүлээхгүй).
 	var (
@@ -472,13 +471,13 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		out.Teacher = p
 	}
 
-	// Цол: элссэн сургалтууд + элсээгүй ч үнэгүй хичээл үзэж оноо авсан сургалтууд (myProgress → RankCourseIDs).
+	// Эрэмбэ: элссэн сургалтууд + элсээгүй ч үнэгүй хичээл үзэж оноо авсан сургалтууд (myProgress → RankCourseIDs).
 	// Багш ч бусдын сургалтад суралцагчтай яг адил суралцана (өөрийн сургалт тооцогдохгүй).
 	if !lite {
 		rank, byCourse, tasks, awarded := s.myProgress(ctx, c.UID, out.Courses)
 		out.CourseRanks, out.Tasks, out.RankAwarded = byCourse, tasks, awarded
 		if len(byCourse) > 0 {
-			out.Rank, out.RankLadder = &rank, RankLadder()
+			out.Rank = &rank
 		}
 	}
 	if out.CourseRanks == nil {

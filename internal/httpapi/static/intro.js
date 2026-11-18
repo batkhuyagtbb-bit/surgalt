@@ -1,6 +1,6 @@
 // Интро: «Оюуны сансар огторгуйн хамгаалагч» — сансарт хөвөх голограмм тавцан дээр цэргийн хуягт машин орж ирээд
 // хамгаалагч-робот болж хувирч, ёслол хийнэ (Three.js / WebGL). Дүр нь surgalt.mn-ийн өөрийн загвар (брэндийн өнгө,
-// «s» од тэмдэг, цолны тэмдэг) — ямар нэг кино, тоглоомын дүрийн хуулбар биш.
+// «s» од тэмдэг, эрэмбийн тэмдэг) — ямар нэг кино, тоглоомын дүрийн хуулбар биш.
 // app.js зөвхөн анх орох үед (эсвэл ?intro=1) ачаална; Three.js-ийг энд л татна. Дуу: intro-sound.js (WebAudio, файлгүй).
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js";
 
@@ -96,7 +96,7 @@ export async function runIntro({ onDone } = {}) {
   });
   const emblemMat = new T.MeshStandardMaterial({ map: emblemTex, emissiveMap: emblemTex, emissive: 0xffffff, emissiveIntensity: 0, metalness: 0.2, roughness: 0.4 });
   const stencil = canvasTex(256, 96, (g) => { g.fillStyle = "#eaa02e"; g.font = "800 58px Manrope, Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("SRG-01", 128, 50); });
-  const chevron = canvasTex(128, 160, (g) => { // цолны тэмдэг: од ба гурван шеврон
+  const chevron = canvasTex(128, 160, (g) => { // эрэмбийн тэмдэг: од ба гурван шеврон
     g.fillStyle = "#eaa02e";
     g.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 9 : 22, a = -Math.PI / 2 + i * Math.PI / 5; g.lineTo(64 + Math.cos(a) * r, 28 + Math.sin(a) * r); } g.closePath(); g.fill();
     for (let k = 0; k < 3; k++) { const y = 62 + k * 30; g.beginPath(); g.moveTo(16, y); g.lineTo(64, y + 22); g.lineTo(112, y); g.lineTo(112, y + 12); g.lineTo(64, y + 34); g.lineTo(16, y + 12); g.closePath(); g.fill(); }
@@ -154,7 +154,7 @@ export async function runIntro({ onDone } = {}) {
   for (const s of [-1, 1]) mesh(box(0.2, 0.1, 0.06), lamp, [s * 0.45, -0.22, 0.05], [0, 0, 0], plate);
   mesh(new T.CircleGeometry(0.25, 48), emblemMat, [0, 0.05, 0.051], [0, 0, 0], plate);
   part(plate, [[1.82, 0.82, 0], [0, H, 0]], [[0, 3.42, 0.49], [0, 0, 0]], T0 + 0.8, 0.8);
-  // ---- Мөрний хуяг: цолны тэмдэгтэй
+  // ---- Мөрний хуяг: эрэмбийн тэмдэгтэй
   for (const s of [-1, 1]) {
     const sh = new T.Group();
     mesh(box(0.64, 0.5, 0.7), navy, [0, 0, 0], [0, 0, 0], sh);

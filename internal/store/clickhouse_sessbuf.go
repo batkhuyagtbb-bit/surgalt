@@ -25,7 +25,19 @@ type sessionBuffer struct {
 	fmu   sync.Mutex                                                  // flush-ууд дараална: зэрэгцвэл хуучин хуулбар сүүлд бичигдэж (их ver-тэй) шинийг дарна
 	mu    sync.Mutex
 	m     map[string]*bufSess
+	// gen — drop бүрт өснө; drops — сүүлийн drop-уудын нөхцөл. Сангаас ачаалж эхэлсний дараа (DELETE-ээс өмнө уншсан)
+	// drop болж энэ сессийг хамарсан бол буферт оруулахгүй (keepFrom) — эс бөгөөс устгасан сесс дахин бичигдэнэ.
+	gen   uint64
+	drops []bufDrop
 }
+
+type bufDrop struct {
+	gen  uint64
+	pred func(*StudySession) bool
+}
+
+// bufDropLog — хадгалах drop-ын нөхцөлийн тоо (ачаалал хэдхэн мс; устгал зэрэг 1-ээс олон ажиллахгүй).
+const bufDropLog = 32
 
 type bufSess struct {
 	s     StudySession
@@ -72,20 +84,53 @@ func (b *sessionBuffer) keep(s *StudySession) {
 	}
 }
 
+// generation — сангаас ачаалахаас өмнө авна (keepFrom-д дамжуулна).
+func (b *sessionBuffer) generation() uint64 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.gen
+}
+
+// keepFrom — сангаас уншсан сессийг буферт нэмнэ, гэхдээ gen-ээс хойш энэ сессийг хамарсан drop болсон бол үгүй (false):
+// уншилт DELETE-ээс өмнө байж болзошгүй тул дуудагч ErrNotFound буцаана.
+func (b *sessionBuffer) keepFrom(s *StudySession, gen uint64) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.gen != gen {
+		if len(b.drops) == 0 || b.drops[0].gen > gen+1 { // бүртгэлээс хэтэрсэн — болгоомжтой
+			return false
+		}
+		for _, d := range b.drops {
+			if d.gen > gen && d.pred(s) {
+				return false
+			}
+		}
+	}
+	if _, ok := b.m[s.ID]; !ok {
+		b.m[s.ID] = &bufSess{s: deepCopy(*s), seen: time.Now()}
+	}
+	return true
+}
+
 func (b *sessionBuffer) beat(ctx context.Context, id string, bt SessionBeat) error {
 	b.mu.Lock()
-	e := b.m[id]
+	e, gen := b.m[id], b.gen
 	b.mu.Unlock()
 	if e == nil {
 		s, err := b.load(ctx, id)
 		if err != nil {
 			return err
 		}
-		b.keep(s)
+		if !b.keepFrom(s, gen) {
+			return ErrNotFound
+		}
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	e = b.m[id]
+	if e == nil { // хооронд нь drop (суралцагчийн өгөгдөл устгасан) эсвэл flush санах ойгоос гаргасан
+		return ErrNotFound
+	}
 	s := &e.s
 	s.ActiveSec += bt.ActiveSec
 	s.IdleSec += bt.IdleSec
@@ -162,6 +207,34 @@ func (b *sessionBuffer) flush(ctx context.Context) {
 		}
 	}
 	b.mu.Unlock()
+}
+
+// hold — flush-ийг (fmu) зогсооно: буцаасан функцийг дуустал санах ойн сессүүд сан руу бичигдэхгүй. Суралцагчийн
+// өгөгдөл устгах (course_reset.go) үед: flush-ийн авсан хуучин хуулбар DELETE-ийн дараа дахин бичигдэхээс сэргийлнэ.
+func (b *sessionBuffer) hold() (release func()) {
+	b.fmu.Lock()
+	var once sync.Once
+	return func() { once.Do(b.fmu.Unlock) }
+}
+
+// drop — pred-д тохирох сессүүдийг (бичигдээгүй beat-ийн хамт) санах ойгоос хаяна; хаясан тоог буцаана.
+// Дараагийн beat сангаас ачаална — мөр нь устсан бол ErrNotFound (клиент шинэ сесс эхлүүлнэ).
+func (b *sessionBuffer) drop(pred func(*StudySession) bool) int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.gen++
+	b.drops = append(b.drops, bufDrop{b.gen, pred})
+	if len(b.drops) > bufDropLog {
+		b.drops = append([]bufDrop(nil), b.drops[len(b.drops)-bufDropLog:]...)
+	}
+	n := 0
+	for id, e := range b.m {
+		if pred(&e.s) {
+			delete(b.m, id)
+			n++
+		}
+	}
+	return n
 }
 
 // size — тестэд: санах ойд байгаа сессийн тоо.

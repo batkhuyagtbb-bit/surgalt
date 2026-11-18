@@ -215,11 +215,11 @@ func (s *Server) handleBoardChatPost(w http.ResponseWriter, r *http.Request) {
 	in.Body = strings.TrimSpace(in.Body)
 	if in.Del == "" {
 		if n := utf8.RuneCountInString(in.Body); n < 1 || n > boardChatMaxLen {
-			writeErr(w, http.StatusBadRequest, "мессеж 1-1000 тэмдэгт")
+			writeErr(w, http.StatusBadRequest, "мессеж 1-1000 тэмдэгт байх ёстой")
 			return
 		}
 		if !s.chatLim.Allow("bd:" + c.UID) {
-			writeErr(w, http.StatusTooManyRequests, "хэт хурдан бичиж байна")
+			writeErr(w, http.StatusTooManyRequests, "хэт хурдан бичиж байна — түр хүлээнэ үү")
 			return
 		}
 	}
@@ -230,7 +230,7 @@ func (s *Server) handleBoardChatPost(w http.ResponseWriter, r *http.Request) {
 	bs, now := br.s, time.Now()
 	if in.Del != "" {
 		if !br.teacher {
-			errLocked(w, bs, http.StatusForbidden, "зөвхөн багш устгана")
+			errLocked(w, bs, http.StatusForbidden, "мессежийг зөвхөн багш устгана")
 			return
 		}
 		ch := bs.chats[in.Ch]
@@ -255,12 +255,12 @@ func (s *Server) handleBoardChatPost(w http.ResponseWriter, r *http.Request) {
 			targets = append(targets, "b:"+strconv.Itoa(i))
 		}
 	} else if !bs.canChat(br.c.UID, br.teacher, in.Ch) {
-		errLocked(w, bs, http.StatusForbidden, "энэ багийн чатад бичих эрхгүй")
+		errLocked(w, bs, http.StatusForbidden, "танд энэ багийн чатад бичих эрх байхгүй")
 		return
 	}
 	if !br.teacher {
 		if bs.state.Mode != "team" {
-			errLocked(w, bs, http.StatusForbidden, "багийн чат «Багаар» горимд нээлттэй")
+			errLocked(w, bs, http.StatusForbidden, "багийн чат зөвхөн «Багаар» горимд нээлттэй")
 			return
 		}
 		if bs.state.Lock {
@@ -373,7 +373,7 @@ func (s *Server) handleBoardVoice(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.boardLim.Allow("v:" + c.UID) {
 		w.Header().Set("Retry-After", "1")
-		writeErr(w, http.StatusTooManyRequests, "хэт олон хүсэлт")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон хүсэлт ирлээ — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	var in struct {
@@ -419,14 +419,14 @@ func (s *Server) handleBoardVoice(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case in.Sig != nil:
 		if !bs.voiceLinked(uid, in.Sig.To, now) {
-			errLocked(w, bs, http.StatusForbidden, "энэ хүнтэй дуугаар холбогдох эрхгүй")
+			errLocked(w, bs, http.StatusForbidden, "танд энэ хүнтэй дуугаар холбогдох эрх байхгүй")
 			return
 		}
 		s.boardSend(bs, []string{in.Sig.To}, boardEvent{Ev: "rtc", Rtc: &boardRTC{From: uid, T: in.Sig.T, ID: in.Sig.ID, SDP: in.Sig.SDP}})
 		writeLocked(w, bs, map[string]any{"ok": true})
 	case in.Hand != nil:
 		if br.teacher {
-			errLocked(w, bs, http.StatusBadRequest, "багш гар өргөхгүй")
+			errLocked(w, bs, http.StatusBadRequest, "багш гар өргөх шаардлагагүй")
 			return
 		}
 		i := slices.Index(bs.state.Hands, uid)
@@ -459,7 +459,7 @@ func (s *Server) handleBoardVoice(w http.ResponseWriter, r *http.Request) {
 		writeLocked(w, bs, map[string]any{"ok": true})
 	case in.D != "":
 		if !bs.canSpeak(uid, br.teacher, in.To) {
-			errLocked(w, bs, http.StatusForbidden, "одоо ярих эрхгүй байна")
+			errLocked(w, bs, http.StatusForbidden, "танд одоогоор ярих эрх байхгүй — гараа өргөж хүснэ үү")
 			return
 		}
 		ids := bs.voiceListeners(uid, in.To, now)

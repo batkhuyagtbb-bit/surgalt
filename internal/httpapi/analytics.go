@@ -31,7 +31,8 @@ type StudentStat struct {
 	IdleSec    int            `json:"idle_sec"`
 	AwaySec    int            `json:"away_sec"`
 	ActivePct  int            `json:"active_pct"` // идэвхтэй / нийт
-	Attention  int            `json:"attention"`  // анхаарал төвлөрлийн индекс 0-100
+	Attention  int            `json:"attention"`  // анхаарлын индекс 0-100: төвлөрөл 60% + видео үзэлт 40% (attentionScore)
+	Focus      int            `json:"focus"`      // хичээл үзэх үеийн төвлөрөл 0-100: идэвхтэй хувь − зөрчлийн хасалт
 	Camera     bool           `json:"camera"`
 	Violations int            `json:"violations"`
 	Counts     map[string]int `json:"counts"`
@@ -59,7 +60,7 @@ type StudentStat struct {
 	QuizFirstTry  int `json:"quiz_first_try"` // анхны оролдлогоор зөв хариулсан хувь
 	QuizQuestions int `json:"quiz_questions"` // хариулж үзсэн өөр өөр асуултын тоо
 	QuizAttempts  int `json:"quiz_attempts"`  // нэг асуултад дунджаар хэдэн оролдлого (×10: 15 = 1.5)
-	// Цэргийн цол: шударга, идэвхтэй суралцсаны нийлбэр.
+	// Суралцахуйн эрэмбэ: шударга, идэвхтэй суралцсаны нийлбэр.
 	Rank        RankInfo     `json:"rank"`
 	LessonRanks []LessonRank `json:"lesson_ranks,omitempty"` // зөвхөн суралцагчийн дэлгэрэнгүйд
 	ActiveDays  int          `json:"active_days"`            // энэ хугацаанд суралцсан өдрийн тоо
@@ -74,29 +75,85 @@ type StudentStat struct {
 	BoardVoiceSec  int `json:"board_voice_sec"`  // дуут өрөөнд ярьсан хугацаа
 	BoardTeam      int `json:"board_team"`       // сүүлд байсан баг (-1 = алга)
 	CollabScore    int `json:"collab_score"`     // багаар ажилласан оноо 0-100
+	// Бүлэг чатын харилцан үнэлгээний хамтын ажиллагааны рейтинг (peer_ratings.go): хүрээний сургалтуудын нийлбэр, тоо
+	// («collaboration» хэмжүүрт самбарын оноотой дундажлагдана; JSON-д гарахгүй).
+	peerSum, peerN int
 	// Мартах муруйн давталт: энэ хугацаанд болсон үе шат (1, 3, 7, 14, 30 хоног) ба тэрэнд эргэж орж давтсан нь.
 	ReviewDue  int `json:"review_due"`
 	ReviewDone int `json:"review_done"`
+	// Даалгавар (Хэрэглээ): нээсэн, илгээсэн, багш үнэлсэн тоо, үнэлгээний дундаж хувь, хугацаандаа илгээсэн нь.
+	AssignOpen   int `json:"assign_open"`
+	AssignDone   int `json:"assign_done"`
+	AssignGraded int `json:"assign_graded"`
+	AssignPct    int `json:"assign_pct"`
+	AssignOnTime int `json:"assign_on_time"`
+	// Хичээл дуусгалт (Үр дүн): оролцсон сургалтуудын нийт хичээлээс «дууслаа» гэж тэмдэглэсэн нь.
+	LessonsDone  int `json:"lessons_done"`
+	LessonsTotal int `json:"lessons_total"`
+	// Regularity — тогтмол байдал 0-100: долоо хоногт 3 ба түүнээс олон өдөр суралцвал дүүрэн (тархмал дадлага).
+	Regularity int `json:"regularity"`
 	// Dims — 8 талын хэмжүүр (0-100, −1 = өгөгдөлгүй): студийн radar график (dimScores).
 	Dims []int `json:"dims"`
 }
 
-// dimNames — Dims-ийн дараалал: идэвх, анхаарал, ойлголт, видео, шалгалт, эргэцүүлэл, багаар ажиллах, санах ой.
-var dimNames = []string{"activity", "attention", "understanding", "video", "exam", "reflection", "collab", "memory"}
+// dimNames — Dims-ийн дараалал: суралцахуйн оролцоо (зан үйлийн, танин мэдэхүйн, метатанин мэдэхүйн, нийгмийн)
+// ба үр дүнгийн 8 хэмжүүр.
+var dimNames = []string{"activity", "attention", "understanding", "application", "outcome", "self_regulation", "reflection", "collaboration"}
 
-// dimScores — суралцагчийг 8 талаас 0-100 оноогоор (тухайн талд өгөгдөл байхгүй бол −1, дундажид орохгүй):
+// dimPart — хэмжүүрийн нэг бүрэлдэхүүн: утга (0-100), жин, өгөгдөл байгаа эсэх.
+type dimPart struct {
+	v, w float64
+	ok   bool
+}
+
+// wavg — өгөгдөлтэй бүрэлдэхүүнүүдийн жигнэсэн дундаж (жинг дахин хэвийн болгоно); аль нь ч байхгүй бол false.
+func wavg(parts ...dimPart) (float64, bool) {
+	var sum, w float64
+	for _, p := range parts {
+		if p.ok {
+			sum += p.v * p.w
+			w += p.w
+		}
+	}
+	if w == 0 {
+		return 0, false
+	}
+	return sum / w, true
+}
+
+// pctOf — a/b хувиар (b = 0 бол 0).
+func pctOf(a, b int) float64 {
+	if b <= 0 {
+		return 0
+	}
+	return math.Min(100, float64(a)*100/float64(b))
+}
+
+// dimScores — суралцагчийг 8 талаас 0-100 оноогоор (тухайн талд өгөгдөл байхгүй бол −1, дундажид орохгүй;
+// бүрэлдэхүүний аль нэг нь байхгүй бол бусдынх нь жинг дахин хэвийн болгоно):
 //   - идэвх: идэвхтэй хувь (60%) + суралцсан өдөр (40%, 5 өдөр = дүүрэн);
-//   - анхаарал: анхаарлын индекс;
+//   - анхаарал: анхаарлын индекс — хичээлийн үеийн төвлөрөл (60%) + видео үзэлт (40%);
 //   - ойлголт: зөв хариултын хувь (60%) + анхны оролдлогоор зөв (40%) − таамаг (1.5 сек-ээс хурдан, ≤20);
-//   - видео: үзсэн дундаж хувь; шалгалт: шилдэг оролдлогын хувь;
-//   - эргэцүүлэл: дүгнэлт бичсэн хичээлийн хувь × үгийн тоо (дунджаар 12+ үг = дүүрэн);
-//   - багаар: багаар ажилласан оноо (collabScore);
-//   - санах ой: мартах муруйн үе шатуудаас (1, 3, 7, 14, 30 хоног) хэдэд нь эргэж орж давтсан хувь (curveReviews).
+//   - хэрэглээ: даалгаврын үнэлгээний дундаж хувь (70%) + нээсэн даалгавраа гүйцэтгэж илгээсэн хувь (30%);
+//   - үр дүн: шалгалтын шилдэг оролдлогын хувь (60%) + хичээл дуусгалт (40%);
+//   - өөрийн зохицуулалт: мартах муруйн дагуу давтсан (50%) + тогтмол байдал (30%) + даалгавраа хугацаандаа илгээсэн (20%);
+//   - эргэцүүлэл: эргэцүүлэл бичсэн хичээлийн хувь × үгийн тоо (дунджаар 12+ үг = дүүрэн);
+//   - хамтын ажиллагаа: самбар, багийн чат, дуут өрөөнд хамтран ажилласан оноо (collabScore) ба бүлэг чатад ангийн
+//     найзуудын өгсөн хамтын ажиллагааны рейтинг (peer collab) — байгаа нь бүрийн дундаж.
 func (st *StudentStat) dimScores() []int {
 	clamp := func(v float64) int { return max(0, min(100, int(math.Round(v)))) }
 	d := []int{-1, -1, -1, -1, -1, -1, -1, -1}
+	set := func(i int) func(float64, bool) {
+		return func(v float64, ok bool) {
+			if ok {
+				d[i] = clamp(v)
+			}
+		}
+	}
 	if st.TotalSec > 0 {
 		d[0] = clamp(0.6*float64(st.ActivePct) + 0.4*math.Min(100, float64(st.ActiveDays)*20))
+	}
+	if st.TotalSec > 0 || st.VideoClips > 0 {
 		d[1] = clamp(float64(st.Attention))
 	}
 	if st.QuizTotal > 0 {
@@ -107,25 +164,19 @@ func (st *StudentStat) dimScores() []int {
 		guess := math.Min(20, float64(st.QuizGuesses)*50/float64(st.QuizTotal))
 		d[2] = clamp(0.6*float64(st.QuizAccuracy) + 0.4*first - guess)
 	}
-	if st.VideoClips > 0 {
-		d[3] = clamp(float64(st.VideoCoverage))
-	}
-	if st.ExamBest >= 0 {
-		d[4] = clamp(float64(st.ExamBest))
-	}
+	set(3)(wavg(dimPart{float64(st.AssignPct), 0.7, st.AssignGraded > 0}, dimPart{pctOf(st.AssignDone, st.AssignOpen), 0.3, st.AssignOpen > 0}))
+	set(4)(wavg(dimPart{float64(st.ExamBest), 0.6, st.ExamBest >= 0}, dimPart{pctOf(st.LessonsDone, st.LessonsTotal), 0.4, st.LessonsTotal > 0}))
+	set(5)(wavg(dimPart{pctOf(st.ReviewDone, st.ReviewDue), 0.5, st.ReviewDue > 0}, dimPart{float64(st.Regularity), 0.3, st.ActiveDays > 0},
+		dimPart{pctOf(st.AssignOnTime, st.AssignDone), 0.2, st.AssignDone > 0}))
 	if st.Lessons > 0 || st.Reflections > 0 {
 		words := 1.0
 		if st.Reflections > 0 {
 			words = math.Min(1, float64(st.ReflectionWords)/12)
 		}
-		d[5] = clamp(float64(st.Reflections) * 100 / math.Max(1, float64(st.Lessons)) * words)
+		d[6] = clamp(float64(st.Reflections) * 100 / math.Max(1, float64(st.Lessons)) * words)
 	}
-	if st.BoardDays > 0 {
-		d[6] = clamp(float64(st.CollabScore))
-	}
-	if st.ReviewDue > 0 {
-		d[7] = clamp(float64(st.ReviewDone) * 100 / float64(st.ReviewDue))
-	}
+	set(7)(wavg(dimPart{float64(st.CollabScore), 1, st.BoardDays > 0},
+		dimPart{float64(st.peerSum) / math.Max(1, float64(st.peerN)), 1, st.peerN > 0}))
 	return d
 }
 
@@ -187,19 +238,30 @@ func (st *StudentStat) add(x *store.StudySession) {
 	}
 }
 
-// finish — хувь, индекс, эрсдэлийн түвшин. Анхаарлын индекс = идэвхтэй хувь × дундаж төвлөрөл
-// (камергүй бол төвлөрөл = 1) − зөрчлийн торгууль.
-// learnScore нь хугацаанаас гадуур бодит сурсан эсэхийг нэгтгэнэ: зөв хариулт, видеог
-// дуустал үзсэн, дүгнэлт бичсэн, тогтмол ирсэн эсэх — байхгүй дохио дундажид орохгүй.
+// Анхаарлын индексийн жин: хичээл үзэх үеийн төвлөрөл ба видеог хэр бүрэн үзсэн нь.
+const attnFocusW, attnVideoW = 0.6, 0.4
+
+// attentionScore — Анхаарлын индекс 0-100 = төвлөрөл × 60% + видео үзэлт × 40%. Видео үзээгүй бол зөвхөн
+// төвлөрөл, хичээлийн сессгүй (зөвхөн видео) бол зөвхөн видео үзэлт.
+func (st *StudentStat) attentionScore() int {
+	switch {
+	case st.VideoClips == 0:
+		return st.Focus
+	case st.TotalSec == 0:
+		return st.VideoCoverage
+	}
+	return max(0, min(100, int(math.Round(attnFocusW*float64(st.Focus)+attnVideoW*float64(st.VideoCoverage)))))
+}
+
+// finish — хувь, индекс, эрсдэлийн түвшин. Төвлөрөл = идэвхтэй хувь × дундаж төвлөрөл
+// (камергүй бол төвлөрөл = 1) − зөрчлийн торгууль; Анхаарлын индекс нь төвлөрөл ба видео үзэлтийг жигнэнэ.
+// learnScore нь хугацаанаас гадуур бодит сурсан эсэхийг нэгтгэнэ: зөв хариулт, эргэцүүлэл бичсэн,
+// тогтмол ирсэн эсэх (видео үзэлт Анхаарлын индекст орно) — байхгүй дохио дундажид орохгүй.
 func (st *StudentStat) learnScore() int {
 	var sum float64
 	n := 0
 	if st.QuizTotal > 0 {
 		sum += float64(st.QuizAccuracy)
-		n++
-	}
-	if st.VideoClips > 0 {
-		sum += float64(st.VideoCoverage)
 		n++
 	}
 	if st.Lessons > 0 {
@@ -231,7 +293,7 @@ func (st *StudentStat) finish(focusSum float64, focusN int) {
 	}
 	hours := math.Max(float64(st.TotalSec)/3600, 0.25)
 	penalty := math.Min(30, float64(st.Violations)/hours*2)
-	st.Attention = max(0, int(math.Round(float64(st.ActivePct)*focus-penalty)))
+	st.Focus = max(0, int(math.Round(float64(st.ActivePct)*focus-penalty)))
 	if st.QuizTotal > 0 {
 		st.QuizAccuracy = int(math.Round(float64(st.QuizCorrect) / float64(st.QuizTotal) * 100))
 		st.QuizAvgMs /= st.QuizTotal
@@ -242,15 +304,16 @@ func (st *StudentStat) finish(focusSum float64, focusN int) {
 	if st.Reflections > 0 {
 		st.ReflectionWords /= st.Reflections
 	}
+	st.Attention = st.attentionScore()
 	st.LearnScore = st.learnScore()
 	st.CollabScore = st.collabScore()
 	st.Dims = st.dimScores()
 	switch {
 	case st.TotalSec == 0:
 		st.Risk = "ok"
-	case st.Attention < 40 || st.Terminated > 0 || st.Counts["copy"]+st.Counts["screenshot"]+st.Counts["phone"] > 2:
+	case st.Focus < 40 || st.Terminated > 0 || st.Counts["copy"]+st.Counts["screenshot"]+st.Counts["phone"] > 2:
 		st.Risk = "risk"
-	case st.Attention < 70 || st.Violations > 5:
+	case st.Focus < 70 || st.Violations > 5:
 		st.Risk = "watch"
 	default:
 		st.Risk = "ok"
@@ -376,6 +439,22 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 	// Асуулттай хичээл бүрт: эхэлсэн үү, бүх асуултад зөв хариулж дуусгасан уу (явцаас).
 	scope := s.scopeCourses(ctx, teacherID, courseID)
 	s.addBoardStats(ctx, scope, teacherID, userID, since, get)
+	// Бүлэг чатын харилцан үнэлгээ: сургалт бүрийн хамтын ажиллагааны рейтинг (хугацаанаас үл хамаарна — сүүлийн үнэлгээ).
+	for i := range scope {
+		collabs, err := s.peerCollabs(ctx, &scope[i].course)
+		if err != nil {
+			s.log.Warn("харилцан үнэлгээ уншиж чадсангүй", "err", err, "course", scope[i].course.ID)
+			continue
+		}
+		for uid, pc := range collabs {
+			if skip[uid] || (userID != "" && uid != userID) {
+				continue
+			}
+			st := get(uid, pc.Name)
+			st.peerSum += pc.Collab
+			st.peerN++
+		}
+	}
 	for _, m := range quizMasteryFromScope(scope, userID) {
 		if skip[m.UserID] {
 			continue
@@ -386,7 +465,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 			st.QuizMastered++
 		}
 	}
-	// Цэргийн цол: суралцагч × сургалт бүрт нотолгоог нэгтгэж, хичээлийн оноог нийлбэрлэнэ.
+	// Суралцахуйн эрэмбэ: суралцагч × сургалт бүрт нотолгоог нэгтгэж, хичээлийн оноог нийлбэрлэнэ.
 	evidence := map[[2]string]*rankEvidence{} // {uid, course}
 	ev := func(uid, cid string) *rankEvidence {
 		k := [2]string{uid, cid}
@@ -459,6 +538,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 		st.VideoClips++
 		st.VideoCoverage += min(100, len(v.Buckets)*100/total)
 	}
+	days0 := days // тайлант хугацаа (хоног); доорх давталтын days-ээс ялгана
 	for uid, days := range userDays {
 		st := get(uid, "")
 		st.ActiveDays = len(days)
@@ -475,6 +555,7 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 			d = d.AddDate(0, 0, -1)
 		}
 		st.StreakDays = streak
+		st.Regularity = int(math.Min(100, math.Round(float64(len(days))*100/math.Max(1, math.Round(float64(days0)*3/7)))))
 	}
 	for _, a := range atts {
 		if skip[a.UserID] {
@@ -514,6 +595,75 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 			}
 		}
 	}
+	// Хэрэглээ: даалгаврын гүйцэтгэл (нээсэн/илгээсэн, багшийн үнэлгээ = оноо/дээд оноо, хугацаандаа эсэх);
+	// Үр дүн: оролцсон сургалт бүрийн нээлттэй хичээлээс «дууслаа» гэж тэмдэглэсэн нь.
+	assignSum := map[string]float64{}
+	mine := func(uid string) bool { return !skip[uid] && (userID == "" || uid == userID) }
+	for _, sc := range scope {
+		total := 0
+		for _, l := range sc.lessons {
+			if !l.Hidden {
+				total++
+			}
+		}
+		for uid, byLesson := range sc.progress {
+			if !mine(uid) || len(byLesson) == 0 {
+				continue
+			}
+			done := 0
+			for _, p := range byLesson {
+				if p.CompletedAt != nil {
+					done++
+				}
+			}
+			st := get(uid, "")
+			st.LessonsTotal += total
+			st.LessonsDone += min(done, total)
+		}
+		for _, l := range sc.lessons {
+			if l.Assignment == nil || l.Hidden {
+				continue
+			}
+			subs, _ := s.store.Submissions(ctx, l.ID)
+			opened := map[string]bool{}
+			for uid, byLesson := range sc.progress {
+				if p, ok := byLesson[l.ID]; ok && !p.ViewedAt.IsZero() {
+					opened[uid] = true
+				}
+			}
+			for _, sb := range subs {
+				opened[sb.UserID] = true
+			}
+			for uid := range opened {
+				if mine(uid) {
+					get(uid, "").AssignOpen++
+				}
+			}
+			mx := l.Assignment.MaxScore
+			if mx <= 0 {
+				mx = 100
+			}
+			for _, sb := range subs {
+				if !mine(sb.UserID) {
+					continue
+				}
+				st := get(sb.UserID, sb.UserName)
+				st.AssignDone++
+				if !sb.Late {
+					st.AssignOnTime++
+				}
+				if sb.Score != nil {
+					st.AssignGraded++
+					assignSum[sb.UserID] += math.Min(100, float64(*sb.Score)*100/float64(mx))
+				}
+			}
+		}
+	}
+	for uid, sum := range assignSum {
+		if st := by[uid]; st != nil && st.AssignGraded > 0 {
+			st.AssignPct = int(math.Round(sum / float64(st.AssignGraded)))
+		}
+	}
 	out := &analyticsData{Students: []*StudentStat{}, Daily: []map[string]any{}, Events: []store.ActivityEvent{}}
 	var tot StudentStat
 	tot.Counts = map[string]int{}
@@ -542,7 +692,8 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 		}
 	}
 	total := tot.ActiveSec + tot.IdleSec + tot.AwaySec
-	activePct, attention, learn, reflections, qLessons, qMastered, cheated := 0, 0, 0, 0, 0, 0, 0
+	activePct, attention, focusAvg, learn, reflections, qLessons, qMastered, cheated := 0, 0, 0, 0, 0, 0, 0, 0
+	videoN, video := 0, 0 // видео үзсэн суралцагч ба тэдний видео үзэлтийн нийлбэр
 	boardN, collab, boardOps, boardMsgs, boardVoice, boardActive := 0, 0, 0, 0, 0, 0
 	rankDist := map[string]int{}
 	riskN := map[string]int{"ok": 0, "watch": 0, "risk": 0} // бүх суралцагчаар (жагсаалт хуудаслагдсан ч)
@@ -561,6 +712,11 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 			st.Rank = RankFor(0)
 		}
 		attention += st.Attention
+		focusAvg += st.Focus
+		if st.VideoClips > 0 {
+			videoN++
+			video += st.VideoCoverage
+		}
 		learn += st.LearnScore
 		reflections += st.Reflections
 		qLessons += st.QuizLessons
@@ -576,10 +732,11 @@ func (s *Server) buildAnalytics(ctx context.Context, teacherID, courseID, userID
 	}
 	if n := len(out.Students); n > 0 {
 		attention /= n
+		focusAvg /= n
 		learn /= n
 	}
 	out.Totals = map[string]any{"students": len(out.Students), "live": live, "active_sec": tot.ActiveSec, "total_sec": total, "active_pct": activePct,
-		"attention": attention, "violations": tot.Violations, "exams": len(atts), "learn_score": learn, "reflections": reflections,
+		"attention": attention, "focus": focusAvg, "video_coverage": video / max(videoN, 1), "video_students": videoN, "violations": tot.Violations, "exams": len(atts), "learn_score": learn, "reflections": reflections,
 		"quiz_lessons": qLessons, "quiz_mastered": qMastered, "rank_dist": rankDist, "top_rank": topRank, "cheated_lessons": cheated,
 		"board_students": boardN, "collab_score": collab / max(boardN, 1), "board_ops": boardOps, "board_msgs": boardMsgs,
 		"board_voice_sec": boardVoice, "board_active_sec": boardActive, "risk": riskN, "dims": avgDims(out.Students)}
@@ -940,11 +1097,11 @@ func (s *Server) handleAnalyticsExport(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%s.csv"`, name, time.Now().Format("2006-01-02")))
 	_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF}) // UTF-8 BOM: Excel монгол үсгийг зөв уншина
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{"Суралцагч", "Нийт хугацаа (мин)", "Идэвхтэй (мин)", "Идэвхгүй (мин)", "Өөр цонхонд (мин)", "Идэвхтэй хувь %", "Анхаарлын индекс %",
-		"Зөрчил", "Таб шилжсэн", "Хуулах", "Автоматаар зогссон", "Хичээл", "Шалгалтын шилдэг %", "Хаагдсан шалгалт",
-		"Асуултад зөв хариулсан %", "Дундаж хариулах хугацаа (сек)", "Таамагласан хариулт", "Асуулга дуусгасан хичээл", "Асуулттай хичээл", "Анх удаад зөв %", "Дүгнэлт бичсэн тоо", "Видео үзэлтийн бүрэн байдал %",
-		"Тогтмол ирсэн өдөр", "Суралцсан оноо", "Цэргийн цол", "Цолын оноо", "Цолгүй хичээл", "Эрсдэл", "Сүүлд",
-		"Самбар дээр (мин)", "Самбарт идэвхтэй (мин)", "Самбарын засвар", "Багийн чат", "Ярьсан (мин)", "Багаар ажилласан оноо"})
+	_ = cw.Write([]string{"Суралцагч", "Нийт хугацаа (мин)", "Идэвхтэй (мин)", "Идэвхгүй (мин)", "Өөр цонхонд (мин)", "Идэвхтэй хувь %", "Төвлөрөл %", "Анхаарлын индекс %",
+		"Хамгаалалтын зөрчил", "Таб шилжсэн", "Хуулах", "Автоматаар зогссон", "Хичээл", "Шалгалтын шилдэг %", "Хаагдсан шалгалт",
+		"Асуултад зөв хариулсан %", "Дундаж хариулах хугацаа (сек)", "Таамагласан хариулт", "Асуултыг бүрэн эзэмшсэн хичээл", "Асуулттай хичээл", "Эхний оролдлогоор зөв %", "Эргэцүүлэл бичсэн тоо", "Видео үзэлтийн бүрэн байдал %",
+		"Суралцсан өдөр", "Суралцахуйн оноо", "Эрэмбэ", "Эрэмбийн оноо", "Эрэмбэгүй хичээл", "Эрсдэл", "Сүүлд",
+		"Самбар дээр (мин)", "Самбарт идэвхтэй (мин)", "Самбарын засвар", "Багийн чат", "Ярьсан (мин)", "Хамтын ажлын оноо"})
 	risk := map[string]string{"ok": "Хэвийн", "watch": "Анхаарах", "risk": "Эрсдэлтэй"}
 	for _, st := range data.Students {
 		best := ""
@@ -956,7 +1113,7 @@ func (s *Server) handleAnalyticsExport(w http.ResponseWriter, r *http.Request) {
 			accuracy = strconv.Itoa(st.QuizAccuracy)
 		}
 		_ = cw.Write([]string{st.Name, strconv.Itoa(st.TotalSec / 60), strconv.Itoa(st.ActiveSec / 60), strconv.Itoa(st.IdleSec / 60), strconv.Itoa(st.AwaySec / 60),
-			strconv.Itoa(st.ActivePct), strconv.Itoa(st.Attention), strconv.Itoa(st.Violations), strconv.Itoa(st.Counts["tab_switch"]), strconv.Itoa(st.Counts["copy"]),
+			strconv.Itoa(st.ActivePct), strconv.Itoa(st.Focus), strconv.Itoa(st.Attention), strconv.Itoa(st.Violations), strconv.Itoa(st.Counts["tab_switch"]), strconv.Itoa(st.Counts["copy"]),
 			strconv.Itoa(st.Counts["auto_block"]), strconv.Itoa(st.Lessons), best, strconv.Itoa(st.Terminated),
 			accuracy, strconv.Itoa(st.QuizAvgMs / 1000), strconv.Itoa(st.QuizGuesses), strconv.Itoa(st.QuizMastered), strconv.Itoa(st.QuizLessons), strconv.Itoa(st.QuizFirstTry), strconv.Itoa(st.Reflections), strconv.Itoa(st.VideoCoverage),
 			strconv.Itoa(st.StreakDays), strconv.Itoa(st.LearnScore), st.Rank.Name, strconv.Itoa(st.Rank.Points), strconv.Itoa(st.Rank.Cheated), risk[st.Risk], st.LastAt.Local().Format("2006-01-02 15:04"),

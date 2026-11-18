@@ -7,6 +7,9 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -98,6 +101,8 @@ var iconPaths = map[string]string{
 	"chat":    `<path d="M21 12a8 8 0 0 1-11.600 7.100L4 20l1-4.600A8 8 0 1 1 21 12Z"/>`,
 	"phone":   `<path d="M5 4h4l2 5-2.500 1.500a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>`,
 	"qr":      `<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20v.01M17 20h4v-3"/>`,
+	"fb":      `<path d="M15 3h-2.500A3.500 3.500 0 0 0 9 6.500V10H6.500v3.500H9V21h3.500v-7.500H15l.600-3.500h-3.100V7.200c0-.700.400-1.100 1.100-1.100H15Z"/>`,
+	"msgr":    `<path d="M12 3C7 3 3 6.700 3 11.300c0 2.600 1.300 4.900 3.300 6.400V21l3-1.700c.900.300 1.800.400 2.700.400 5 0 9-3.700 9-8.400S17 3 12 3Z"/><path d="m7.500 13.600 3.100-3.300 2.300 2.300 3.600-2.600-3.100 3.300-2.300-2.300Z"/>`,
 	"share":   `<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 15V3M8 7l4-4 4 4"/>`,
 	"edit":    `<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.500 6.500 4 4"/>`,
 	"user":    `<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.600-6 8-6s8 2 8 6"/>`,
@@ -171,6 +176,7 @@ func parseTemplates() *template.Template {
 		// SEO (seo.go): бүтэцтэй өгөгдөл, гарчиг, тайлбар, баталгаажуулах код.
 		"ldProfile": ldProfile, "ldCourse": ldCourse, "ldBook": ldBook, "ldHome": ldHome,
 		"metaDesc": metaDesc, "courseDesc": courseDesc, "pageTitle": pageTitle, "abs": absURL,
+		"courseOGv": func(pc PublicCourse) string { return courseOGVersion(&pc) },
 		"gsv": func() string { return siteVerifyGoogle }, "bsv": func() string { return siteVerifyBing },
 		"site": func() string { return siteURL }, "fbapp": func() string { return siteFBApp },
 		"sub": func(a, b int) int { return a - b },
@@ -188,7 +194,15 @@ func parseTemplates() *template.Template {
 	return template.Must(template.New("").Funcs(funcs).ParseFS(templateFS, "templates/*.html"))
 }
 
-func staticHandler(minify bool, log *slog.Logger) http.Handler {
+// introName — /static/intro/ доторх дискний файлын зөвшөөрөгдөх нэр (дэд хавтас, «..» орохгүй).
+var introName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*.(mp4|webm|jpg)$`)
+
+// introTypes — Windows-ийн бүртгэлээс хамаарахгүй тогтмол MIME (жишээ нь .webm → audio/webm болдог).
+var introTypes = map[string]string{".mp4": "video/mp4", ".webm": "video/webm", ".jpg": "image/jpeg"}
+
+// staticHandler — embed static. introDir: танилцуулга видео (HD, том файл) програмд шингээлгүй дискнээс
+// (STORAGE_DIR/intro) /static/intro/<нэр>-д өгнө; дискэнд байхгүй бол embed хувилбар руу унана. Range дэмжинэ.
+func staticHandler(minify bool, introDir string, log *slog.Logger) http.Handler {
 	sub, _ := fs.Sub(staticFS, "static")
 	if minify {
 		sub = newMinFS(sub, log)
@@ -197,6 +211,16 @@ func staticHandler(minify bool, log *slog.Logger) http.Handler {
 	gz := &gzStatic{fsys: sub}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		if name, ok := strings.CutPrefix(r.URL.Path, "/static/intro/"); ok && introDir != "" && introName.MatchString(name) {
+			if f, err := os.Open(filepath.Join(introDir, name)); err == nil {
+				defer f.Close()
+				if st, err := f.Stat(); err == nil && st.Mode().IsRegular() {
+					w.Header().Set("Content-Type", introTypes[filepath.Ext(name)])
+					http.ServeContent(w, r, name, st.ModTime(), f)
+					return
+				}
+			}
+		}
 		if gz.serve(w, r, strings.TrimPrefix(r.URL.Path, "/static/")) {
 			return
 		}

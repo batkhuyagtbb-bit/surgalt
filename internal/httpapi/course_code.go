@@ -58,7 +58,7 @@ func (s *Server) handleUnlockCourse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !course.Published || !course.Locked {
-		writeErr(w, http.StatusBadRequest, "энэ сургалт нууц үггүй")
+		writeErr(w, http.StatusBadRequest, "энэ сургалтад нууц үг тавиагүй байна")
 		return
 	}
 	if teaches(course, c.UID) {
@@ -72,7 +72,7 @@ func (s *Server) handleUnlockCourse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.codeLim.Allow(c.UID+"|"+course.ID) || !s.codeLim.Allow("ip|"+s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "Хэт олон удаа оролдлоо — хагас минутын дараа дахин оролдоно уу")
+		writeErr(w, http.StatusTooManyRequests, "Хэт олон удаа оролдлоо — 30 секундийн дараа дахин оролдоно уу")
 		return
 	}
 	if subtle.ConstantTimeCompare([]byte(normCode(in.Code)), []byte(normCode(course.AccessCode))) != 1 {

@@ -187,7 +187,7 @@ VIEWS.overview = {
     <section class="adm-card">
       <header><h3>Өдөр бүрийн зочин</h3><span class="lg"><i class="brand"></i>Давтагдаагүй зочин <i class="soft"></i>Хуудас үзэлт</span></header>
       ${chart(d.daily, { key: "unique", second: "views", label: dayLbl, tip: (x) => `${x.day} · ${num(x.unique)} зочин · ${num(x.views)} үзэлт · ${num(x.members)} нэвтэрсэн` })}
-      <p class="muted small">${per}: ${num(T.period.unique)} давтагдаагүй зочин, ${num(T.period.views)} хуудас үзэлт. Хөтчөөр тоолно (бот, хайлтын систем тоологдохгүй).</p>
+      <p class="muted small">${per}: ${num(T.period.unique)} давтагдаагүй зочин, ${num(T.period.views)} хуудас үзэлт. Хөтөч бүрээр тоолно (бот, хайлтын системийг тооцохгүй).</p>
     </section>
     <div class="adm-grid3">
       <section class="adm-card"><header><h3>Их үзсэн хуудас</h3></header>${bars(T.pages)}</section>
@@ -215,7 +215,7 @@ VIEWS.overview = {
       ${kpi("Хичээл", num(C.lessons || 0), `${num(C.course_views || 0)} сургалтын үзэлт`)}
       ${kpi("Ном, өгүүлэл", num(C.books || 0), `${num(C.books_published || 0)} нийтэлсэн`)}
       ${kpi("Файл", num(C.files || 0), bytes(C.file_bytes))}
-      ${kpi("Элсэлт", num(C.enrollments || 0), `${num(C.lesson_purchases || 0)} хичээл тусад нь`)}
+      ${kpi("Элсэлт", num(C.enrollments || 0), `${num(C.lesson_purchases || 0)} хичээлийг тусад нь авсан`)}
       ${kpi("Нээлттэй мэдүүлэг", num(d.open_reports), d.open_reports ? `<a href="#reports" class="link">Шийдвэрлэх →</a>` : "алга", d.open_reports ? "warn" : "")}
     </section>
 
@@ -232,7 +232,7 @@ VIEWS.overview = {
 
 /* ---------- Багш нар ---------- */
 VIEWS.teachers = {
-  title: "Багш нар", sub: "Агуулга, суралцагч, борлуулалт, татсан ба үлдэгдэл — мөрөн дээр дарж дэлгэрэнгүйг харна",
+  title: "Багш нар", sub: "Агуулга, суралцагч, борлуулалт, татсан дүн, үлдэгдэл — мөр дээр дарж дэлгэрэнгүйг харна уу",
   async render(tools, el, live) {
     tools.innerHTML = `<label class="adm-search">${ic("search", 16)}<input type="search" placeholder="Нэр, имэйл, @нэр" aria-label="Багш хайх"></label>`;
     const d = await api("/api/admin/teachers");
@@ -317,7 +317,7 @@ VIEWS.orgs = {
           <label>Нууц үг<input name="password" type="text" minlength="6" maxlength="72" autocomplete="new-password" placeholder="6+ тэмдэгт"></label></div></details>
         <button class="btn btn-gold">${ic("school", 16)} Бүртгэх</button>
       </form>
-      <p class="muted small">Гүйлгээний шимтгэл байгууллагын борлуулалт бүрээс хасагдаж, үлдсэн нь дансанд шилжинэ (анхдагч ${esc(d.default_pct)}%). Эхний 2 сар үнэгүй (файлын сан ${mbLabel(d.free_mb)}), дараа нь байгууллага «Данс»-аас багц авна: сар ₮129,000 (2GB), хагас жил ₮500,000 (5GB), жил ₮1,000,000 (5GB). Гэрээний сан багцынхаас их бол түүнийг орлоно; гэрээгээр төлсөн бол «Засах» → «Эрх олгох». Шимтгэлийг ${esc(d.default_pct)}%-аас өөр болговол <b>гэрээт байгууллага</b> болно: багц харагдахгүй, эрх хугацаагүй.</p>
+      <p class="muted small">Гүйлгээний шимтгэл байгууллагын борлуулалт бүрээс хасагдаж, үлдсэн нь дансанд шилжинэ (анхдагч ${esc(d.default_pct)}%). Эхний 2 сар үнэгүй (файлын сан ${mbLabel(d.free_mb)}), дараа нь байгууллага «Данс» хэсгээс багц авна: сар ₮129,000 (2GB), хагас жил ₮500,000 (5GB), жил ₮1,000,000 (5GB). Гэрээний сан багцынхаас их бол түүнийг орлоно; гэрээгээр төлсөн бол «Засах» → «Эрх олгох». Шимтгэлийг ${esc(d.default_pct)}%-аас өөр болговол <b>гэрээт байгууллага</b> болно: багц харагдахгүй, эрх хугацаагүй.</p>
     </section>
     <div class="adm-table-wrap"><table class="adm-table" id="oTable"><thead><tr>
       <th data-sort="name" data-type="text">Байгууллага</th><th>Удирдагч</th><th data-sort="plan_until" data-type="text">Эрх</th><th data-sort="commission_pct">Шимтгэл</th><th data-sort="storage_mb">Файлын сан</th>
@@ -371,15 +371,15 @@ function openOrg(o, done) {
         <label>Гэрээний файлын сан (MB, 0 — багцынх)<input name="storage_mb" type="number" min="0" max="1048576" step="1" value="${esc(o.storage_mb)}" required></label>
         <button class="btn btn-gold">Хадгалах</button>
       </form>
-      <p class="muted small">Профайлын нэрийг солибол хуучин холбоос, хэвлэсэн QR ажиллахгүй болно.</p></section>
+      <p class="muted small">Профайлын нэрийг солибол хуучин холбоос, хэвлэсэн QR код ажиллахгүй болно.</p></section>
     <section class="adm-card"><header><h3>Системийн эрх</h3><span class="muted small">${planChip(o)} ${orgUntil(o)}</span></header>
-      ${o.plan === "contract" ? `<p class="muted small">Гэрээт байгууллага (шимтгэл анхдагчаас өөр) — багц авахгүй, эрх хугацаагүй. Шимтгэлийг анхдагч болговол үнэгүй хугацаа, байгууллагын багцын журамд шилжинэ.</p>` : `<form class="exp-form" id="orgPlan"><label>Гэрээгээр төлсөн бол эрх олгох<select name="plan">${ORG_PLAN_OPTS}</select></label><button class="btn btn-ghost">Эрх олгох</button></form>
-      <p class="muted small">Олгосон хугацаа одоогийн эрхийн араас үргэлжилнэ; байгууллагад мэдэгдэл очно.</p>`}</section>
+      ${o.plan === "contract" ? `<p class="muted small">Гэрээт байгууллага (шимтгэл анхдагчаас өөр) — багц авахгүй, эрх хугацаагүй. Шимтгэлийг анхдагч хэмжээнд буцаавал үнэгүй хугацаа, байгууллагын багцын журамд шилжинэ.</p>` : `<form class="exp-form" id="orgPlan"><label>Гэрээгээр төлсөн бол эрх олгох<select name="plan">${ORG_PLAN_OPTS}</select></label><button class="btn btn-ghost">Эрх олгох</button></form>
+      <p class="muted small">Олгосон хугацаа одоогийн эрхийн хугацаан дээр нэмэгдэнэ; байгууллагад мэдэгдэл очно.</p>`}</section>
     <section class="adm-card"><header><h3>Удирдагчид</h3><span class="muted small">Өөрийн бүртгэлээр нэвтэрч байгууллага руу шилжинэ. Хассан хүний нээлттэй эрх шууд хаагдана.</span></header>
       <div class="us-sel" id="orgMgrs">${o.managers.map((m) => personChip(m, "mgr-del")).join("") || `<p class="muted small" style="margin:0">Удирдагч алга</p>`}</div>
       <div id="orgMgrAdd" style="margin-top:10px">${pickerHTML("Удирдагч нэмэх — нэр, @нэр эсвэл имэйл…")}</div></section>
     <section class="adm-card org-danger"><header><h3>Устгах</h3></header>
-      <p class="muted small">Байгууллагын профайл, бүртгэл бүрмөсөн устна. Сургалт, номтой бол устгахгүй — эхлээд сургалтуудыг нь устгана (суралцагчтай сургалтыг устгах боломжгүй).</p>
+      <p class="muted small">Байгууллагын профайл, бүртгэл бүрмөсөн устна. Сургалт, номтой бол устгах боломжгүй — эхлээд сургалтуудыг нь устгана уу (суралцагчтай сургалтыг устгах боломжгүй).</p>
       <button type="button" class="btn btn-danger btn-sm" data-org-del>${ic("trash", 15)} Байгууллагыг устгах</button></section>`;
     $("#orgEd", body).addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -484,7 +484,7 @@ async function openTeacher(id) {
 
 /* ---------- Гүйлгээ ---------- */
 VIEWS.transactions = {
-  title: "Гүйлгээ", sub: "Бүх захиалга, төлбөр — шүүж, CSV-ээр татна",
+  title: "Гүйлгээ", sub: "Бүх захиалга, төлбөр — шүүж харах, CSV-ээр татах",
   async render(tools, el, live) {
     const f = state.tx;
     tools.innerHTML = seg("st", [["paid", "Төлөгдсөн"], ["pending", "Хүлээгдэж буй"], ["all", "Бүгд"]], f.status) +
@@ -596,12 +596,12 @@ const PST = { pending: ["Хүлээгдэж буй", "chip-amber"], sending: ["�
 // Хаан банк (Corporate Gateway): үлдэгдэл, шилжүүлэх данс — зөвхөн хянагчид.
 let BANK = null;
 const bankCard = (b) => !b?.configured
-  ? `<section class="adm-card ad-bank off"><b>🏦 Хаан банк холбоогүй</b><small>KHAN_CGW_CONSUMER_KEY, KHAN_CGW_SECRET_KEY тохируулбал хүсэлтийг эндээс шууд шилжүүлнэ.</small></section>`
-  : `<section class="adm-card ad-bank"><header><b>🏦 Хаан банк</b>${b.test ? `<span class="chip chip-amber">ТЕСТ орчин — бодит мөнгө хөдлөхгүй</span>` : `<span class="chip chip-teal">Бодит орчин</span>`}</header>
+  ? `<section class="adm-card ad-bank off"><b>🏦 Хаан банк холбогдоогүй</b><small>KHAN_CGW_CONSUMER_KEY, KHAN_CGW_SECRET_KEY тохируулбал хүсэлтийг эндээс шууд шилжүүлнэ.</small></section>`
+  : `<section class="adm-card ad-bank"><header><b>🏦 Хаан банк</b>${b.test ? `<span class="chip chip-amber">ТЕСТ орчин — бодит мөнгө шилжихгүй</span>` : `<span class="chip chip-teal">Бодит орчин</span>`}</header>
     <dl class="ad-acct"><div><dt>Шилжүүлэх данс</dt><dd><code>${esc(b.from_account || "—")}</code>${b.account_name ? `<small>${esc(b.account_name)}</small>` : ""}</dd></div>
       <div><dt>Боломжит үлдэгдэл</dt><dd><b>${b.available != null ? tg(b.available) : "—"}</b></dd></div>
       <div><dt>Гүйлгээний нууц үг</dt><dd>${b.tran_password ? "✓ тохируулсан" : `<span class="bad">✗ KHAN_CGW_TRAN_PASSWORD</span>`}</dd></div>
-      <div><dt>Автомат шилжүүлэг</dt><dd>${b.auto ? `Асаалттай · ${tg(b.auto_max)} хүртэл` : "Унтраалттай — хянагч батална"}</dd></div></dl>
+      <div><dt>Автомат шилжүүлэг</dt><dd>${b.auto ? `Асаалттай · ${tg(b.auto_max)} хүртэл` : "Унтраалттай — хянагч баталгаажуулна"}</dd></div></dl>
     ${b.error ? `<p class="ad-warn">${esc(b.error)}</p>` : ""}</section>`;
 const payCard = (p) => `<article class="ad-card" data-pid="${esc(p.id)}" data-amount="${p.amount}" data-acct="${esc(p.bank_name + " " + p.account_no)}">
   <header><span class="chip ${PST[p.status]?.[1] || ""}">${PST[p.status]?.[0] || esc(p.status)}</span><small class="muted">${p.auto ? "Хуваариар" : "Гараар"}</small><time>${dt(p.created_at)}</time></header>
@@ -613,7 +613,7 @@ const payCard = (p) => `<article class="ad-card" data-pid="${esc(p.id)}" data-am
     : `<p class="ad-done">${esc(p.processed_by || "")}${p.processed_at ? " · " + dt(p.processed_at) : ""}${p.note ? ` — ${esc(p.note)}` : ""}</p>`}
 </article>`;
 VIEWS.payouts = {
-  title: "Орлого татах хүсэлт", sub: "«Хаанаар шилжүүлэх» дарахад платформын данснаас багшийн данс руу шууд шилжинэ (эсвэл гараар шилжүүлээд тэмдэглэнэ). Татгалзвал дүн багшийн үлдэгдэлд буцна. Аль ч тохиолдолд багшид мэдэгдэнэ.",
+  title: "Орлого татах хүсэлт", sub: "«Хаанаар шилжүүлэх» дарахад платформын данснаас багшийн данс руу шууд шилжүүлнэ (эсвэл гараар шилжүүлж, тэмдэглэнэ). Татгалзвал дүн багшийн үлдэгдэлд буцаж орно. Аль ч тохиолдолд багшид мэдэгдэл очно.",
   st: "pending",
   async render(tools, el, live) {
     const self = VIEWS.payouts;
@@ -635,12 +635,12 @@ VIEWS.payouts = {
         b.disabled = false;
       }
       if (e.target.closest("[data-send]")) {
-        if (!confirm(`${tg(+card.dataset.amount)}-ийг ${card.dataset.acct} руу Хаан банкаар шилжүүлэх үү?${BANK?.test ? "\n(ТЕСТ орчин — бодит мөнгө хөдлөхгүй)" : ""}`)) return;
+        if (!confirm(`${tg(+card.dataset.amount)}-ийг ${card.dataset.acct} руу Хаан банкаар шилжүүлэх үү?${BANK?.test ? "\n(ТЕСТ орчин — бодит мөнгө шилжихгүй)" : ""}`)) return;
         $$("button", card).forEach((b) => (b.disabled = true));
         try {
           const p = await api(`/api/admin/payouts/${id}/send`, { method: "POST" });
           if (p.status === "paid") toast(`✓ Шилжлээ${p.journal ? " · журнал " + p.journal : ""}`);
-          else toast(p.note || "Шилжүүлэг амжилтгүй", true);
+          else toast(p.note || "Шилжүүлэг амжилтгүй боллоо", true);
         } catch (x) { toast(x.message, true); }
         badges(); route();
       }
@@ -651,7 +651,7 @@ VIEWS.payouts = {
       const status = e.submitter?.value || "paid", card = pf.closest(".ad-card");
       if (status === "rejected" && !pf.note.value.trim()) { toast("Татгалзсан шалтгаанаа бичнэ үү", true); pf.note.focus(); return; }
       if (status === "paid" && !confirm("Энэ дүн багшийн данс руу шилжсэн үү?")) return;
-      if (status === "pending" && !confirm("Банкны хуулгаас шилжээгүйг шалгасан уу? Дараа нь дахин илгээж болно.")) return;
+      if (status === "pending" && !confirm("Мөнгө шилжээгүйг банкны хуулгаас шалгасан уу? Дараа нь дахин илгээж болно.")) return;
       $$("button", pf).forEach((b) => (b.disabled = true));
       try { await api(`/api/admin/payouts/${encodeURIComponent(card.dataset.pid)}`, { method: "POST", body: { status, note: pf.note.value } }); toast(status === "paid" ? "Шилжүүлсэн гэж тэмдэглэлээ ✓" : status === "pending" ? "Дахин илгээх боломжтой боллоо" : "Татгалзлаа"); badges(); route(); }
       catch (x) { toast(x.message, true); $$("button", pf).forEach((b) => (b.disabled = false)); }
@@ -660,17 +660,17 @@ VIEWS.payouts = {
 };
 
 /* ---------- Мэдүүлэг ---------- */
-const KIND = { group: "Сургалтын бүлэг чат", team: "Сурагчдын бүлэг", dm: "Ангийн найзын чат", "": "Багштай чат" };
+const KIND = { group: "Сургалтын бүлэг чат", team: "Суралцагчдын баг", dm: "Ангийн найзын чат", "": "Багштай чат" };
 const repCard = (r) => `<article class="ad-card" data-id="${esc(r.id)}">
   <header><span class="chip ${r.status === "open" ? "chip-amber" : ""}">${esc(r.reason_label || r.reason)}</span><small class="muted">${esc(KIND[r.conv_kind] ?? "Чат")}</small><time>${dt(r.created_at)}</time></header>
   <p class="ad-who"><b>${esc(r.reporter_name || "Зочин")}</b> мэдүүлэв <span aria-hidden="true">→</span> <b>${esc(r.target_name || "Зочин")}</b></p>
   ${r.note ? `<p class="ad-note">«${esc(r.note)}»</p>` : ""}
   <ol class="ad-ctx">${(r.context || []).map((m) => `<li class="${m.reported ? "hit" : ""}"><b>${esc(m.name || "?")}</b><span>${esc(m.body)}</span><time>${dt(m.at).slice(11)}</time></li>`).join("")}</ol>
-  ${r.status === "open" ? `<form class="ad-act ad-repact"><input name="resolution" maxlength="500" placeholder="Шийдвэр (ж: сануулсан, мессежийг устгасан)" aria-label="Шийдвэр"><label class="check"><input type="checkbox" name="del">Мессежийг устгах</label><button class="btn btn-gold btn-sm">Шийдвэрлэх</button></form>`
+  ${r.status === "open" ? `<form class="ad-act ad-repact"><input name="resolution" maxlength="500" placeholder="Шийдвэр (жишээ нь: сануулсан, мессежийг устгасан)" aria-label="Шийдвэр"><label class="check"><input type="checkbox" name="del">Мессежийг устгах</label><button class="btn btn-gold btn-sm">Шийдвэрлэх</button></form>`
     : `<p class="ad-done">✓ ${esc(r.resolved_by || "")}${r.resolved_at ? " · " + dt(r.resolved_at) : ""}${r.resolution ? ` — ${esc(r.resolution)}` : ""}</p>`}
 </article>`;
 VIEWS.reports = {
-  title: "Чатын мэдүүлэг", sub: "Мэдүүлсэн мессеж ба түүний өмнөх хэдэн мессежийг л харуулна. Шийдвэрлэхэд бүртгэлтэй мэдүүлэгчид мэдэгдэнэ.",
+  title: "Чатын мэдүүлэг", sub: "Зөвхөн мэдүүлсэн мессеж болон түүний өмнөх хэдэн мессежийг харуулна. Шийдвэрлэсний дараа бүртгэлтэй мэдүүлэгчид мэдэгдэл очно.",
   st: "open",
   async render(tools, el, live) {
     const self = VIEWS.reports;
@@ -803,7 +803,7 @@ function init() {
     showLogin(false);
     if (!me.password) {
       const err = $("#admLoginErr");
-      err.textContent = "Нууц үгээр нэвтрэх тохируулаагүй байна (ADMIN_LOGIN, ADMIN_PASSWORD_HASH). ADMIN_EMAILS-д бүртгэлтэй Google бүртгэлээр нэвтэрч болно.";
+      err.textContent = "Нууц үгээр нэвтрэх боломжийг тохируулаагүй байна (ADMIN_LOGIN, ADMIN_PASSWORD_HASH). ADMIN_EMAILS-д бүртгэлтэй Google бүртгэлээрээ нэвтэрнэ үү.";
       err.hidden = false; $$("#admLoginForm input, #admLoginForm button").forEach((x) => (x.disabled = true));
     }
   }).catch(() => showLogin(false));

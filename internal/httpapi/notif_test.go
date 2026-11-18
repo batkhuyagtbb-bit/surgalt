@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"surgalt/internal/store"
@@ -99,5 +100,49 @@ func TestNotificationPages(t *testing.T) {
 	}
 	if code, _ := call(t, srv, "GET", "/api/me/notifications?before=x'--", tt, ""); code != 400 {
 		t.Fatalf("буруу before: %d", code)
+	}
+}
+
+// Чатын мэдэгдэл: суралцагчийн мессеж багшид, багшийн хариу суралцагчид очно (холбоос /me#chat=<яриа> —
+// дарвал тухайн чат шууд нээгдэнэ); нэг яриан дээр 2 минутад нэг л мэдэгдэл.
+func TestChatReplyNotification(t *testing.T) {
+	srv, _ := newTestServer(t)
+	defer srv.Close()
+	tt, _ := register(t, srv, "chnteach", "teacher")
+	st, _ := register(t, srv, "chnstud", "student")
+	code, d := call(t, srv, "POST", "/api/teachers/chnteach/chat", st, "")
+	conv, _ := d["conversation"].(map[string]any)
+	if code != 200 && code != 201 || conv == nil {
+		t.Fatalf("чат эхлүүлэх: %d %v", code, d)
+	}
+	id := conv["id"].(string)
+	chats := func(tok string) []map[string]any {
+		_, d := call(t, srv, "GET", "/api/me/notifications", tok, "")
+		raw, _ := d["items"].([]any)
+		var out []map[string]any
+		for _, x := range raw {
+			if n := x.(map[string]any); n["type"] == "message" {
+				out = append(out, n)
+			}
+		}
+		return out
+	}
+	if code, _ := call(t, srv, "POST", "/api/chat/"+id+"/messages", st, `{"body":"Багшаа, асуулт байна"}`); code != 201 {
+		t.Fatalf("суралцагчийн мессеж: %d", code)
+	}
+	if ns := chats(tt); len(ns) != 1 || ns[0]["link"] != "/me#chat="+id {
+		t.Fatalf("багшид мэдэгдэл: %v", ns)
+	}
+	for i := 0; i < 2; i++ {
+		if code, _ := call(t, srv, "POST", "/api/chat/"+id+"/messages", tt, `{"body":"Тэгье, бичээрэй"}`); code != 201 {
+			t.Fatalf("багшийн хариу: %d", code)
+		}
+	}
+	ns := chats(st)
+	if len(ns) != 1 || ns[0]["link"] != "/me#chat="+id || !strings.Contains(ns[0]["title"].(string), "хариу бичлээ") || ns[0]["body"] != "Тэгье, бичээрэй" {
+		t.Fatalf("суралцагчид нэг л мэдэгдэл: %v", ns)
+	}
+	if len(chats(tt)) != 1 {
+		t.Fatalf("багшийн хариу багшид мэдэгдэл үүсгэхгүй")
 	}
 }

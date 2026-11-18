@@ -157,12 +157,12 @@ func (s *Server) handleBuyPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if u.Org.Contract() {
-		writeErr(w, http.StatusBadRequest, "гэрээт байгууллага — эрх гэрээгээр, багц авах шаардлагагүй")
+		writeErr(w, http.StatusBadRequest, "гэрээт байгууллагын эрх гэрээгээр олгогддог тул багц авах шаардлагагүй")
 		return
 	}
 	p, ok := store.PlanOnSale(u, in.Plan) // байгууллагад зөвхөн байгууллагын багц
 	if !ok {
-		writeErr(w, http.StatusBadRequest, "ийм багц байхгүй")
+		writeErr(w, http.StatusBadRequest, "ийм багц олдсонгүй")
 		return
 	}
 	o, err := s.store.CreatePlanOrder(r.Context(), c.UID, p)
@@ -212,11 +212,11 @@ func (s *Server) handleAdminGrantPlan(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if errors.Is(err, errNotTeacher) {
-		writeErr(w, http.StatusConflict, "энэ хэрэглэгч багш биш")
+		writeErr(w, http.StatusConflict, "энэ хэрэглэгч багш биш байна")
 		return
 	}
 	if errors.Is(err, errNoPlan) {
-		writeErr(w, http.StatusBadRequest, "ийм багц байхгүй")
+		writeErr(w, http.StatusBadRequest, "ийм багц олдсонгүй")
 		return
 	}
 	if s.storeErr(w, r, err) {
@@ -233,7 +233,7 @@ func (s *Server) handleAdminGrantPlan(w http.ResponseWriter, r *http.Request) {
 
 var (
 	errNotTeacher = errors.New("багш биш")
-	errNoPlan     = errors.New("ийм багц байхгүй")
+	errNoPlan     = errors.New("ийм багц олдсонгүй")
 )
 
 // planLoop — эрх дуусахаас 7 ба 1 хоногийн өмнө, дуусахад, дараа нь 4 долоо хоног долоо хоног бүр багшид нэг удаа мэдэгдэнэ.
@@ -319,11 +319,11 @@ func planNotice(u *store.User, now time.Time) (*store.Notification, string) {
 	n := &store.Notification{UserID: u.ID, Type: NotifPlan, Count: 1, Link: "/me#wallet"}
 	switch stage {
 	case "7":
-		n.Title, n.Body = "⏳ "+what+" 7 хоногийн дараа дуусна", date+"-нд дуусна. «Данс» хэсгээс багц авч сунгаарай — сургалтаа тасралтгүй удирдана."
+		n.Title, n.Body = "⏳ "+what+" 7 хоногийн дараа дуусна", date+"-нд дуусна. «Данс» хэсгээс багц авч сунгавал сургалтаа тасралтгүй удирдах боломжтой."
 	case "1":
 		n.Title, n.Body = "⚠️ "+what+" маргааш дуусна", date+"-нд дуусна. Сунгаагүй бол сургалт удирдах, шинээр борлуулах боломж хаагдана."
 	case "0":
-		n.Title, n.Body = "⛔ "+what+" дууслаа", "Сургалт удирдах, шинээр борлуулах боломж хаагдлаа. «Данс» хэсгээс багц авч сунгана уу. Худалдаж авсан суралцагчдын эрх хэвээр."
+		n.Title, n.Body = "⛔ "+what+" дууслаа", "Сургалт удирдах, шинээр борлуулах боломж хаагдлаа. «Данс» хэсгээс багц авч сунгана уу. Худалдаж авсан суралцагчдын эрх хэвээр үлдэнэ."
 	default:
 		n.Title = "💳 Системийн эрхийн төлбөрөө төлнө үү"
 		n.Body = date + "-нд дууссан тул сургалт удирдах, шинээр борлуулах боломж хаалттай байна. «Данс» хэсгээс багц сонгоод QPay-ээр төлмөгц шууд нээгдэнэ."

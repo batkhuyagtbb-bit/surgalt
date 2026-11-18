@@ -118,6 +118,8 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	add("bookings", bookings, err)
 	notifs, _, err := s.store.Notifications(ctx, c.UID, "", 500)
 	add("notifications", notifs, err)
+	gifts, err := s.store.BoxOpens(ctx, c.UID) // системийн бэлэг: нээсэн хайрцаг, гарсан амьтад
+	add("gift_boxes", gifts, err)
 	if u.Role == store.RoleTeacher {
 		own, err := s.store.CoursesByTeacher(ctx, c.UID, false)
 		mine := make([]brief, len(own))
@@ -233,7 +235,7 @@ func (s *Server) eraseAccount(ctx context.Context, u *store.User) (blocked strin
 			return "", err
 		}
 		if len(courses) > 0 || len(books) > 0 {
-			return "Сургалт, номтой багшийн бүртгэлийг шууд устгахгүй — суралцагчдын төлбөр, хандалт хамааралтай. Эхлээд сургалт, номоо устгах эсвэл бидэнтэй холбогдоно уу.", nil
+			return "Сургалт эсвэл номтой багшийн бүртгэлийг шууд устгах боломжгүй: суралцагчдын төлбөр, хандах эрх үүнтэй холбоотой. Эхлээд сургалт, номоо устгах эсвэл бидэнтэй холбогдоно уу.", nil
 		}
 		slots, err := s.store.Slots(ctx, u.ID, now, now.AddDate(2, 0, 0))
 		if err != nil {
@@ -242,7 +244,7 @@ func (s *Server) eraseAccount(ctx context.Context, u *store.User) (blocked strin
 		var free []string
 		for _, sl := range slots {
 			if !sl.Free(now) {
-				return "Захиалгатай цагаа эхлээд цуцлана уу (Хуваарь → Захиалгууд).", nil
+				return "Танд захиалгатай цаг байна. Эхлээд тэдгээрийг цуцлана уу (Хуваарь → Захиалгууд).", nil
 			}
 			free = append(free, sl.ID)
 		}
@@ -297,7 +299,7 @@ func (s *Server) releaseBookings(ctx context.Context, u *store.User) {
 	var ns []*store.Notification
 	for _, tid := range order {
 		ns = append(ns, &store.Notification{UserID: tid, Type: NotifBooking, Link: "/me#live",
-			Title: "📅 Суралцагч бүртгэлээ устгасан — цаг чөлөөлөгдлөө", Body: strings.Join(byTeacher[tid], ", ")})
+			Title: "📅 Суралцагч бүртгэлээ устгасан тул захиалсан цаг нь чөлөөлөгдлөө", Body: strings.Join(byTeacher[tid], ", ")})
 	}
 	if len(ns) > 0 {
 		s.notify(ctx, ns...)

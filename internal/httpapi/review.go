@@ -100,6 +100,9 @@ func (s *Server) sendReviews(ctx context.Context, now time.Time) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	for _, it := range claimed { // давтах popup шинэ сануулгыг шууд харуулна (review_due.go)
+		s.reviewDueChanged(it.UserID)
+	}
 	ns := reviewNotices(claimed, courses, lessons)
 	for _, n := range ns {
 		s.notify(ctx, n)
@@ -170,7 +173,7 @@ func reviewNotices(items []store.ReviewItem, courses map[string]*store.Course, l
 		if len(g.items) == 1 {
 			title := lessons[first.LessonID].Title
 			n.Title = "🧠 Давтах цаг: «" + title + "»"
-			n.Body = fmt.Sprintf("«%s» хичээлийг үзээд %s өнгөрлөө — мартахаас өмнө давтаарай. 1-3-7-14-30 хоногийн давталт мэдлэгийг удаан хадгална.",
+			n.Body = fmt.Sprintf("«%s» хичээлийг үзсэнээс хойш %s өнгөрлөө — мартахаас өмнө давтаарай. 1-3-7-14-30 хоногийн зайтай давтах нь мэдлэгийг удаан хадгалахад тусалдаг.",
 				title, reviewAgo(first.Stage))
 		} else {
 			parts := make([]string, 0, 3)

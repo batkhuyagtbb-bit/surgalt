@@ -6,10 +6,10 @@
     <div class="home-inner home-hero">
     <div class="home-copy">
       <div class="home-intro landing">
-        <p class="eyebrow shine">Багш, суралцагчдын платформ</p>
+        <p class="eyebrow shine">Суралцахуй платформ</p>
         <h1 class="home-title display split" data-split="1">{{splitWords "Сур, сур, бас дахин сур"}}</h1>
         <p class="lead">Хичээл үзэх биш, ойлгож сурах газар.</p>
-        <p class="home-sub">Сургалт, ном, шууд хичээл нэг дор — суралцагч хяналттай орчинд ойлгож сурна, багш мэдлэгээрээ орлого олно.</p>
+        <p class="home-sub">Сургалт, ном, шууд хичээл нэг дор: суралцагч хяналттай орчинд ойлгож суралцана, багш мэдлэгээрээ орлого олно.</p>
       </div>
     <section class="find find-home" id="find" aria-label="Сургалт хайх" hidden>{{/* Хичээл хайх хэсгийг түр нуусан */}}
       <form class="find-bar" role="search">
@@ -34,10 +34,10 @@
       </div>
       <ul class="home-trust landing" aria-label="Давуу тал"><li>{{icon "check" 16}}Бүртгэл үнэгүй</li><li>{{icon "qr" 16}}QPay-ээр төлнө</li><li>{{icon "shield" 16}}Хяналттай орчин</li></ul>
     </div>
-      <figure class="home-film landing" aria-label="Surgalt.mn танилцуулга кино">
-        {{/* Кино (iframe)-г app.js homeFilm хэрэгтэй үед л үүсгэнэ — түүнээс өмнө ижил харагдах зурагт хуудас */}}
-        <div class="hf-frame" data-src="/intro2?embed=1"><button type="button" class="hf-poster" aria-label="Танилцуулга кино үзэх"><b>Surgalt<em>.mn</em></b><span>Хичээл үзэх биш, ойлгож сурах газар.</span><i>▶ Интро үзэх</i></button></div>
-        <figcaption>1.5 минутын танилцуулга · дуутай үзээрэй</figcaption>
+      <figure class="home-film landing" aria-label="surgalt.mn — алхам алхмаар танилцуулга видео">
+        {{/* /ar-ийн 3D аяллаас бичсэн, монгол яриа, арын хөгжимтэй видео. Дарахад л татагдаж эхэлнэ (preload=none). */}}
+        <div class="hf-frame hf-video"><video preload="none" playsinline poster="/static/intro/tour-poster.jpg?v=5" src="/static/intro/tour.mp4?v=5" data-mobile="/static/intro/tour-mobile.mp4?v=5" aria-label="surgalt.mn хэрхэн ажилладаг вэ — танилцуулга видео"></video>
+          <button type="button" class="hf-play" aria-label="Танилцуулга видео үзэх"><i>▶ Танилцуулга үзэх</i><small>алхам алхмаар · яриатай</small></button></div>
       </figure>
     </div>
   </section>
@@ -52,27 +52,27 @@
        самбар (хөдөлгөөнт жишээ). Горим: Бүтэц / Сурагч сурах / Багш сургалт явуулах. app.js (explore) удирдана. */}}
   <section class="ex" id="explore" aria-labelledby="exTitle">
     <div class="how-head">
-      <p class="eyebrow shine">Нэг тойрог · гурван ялалт</p>
+      <p class="eyebrow shine">Нэг тойрог · гурван талын ашиг</p>
       <h2 id="exTitle" class="shine">surgalt.mn хэрхэн ажилладаг вэ?</h2>
       <p class="lead">Багш мэдлэгээ хуваалцаж <b>орлого</b> олно. Суралцагч хяналттай орчинд <b>сахилга баттай</b>, <b>хариуцлагатай</b>, <b>идэвхтэй</b> суралцана.</p>
     </div>
     <div class="ex-modes" role="tablist" aria-label="Юуг үзэх вэ">
       <button type="button" role="tab" data-mode="map" aria-selected="true"><svg data-ico="layers" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/></svg>Бүтэц</button>
-      <button type="button" role="tab" data-mode="stu" aria-selected="false"><svg data-ico="courses" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/></svg><span class="ex-l">Сурагч сурах</span><span class="ex-s">Сурагч</span></button>
-      <button type="button" role="tab" data-mode="tch" aria-selected="false"><svg data-ico="monitor" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h10M12 16v4"/></svg><span class="ex-l">Багш сургалт явуулах</span><span class="ex-s">Багш</span></button>
+      <button type="button" role="tab" data-mode="stu" aria-selected="false"><svg data-ico="courses" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/></svg><span class="ex-l">Суралцагчийн зам</span><span class="ex-s">Суралцагч</span></button>
+      <button type="button" role="tab" data-mode="tch" aria-selected="false"><svg data-ico="monitor" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h10M12 16v4"/></svg><span class="ex-l">Багшийн зам</span><span class="ex-s">Багш</span></button>
     </div>
     <div class="ex-body">
       <div class="ex-map">
         <svg class="ex-wires" aria-hidden="true"></svg>
         <button type="button" class="ex-core" data-node="core"><b>surgalt<i>.mn</i></b><small>Сур, сур, бас дахин сур</small></button>
-        <button type="button" class="ex-br" data-node="0" data-tone="brand" data-leaves="QR код|Нууц утас|Статистик"><svg data-ico="user" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg><span>Профайл</span></button>
+        <button type="button" class="ex-br" data-node="0" data-tone="brand" data-leaves="QR код|Утасны нууцлал|Статистик"><svg data-ico="user" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg><span>Профайл</span></button>
         <button type="button" class="ex-br" data-node="1" data-tone="brand" data-leaves="Блок хичээл|Ном, өгүүлэл|Нээх дүрэм"><svg data-ico="courses" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/></svg><span>Сургалт</span></button>
         <button type="button" class="ex-br" data-node="2" data-tone="brand" data-leaves="Шалгалт|Рубрик|Журнал"><svg data-ico="exam" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 12l2 2 4-4"/></svg><span>Үнэлгээ</span></button>
         <button type="button" class="ex-br" data-node="3" data-tone="red" data-leaves="Анхаарал|Сануулга|Түр хаалт"><svg data-ico="shield" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span>Сахилга бат</span></button>
         <button type="button" class="ex-br" data-node="4" data-tone="brand" data-leaves="Шууд хичээл|Цаг захиалга|Давталт"><svg data-ico="cal" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span>Хуваарь</span></button>
         <button type="button" class="ex-br" data-node="5" data-tone="amber" data-leaves="QPay QR|Үнэгүй / төлбөртэй|Орлого"><svg data-ico="money" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg><span>Төлбөр</span></button>
         <button type="button" class="ex-br" data-node="6" data-tone="brand" data-leaves="Чат|Бүлгийн чат|Мэдэгдэл"><svg data-ico="chat" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg><span>Харилцаа</span></button>
-        <button type="button" class="ex-br" data-node="7" data-tone="amber" data-leaves="Цол|Сертификат|Нүүр самбар"><svg data-ico="medal" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="15" r="5"/><path d="M8.5 10.5 6 3h4l2 4 2-4h4l-2.5 7.5"/></svg><span>Ахиц</span></button>
+        <button type="button" class="ex-br" data-node="7" data-tone="amber" data-leaves="Эрэмбэ|Гэрчилгээ|Нүүр самбар"><svg data-ico="medal" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="15" r="5"/><path d="M8.5 10.5 6 3h4l2 4 2-4h4l-2.5 7.5"/></svg><span>Ахиц</span></button>
         <div class="ex-leaves" aria-hidden="true"></div>
       </div>
       <div class="ex-side">
@@ -95,13 +95,13 @@
           <g class="xl-d pay"><circle r="9"/><text dy="4" text-anchor="middle">₮</text><animateMotion dur="3.4s" repeatCount="indefinite" begin="-.5s"><mpath href="#xlp"/></animateMotion></g>
           <g class="xl-d pay"><circle r="9"/><text dy="4" text-anchor="middle">₮</text><animateMotion dur="3.4s" repeatCount="indefinite" begin="-2.2s"><mpath href="#xlp"/></animateMotion></g>
         </svg><div class="ex-loop-out"><span class="u-chip amber">Багш · ₮ орлого</span><span class="u-chip">Суралцагч · сахилга бат · хариуцлага · идэвх</span></div></div></div></template>
-    <template data-node="0"><span class="ex-k"><svg data-ico="user" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Салбар · Профайл</span><h3>Профайл, QR — танд хүрэх зам</h3><p>Суралцагч QR уншуулаад профайлыг тань шууд олно. Утсаа нууцалж, хэн үзсэн, хэн утас харсныг мэднэ.</p>
+    <template data-node="0"><span class="ex-k"><svg data-ico="user" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Салбар · Профайл</span><h3>Профайл, QR — танд хүрэх зам</h3><p>Суралцагч QR кодыг уншуулаад таны профайлыг шууд олно. Утасны дугаараа нууцалж, профайлыг тань хэн үзсэн, дугаарыг тань хэн харсныг мэднэ.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-card k" style="--d:.2"><i class="u-av"></i><i></i><i></i></span><span class="u-col"><span class="u-qrbox sm k" style="--d:.8"><i class="u-qr"></i></span><span class="u-chip k" style="--d:1.5">📞 8811 ••••</span></span></div></div></template>
-    <template data-node="1"><span class="ex-k"><svg data-ico="courses" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/></svg>Салбар · Сургалт</span><h3>Сургалтаа блокоор угсарна</h3><p>Текст, видео, тест, файлыг блокоор угсарч, үнэгүй, төлбөртэй хичээл, ном зарна; нээх дүрмээ өөрөө тавина.</p>
-      <div class="ex-visual"><div class="uc-stage"><span class="u-col"><span class="u-blk k" style="--d:.2">📝 Текст</span><span class="u-blk k" style="--d:.7">🎬 Видео</span><span class="u-blk k" style="--d:1.2">❓ Тест</span></span><span class="u-chip ok k" style="--d:1.9">Нийтлэв ✓</span></div></div></template>
-    <template data-node="2"><span class="ex-k"><svg data-ico="exam" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 12l2 2 4-4"/></svg>Салбар · Үнэлгээ</span><h3>Шалгалт, рубрик, журнал</h3><p>Шалгалт, даалгаврыг тоогоор эсвэл рубрикаар дүгнэнэ — дүн суралцагчид шууд очиж, журнал автоматаар бүрдэнэ.</p>
+    <template data-node="1"><span class="ex-k"><svg data-ico="courses" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5"/></svg>Салбар · Сургалт</span><h3>Сургалтаа блокоор угсарна</h3><p>Текст, видео, асуулт, файлаар хичээлээ блок блокоор угсарч, үнэгүй ба төлбөртэй хичээл, ном санал болгоно; хичээл нээгдэх дүрмийг өөрөө тогтооно.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-col"><span class="u-blk k" style="--d:.2">📝 Текст</span><span class="u-blk k" style="--d:.7">🎬 Видео</span><span class="u-blk k" style="--d:1.2">❓ Асуулт</span></span><span class="u-chip ok k" style="--d:1.9">Нийтэллээ ✓</span></div></div></template>
+    <template data-node="2"><span class="ex-k"><svg data-ico="exam" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 12l2 2 4-4"/></svg>Салбар · Үнэлгээ</span><h3>Шалгалт, рубрик, журнал</h3><p>Шалгалт, даалгаврыг оноогоор эсвэл рубрикаар дүгнэнэ. Дүн нь суралцагчид шууд очиж, журнал автоматаар бүрдэнэ.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-rub"><i></i><i class="k-cell" style="--d:.3"></i><i></i><i class="k-cell" style="--d:.7"></i><i></i><i></i><i></i><i></i><i class="k-cell" style="--d:1.1"></i></span><span class="u-col"><span class="u-chip k" style="--d:1.6">Нийт 14/15</span><span class="u-chip ok k" style="--d:2">Журналд ✓</span></span></div></div></template>
-    <template data-node="3"><span class="ex-k"><svg data-ico="shield" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Салбар · Сахилга бат</span><h3>Идэвхгүй бол систем өөрөө дохиолно</h3><p>Анхаарлыг хянаж, таб сольвол сануулж, давтвал хичээлийг түр хаана — багшид мэдэгдэл очно.</p>
+    <template data-node="3"><span class="ex-k"><svg data-ico="shield" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Салбар · Сахилга бат</span><h3>Анхаарал сарнивал систем өөрөө сануулна</h3><p>Систем анхаарлыг хянаж, таб сольвол сануулна; дахин давтвал хичээлийг түр хааж, багшид мэдэгдэнэ.</p>
       <div class="ex-visual"><div class="how-demo compact" data-s="0">
   <div class="hd-screen" aria-hidden="true">
     <div class="hd-bar"><i></i><i></i><i></i><span>surgalt.mn · Логарифмын шинж чанар</span></div>
@@ -114,27 +114,27 @@
       <div class="hd-alert hd-a1"><b>⚠️ Таб сольсон байна!</b><span>Хичээл рүүгээ буцна уу · 1/3</span><em class="hd-snd">🔊</em></div>
       <div class="hd-alert hd-a2"><b>🖱 Хичээлээс гарсан байна</b><span>Анхаарлаа хандуулна уу · 2/3</span></div>
       <div class="hd-lock"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path class="hd-shackle" d="M8 11V8a4 4 0 0 1 8 0v3"/><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M12 15v2"/></svg>
-        <b>Хичээл түр хаагдлаа</b><span>3 удаа зөрчил гаргасан · 30 минутын дараа нээгдэнэ</span></div>
-      <div class="hd-notif"><span class="hd-notif-ico">⛔</span><span><small class="hd-notif-k">Багшид ирсэн мэдэгдэл</small><b>Бат: «Логарифм» хаагдсан</b><small>Таб 2 удаа сольсон · курсор 1 удаа гарсан</small></span></div>
+        <b>Хичээл түр хаагдлаа</b><span>3 удаа хичээлээс гарсан · 30 минутын дараа нээгдэнэ</span></div>
+      <div class="hd-notif"><span class="hd-notif-ico">⛔</span><span><small class="hd-notif-k">Багшид ирсэн мэдэгдэл</small><b>Бат: «Логарифм» түр хаагдсан</b><small>Таб 2 удаа сольсон · курсор 1 удаа гарсан</small></span></div>
     </div>
   </div>
         <p class="hd-cap"></p>
       </div></div></template>
-    <template data-node="4"><span class="ex-k"><svg data-ico="cal" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Салбар · Хуваарь</span><h3>Шууд хичээл, цаг захиалга</h3><p>Нэг календарь дээр шууд хичээл товлож, сул цагаа тэмдэглэнэ — улирал, жилээр давтана; Meet холбоос өөрөө орж ирнэ.</p>
+    <template data-node="4"><span class="ex-k"><svg data-ico="cal" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Салбар · Хуваарь</span><h3>Шууд хичээл, цаг захиалга</h3><p>Нэг хуанли дээр шууд хичээл товлож, сул цагаа тэмдэглэнэ. Хуваарийг улирал, жилээр давтаж болох бөгөөд Meet холбоос автоматаар үүснэ.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-grid"><i class="k-cell" style="--d:.2"></i><i></i><i class="k-cell" style="--d:.5"></i><i></i><i class="k-cell" style="--d:.8"></i><i class="k-cell bk" style="--d:1.6"></i><i></i><i class="k-cell" style="--d:1.1"></i><i></i></span><span class="u-chip k" style="--d:1.8">📅 Захиалга ирлээ</span></div></div></template>
-    <template data-node="5"><span class="ex-k"><svg data-ico="money" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>Салбар · Төлбөр</span><h3>QPay-ээр төлмөгц шууд нээгдэнэ</h3><p>Хичээл, багц, шалгалт, шууд хичээл, цаг, номыг QR-аар төлнө — багшид орлого шууд орно.</p>
+    <template data-node="5"><span class="ex-k"><svg data-ico="money" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>Салбар · Төлбөр</span><h3>QPay-ээр төлмөгц шууд нээгдэнэ</h3><p>Хичээл, багц, шалгалт, шууд хичээл, цаг захиалга, номын төлбөрийг QR кодоор төлнө; орлого нь багшийн дансанд шууд орно.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-qrbox"><i class="u-qr"></i></span><span class="u-col"><span class="u-chip amber k" style="--d:.3">₮ 25,000</span><span class="u-chip ok k" style="--d:1.5">🔓 Нээгдлээ</span></span></div></div></template>
-    <template data-node="6"><span class="ex-k"><svg data-ico="chat" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>Салбар · Харилцаа</span><h3>Чат, мэдэгдэл бодит хугацаанд</h3><p>Суралцагч, бүлгээрээ чатлана; захиалга, дүн, сануулга бүр мэдэгдлээр шууд ирнэ.</p>
-      <div class="ex-visual"><div class="uc-stage"><span class="u-col u-chat"><span class="u-bub k" style="--d:.2">Багш аа, асуулт байна</span><span class="u-bub me k" style="--d:1">Тэгье, бичээрэй 👍</span><span class="u-bub k" style="--d:1.8">Баярлалаа!</span></span></div></div></template>
-    <template data-node="7"><span class="ex-k"><svg data-ico="medal" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="15" r="5"/><path d="M8.5 10.5 6 3h4l2 4 2-4h4l-2.5 7.5"/></svg>Салбар · Ахиц</span><h3>Ахиц, цол, сертификат</h3><p>Идэвхтэй суралцах тусам цол ахиж, сертификат авна — бүгд нүүр самбарт харагдана.</p>
-      <div class="ex-visual"><div class="uc-stage"><span class="u-ring"><i class="k-ring" style="--d:.2"></i><b>85%</b></span><span class="u-chip amber k" style="--d:1.7">🏅 Цол ахилаа</span></div></div></template>
-    <template data-step="stu" data-branch="0"><span class="ex-k">Сурагч сурах · алхам 1/7</span><h3>QR уншуулна</h3><p>Багшийн QR-ыг утсаараа уншуулахад профайл нь шууд нээгдэнэ.</p>
+    <template data-node="6"><span class="ex-k"><svg data-ico="chat" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>Салбар · Харилцаа</span><h3>Чат, мэдэгдэл бодит хугацаанд</h3><p>Суралцагчидтайгаа ганцаарчлан болон бүлгээр чатлана; захиалга, дүн, сануулга бүр мэдэгдлээр шууд ирнэ.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-col u-chat"><span class="u-bub k" style="--d:.2">Багшаа, асуулт байна</span><span class="u-bub me k" style="--d:1">Тэгье, бичээрэй 👍</span><span class="u-bub k" style="--d:1.8">Баярлалаа!</span></span></div></div></template>
+    <template data-node="7"><span class="ex-k"><svg data-ico="medal" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="15" r="5"/><path d="M8.5 10.5 6 3h4l2 4 2-4h4l-2.5 7.5"/></svg>Салбар · Ахиц</span><h3>Ахиц, эрэмбэ, гэрчилгээ</h3><p>Идэвхтэй суралцах тусам эрэмбэ ахиж, гэрчилгээ авна. Бүгд нүүр самбарт тань харагдана.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-ring"><i class="k-ring" style="--d:.2"></i><b>85%</b></span><span class="u-chip amber k" style="--d:1.7">🏅 Эрэмбэ ахилаа</span></div></div></template>
+    <template data-step="stu" data-branch="0"><span class="ex-k">Суралцагчийн зам · алхам 1/7</span><h3>QR уншуулна</h3><p>Багшийн QR кодыг утсаараа уншуулахад профайл нь шууд нээгдэнэ.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-phone"><i class="u-qr"></i><i class="u-scan"></i></span><span class="u-chip ok k" style="--d:1.5">✓ Профайл нээгдлээ</span></div></div></template>
-    <template data-step="stu" data-branch="1"><span class="ex-k">Сурагч сурах · алхам 2/7</span><h3>Үнэгүй хичээл үзнэ</h3><p>Үнэгүй хичээлээр багштайгаа танилцаж, итгэл төрнө.</p>
+    <template data-step="stu" data-branch="1"><span class="ex-k">Суралцагчийн зам · алхам 2/7</span><h3>Үнэгүй хичээл үзнэ</h3><p>Үнэгүй хичээлээр багшийн заах арга барилтай танилцаж, итгэлтэй сонголт хийнэ.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-video k-pulse">▶</span><span class="u-col"><span class="u-chip amber">Үнэгүй</span><span class="u-bar"><i class="k-fill" style="--w:1;--d:.3"></i></span></span></div></div></template>
-    <template data-step="stu" data-branch="5"><span class="ex-k">Сурагч сурах · алхам 3/7</span><h3>QPay-ээр төлнө</h3><p>Хичээл, багц, шалгалтыг QR-аар төлөхөд шууд нээгдэнэ.</p>
+    <template data-step="stu" data-branch="5"><span class="ex-k">Суралцагчийн зам · алхам 3/7</span><h3>QPay-ээр төлнө</h3><p>Хичээл, багц, шалгалтыг QR-аар төлөхөд шууд нээгдэнэ.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-qrbox"><i class="u-qr"></i></span><span class="u-col"><span class="u-chip amber k" style="--d:.3">₮ 25,000</span><span class="u-chip ok k" style="--d:1.5">🔓 Нээгдлээ</span></span></div></div></template>
-    <template data-step="stu" data-branch="3"><span class="ex-k">Сурагч сурах · алхам 4/7</span><h3>Хяналттай суралцана</h3><p>Таб сольвол сануулга, давтвал хичээл түр хаагдана — анхааралтай суралцана.</p>
+    <template data-step="stu" data-branch="3"><span class="ex-k">Суралцагчийн зам · алхам 4/7</span><h3>Хяналттай орчинд суралцана</h3><p>Таб сольвол сануулга гарч, давтвал хичээл түр хаагдана. Ингэснээр анхаарлаа төвлөрүүлж суралцана.</p>
       <div class="ex-visual"><div class="how-demo compact" data-s="0">
   <div class="hd-screen" aria-hidden="true">
     <div class="hd-bar"><i></i><i></i><i></i><span>surgalt.mn · Логарифмын шинж чанар</span></div>
@@ -147,31 +147,31 @@
       <div class="hd-alert hd-a1"><b>⚠️ Таб сольсон байна!</b><span>Хичээл рүүгээ буцна уу · 1/3</span><em class="hd-snd">🔊</em></div>
       <div class="hd-alert hd-a2"><b>🖱 Хичээлээс гарсан байна</b><span>Анхаарлаа хандуулна уу · 2/3</span></div>
       <div class="hd-lock"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path class="hd-shackle" d="M8 11V8a4 4 0 0 1 8 0v3"/><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M12 15v2"/></svg>
-        <b>Хичээл түр хаагдлаа</b><span>3 удаа зөрчил гаргасан · 30 минутын дараа нээгдэнэ</span></div>
-      <div class="hd-notif"><span class="hd-notif-ico">⛔</span><span><small class="hd-notif-k">Багшид ирсэн мэдэгдэл</small><b>Бат: «Логарифм» хаагдсан</b><small>Таб 2 удаа сольсон · курсор 1 удаа гарсан</small></span></div>
+        <b>Хичээл түр хаагдлаа</b><span>3 удаа хичээлээс гарсан · 30 минутын дараа нээгдэнэ</span></div>
+      <div class="hd-notif"><span class="hd-notif-ico">⛔</span><span><small class="hd-notif-k">Багшид ирсэн мэдэгдэл</small><b>Бат: «Логарифм» түр хаагдсан</b><small>Таб 2 удаа сольсон · курсор 1 удаа гарсан</small></span></div>
     </div>
   </div>
         <p class="hd-cap"></p>
       </div></div></template>
-    <template data-step="stu" data-branch="2"><span class="ex-k">Сурагч сурах · алхам 5/7</span><h3>Шалгалт, даалгавар</h3><p>Шалгалт өгч, даалгавраа илгээнэ — дүн нь шууд ирнэ.</p>
+    <template data-step="stu" data-branch="2"><span class="ex-k">Суралцагчийн зам · алхам 5/7</span><h3>Шалгалт, даалгавар</h3><p>Шалгалт өгч, даалгавраа илгээнэ. Дүн гармагц танд шууд мэдэгдэнэ.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-col"><span class="u-row k" style="--d:.2"><b>✓</b><i></i></span><span class="u-row k" style="--d:.7"><b>✓</b><i></i></span><span class="u-row k" style="--d:1.2"><b>✓</b><i></i></span></span><span class="u-chip ok k" style="--d:1.9">Дүн 18/20</span></div></div></template>
-    <template data-step="stu" data-branch="4"><span class="ex-k">Сурагч сурах · алхам 6/7</span><h3>Багштай уулзана</h3><p>Сул цагаас захиалж, шууд хичээлд Google Meet-ээр нэгдэнэ.</p>
+    <template data-step="stu" data-branch="4"><span class="ex-k">Суралцагчийн зам · алхам 6/7</span><h3>Багштай уулзана</h3><p>Багшийн сул цагаас захиалж, шууд хичээлд Google Meet-ээр нэгдэнэ.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-cal"><i></i><i></i><i class="k-pick" style="--d:.4"></i><i></i><i></i><i></i></span><span class="u-col"><span class="u-tiles k" style="--d:1.3"><i>Б</i><i>Т</i><i>С</i></span><span class="u-chip bad k" style="--d:1.5">● LIVE</span></span></div></div></template>
-    <template data-step="stu" data-branch="7"><span class="ex-k">Сурагч сурах · алхам 7/7</span><h3>Цол ахина</h3><p>Ахиц, цол, сертификат нүүр хуудсанд тань хадгалагдана.</p>
-      <div class="ex-visual"><div class="uc-stage"><span class="u-ring"><i class="k-ring" style="--d:.2"></i><b>85%</b></span><span class="u-chip amber k" style="--d:1.7">🏅 Цол ахилаа</span></div></div></template>
-    <template data-step="tch" data-branch="0"><span class="ex-k">Багш сургалт явуулах · алхам 1/7</span><h3>Профайл, QR</h3><p>Профайлаа бүрдүүлж QR-аа тараана — хэн үзсэн, утас харсныг мэднэ.</p>
+    <template data-step="stu" data-branch="7"><span class="ex-k">Суралцагчийн зам · алхам 7/7</span><h3>Эрэмбэ ахина</h3><p>Ахиц, эрэмбэ, гэрчилгээ тань нүүр хуудсанд хадгалагдана.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-ring"><i class="k-ring" style="--d:.2"></i><b>85%</b></span><span class="u-chip amber k" style="--d:1.7">🏅 Эрэмбэ ахилаа</span></div></div></template>
+    <template data-step="tch" data-branch="0"><span class="ex-k">Багшийн зам · алхам 1/7</span><h3>Профайл, QR</h3><p>Профайлаа бүрдүүлж, QR кодоо түгээнэ. Профайлыг тань хэн үзэж, утасны дугаарыг тань хэн харсныг мэднэ.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-card k" style="--d:.2"><i class="u-av"></i><i></i><i></i></span><span class="u-col"><span class="u-qrbox sm k" style="--d:.8"><i class="u-qr"></i></span><span class="u-chip k" style="--d:1.5">📞 8811 ••••</span></span></div></div></template>
-    <template data-step="tch" data-branch="1"><span class="ex-k">Багш сургалт явуулах · алхам 2/7</span><h3>Сургалт угсарна</h3><p>Текст, видео, тест, файлыг блокоор угсарч, үнэ, нээх дүрмээ тавина.</p>
-      <div class="ex-visual"><div class="uc-stage"><span class="u-col"><span class="u-blk k" style="--d:.2">📝 Текст</span><span class="u-blk k" style="--d:.7">🎬 Видео</span><span class="u-blk k" style="--d:1.2">❓ Тест</span></span><span class="u-chip ok k" style="--d:1.9">Нийтлэв ✓</span></div></div></template>
-    <template data-step="tch" data-branch="4"><span class="ex-k">Багш сургалт явуулах · алхам 3/7</span><h3>Хуваарь гаргана</h3><p>Шууд хичээл товлож, сул цагаа тэмдэглэнэ — улирал, жилээр давтана.</p>
+    <template data-step="tch" data-branch="1"><span class="ex-k">Багшийн зам · алхам 2/7</span><h3>Сургалтаа угсарна</h3><p>Текст, видео, асуулт, файлыг блокоор угсарч, үнэ болон нээгдэх дүрмээ тогтооно.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-col"><span class="u-blk k" style="--d:.2">📝 Текст</span><span class="u-blk k" style="--d:.7">🎬 Видео</span><span class="u-blk k" style="--d:1.2">❓ Асуулт</span></span><span class="u-chip ok k" style="--d:1.9">Нийтэллээ ✓</span></div></div></template>
+    <template data-step="tch" data-branch="4"><span class="ex-k">Багшийн зам · алхам 3/7</span><h3>Хуваарь гаргана</h3><p>Шууд хичээл товлож, сул цагаа тэмдэглэнэ; хуваарийг улирал, жилээр давтаж болно.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-grid"><i class="k-cell" style="--d:.2"></i><i></i><i class="k-cell" style="--d:.5"></i><i></i><i class="k-cell" style="--d:.8"></i><i class="k-cell bk" style="--d:1.6"></i><i></i><i class="k-cell" style="--d:1.1"></i><i></i></span><span class="u-chip k" style="--d:1.8">📅 Захиалга ирлээ</span></div></div></template>
-    <template data-step="tch" data-branch="2"><span class="ex-k">Багш сургалт явуулах · алхам 4/7</span><h3>Хянаж, үнэлнэ</h3><p>Анхаарал, зөрчлийг харж, даалгаврыг рубрикаар дүгнэнэ — журнал автоматаар.</p>
+    <template data-step="tch" data-branch="2"><span class="ex-k">Багшийн зам · алхам 4/7</span><h3>Хянаж, үнэлнэ</h3><p>Суралцагчийн анхаарал, зөрчлийг харж, даалгаврыг рубрикаар дүгнэнэ; журнал автоматаар бүрдэнэ.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-rub"><i></i><i class="k-cell" style="--d:.3"></i><i></i><i class="k-cell" style="--d:.7"></i><i></i><i></i><i></i><i></i><i class="k-cell" style="--d:1.1"></i></span><span class="u-col"><span class="u-chip k" style="--d:1.6">Нийт 14/15</span><span class="u-chip ok k" style="--d:2">Журналд ✓</span></span></div></div></template>
-    <template data-step="tch" data-branch="1"><span class="ex-k">Багш сургалт явуулах · алхам 5/7</span><h3>Ном зарна</h3><p>Ном, өгүүллээ уншигчийн нэрийг хуудас бүрт шингээж хамгаалан зарна.</p>
+    <template data-step="tch" data-branch="1"><span class="ex-k">Багшийн зам · алхам 5/7</span><h3>Ном зарна</h3><p>Ном, өгүүллээ зарахдаа хуудас бүрт уншигчийн нэрийг шингээж хамгаална.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-book"><i></i><i class="k-flip"></i></span><span class="u-chip k" style="--d:1.2">🔏 Таны нэр шингэсэн</span></div></div></template>
-    <template data-step="tch" data-branch="6"><span class="ex-k">Багш сургалт явуулах · алхам 6/7</span><h3>Чатлана</h3><p>Суралцагч, бүлгээрээ бодит хугацаанд чатлана.</p>
-      <div class="ex-visual"><div class="uc-stage"><span class="u-col u-chat"><span class="u-bub k" style="--d:.2">Багш аа, асуулт байна</span><span class="u-bub me k" style="--d:1">Тэгье, бичээрэй 👍</span><span class="u-bub k" style="--d:1.8">Баярлалаа!</span></span></div></div></template>
-    <template data-step="tch" data-branch="5"><span class="ex-k">Багш сургалт явуулах · алхам 7/7</span><h3>Орлого олно</h3><p>QPay-ээр орсон орлого, үзэлт, борлуулалтаа нэг дороос харна.</p>
+    <template data-step="tch" data-branch="6"><span class="ex-k">Багшийн зам · алхам 6/7</span><h3>Чатлана</h3><p>Суралцагчидтайгаа ганцаарчлан болон бүлгээр шууд чатлана.</p>
+      <div class="ex-visual"><div class="uc-stage"><span class="u-col u-chat"><span class="u-bub k" style="--d:.2">Багшаа, асуулт байна</span><span class="u-bub me k" style="--d:1">Тэгье, бичээрэй 👍</span><span class="u-bub k" style="--d:1.8">Баярлалаа!</span></span></div></div></template>
+    <template data-step="tch" data-branch="5"><span class="ex-k">Багшийн зам · алхам 7/7</span><h3>Орлого олно</h3><p>QPay-ээр орсон орлого, үзэлт, борлуулалтаа нэг дороос харна.</p>
       <div class="ex-visual"><div class="uc-stage"><span class="u-bars"><i class="k-grow" style="--h:.35;--d:.1"></i><i class="k-grow" style="--h:.55;--d:.25"></i><i class="k-grow" style="--h:.45;--d:.4"></i><i class="k-grow" style="--h:.75;--d:.55"></i><i class="k-grow" style="--h:1;--d:.7"></i></span><span class="u-chip amber k" style="--d:1.4">₮ 2,450,000</span></div></div></template>
   </section>
   {{/* Үнэ — багш, байгууллагын багц (public.go homePricing ← store.Plans, store.OrgPlans). */}}
@@ -180,7 +180,7 @@
     <div class="tt-head">
       <p class="eyebrow shine">Үнэ</p>
       <h2 id="prTitle">Борлуулалтаас хувь авахгүй</h2>
-      <p class="lead">Эхний {{.TrialMonths}} сар үнэгүй. Дараа нь нэг профайлын багц — орлогоос зөвхөн гүйлгээний шимтгэл хасагдаж, үлдсэн нь таны данс руу шилжинэ.</p>
+      <p class="lead">Эхний {{.TrialMonths}} сар үнэгүй. Дараа нь нэг профайлын багц авна; орлогоос зөвхөн гүйлгээний шимтгэл хасагдаж, үлдсэн нь таны данс руу шилжинэ.</p>
     </div>
     <div class="pr-groups">
       <div class="pr-group">
@@ -195,7 +195,7 @@
         <a class="btn btn-gold pr-cta" href="/login?tab=register" data-auth-hide>Үнэгүй эхлэх</a>
       </div>
       <div class="pr-group">
-        <div class="pr-ghead"><span class="pr-gic org">{{icon "users" 20}}</span><div><h3>Байгууллага</h3><p>Сургууль, сургалтын төв: олон багш, мэргэжлийн хөтөлбөр, удирдагч · гүйлгээний шимтгэл <b>{{.OrgFee}}%</b> · үнэ суралцагч (хүүхдийн) тооноос хамаарна</p></div></div>
+        <div class="pr-ghead"><span class="pr-gic org">{{icon "users" 20}}</span><div><h3>Байгууллага</h3><p>Сургууль, сургалтын төв: олон багш, мэргэжлийн хөтөлбөр, удирдагч · гүйлгээний шимтгэл <b>{{.OrgFee}}%</b> · үнэ 100 ба түүнээс доош суралцагчтай (хүүхэдтэй) байгууллагад хамаарна</p></div></div>
         <div class="pr-grid">{{range .Org}}
           <article class="pr-card{{if .Best}} best{{end}}">{{if .Best}}<span class="pr-tag">Хамгийн ашигтай</span>{{end}}
             <h4>{{.Name}}</h4><span class="pr-term">{{.Term}}</span>
@@ -203,14 +203,17 @@
             <p class="pr-store">{{icon "layers" 15}}<b>{{.Storage}}</b> файлын сан</p>
           </article>{{end}}
         </div>
-        <p class="muted small pr-cta">Дээрх нь эхлэх үнэ — суралцагч (хүүхдийн) тоо ихтэй байгууллагад үнийг тоонд нь тохируулан гэрээгээр тохирно.{{if not $.Contact}} Байгууллагын профайлыг surgalt.mn-ийн хянагч үүсгэж, удирдах хүнийг холбоно.{{end}}</p>
+        <p class="muted small pr-cta">100-аас олон суралцагчтай байгууллагын үнийг суралцагчийн тоонд нь тохируулан гэрээгээр тогтооно.{{if not $.Contact}} Байгууллагын профайлыг surgalt.mn-ийн хянагч үүсгэж, удирдах хүнийг холбоно.{{end}}</p>
+        {{/* Дарахад шууд залгана (утсанд); компьютерт дугаар нь харагдана. */}}
+        <a class="btn btn-gold pr-cta pr-call" href="tel:+97699858233">{{icon "phone" 16}}<span>Сургалт зохион байгуулна · <b>9985 8233</b></span></a>
+        <p class="muted small pr-cta pr-online">Сургалтыг онлайн танхимд заана</p>
         {{with $.Contact}}<a class="btn btn-ghost pr-cta" href="mailto:{{.}}?subject=Байгууллагын бүртгэл">Байгууллагаа бүртгүүлэх</a>{{end}}
       </div>
     </div>
     <ul class="pr-notes">
-      <li>{{icon "check" 16}}Суралцагчид бүртгэл, суралцах нь үнэгүй{{if .BuyerFee}} — худалдан авалтад {{.BuyerFee}}% үйлчилгээний хураамж{{end}}</li>
-      <li>{{icon "card" 16}}QPay-ээр төлнө, сунгавал одоогийн эрхийн араас үргэлжилнэ</li>
-      <li>{{icon "shield" 16}}Холбосон багш нар, удирдагчид байгууллагын багцад нэмэлт төлбөргүй</li>
+      <li>{{icon "check" 16}}Суралцагч үнэгүй бүртгүүлж, суралцана{{if .BuyerFee}} — худалдан авалтад {{.BuyerFee}}% үйлчилгээний хураамж нэмэгдэнэ{{end}}</li>
+      <li>{{icon "card" 16}}QPay-ээр төлнө; сунгавал одоогийн эрх дууссаны дараа үргэлжилнэ</li>
+      <li>{{icon "shield" 16}}Байгууллагад холбогдсон багш нар, удирдагчдад нэмэлт төлбөргүй</li>
     </ul>
   </section>
   {{end}}
@@ -233,9 +236,9 @@
   {{/* Идэвхтэй суралцагчид — 5 зэрэглэл × 10 (app.js topStudents, /api/top-students). Нэрийг товчилно, холбоосгүй, хүсвэл нууна. */}}
   <section class="tt tt-stu" id="topStudents" aria-labelledby="tsTitle" hidden>
     <div class="tt-head">
-      <p class="eyebrow shine">Шилдэг 10</p>
+      <p class="eyebrow shine">Бидний бахархал</p>
       <h2 id="tsTitle">Идэвхтэй суралцагчид</h2>
-      <p class="lead">Олон сургалтад суралцаж, цол ахиулж, бүтээлчээр, сахилга баттай суралцдаг суралцагчид</p>
+      <p class="lead">Олон сургалтад хамрагдаж, эрэмбээ ахиулсан, бүтээлч, сахилга бат сайтай суралцагчид</p>
     </div>
     <div class="tt-tabs" role="tablist" aria-label="Зэрэглэл"></div>
     <div class="tt-stage">
@@ -247,9 +250,25 @@
   </section>
 </main>
 <footer class="footer footer-x">
-  <div class="fx-brand"><a class="fx-logo" href="/">surgalt<b>.mn</b></a><p>Сур, сур, бас дахин сур — багш, суралцагчдын платформ.</p>{{with .Contact}}<a href="mailto:{{.}}">{{.}}</a>{{end}}</div>
+  <div class="fx-brand"><a class="fx-logo" href="/">surgalt<b>.mn</b></a><p>Сур, сур, бас дахин сур — суралцахуй платформ.</p>
+    {{/* Сургалт захиалах: утсанд дарвал шууд залгана, компьютерт дугаар нь харагдана. */}}
+    <div class="fx-cta"><b>Сургалт зохион байгуулна</b><span>Сургалтыг онлайн танхимд заана</span>
+      <a class="btn btn-gold btn-sm" href="tel:+97699858233">{{icon "phone" 16}}9985 8233 — залгах</a></div>
+    {{with .Contact}}<a class="fx-mail" href="mailto:{{.}}">{{.}}</a>{{end}}</div>
   <nav class="fx-col" aria-label="Бүртгэл"><b>Бүртгэл</b><a href="/login" data-auth-hide>Нэвтрэх</a><a href="/#pricing">Үнэ</a><a href="/login?tab=register" data-auth-hide>Бүртгүүлэх</a><a href="/me" data-auth-show hidden>Миний хуудас</a></nav>
   <nav class="fx-col" aria-label="Хууль"><b>Хууль</b><a href="/privacy">Нууцлалын бодлого</a><a href="/terms">Үйлчилгээний нөхцөл</a></nav>
-  <p class="fx-copy">© 2026 surgalt.mn · Бүх эрх хуулиар хамгаалагдсан</p>
+  {{/* Холбоо барих — seo.go ldHome-ийн Organization (утас, хаяг, Facebook)-той ижил байлгана. Дугаарт дарвал залгана, «Viber» нь Viber-ийн чат нээнэ. */}}
+  <div class="fx-col fx-contact" role="group" aria-label="Холбоо барих"><b>Холбоо барих</b>
+    <span class="fx-co">ОРД ДАТА СОФТ ХХК</span>
+    <ul class="fx-tels"><li><a class="fx-num" href="tel:+97699858233">9985 8233</a><a class="fx-vb" href="viber://chat?number=%2B97699858233" aria-label="9985 8233 — Viber-ээр бичих">Viber</a></li><li><a class="fx-num" href="tel:+97699062437">9906 2437</a><a class="fx-vb" href="viber://chat?number=%2B97699062437" aria-label="9906 2437 — Viber-ээр бичих">Viber</a></li></ul>
+    <address>Улаанбаатар, Сүхбаатар дүүрэг, <span class="nw">1-р хороо</span>, Тээвэрчдийн гудамж, Flamingo Tower, 503 тоот</address>
+    <a class="fx-fb" href="https://m.me/61595289405243" target="_blank" rel="noopener">{{icon "msgr" 16}}Messenger-ээр бичих</a>
+    <a class="fx-fb" href="https://www.facebook.com/profile.php?id=61595289405243" target="_blank" rel="noopener">{{icon "fb" 16}}Facebook</a></div>
+  {{/* Google Maps (түлхүүргүй embed): доош гүйлгэхэд л ачаална. */}}
+  <div class="fx-mapbox"><iframe class="fx-map" src="https://www.google.com/maps?q=Flamingo+Tower,+Teeverchidiin+St,+Ulaanbaatar+14210&amp;z=16&amp;hl=mn&amp;output=embed" title="Байршил — Flamingo Tower, Google Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+    <a href="https://www.google.com/maps/search/?api=1&amp;query=Flamingo+Tower,+Teeverchidiin+St,+Ulaanbaatar+14210" target="_blank" rel="noopener">{{icon "pin" 15}}Google Map дээр нээх</a></div>
+  <p class="fx-copy">© 2026 surgalt.mn · ОРД ДАТА СОФТ ХХК · Бүх эрх хуулиар хамгаалагдсан</p>
 </footer>
+{{/* Facebook Messenger-ээр шууд бичих (m.me): утсанд Messenger апп, компьютерт messenger.com нээгдэнэ. */}}
+<a class="fb-chat" href="https://m.me/61595289405243" target="_blank" rel="noopener" aria-label="Facebook Messenger-ээр бидэнтэй шууд бичих">{{icon "msgr" 24}}<span>Messenger-ээр бичих</span></a>
 {{template "foot" (dict "Page" "home")}}

@@ -128,13 +128,13 @@ func (s *Server) blocksChanged(evs []store.ActivityEvent) {
 }
 
 func blockedErr(b *LessonBlock) error {
-	what := "Та сануулгын хязгаарыг хэтрүүлсэн тул энэ хичээл"
+	what := "Сануулгын хязгаар хэтэрсэн тул энэ хичээл"
 	if strings.HasPrefix(b.Reason, "Шалгалт") {
-		what = "Шалгалт зөрчлөөр хаагдсан тул энэ шалгалт"
+		what = "Зөрчил гарсан тул энэ шалгалт"
 	}
 	msg := what + " түр хаагдсан — багш тань нээх хүртэл хүлээнэ үү"
 	if b.Until != nil {
-		msg = what + " " + b.Until.Local().Format("01/02 15:04") + " хүртэл хаагдсан"
+		msg = what + " " + b.Until.Local().Format("01/02 15:04") + " хүртэл хаагдсан байна"
 	}
 	return apiError(http.StatusLocked, msg, map[string]any{"blocked": b})
 }
@@ -202,7 +202,7 @@ func (s *Server) handleUnblockStudent(w http.ResponseWriter, r *http.Request) {
 	if in.LessonID != "" {
 		l, ok := lessonOf[in.LessonID]
 		if !ok {
-			writeErr(w, http.StatusNotFound, "олдсонгүй")
+			writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 			return
 		}
 		if l.Exam != nil {
@@ -240,9 +240,9 @@ func (s *Server) handleUnblockStudent(w http.ResponseWriter, r *http.Request) {
 	for lid := range targets {
 		s.journals.Delete(courseOf[lid]) // журнал шинэ төлвийг шууд харуулна
 	}
-	n := &store.Notification{UserID: uid, Type: "unblock", ActorID: c.UID, Title: "🔓 Багш хичээлийг тань дахин нээлээ", Body: "Анхааралтай, бусад цонхоо хаагаад үзээрэй.", Link: link}
+	n := &store.Notification{UserID: uid, Type: "unblock", ActorID: c.UID, Title: "🔓 Багш хичээлийг тань дахин нээлээ", Body: "Бусад цонхоо хаагаад, анхаарлаа төвлөрүүлэн үзээрэй.", Link: link}
 	if exam != "" {
-		n.Title, n.Body = "🔓 Багш шалгалтыг тань дахин нээлээ", "«"+exam+"» — дахин өгөх боломжтой (нэмэлт оролдлого). Бусад цонхоо хаагаад, анхааралтай өгөөрэй."
+		n.Title, n.Body = "🔓 Багш шалгалтыг тань дахин нээлээ", "«"+exam+"» шалгалтыг дахин өгөх боломжтой боллоо (нэмэлт оролдлого). Бусад цонхоо хаагаад, анхаарлаа төвлөрүүлэн өгөөрэй."
 	}
 	s.notify(r.Context(), n)
 	// Суралцагчийн нээлттэй хуудас (хичээлийн жагсаалт, хаагдсан цонх) шинэчлэхгүйгээр шууд нээгдэнэ.

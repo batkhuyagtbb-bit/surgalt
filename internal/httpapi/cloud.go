@@ -126,7 +126,7 @@ func (s *Server) handleSendCloud(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if teaches(course, c.UID) {
-		writeErr(w, http.StatusBadRequest, "багш өөрийн хичээлийн үүлэн үгэнд хариулахгүй — үр дүнг л харна")
+		writeErr(w, http.StatusBadRequest, "багш өөрийн хичээлийн үүлэн үгэнд хариулахгүй, зөвхөн үр дүнг нь харна")
 		return
 	}
 	var in struct {

@@ -101,7 +101,7 @@ const EMOJI = [
 const BGS = [["dots", "Цэгэн"], ["grid", "Нүдэн тор"], ["lines", "Шугамтай"], ["none", "Хоосон"]];
 const ERASABLE = new Set(["pen", "marker", "line", "shape", "icon", "emoji", "text"]);
 const PROPS = ["id", "k", "lk", "by", "fm", "note", "cr"];
-const IMG_KINDS = [["", "Бүгд"], ["clip", "Зурган"], ["photo", "Гэрэл зураг"]];
+const IMG_KINDS = [["", "Бүгд"], ["clip", "Зурмал"], ["photo", "Гэрэл зураг"]];
 const IMG_IDEAS = ["нарны аймаг", "наран цэцэг", "хүний бие", "амьтан", "монгол гэр", "галт уул", "үлэг гүрвэл", "дэлхий"];
 const U = 100; // дүрсийн суурь хэмжээ (scaleX/Y-ээр томруулна, хүрээ strokeUniform)
 
@@ -218,7 +218,7 @@ function shellHTML(title) {
     </div>
     <div class="bd-sp"></div>
     <div class="bd-peers"></div>
-    <div class="bd-grp bd-hist"><button type="button" class="bd-ib" data-a="undo" title="Буцаах (Ctrl+Z)" disabled>${bi("undo")}</button><button type="button" class="bd-ib" data-a="redo" title="Дахих (Ctrl+Y)" disabled>${bi("redo")}</button></div>
+    <div class="bd-grp bd-hist"><button type="button" class="bd-ib" data-a="undo" title="Буцаах (Ctrl+Z)" disabled>${bi("undo")}</button><button type="button" class="bd-ib" data-a="redo" title="Дахин хийх (Ctrl+Y)" disabled>${bi("redo")}</button></div>
     <div class="bd-grp bd-zoom"><button type="button" class="bd-ib" data-a="zout" title="Жижигрүүлэх (−)">${bi("zout")}</button><button type="button" class="bd-zv" data-a="fit" title="Бүгдийг харах (0)">100%</button><button type="button" class="bd-ib" data-a="zin" title="Томруулах (+)">${bi("zin")}</button></div>
     <button type="button" class="bd-pill bd-lockbtn" data-a="lock" hidden>${bi("pause", 17)}<span>Түр зогсоох</span></button>
     <select class="bd-vto" aria-label="Хэнд ярих" title="Микрофоноор хэнд ярих" hidden></select>
@@ -254,8 +254,8 @@ function shellHTML(title) {
     <div class="bd-pop bd-menu" data-p="more" hidden></div>
     <div class="bd-style" hidden></div>
     <div class="bd-banner" hidden></div>
-    <div class="bd-lockov" hidden><div><b>⏸</b><h3>Багш самбарыг түр зогсоолоо</h3><p>Багш руугаа анхаарлаа хандуулаарай 👀</p></div></div>
-    <div class="bd-loading"><span class="bd-spin"></span>Самбар ачаалж байна…</div>
+    <div class="bd-lockov" hidden><div><b>⏸</b><h3>Багш самбарыг түр зогсоолоо</h3><p>Багшдаа анхаарлаа хандуулаарай 👀</p></div></div>
+    <div class="bd-loading"><span class="bd-spin"></span>Самбарыг ачаалж байна…</div>
     <aside class="bd-panel" hidden aria-label="Анги"></aside>
     <div class="bd-voice" hidden aria-live="polite"></div>
     <aside class="bd-chat" hidden aria-label="Багийн чат">
@@ -514,7 +514,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     if (st.spot && st.spot !== prev.spot) return toast(`📢 Багш «${roomLabel(st.spot)}» самбарыг бүх ангид харуулж байна`);
     if (st.mode === prev.mode && ownRoomOf(prev) === ownRoom()) return;
     if (st.mode === "solo") toast("✏️ Хувиараа ажиллах цаг — өөрийн самбар дээрээ зурна уу");
-    else if (st.mode === "team") { const r = ownRoom(); toast(r ? `👥 Багаар ажиллана — та ${roomLabel(r)} багт` : "👥 Багаар ажиллана"); }
+    else if (st.mode === "team") { const r = ownRoom(); toast(r ? `👥 Багаар ажиллана — та ${roomLabel(r)} багт байна` : "👥 Багаар ажиллана"); }
     else toast("👩‍🏫 Багш тайлбарлаж байна — багшийн самбарыг харна уу");
   }
   async function switchRoom(r) {
@@ -934,7 +934,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     if (!canEdit) return toast("Энэ самбарт одоо зураг оруулах боломжгүй", true);
     u = String(u || "").trim();
     if (/^data:image\//i.test(u)) { try { return insertBlobs([await (await fetch(u)).blob()], at); } catch { return toast("Зургийг уншиж чадсангүй", true); } }
-    if (!/^https?:\/\//i.test(u)) return toast("Зургийн холбоос https://-ээр эхэлнэ", true);
+    if (!/^https?:\/\//i.test(u)) return toast("Зургийн холбоос https://-ээр эхлэх ёстой", true);
     const done = busyToast("Зураг татаж байна…");
     try { await addImage(await post("/fetch", { url: u }), at); } catch (e) { toast(e.message, true); } finally { done(); }
   }
@@ -1050,7 +1050,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     }
   }
   function renderShapes(p) {
-    p.innerHTML = `<div class="bd-pop-h"><b>Дүрс</b><small>Чирж хэмжээг нь тохируулна · Shift — тэгш</small></div>
+    p.innerHTML = `<div class="bd-pop-h"><b>Дүрс</b><small>Чирж хэмжээг нь тохируулна · Shift — тэнцүү харьцаатай</small></div>
       <div class="bd-shgrid">${Object.keys(SH).map((k) => `<button type="button" data-sh="${k}" class="${shapeKind === k ? "on" : ""}" title="${esc(SH[k][0])}">${shSVG(k)}</button>`).join("")}</div>
       <div class="bd-pop-h"><b>Шугам, сум</b></div>
       <div class="bd-shgrid">${Object.entries(LINES).map(([k, [t, svg]]) => `<button type="button" data-sh="${k}" class="${shapeKind === k ? "on" : ""}" title="${esc(t)}"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg></button>`).join("")}</div>`;
@@ -1064,10 +1064,10 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
       <div class="bd-ires"></div>
       <details class="bd-imore"><summary>Бусад арга: Google, холбоос, хуулж буулгах</summary>
         <form class="bd-f" data-img="google"><div class="bd-row"><input name="q" placeholder="Google зургаас хайх" required autocomplete="off" value="${esc(isr.q)}"><button class="btn btn-glass btn-sm">Google ↗</button></div>
-          <small class="muted">Google шинэ цонхонд нээгдэнэ: зураг дээр <b>баруун товч → «Зургийг хуулах»</b> дараад энд <kbd>Ctrl</kbd>+<kbd>V</kbd> (эсвэл зургийг чирээд оруулна).</small></form>
+          <small class="muted">Google шинэ цонхонд нээгдэнэ. Зураг дээр <b>баруун товч → «Зургийг хуулах»</b> дараад энд <kbd>Ctrl</kbd>+<kbd>V</kbd> дарна уу (эсвэл зургийг чирж оруулна уу).</small></form>
         <form class="bd-f" data-img="url"><div class="bd-row"><input name="u" placeholder="Зургийн холбоос https://…" required autocomplete="off" inputmode="url"><button class="btn btn-glass btn-sm">Оруулах</button></div></form>
       </details>
-      <p class="bd-tip">${bi("crop", 15)}<span>Оруулсан зураг дээр <b>давхар дарж</b> тайрах, <b>дэвсгэрийг арилгана</b>.</span></p>`;
+      <p class="bd-tip">${bi("crop", 15)}<span>Оруулсан зураг дээр <b>давхар дарж</b> тайрах, <b>дэвсгэрийг арилгах</b> боломжтой.</span></p>`;
     paintHits(p);
     if (innerWidth > 720) setTimeout(() => p.querySelector(".bd-isf input")?.focus(), 30);
   }
@@ -1075,10 +1075,10 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     const box = p.querySelector(".bd-ires"); if (!box) return;
     if (isr.busy && !isr.items.length) { box.innerHTML = `<p class="bd-pop-wait"><span class="bd-spin"></span>Хайж байна…</p>`; return; }
     if (!isr.q) { box.innerHTML = `<p class="bd-ihint">Санаа:</p><div class="bd-ideas">${IMG_IDEAS.map((t) => `<button type="button" data-idea="${esc(t)}">${esc(t)}</button>`).join("")}</div>`; return; }
-    if (!isr.items.length) { box.innerHTML = `<p class="bd-ihint">«${esc(isr.q)}» олдсонгүй — өөр үгээр, эсвэл англиар хайгаад үзээрэй.</p>`; return; }
+    if (!isr.items.length) { box.innerHTML = `<p class="bd-ihint">«${esc(isr.q)}» гэсэн зураг олдсонгүй — өөр үгээр эсвэл англиар хайж үзээрэй.</p>`; return; }
     box.innerHTML = `<div class="bd-igrid2">${isr.items.map((h, i) => `<button type="button" class="bd-ihit" data-hit="${i}" draggable="true" title="${esc((h.title || "") + (h.credit ? " — " + h.credit : ""))}"><img src="${esc(h.thumb)}" alt="${esc(h.title || "")}" loading="lazy" referrerpolicy="no-referrer" style="aspect-ratio:${h.w && h.h ? h.w + "/" + h.h : "4/3"}"></button>`).join("")}</div>
       ${isr.more ? `<button type="button" class="btn btn-glass btn-sm bd-imorebtn" data-img="more" ${isr.busy ? "disabled" : ""}>${isr.busy ? "Ачаалж байна…" : "Цааш үзэх"}</button>` : ""}
-      <p class="bd-credit muted">${isr.en && isr.en !== isr.q ? `«${esc(isr.en)}» гэж хайлаа · ` : ""}Нээлттэй лицензтэй зургууд (Wikimedia Commons, Pixabay). Дармагц самбарт орно, чирж ч болно.</p>`;
+      <p class="bd-credit muted">${isr.en && isr.en !== isr.q ? `«${esc(isr.en)}» гэж хайлаа · ` : ""}Нээлттэй лицензтэй зургууд (Wikimedia Commons, Pixabay). Дармагц самбарт орно, чирж оруулж ч болно.</p>`;
     box.querySelectorAll("img").forEach((im) => { im.onerror = () => im.closest(".bd-ihit")?.remove(); });
   }
   async function searchImages(p, more) {
@@ -1154,11 +1154,11 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
       const one = sel.length === 1 ? sel[0] : null, locked = sel.every((o) => o.lk);
       h += `<div class="bd-sg bd-acts">${one?.type === "image" ? `<button type="button" data-act="edit" class="bd-act-wide">${bi("crop", 17)}<span>Тайрах · дэвсгэр</span></button>${one.cr ? `<button type="button" data-act="credit" title="${esc(one.cr)}">©</button>` : ""}` : ""}
         <button type="button" data-act="dup" title="Хувилах (Ctrl+D)">${bi("copy", 18)}</button>
-        <button type="button" data-act="front" title="Хамгийн өмнө">${bi("front", 18)}</button>
-        <button type="button" data-act="back" title="Хамгийн ард">${bi("back", 18)}</button>
+        <button type="button" data-act="front" title="Хамгийн урд гаргах">${bi("front", 18)}</button>
+        <button type="button" data-act="back" title="Хамгийн ард оруулах">${bi("back", 18)}</button>
         ${me.teacher ? `<button type="button" data-act="lock" class="${locked ? "on" : ""}" title="${locked ? "Түгжээг тайлах" : "Түгжих — суралцагч хөдөлгөж, устгаж чадахгүй"}">${bi(locked ? "lock" : "unlock", 18)}</button>` : ""}
         <button type="button" data-act="del" class="bd-del" title="Устгах (Del)">${bi("trash", 18)}</button></div>`;
-    } else if (m === "eraser") h += `<p class="bd-hint">Арилгах зураас, дүрс дээгүүр чирнэ</p>`;
+    } else if (m === "eraser") h += `<p class="bd-hint">Арилгах зураас, дүрсийн дээгүүр чирнэ үү</p>`;
     else if (m === "laser") h += `<p class="bd-hint">Хулганаа хөдөлгөхөд суралцагчид улаан цэгийг харна</p>`;
     styleBar.innerHTML = h; styleBar.hidden = !h;
   }
@@ -1235,7 +1235,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     const msgs = [];
     if (me.teacher) {
       if (st.spot) msgs.push(`${bi("spot", 17)}<span>Бүх ангид <b>${esc(roomLabel(st.spot))}</b> самбарыг харуулж байна</span><button type="button" data-a="unspot">Зогсоох</button>`);
-      if (st.lock && st.mode !== "teach") msgs.push(`${bi("pause", 17)}<span>Суралцагчид түр зогссон</span><button type="button" data-a="lock">Үргэлжлүүлэх</button>`);
+      if (st.lock && st.mode !== "teach") msgs.push(`${bi("pause", 17)}<span>Суралцагчдын самбар түр зогссон</span><button type="button" data-a="lock">Үргэлжлүүлэх</button>`);
       if (room !== "main") msgs.push(`${bi("eye", 17)}<span><b>${esc(roomLabel(room))}</b> — шууд харж, засаж, ⭐ тавьж болно</span><button type="button" data-a="spot-here">Ангид харуулах</button>`);
     } else if (st.spot && room === st.spot) msgs.push(`${bi("spot", 17)}<span>Багш <b>${esc(roomLabel(st.spot))}</b> самбарыг ангид харуулж байна</span>`);
     else if (!canEdit && room === "main") msgs.push(`${bi("eye", 17)}<span>Багшийн самбарыг харж байна</span>${!follow && lastView ? `<button type="button" data-a="follow">${bi("target", 15)}Багшийг дагах</button>` : ""}`);
@@ -1300,21 +1300,21 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     if (!me.teacher || panel.hidden) return;
     const online = new Map(peers.filter((p) => !p.teacher).map((p) => [p.uid, p]));
     const names = st.names || {}, ids = Object.keys(names).sort((a, b) => names[a].localeCompare(names[b]));
-    let h = `<header class="bd-ph"><div><b>Анги</b><small>${online.size} онлайн · ${ids.length} хүүхэд самбар нээсэн</small></div><button type="button" class="bd-ib" data-a="panel" title="Хаах">${bi("x", 18)}</button></header><div class="bd-pb">`;
+    let h = `<header class="bd-ph"><div><b>Анги</b><small>${online.size} онлайн · ${ids.length} суралцагч самбар нээсэн</small></div><button type="button" class="bd-ib" data-a="panel" title="Хаах">${bi("x", 18)}</button></header><div class="bd-pb">`;
     if (st.mode === "teach") {
-      h += `<p class="bd-pnote">${bi("board", 18)}<span>Хүүхдүүд <b>таны самбарыг</b> шууд харж байна. <b>Хувиараа</b> эсвэл <b>Багаар</b> горимд шилжүүлбэл хүн бүр/баг бүр өөрийн самбартай болж, энд шууд харагдана.</span></p>`;
-      h += `<div class="bd-people">${online.size ? [...online.values()].map((p) => `<span class="bd-person">${avatar(p)}${esc(p.name)}</span>`).join("") : `<p class="muted small">Одоогоор хүүхэд нэгдээгүй байна. Хичээлээ нээж «Самбар нээх» дарахад энд гарна.</p>`}</div>`;
+      h += `<p class="bd-pnote">${bi("board", 18)}<span>Суралцагчид <b>таны самбарыг</b> шууд харж байна. <b>Хувиараа</b> эсвэл <b>Багаар</b> горимд шилжүүлбэл хүн бүр (баг бүр) өөрийн самбартай болж, тэдгээр нь энд шууд харагдана.</span></p>`;
+      h += `<div class="bd-people">${online.size ? [...online.values()].map((p) => `<span class="bd-person">${avatar(p)}${esc(p.name)}</span>`).join("") : `<p class="muted small">Одоогоор суралцагч нэгдээгүй байна. Суралцагчид хичээлээ нээж «Самбар нээх» дармагц энд харагдана.</p>`}</div>`;
     } else if (st.mode === "solo") {
-      h += ids.length ? `<div class="bd-cards">${ids.map((u) => cardHTML("u:" + u, esc(names[u]), "", online.has(u))).join("")}</div>` : `<p class="muted small bd-pnote">Хүүхдүүд самбар нээмэгц энд тус бүрийн самбар шууд харагдана.</p>`;
+      h += ids.length ? `<div class="bd-cards">${ids.map((u) => cardHTML("u:" + u, esc(names[u]), "", online.has(u))).join("")}</div>` : `<p class="muted small bd-pnote">Суралцагчид самбар нээмэгц тус бүрийн самбар энд шууд харагдана.</p>`;
     } else {
       const teams = Array.from({ length: st.teams }, () => []), free = [];
       for (const u of ids) { const n = st.assign?.[u]; (n != null && n < st.teams ? teams[n] : free).push(u); }
       h += `<div class="bd-teamctl"><span>Баг</span><button type="button" class="bd-ib bd-sm" data-teams="-1" ${st.teams <= 2 ? "disabled" : ""}>${bi("minus", 16)}</button><b>${st.teams}</b><button type="button" class="bd-ib bd-sm" data-teams="1" ${st.teams >= 12 ? "disabled" : ""}>${bi("plus", 16)}</button>
         <button type="button" class="btn btn-glass btn-sm" data-a="shuffle">${bi("shuffle", 16)}Санамсаргүй хуваах</button></div>
-        <p class="muted small">Хүүхдийн нэрийг чирж өөр багт шилжүүлнэ.</p>`;
+        <p class="muted small">Суралцагчийн нэрийг чирж өөр багт шилжүүлнэ.</p>`;
       const chip = (u) => `<span class="bd-chip" draggable="true" data-uid="${esc(u)}"><i class="bd-dot ${online.has(u) ? "on" : ""}"></i>${esc(names[u])}${online.get(u)?.mic ? `<i class="bd-mic-i" title="Микрофон асаалттай">${bi("mic", 11)}</i>` : ""}</span>`;
       const chatBtn = (i) => { const n = unreadOf("b:" + i) + unreadOf("t:" + i); return `<button type="button" class="bd-mini bd-chatmini" data-chteam="${i}" title="Багийн чат, самбар">${bi("chat", 13)}Чат<b ${n ? "" : "hidden"}>${n || ""}</b></button>`; };
-      h += `<div class="bd-cards">${teams.map((m, i) => { const t = teamOf(i); return cardHTML("t:" + i, `<span style="color:${t[2]}">${t[0]} ${esc(t[1])}</span>`, `<div class="bd-members" data-team="${i}">${m.map(chip).join("") || `<small class="muted">Хүүхэд чирч оруулна</small>`}</div><div class="bd-card-f">${chatBtn(i)}</div>`, m.some((u) => online.has(u))); }).join("")}</div>`;
+      h += `<div class="bd-cards">${teams.map((m, i) => { const t = teamOf(i); return cardHTML("t:" + i, `<span style="color:${t[2]}">${t[0]} ${esc(t[1])}</span>`, `<div class="bd-members" data-team="${i}">${m.map(chip).join("") || `<small class="muted">Суралцагчийг чирж оруулна</small>`}</div><div class="bd-card-f">${chatBtn(i)}</div>`, m.some((u) => online.has(u))); }).join("")}</div>`;
       if (free.length) h += `<div class="bd-free"><b>Багт ороогүй</b><div class="bd-members" data-team="-1">${free.map(chip).join("")}</div></div>`;
     }
     h += `</div><footer class="bd-pf">${st.mode !== "teach" ? `<button type="button" class="btn btn-glass btn-sm" data-a="distribute">${bi("distribute", 16)}Миний самбарыг бүгдэд тараах</button>` : ""}
@@ -1430,7 +1430,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     const atBottom = chatList.dataset.ch !== ch || chatList.scrollHeight - chatList.scrollTop - chatList.clientHeight < 90;
     chatList.dataset.ch = ch;
     const changed = setHTML(chatList, list.length ? list.map((m, i) => msgHTML(m, list[i - 1])).join("")
-      : `<p class="bd-ch-empty">${chatTab === "t" ? (me.teacher ? "Энэ баг хоорондоо одоогоор бичээгүй байна." : "Багийнхантайгаа энд ярилцаарай 👋<br><small>Багш харах боломжтой.</small>")
+      : `<p class="bd-ch-empty">${chatTab === "t" ? (me.teacher ? "Энэ багийнхан одоогоор хоорондоо бичээгүй байна." : "Багийнхантайгаа энд ярилцаарай 👋<br><small>Багш харах боломжтой.</small>")
         : (me.teacher ? "Энэ багаас асуулт ирээгүй байна.<br><small>Та бичвэл багийн бүх гишүүнд очно.</small>" : "Багаараа багшдаа асуулт, санал бичээрэй 🙋<br><small>Багийн бүх гишүүн харна.</small>")}</p>`);
     if (changed && atBottom) chatList.scrollTop = chatList.scrollHeight;
     const lockMe = !me.teacher && (st.lock || st.mode !== "team");
@@ -1501,7 +1501,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     if (!micTarget()) return toast("Одоо ярих боломжгүй — ✋ гараа өргөөд багшийн зөвшөөрлийг хүлээнэ үү", true);
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } }); }
-    catch { return toast("Микрофон ашиглах зөвшөөрөл өгнө үү (хаягийн мөрөн дэх 🔒 дүрс → Микрофон)", true); }
+    catch { return toast("Микрофон ашиглах зөвшөөрөл өгнө үү (хаягийн мөрний 🔒 дүрс → Микрофон)", true); }
     if (dead || mic) { stream.getTracks().forEach((t) => t.stop()); return; }
     const ctx = audioOut(); ctx.resume().catch(() => {});
     const src = ctx.createMediaStreamSource(stream), an = ctx.createAnalyser(); an.fftSize = 1024; src.connect(an);
@@ -1510,7 +1510,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     mic.track.onended = () => micOff();
     post("/voice", { mic: true }).catch(() => {});
     syncLinks(); renderTop(); renderVoice();
-    toast(micTarget() === "all" ? "🎙 Микрофон асаалттай — бүх анги таныг сонсож байна" : "🎙 Микрофон асаалттай — багийнхан тань сонсож байна");
+    toast(micTarget() === "all" ? "🎙 Микрофон асаалттай — бүх анги таныг сонсож байна" : "🎙 Микрофон асаалттай — багийнхан таныг сонсож байна");
   }
   function micOff(quiet) {
     if (!mic) return;
@@ -1678,12 +1678,12 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
     if (!show) return;
     const av = (p) => `<span class="bd-vav" data-vuid="${esc(p.uid)}" title="${esc(p.teacher ? "Багш · " + p.name : p.name)}">${avatar(p)}<i class="bd-vring"></i>${p.teacher ? `<i class="bd-vbadge">👩‍🏫</i>` : ""}</span>`;
     const relayN = [...outLinks.values()].filter((L) => L.relay).length;
-    let h = `<div class="bd-vroom"><span class="bd-vlive"><i></i>LIVE</span><b>Дуут өрөө</b>
+    let h = `<div class="bd-vroom"><span class="bd-vlive"><i></i>ШУУД</span><b>Дуут өрөө</b>
       <span class="bd-vavs">${mic ? av({ uid: me.uid, name: me.name, teacher: me.teacher }) : ""}${rel.slice(0, 7).map(av).join("")}${rel.length > 7 ? `<span class="bd-av bd-more">+${rel.length - 7}</span>` : ""}</span>
       <span class="bd-eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
       <button type="button" class="bd-ib bd-sm" data-a="vmute" title="${vMuted ? "Дууг нээх" : "Дууг хаах (бусдыг сонсохгүй)"}">${bi(vMuted ? "volx" : "vol", 16)}</button></div>
       <div class="bd-vnow" hidden></div>`;
-    if (mic && relayN) h += `<div class="bd-vinfo" title="Эдгээр сонсогчийн сүлжээ шууд холболт зөвшөөрөөгүй тул дуу серверээр дамжиж байна">↪ ${relayN} сонсогчид серверээр</div>`;
+    if (mic && relayN) h += `<div class="bd-vinfo" title="Эдгээр сонсогчийн сүлжээ шууд холболт зөвшөөрөөгүй тул дуу серверээр дамжиж байна">↪ ${relayN} сонсогч серверээр</div>`;
     if (needTap) h += `<div class="bd-vtap"><button type="button" data-a="vtap">🔊 Дуу сонсохын тулд энд дарна уу</button></div>`;
     if (queue) h += `<div class="bd-vq">${(st.hands || []).map((u) => `<span class="bd-vh">✋ ${esc(nameOf(u))}<button type="button" data-grant="${esc(u)}">🎤 Ярих эрх</button><button type="button" class="bd-vx" data-revoke="${esc(u)}" title="Гарыг буулгах">${bi("x", 12)}</button></span>`).join("")}${(st.stage || []).map((u) => `<span class="bd-vh on">🎤 ${esc(nameOf(u))} · бүх ангид<button type="button" class="bd-vx" data-revoke="${esc(u)}" title="Ярих эрхийг авах">${bi("x", 12)}</button></span>`).join("")}</div>`;
     if (vbox._h !== h) { vbox._h = h; vbox.innerHTML = h; }
@@ -1691,7 +1691,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
   }
   function voiceState(prev, quiet) {
     if (!quiet) {
-      if (me.teacher) { const nw = (st.hands || []).filter((u) => !(prev.hands || []).includes(u)); if (nw.length) toast(`✋ ${nw.map((u) => st.names?.[u] || "Суралцагч").join(", ")} гар өргөлөө — «Дуут өрөө»-нөөс ярих эрх өгнө үү`); }
+      if (me.teacher) { const nw = (st.hands || []).filter((u) => !(prev.hands || []).includes(u)); if (nw.length) toast(`✋ ${nw.map((u) => st.names?.[u] || "Суралцагч").join(", ")} гар өргөлөө — «Дуут өрөө» хэсгээс ярих эрх өгнө үү`); }
       else if (onStage() && !(prev.stage || []).includes(me.uid)) toast("🎤 Багш танд бүх ангид ярих эрх өглөө — «Ярих» дарж микрофоноо асаагаарай");
       else if (!onStage() && (prev.stage || []).includes(me.uid)) toast("Ярих эрх дууслаа — баярлалаа 🙏");
     }
@@ -1748,7 +1748,7 @@ function board({ base, lid, bid, title = "Цагаан самбар", teacher: o
   async function distribute() {
     closePops();
     if (st.mode === "teach") return toast("Эхлээд «Хувиараа» эсвэл «Багаар» горимд шилжүүлнэ үү");
-    if (!confirm("Таны самбарыг бүх хүүхдийн (багийн) самбарт хуулна. Тэдний одоогийн зурсан зүйл солигдоно. Үргэлжлүүлэх үү?")) return;
+    if (!confirm("Таны самбарыг бүх суралцагчийн (багийн) самбарт хуулна. Тэдний самбар дээрх одоогийн зураг солигдоно. Үргэлжлүүлэх үү?")) return;
     await flushAll();
     const d = await setState({ distribute: true });
     if (d) toast("Ажлын хуудас тарааллаа ✓");
@@ -1893,7 +1893,7 @@ function imageEditor(src) {
           <button type="button" data-m="restore">${bi("restore", 18)}<span>Сэргээх бийр</span></button>
           <label class="bd-ie-rng">Мэдрэмж <output>28</output><input type="range" data-r="tol" min="4" max="90" value="28"></label>
           <label class="bd-ie-rng">Бийрний хэмжээ <output>36</output><input type="range" data-r="brush" min="6" max="160" value="36"></label>
-          <div class="bd-ie-row"><button type="button" data-ie="undo" disabled>${bi("undo", 16)}Буцаах</button><button type="button" data-ie="reset" disabled>Анхны</button></div>
+          <div class="bd-ie-row"><button type="button" data-ie="undo" disabled>${bi("undo", 16)}Буцаах</button><button type="button" data-ie="reset" disabled>Анхны төлөв</button></div>
         </aside>
         <div class="bd-ie-stage"><canvas></canvas><p class="bd-ie-hint"></p><div class="bd-ie-apply" hidden></div></div>
       </div>
@@ -1906,8 +1906,8 @@ function imageEditor(src) {
     let cur = null, orig = null, s0 = 1, offX = 0, offY = 0, mode = "", tol = 28, brush = 36, hist = [], crop = null, lasso = null, dragging = null, hover = null;
     let sx = 1, ox = 0, oy = 0, dirty = false;
     const HINTS = {
-      auto: "Ирмэгтэй холбоотой нэг өнгийн дэвсгэрийг арилгалаа. Үлдсэн хэсэг дээр «Дарж арилгах»-аар дарна.",
-      wand: "Арилгах өнгөт хэсэг дээр дарна (мэдрэмжийг тохируулж болно)",
+      auto: "Ирмэгт залгаа нэг өнгийн дэвсгэрийг арилгалаа. Үлдсэн хэсгийг «Дарж арилгах» хэрэгслээр арилгана уу.",
+      wand: "Арилгах өнгөтэй хэсэг дээр дарна (мэдрэмжийг тохируулж болно)",
       crop: "Хүрээний булан, ирмэгийг чирж тайрах хэсгээ сонгоно",
       lasso: "Үлдээх (эсвэл хасах) хэсгийнхээ эргэн тойронд зурна",
       erase: "Арилгах газраа будна", restore: "Андуурч арилгасан хэсгийг будаж сэргээнэ",
@@ -1966,7 +1966,7 @@ function imageEditor(src) {
     }
     function showApply() {
       if (mode === "crop") applyBar.innerHTML = `<button type="button" class="btn btn-gold btn-sm" data-ie="crop">${bi("check", 16)}Тайрах</button>`;
-      else if (mode === "lasso" && lasso?.length > 2 && !dragging) applyBar.innerHTML = `<button type="button" class="btn btn-gold btn-sm" data-ie="keep">Дотрохыг үлдээх</button><button type="button" class="btn btn-glass btn-sm" data-ie="cut">Дотрохыг хасах</button><button type="button" class="btn btn-ghost btn-sm" data-ie="relasso">Дахин зурах</button>`;
+      else if (mode === "lasso" && lasso?.length > 2 && !dragging) applyBar.innerHTML = `<button type="button" class="btn btn-gold btn-sm" data-ie="keep">Доторхыг үлдээх</button><button type="button" class="btn btn-glass btn-sm" data-ie="cut">Доторхыг хасах</button><button type="button" class="btn btn-ghost btn-sm" data-ie="relasso">Дахин зурах</button>`;
       else { applyBar.hidden = true; return; }
       applyBar.hidden = false;
     }
@@ -2017,7 +2017,7 @@ function imageEditor(src) {
         return false;
       };
       const f = flood(border.filter(like), false);
-      if (f > 0.97 || f === 0) { undoOne(); toast(f ? "Дэвсгэрийг ялгаж чадсангүй — мэдрэмжийг багасгаад, эсвэл «Дарж арилгах»-аар оролдоно уу" : "Ирмэгт нэг өнгийн дэвсгэр олдсонгүй — «Дарж арилгах» эсвэл лассо ашиглана уу", true); return; }
+      if (f > 0.97 || f === 0) { undoOne(); toast(f ? "Дэвсгэрийг ялгаж чадсангүй — мэдрэмжийг багасгаж үзэх эсвэл «Дарж арилгах» хэрэгслийг ашиглана уу" : "Ирмэгт нэг өнгийн дэвсгэр олдсонгүй — «Дарж арилгах» эсвэл лассо ашиглана уу", true); return; }
       setMode("wand"); hint.textContent = HINTS.auto; draw();
     }
     function undoOne() { const h = hist.pop(); if (!h) return; cur = h.cur; orig = h.orig; offX = h.offX; offY = h.offY; dirty = hist.length > 0; syncBtns(); setMode(mode === "crop" ? "wand" : mode); }

@@ -8,10 +8,10 @@ import (
 	"surgalt/internal/store"
 )
 
-// Суралцагчийн өөрийн хуудас ("Миний хэсэг"): цол, зөвлөмж, сургалт бүрийн цол, даалгавар ба шалгалтын
+// Суралцагчийн өөрийн хуудас ("Миний хэсэг"): эрэмбэ, зөвлөмж, сургалт бүрийн эрэмбэ, даалгавар ба шалгалтын
 // хугацаа, төлөв, дүн — бүгдийг нэг дор.
 
-// HomeCourseRank — нэг сургалт дахь цол.
+// HomeCourseRank — нэг сургалт дахь эрэмбэ.
 type HomeCourseRank struct {
 	CourseID string       `json:"course_id"`
 	Title    string       `json:"title"`
@@ -37,8 +37,8 @@ type HomeTask struct {
 	Extra       map[string]any `json:"extra,omitempty"`
 }
 
-// myProgress — суралцагчийн бүх сургалтаар цол ба даалгавар/шалгалтын төлөвийг нэгтгэнэ.
-// Цолыг системээр дахин тооцож (autoAward) шинэ түвшин олгогдсон бол awarded=true.
+// myProgress — суралцагчийн бүх сургалтаар эрэмбэ ба даалгавар/шалгалтын төлөвийг нэгтгэнэ.
+// Эрэмбийг системээр дахин тооцож (autoAward) шинэ түвшин олгогдсон бол awarded=true.
 func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCourse) (rank RankInfo, byCourse []HomeCourseRank, tasks []HomeTask, awarded bool) {
 	var all []LessonRank
 	var infos []RankInfo
@@ -46,7 +46,7 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 	now := time.Now()
 	for _, hc := range courses {
 		c := hc.Course
-		if teaches(&c, uid) { // багшийн өөрийн сургалт (урьдчилан үзсэн) цол, даалгаварт орохгүй
+		if teaches(&c, uid) { // багшийн өөрийн сургалт (урьдчилан үзсэн) эрэмбэ, даалгаварт орохгүй
 			continue
 		}
 		lessons, err := s.store.LessonsByCourse(ctx, c.ID)
@@ -69,10 +69,16 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 			infos, titles = append(infos, info), append(titles, c.Title)
 			byCourse = append(byCourse, HomeCourseRank{CourseID: c.ID, Title: c.Title, Rank: info, Lessons: ranks})
 		}
+		var passes map[string]map[string]bool // төлсөн эрх (зөвхөн эрхтэй, үзээгүй мөрийнх ч) — шалгалт/даалгавартай үед л
 		for i := range lessons {
 			l := &lessons[i]
 			if l.Exam == nil && l.Assignment == nil {
 				continue
+			}
+			if passes == nil {
+				if passes, _ = s.store.LessonPasses(ctx, uid, c.ID); passes == nil {
+					passes = map[string]map[string]bool{}
+				}
 			}
 			t := HomeTask{CourseID: c.ID, CourseTitle: c.Title, LessonID: l.ID, Title: l.Title, Kind: "assignment"}
 			var d store.Due
@@ -81,8 +87,8 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 			} else {
 				d, t.MaxScore = l.Assignment.Due, l.Assignment.MaxScore
 			}
-			feePass := progress[l.ID].Quiz[store.FeePassKey] || (d.Fee > 0 && s.boughtLesson(ctx, uid, c.ID, l.ID))
-			t.Due = dueStateOf(d, progress[l.ID].Quiz[store.LatePassKey], feePass, now)
+			feePass := passes[l.ID][store.FeePassKey] || (d.Fee > 0 && s.boughtLesson(ctx, uid, c.ID, l.ID))
+			t.Due = dueStateOf(d, passes[l.ID][store.LatePassKey], feePass, now)
 			switch {
 			case t.Due.NotStarted:
 				t.Status = "not_started"
@@ -122,7 +128,7 @@ func (s *Server) myProgress(ctx context.Context, uid string, courses []HomeCours
 			tasks = append(tasks, t)
 		}
 	}
-	// Нэгдсэн цол бүх хичээлийг нэгтгэнэ: элсээгүй ч үнэгүй хичээл үзэж оноо авсан сургалтууд мөн орно
+	// Нэгдсэн эрэмбэ бүх хичээлийг нэгтгэнэ: элсээгүй ч үнэгүй хичээл үзэж оноо авсан сургалтууд мөн орно
 	// (систем олгосон нийт оноотой ижил байна).
 	seen := make(map[string]bool, len(courses))
 	for _, hc := range courses {

@@ -48,7 +48,7 @@ func processImage(path string) (w, h int, err error) {
 		return 0, 0, ErrImage
 	}
 	if cfg.Width*cfg.Height > maxPixels {
-		return 0, 0, fmt.Errorf("%w: %dx%d хэт том", ErrImage, cfg.Width, cfg.Height)
+		return 0, 0, fmt.Errorf("%w: %dx%d хэмжээтэй зураг хэт том байна", ErrImage, cfg.Width, cfg.Height)
 	}
 	src, _, err := image.Decode(bytes.NewReader(raw))
 	if err != nil {

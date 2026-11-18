@@ -117,13 +117,13 @@ func (s *Server) handleSetPayoutAccount(w http.ResponseWriter, r *http.Request) 
 		writeErr(w, http.StatusBadRequest, "банкаа сонгоно уу")
 		return
 	case !acctNoRe.MatchString(in.AccountNo):
-		writeErr(w, http.StatusBadRequest, "дансны дугаар буруу (6–20 цифр эсвэл MN-ээр эхэлсэн IBAN)")
+		writeErr(w, http.StatusBadRequest, "дансны дугаараа шалгана уу (6–20 оронтой тоо эсвэл MN-ээр эхэлсэн IBAN)")
 		return
 	case utf8.RuneCountInString(in.AccountName) < 2 || utf8.RuneCountInString(in.AccountName) > 100:
 		writeErr(w, http.StatusBadRequest, "данс эзэмшигчийн нэрээ бичнэ үү")
 		return
 	case !validSchedule(in.Schedule):
-		writeErr(w, http.StatusBadRequest, "татах хуваарь буруу")
+		writeErr(w, http.StatusBadRequest, "татах хуваариа сонгоно уу")
 		return
 	}
 	ctx, now := r.Context(), time.Now()
@@ -164,7 +164,7 @@ func (s *Server) handleWithdraw(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case want < s.payoutMin():
-		writeErr(w, http.StatusBadRequest, fmt.Sprintf("хамгийн багадаа %s татна", money(s.payoutMin())))
+		writeErr(w, http.StatusBadRequest, fmt.Sprintf("хамгийн багадаа %s татах боломжтой", money(s.payoutMin())))
 		return
 	case want > bal.Available:
 		writeErr(w, http.StatusBadRequest, "үлдэгдэл хүрэлцэхгүй байна")
@@ -576,7 +576,7 @@ func (s *Server) handleAdminPayout(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "төлөв буруу")
 		return
 	case utf8.RuneCountInString(in.Note) > 300:
-		writeErr(w, http.StatusBadRequest, "тайлбар 300 тэмдэгтээс ихгүй")
+		writeErr(w, http.StatusBadRequest, "тайлбар 300 тэмдэгтээс хэтрэхгүй байх ёстой")
 		return
 	case in.Status == store.PayoutRejected && in.Note == "":
 		writeErr(w, http.StatusBadRequest, "татгалзсан шалтгаанаа бичнэ үү")
@@ -601,7 +601,7 @@ func (s *Server) handleAdminPayout(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if errors.Is(err, errDone) {
-		writeErr(w, http.StatusConflict, "энэ хүсэлтийг аль хэдийн шийдвэрлэсэн")
+		writeErr(w, http.StatusConflict, "энэ хүсэлтийг аль хэдийн шийдвэрлэсэн байна")
 		return
 	}
 	if s.storeErr(w, r, err) {
@@ -617,8 +617,8 @@ func (s *Server) handleAdminPayout(w http.ResponseWriter, r *http.Request) {
 		n.Title = "✅ Орлого данс руу шилжлээ · " + money(p.Amount)
 		n.Body = bankName(p.Bank) + " " + p.AccountNo
 	} else {
-		n.Title = "⚠️ Татах хүсэлт татгалзагдлаа · " + money(p.Amount)
-		n.Body = in.Note + " — дүн үлдэгдэлд буцлаа"
+		n.Title = "⚠️ Орлого татах хүсэлтээс татгалзлаа · " + money(p.Amount)
+		n.Body = in.Note + " — татах гэсэн мөнгө үлдэгдэлд тань буцаж орлоо"
 	}
 	s.notify(ctx, n)
 	writeJSON(w, http.StatusOK, p)

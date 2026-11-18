@@ -26,7 +26,7 @@ func (s *Server) handleSaveReflection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if teaches(course, c.UID) {
-		writeErr(w, http.StatusBadRequest, "өөрийн хичээлд дүгнэлт бичихгүй")
+		writeErr(w, http.StatusBadRequest, "өөрийн хичээлд дүгнэлт бичих шаардлагагүй")
 		return
 	}
 	var in struct {
@@ -38,11 +38,11 @@ func (s *Server) handleSaveReflection(w http.ResponseWriter, r *http.Request) {
 	in.Text = strings.TrimSpace(in.Text)
 	words := len(strings.Fields(in.Text))
 	if utf8.RuneCountInString(in.Text) > reflectionMaxChars {
-		writeErr(w, http.StatusBadRequest, "дүгнэлт 2000 тэмдэгтээс хэтрэхгүй")
+		writeErr(w, http.StatusBadRequest, "дүгнэлт 2000 тэмдэгтээс хэтрэхгүй байх ёстой")
 		return
 	}
 	if words < reflectionMinWords {
-		writeErr(w, http.StatusBadRequest, "дор хаяж 3 үгээр бичнэ үү")
+		writeErr(w, http.StatusBadRequest, "дүгнэлтээ дор хаяж 3 үгээр бичнэ үү")
 		return
 	}
 	ref := &store.Reflection{UserID: c.UID, UserName: s.displayName(r.Context(), c.UID, c.Name), CourseID: course.ID, LessonID: l.ID, Lesson: l.Title,

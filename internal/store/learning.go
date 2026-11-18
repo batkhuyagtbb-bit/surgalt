@@ -34,6 +34,18 @@ const (
 	AttemptExpired    = "expired"
 )
 
+// BoxOpen — бэлгийн хайрцаг нээсэн бичлэг: Box — хайрцгийн төрөл, Animal — гарсан амьтны түвшин (эрэмбийн шатлалаар),
+// Cost — зарцуулсан зоос, Refund — давхардсан амьтанд буцаасан зоос.
+type BoxOpen struct {
+	ID     string    `json:"id"`
+	UserID string    `json:"-"`
+	Box    string    `json:"box"`
+	Animal int       `json:"animal"`
+	Cost   int       `json:"cost"`
+	Refund int       `json:"refund"`
+	At     time.Time `json:"at"`
+}
+
 // StudySession — суралцагчийн нэг удаагийн үзэлт (хичээл, шалгалт, ном). Идэвхтэй, идэвхгүй,
 // өөр цонхонд байсан хугацаа ба анхаарлын оноог зүрхний цохилт (heartbeat) бүрээр нэмнэ.
 type StudySession struct {
@@ -156,13 +168,18 @@ type LearningStore interface {
 	AddActivityEvents(ctx context.Context, evs []ActivityEvent) error
 	ActivityEvents(ctx context.Context, f ActivityFilter, limit int) ([]ActivityEvent, error)
 
-	// Цэргийн цол: сургалт бүрийн оноог хадгалж нийлбэрийг буцаана; олгосон түвшинг хэрэглэгчээр хадгална
+	// Суралцахуйн эрэмбэ: сургалт бүрийн оноог хадгалж нийлбэрийг буцаана; олгосон түвшинг хэрэглэгчээр хадгална
 	// (систем автоматаар олгож, түвшин дээшлэхэд мэдэгдэнэ).
 	SaveRankPoints(ctx context.Context, userID, courseID string, points int) (average int, err error)
 	// RankCourseIDs — суралцагчийн оноо хадгалагдсан сургалтууд (элсээгүй, зөвхөн үнэгүй хичээл үзсэн ч).
 	RankCourseIDs(ctx context.Context, userID string) ([]string, error)
 	UserRankLevel(ctx context.Context, userID string) (int, error)
 	SetUserRankLevel(ctx context.Context, userID string, level int) error
+	// Системийн бэлэг: суралцахуйн зоосыг оноогоос (бүх сургалтын rank_points-ийн нийлбэр) тооцно;
+	// бэлгийн хайрцаг нээлт бүрийг хадгална (зарцуулсан зоос, гарсан амьтан).
+	RankPointsSum(ctx context.Context, userID string) (int, error)
+	BoxOpens(ctx context.Context, userID string) ([]BoxOpen, error)
+	AddBoxOpen(ctx context.Context, b *BoxOpen) error
 	// Даалгаврын хариу: нэг суралцагч нэг даалгаварт нэг (сүүлийн) хариу.
 	SaveSubmission(ctx context.Context, sub *Submission) error
 	SubmissionFor(ctx context.Context, userID, lessonID string) (*Submission, error)

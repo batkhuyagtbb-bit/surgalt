@@ -223,7 +223,7 @@ func (s *Server) syncPayment(ctx context.Context, o *store.Order, force bool) *s
 func (s *Server) handleQPayCallback(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("o")
 	if s.QPay == nil || id == "" || !constantEq(r.URL.Query().Get("t"), s.payMAC(id)) {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	o, err := s.store.OrderByID(r.Context(), id)

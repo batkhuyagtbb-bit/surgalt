@@ -28,7 +28,7 @@ const (
 
 var (
 	boardNameRe   = regexp.MustCompile(`^[0-9a-f]{32}\.webp$`)
-	ErrBoardFull  = errors.New("энэ хичээлийн самбарт хэт олон зураг орсон")
+	ErrBoardFull  = errors.New("энэ хичээлийн самбарт зураг хэт олон орсон байна")
 	ErrNotesFull  = errors.New("тэмдэглэлийн зураг хэт олон болсон — хуучнаас нь устгана уу")
 	errBoardImage = errors.New("самбарын зургийн нэр буруу")
 )

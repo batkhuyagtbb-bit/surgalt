@@ -83,7 +83,7 @@ func (s *Server) fbDelStatus(code string) (st byte, at time.Time, ok bool) {
 // POST /auth/facebook/data-deletion (form: signed_request) — Facebook-ийн серверээс.
 func (s *Server) handleFBDataDeletion(w http.ResponseWriter, r *http.Request) {
 	if !s.authLim.Allow(s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон хүсэлт")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон хүсэлт ирлээ — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	secret := ""

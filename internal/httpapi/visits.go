@@ -79,7 +79,7 @@ func (s *Server) handleVisitEnd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !constantEq(in.T, s.tokens.MAC("visit", id)) {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	v, err := s.store.VisitByID(r.Context(), id)

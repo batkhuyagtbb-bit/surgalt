@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Нэгдсэн цол — сургалт бүрийн онооны дундаж (олон сургалтад хамрагдсанаар нэмэгдэхгүй).
+// Нэгдсэн эрэмбэ — сургалт бүрийн онооны дундаж (олон сургалтад хамрагдсанаар нэмэгдэхгүй).
 func TestRankPointsAverage(t *testing.T) {
 	m, ctx := NewMemory(), context.Background()
 	if avg, _ := m.SaveRankPoints(ctx, "u", "a", 900); avg != 900 {

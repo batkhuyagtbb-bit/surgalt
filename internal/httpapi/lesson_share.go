@@ -79,13 +79,13 @@ func (s *Server) handleShareCourse(w http.ResponseWriter, r *http.Request) {
 	var lesson *store.Lesson
 	switch {
 	case in.Mode != store.ShareView && in.Mode != store.ShareEdit:
-		writeErr(w, http.StatusBadRequest, "эрх буруу")
+		writeErr(w, http.StatusBadRequest, "эрхийн төрлөө сонгоно уу")
 		return
 	case in.Mode == store.ShareEdit && course.TeacherID != c.UID:
 		writeErr(w, http.StatusForbidden, "«Хамт хөгжүүлэх» эрхийг зөвхөн сургалтын эзэмшигч өгнө")
 		return
 	case in.Mode == store.ShareEdit && in.LessonID != "":
-		writeErr(w, http.StatusBadRequest, "«Хамт хөгжүүлэх» эрх сургалтаар өгөгдөнө — хичээлээр «Харах, хадгалах» эрх өгнө")
+		writeErr(w, http.StatusBadRequest, "«Хамт хөгжүүлэх» эрхийг бүхэл сургалтад өгнө — хичээлд зөвхөн «Харах, хадгалах» эрх өгөх боломжтой")
 		return
 	case in.LessonID != "":
 		var err error
@@ -101,10 +101,10 @@ func (s *Server) handleShareCourse(w http.ResponseWriter, r *http.Request) {
 	case s.storeErr(w, r, err):
 		return
 	case t.ID == c.UID:
-		writeErr(w, http.StatusBadRequest, "өөртөө хуваалцахгүй")
+		writeErr(w, http.StatusBadRequest, "өөртөө хуваалцах боломжгүй")
 		return
 	case teaches(course, t.ID):
-		writeErr(w, http.StatusConflict, "«"+t.DisplayName+"» энэ сургалтыг аль хэдийн хамт заадаг")
+		writeErr(w, http.StatusConflict, "«"+t.DisplayName+"» энэ сургалтад аль хэдийн хамт хөгжүүлэгчээр нэгдсэн байна")
 		return
 	}
 	existing, err := s.store.SharesOfCourse(ctx, course.ID)
@@ -112,12 +112,12 @@ func (s *Server) handleShareCourse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if slices.ContainsFunc(existing, func(x store.Share) bool { return x.ToID == t.ID && x.LessonID == in.LessonID && x.Mode == in.Mode }) {
-		writeErr(w, http.StatusConflict, "«"+t.DisplayName+"»-д аль хэдийн хуваалцсан")
+		writeErr(w, http.StatusConflict, "«"+t.DisplayName+"»-д аль хэдийн хуваалцсан байна")
 		return
 	}
 	if in.Mode == store.ShareEdit {
 		if len(course.Teachers) >= maxCourseTeachers {
-			writeErr(w, http.StatusBadRequest, "нэг сургалтыг 10 хүртэл багш хамт хөгжүүлнэ")
+			writeErr(w, http.StatusBadRequest, "нэг сургалтыг 10 хүртэл багш хамт хөгжүүлэх боломжтой")
 			return
 		}
 		updated, err := s.store.SetCourseOrg(ctx, course.TeacherID, course.ID, course.ProgramID, append(slices.Clone(course.Teachers), t.ID))
@@ -135,14 +135,14 @@ func (s *Server) handleShareCourse(w http.ResponseWriter, r *http.Request) {
 	if lesson != nil {
 		what, title = map[string]string{"exam": "шалгалт", "assignment": "даалгавар", "lesson": "хичээл"}[lessonKind(lesson)], lesson.Title
 	}
-	body := "«" + title + "» — харах, өөрийн сургалтад хадгалах эрхтэй. Студийн «Сургалтууд» → «Надад хуваалцсан» хэсэгт."
+	body := "«" + title + "» — та үүнийг харж, өөрийн сургалтад хадгалах боломжтой. Студийн «Сургалтууд» → «Надад хуваалцсан» хэсгээс нээнэ үү."
 	link := "/me#courses"
 	switch {
 	case in.Mode == store.ShareEdit:
-		body = "«" + title + "» — хамт хөгжүүлэх эрхтэй: студийн «Сургалтууд» хэсэгт нээж хичээл оруулж, засна."
+		body = "«" + title + "» — та хамт хөгжүүлэх эрхтэй боллоо: студийн «Сургалтууд» хэсгээс нээж, хичээл нэмж, засах боломжтой."
 		link = "/me#course=" + course.ID
 	case lesson == nil:
-		body = "«" + title + "» — хичээлүүдийг нь харж, өөрийн сургалт болгон хуулж аваад дараалал, бүлгийг нь өөрөө зохион байгуулна."
+		body = "«" + title + "» — хичээлүүдийг нь харж, өөрийн сургалт болгон хуулж аваад дараалал, бүлгийг нь өөрөө зохион байгуулах боломжтой."
 		link = "/me#shared=" + sh.ID
 	}
 	s.notify(ctx, &store.Notification{UserID: t.ID, Type: NotifAccount, Count: 1, ActorID: c.UID,
@@ -226,7 +226,7 @@ func (s *Server) handleDeleteShare(w http.ResponseWriter, r *http.Request) {
 	}
 	if sh.Mode == store.ShareEdit {
 		if course.TeacherID != c.UID {
-			writeErr(w, http.StatusForbidden, "хамт хөгжүүлэгчийг зөвхөн эзэмшигч хасна")
+			writeErr(w, http.StatusForbidden, "хамт хөгжүүлэгчийг зөвхөн сургалтын эзэмшигч хасна")
 			return
 		}
 		if slices.Contains(course.Teachers, sh.ToID) {
@@ -268,7 +268,7 @@ func (s *Server) myShare(w http.ResponseWriter, r *http.Request, uid string) (*s
 	}
 	course, err := s.store.CourseByID(r.Context(), sh.CourseID)
 	if errors.Is(err, store.ErrNotFound) {
-		writeErr(w, http.StatusNotFound, "хуваалцсан сургалт устсан")
+		writeErr(w, http.StatusNotFound, "хуваалцсан сургалт устгагдсан байна")
 		return nil, nil, false
 	}
 	if s.storeErr(w, r, err) {
@@ -335,7 +335,7 @@ func (s *Server) handleSharedView(w http.ResponseWriter, r *http.Request) {
 		}
 		var cp store.Lesson
 		if b, err := json.Marshal(l); err != nil || json.Unmarshal(b, &cp) != nil {
-			writeErr(w, http.StatusInternalServerError, "хичээлийг уншиж чадсангүй")
+			writeErr(w, http.StatusInternalServerError, "хичээлийг уншиж чадсангүй — дахин оролдоно уу")
 			return
 		}
 		cp.VideoURL = s.media(cp.VideoURL)
@@ -417,7 +417,7 @@ func (s *Server) handleSharedSave(w http.ResponseWriter, r *http.Request) {
 		srcLessons = all
 		if len(in.LessonIDs) > 0 {
 			if len(in.LessonIDs) > 2000 {
-				writeErr(w, http.StatusBadRequest, "хэт олон хичээл")
+				writeErr(w, http.StatusBadRequest, "хичээл хэт олон байна")
 				return
 			}
 			want := map[string]bool{}
@@ -432,7 +432,7 @@ func (s *Server) handleSharedSave(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(srcLessons) == 0 {
-		writeErr(w, http.StatusBadRequest, "хадгалах хичээл алга")
+		writeErr(w, http.StatusBadRequest, "хадгалах хичээлээ сонгоно уу")
 		return
 	}
 	// Хадгалах сургалтын эзэн — файлууд түүний санд хуулагдаж, багтаамжийг нь ашиглана (шинэ сургалт бол өөрөө).
@@ -476,12 +476,12 @@ func (s *Server) handleSharedSave(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if free := max(0, fc.quota-used); need > free {
-			whose := "Таны"
+			whose := "таны"
 			if ownerID != c.UID {
-				whose = "Сургалтын эзэмшигчийн"
+				whose = "сургалтын эзэмшигчийн"
 			}
 			writeErr(w, http.StatusRequestEntityTooLarge, "Файлын сан хүрэлцэхгүй: сонгосон хичээлүүдийн файл "+mbLabel(need)+", "+whose+
-				" санд "+mbLabel(free)+" сул байна (нийт "+mbLabel(fc.quota)+"). Цөөн хичээл сонгох, эсвэл «Данс» → «Файлын сан»-аас багтаамжаа нэмнэ үү.")
+				" санд "+mbLabel(free)+" сул байна (нийт "+mbLabel(fc.quota)+"). Цөөн хичээл сонгох эсвэл «Данс» → «Файлын сан» хэсгээс багтаамжаа нэмнэ үү.")
 			return
 		}
 	}
@@ -588,7 +588,7 @@ func (e *copyErr) Error() string { return e.msg }
 func (s *Server) copyLesson(ctx context.Context, target *store.Course, src *store.Lesson, section string, hidden bool, cpFile func(string) (string, error)) (*store.Lesson, error) {
 	var cp store.Lesson // гүн хуулбар: кэшээс ирсэн хичээлийн блок, асуултыг өөрчлөхгүй
 	if b, err := json.Marshal(src); err != nil || json.Unmarshal(b, &cp) != nil {
-		return nil, &copyErr{http.StatusInternalServerError, "хичээлийг хуулж чадсангүй"}
+		return nil, &copyErr{http.StatusInternalServerError, "хичээлийг хуулж чадсангүй — дахин оролдоно уу"}
 	}
 	in := lessonInput{Hidden: hidden, Title: cp.Title, Content: cp.Content, IsFree: cp.IsFree, Price: cp.Price, UnlockAfterH: cp.UnlockAfterH,
 		AlwaysOpen: cp.AlwaysOpen, Format: cp.Format, Mode: cp.Mode, Section: section, Blocks: cp.Blocks, ActiveMin: cp.ActiveMin,

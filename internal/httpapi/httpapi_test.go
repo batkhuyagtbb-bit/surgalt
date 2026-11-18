@@ -14,6 +14,7 @@ import (
 	"image/png"
 	"io"
 	"log/slog"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -1383,7 +1384,18 @@ func TestEngagementEvidence(t *testing.T) {
 	if st["learn_score"].(float64) <= 0 {
 		t.Fatalf("суралцсан оноо тооцогдоогүй: %v", st)
 	}
+	// Анхаарлын индекс = төвлөрөл 60% + видео үзэлт 40% (хичээлийн сессгүй бол зөвхөн видео үзэлт).
+	want := math.Round(0.6*st["focus"].(float64) + 0.4*st["video_coverage"].(float64))
+	if st["total_sec"].(float64) == 0 {
+		want = st["video_coverage"].(float64)
+	}
+	if st["attention"].(float64) != want {
+		t.Fatalf("анхаарлын индекс %v, хүлээсэн %v: %v", st["attention"], want, st)
+	}
 	tot := an["data"].(map[string]any)["totals"].(map[string]any)
+	if tot["video_students"].(float64) != 1 || tot["video_coverage"] != st["video_coverage"] || tot["focus"] != st["focus"] {
+		t.Fatalf("нийт төвлөрөл, видео үзэлт буруу: %v", tot)
+	}
 	if tot["reflections"].(float64) != 1 {
 		t.Fatalf("нийт дүгнэлт буруу: %v", tot)
 	}
@@ -1415,7 +1427,7 @@ func TestEngagementEvidence(t *testing.T) {
 	}
 	body, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	for _, want := range []string{"Асуултад зөв хариулсан", "Дүгнэлт бичсэн тоо", "Суралцсан оноо", "stud"} {
+	for _, want := range []string{"Асуултад зөв хариулсан", "Эргэцүүлэл бичсэн тоо", "Суралцахуйн оноо", "stud"} {
 		if !strings.Contains(string(body), want) {
 			t.Errorf("CSV-д %q алга", want)
 		}
@@ -1678,16 +1690,16 @@ func TestQuizMasteryUnlock(t *testing.T) {
 	}
 }
 
-// Цэргийн цол: хичээл бүр оноо нэмнэ (цол биш), хуулах оролдлоготой хичээлийн оноо тооцогдохгүй; нэгтгэж нэг цол.
-func TestMilitaryRanks(t *testing.T) {
-	if r := RankFor(0); r.Name != "Шинэ цэрэг" || r.Next != 60 {
-		t.Fatalf("эхний цол: %+v", r)
+// Суралцахуйн эрэмбэ: хичээл бүр оноо нэмнэ (эрэмбэ биш), хуулах оролдлоготой хичээлийн оноо тооцогдохгүй; нэгтгэж нэг эрэмбэ.
+func TestLearningRanks(t *testing.T) {
+	if r := RankFor(0); r.Name != "Оч" || r.Next != 60 || r.Emoji != "✨" || r.Meaning == "" {
+		t.Fatalf("эхний эрэмбэ: %+v", r)
 	}
-	if r := RankFor(420); r.Name != "Түрүүч" || r.NextName != "Ахлах түрүүч" || r.Progress != 13 {
+	if r := RankFor(420); r.Name != "Зальжин үнэг" || r.NextName != "Алсын шар шувуу" || r.Progress != 13 {
 		t.Fatalf("420 оноо: %+v", r)
 	}
-	if r := RankFor(99999); r.Name != "Генерал" || r.Next != 0 || r.Progress != 100 {
-		t.Fatalf("дээд цол: %+v", r)
+	if r := RankFor(99999); r.Name != "Ертөнцийг бүтээгч" || r.Next != 0 || r.Progress != 100 || RankFor(6699).Name != "Тэнгэрийн луу" {
+		t.Fatalf("дээд эрэмбэ: %+v", r)
 	}
 	now := time.Now()
 	l := &store.Lesson{ID: "l1", Title: "Нэг", ActiveMin: 10, Blocks: []store.Block{{ID: "q001", Type: "quiz", Quiz: &store.Quiz{Question: "?"}}, {ID: "v001", Type: "video", URL: "/files/x/private/a.mp4"}}}
@@ -1704,7 +1716,7 @@ func TestMilitaryRanks(t *testing.T) {
 	// Хуулах оролдлого → 0 оноо, тооцогдохгүй.
 	cheat := []*store.StudySession{{LessonID: "l1", Kind: "lesson", ActiveSec: 700, Counts: map[string]int{"copy": 1}}}
 	if lr := lessonPoints(l, full, cheat, true, 100, true); !lr.Disqualified || lr.Points != 0 {
-		t.Fatalf("хуулсан хичээлд цол олгох ёсгүй: %+v", lr)
+		t.Fatalf("хуулсан хичээлд эрэмбэ олгох ёсгүй: %+v", lr)
 	}
 	// Хагас: дуусгаагүй, идэвхтэй хугацаа хагас, асуулга буруу, дүгнэлтгүй, видео 50%.
 	half := &store.LessonProgress{LessonID: "l1", ViewedAt: now, Quiz: map[string]bool{"q001": false}}
@@ -1719,11 +1731,11 @@ func TestMilitaryRanks(t *testing.T) {
 		t.Fatalf("энгийн хичээл (5+10+30)/60: %+v", lr)
 	}
 
-	// Бүтэн урсгал: сурагч хичээл үзэж, асуултад зөв хариулж, дүгнэлт бичнэ → /access-д цол; хуулсан хичээл цолгүй.
+	// Бүтэн урсгал: сурагч хичээл үзэж, асуултад зөв хариулж, дүгнэлт бичнэ → /access-д эрэмбэ; хуулсан хичээл эрэмбэгүй.
 	srv, _ := newTestServer(t)
 	defer srv.Close()
 	tt, _ := register(t, srv, "teach", "teacher")
-	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Цол","price":0,"published":true}`)
+	_, c := call(t, srv, "POST", "/api/courses", tt, `{"title":"Эрэмбэ","price":0,"published":true}`)
 	cid := c["id"].(string)
 	_, l1 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Нэг","is_free":true,"blocks":[{"id":"q001","type":"quiz","quiz":{"question":"?","options":["a","b"],"correct":[0]}}]}`)
 	_, l2 := call(t, srv, "POST", "/api/courses/"+cid+"/lessons", tt, `{"title":"Хоёр","is_free":true}`)
@@ -1742,14 +1754,14 @@ func TestMilitaryRanks(t *testing.T) {
 	ranks := acc["ranks"].(map[string]any)
 	r1, r2 := ranks[lid1].(map[string]any), ranks[lid2].(map[string]any)
 	if r1["points"].(float64) < 90 || r1["disqualified"] == true {
-		t.Fatalf("1-р хичээл өндөр цолтой байх ёстой: %v", r1)
+		t.Fatalf("1-р хичээл өндөр эрэмбэтэй байх ёстой: %v", r1)
 	}
 	if r2["disqualified"] != true || r2["points"].(float64) != 0 || r1["rank"] != nil || r2["rank"] != nil {
-		t.Fatalf("хичээлд цол олгохгүй, хуулсан хичээлийн оноо тооцогдохгүй: %v %v", r1, r2)
+		t.Fatalf("хичээлд эрэмбэ олгохгүй, хуулсан хичээлийн оноо тооцогдохгүй: %v %v", r1, r2)
 	}
 	rank := acc["rank"].(map[string]any)
-	if rank["name"] != "Байлдагч" || rank["cheated"].(float64) != 1 || rank["honest"].(float64) != 1 {
-		t.Fatalf("нэгдсэн цол: %v", rank)
+	if rank["name"] != "Болор хайрга" || rank["cheated"].(float64) != 1 || rank["honest"].(float64) != 1 {
+		t.Fatalf("нэгдсэн эрэмбэ: %v", rank)
 	}
 	// Хуулсан хичээлтэй тул сургалтын интеграцын нэмэлт хаагдсан: оноо = хичээлүүдийн оноо.
 	if in := rank["integration"].(map[string]any); in["bonus"].(float64) != 0 || in["lesson_points"] != rank["points"] {
@@ -1758,33 +1770,33 @@ func TestMilitaryRanks(t *testing.T) {
 	if tips, _ := rank["tips"].([]any); len(tips) == 0 || !strings.Contains(fmt.Sprint(tips), "хуулах") {
 		t.Fatalf("оношилгооны зөвлөмж алга: %v", rank["tips"])
 	}
-	// Систем өөрөө олгосон: нэгдсэн (бүх сургалтын) цол ба суралцагчид мэдэгдэл.
-	if tot := acc["rank_total"].(map[string]any); tot["name"] != "Байлдагч" || acc["rank_awarded"] != true {
-		t.Fatalf("нэгдсэн цол олгогдоогүй / олгосон дохио алга: %v %v", tot, acc["rank_awarded"])
+	// Систем өөрөө олгосон: нэгдсэн (бүх сургалтын) эрэмбэ ба суралцагчид мэдэгдэл.
+	if tot := acc["rank_total"].(map[string]any); tot["name"] != "Болор хайрга" || acc["rank_awarded"] != true {
+		t.Fatalf("нэгдсэн эрэмбэ олгогдоогүй / олгосон дохио алга: %v %v", tot, acc["rank_awarded"])
 	}
 	_, ns := call(t, srv, "GET", "/api/me/notifications", s1, "")
-	if !strings.Contains(fmt.Sprint(ns), "Шинэ цол: Байлдагч") {
-		t.Fatalf("цол олгосон мэдэгдэл алга: %v", ns)
+	if !strings.Contains(fmt.Sprint(ns), "Шинэ эрэмбэ: Болор хайрга") {
+		t.Fatalf("эрэмбэ олгосон мэдэгдэл алга: %v", ns)
 	}
 	call(t, srv, "GET", "/api/courses/"+cid+"/access", s1, "")
 	_, ns2 := call(t, srv, "GET", "/api/me/notifications", s1, "")
-	if strings.Count(fmt.Sprint(ns2), "Шинэ цол") != 1 {
+	if strings.Count(fmt.Sprint(ns2), "Шинэ эрэмбэ") != 1 {
 		t.Fatalf("давхар мэдэгдэл: %v", ns2)
 	}
-	// Багшийн дашбоард: суралцагчийн цол, дэлгэрэнгүйд хичээл бүрийн цол.
+	// Багшийн дашбоард: суралцагчийн эрэмбэ, дэлгэрэнгүйд хичээл бүрийн эрэмбэ.
 	_, an := call(t, srv, "GET", "/api/me/analytics?course="+cid, tt, "")
 	x := an["data"].(map[string]any)["students"].([]any)[0].(map[string]any)
-	if x["rank"].(map[string]any)["name"] != "Байлдагч" {
-		t.Fatalf("дашбоард дахь цол: %v", x["rank"])
+	if x["rank"].(map[string]any)["name"] != "Болор хайрга" {
+		t.Fatalf("дашбоард дахь эрэмбэ: %v", x["rank"])
 	}
 	tot := an["data"].(map[string]any)["totals"].(map[string]any)
-	if tot["cheated_lessons"].(float64) != 1 || tot["rank_dist"].(map[string]any)["Байлдагч"].(float64) != 1 {
-		t.Fatalf("нийт цол: %v", tot)
+	if tot["cheated_lessons"].(float64) != 1 || tot["rank_dist"].(map[string]any)["Болор хайрга"].(float64) != 1 {
+		t.Fatalf("нийт эрэмбэ: %v", tot)
 	}
 	_, det := call(t, srv, "GET", "/api/me/analytics/students/"+uid+"?course="+cid, tt, "")
 	lrs := det["student"].(map[string]any)["lesson_ranks"].([]any)
 	if len(lrs) != 2 {
-		t.Fatalf("хичээл бүрийн цол 2 байх ёстой: %v", lrs)
+		t.Fatalf("хичээл бүрийн эрэмбэ 2 байх ёстой: %v", lrs)
 	}
 }
 
@@ -1826,7 +1838,7 @@ func TestMediaTicket(t *testing.T) {
 		res.Body.Close()
 		return res
 	}
-	if r := get("video", "no-cors", "bytes=0-99"); r.StatusCode != 206 || r.Header.Get("Content-Type") != "video/webm" || r.Header.Get("Cache-Control") != "private, no-store" {
+	if r := get("video", "no-cors", "bytes=0-99"); r.StatusCode != 206 || r.Header.Get("Content-Type") != "video/webm" || r.Header.Get("Cache-Control") != "private, max-age=10800" { // тасалбар хэрэглэгчид холбогдсон тул хувийн кэш (media.go)
 		t.Fatalf("<video>-оос Range хүсэлт 206 байх ёстой: %d %v", r.StatusCode, r.Header)
 	}
 	if r := get("document", "navigate", ""); r.StatusCode != 403 {
@@ -1953,6 +1965,17 @@ func TestAssignmentAndDueFlow(t *testing.T) {
 	if sm := info["submission"].(map[string]any); sm["score"].(float64) != 42 || sm["feedback"] != "Сайн, гэхдээ дүгнэлт сул" {
 		t.Fatalf("суралцагчид дүн харагдахгүй байна: %v", sm)
 	}
+	// Хэрэглээ хэмжүүр: үнэлгээ 42/50 = 84% (70%) + илгээсэн 1/1 (30%) = 89.
+	_, an := call(t, srv, "GET", "/api/me/analytics?course="+cid, tt, "")
+	var stu map[string]any
+	for _, x := range an["data"].(map[string]any)["students"].([]any) {
+		if m := x.(map[string]any); m["user_id"] == uid {
+			stu = m
+		}
+	}
+	if stu == nil || stu["assign_graded"].(float64) != 1 || stu["assign_pct"].(float64) != 84 || stu["dims"].([]any)[3].(float64) != 89 {
+		t.Fatalf("хэрэглээ хэмжүүр: %v", stu)
+	}
 	_, sn := call(t, srv, "GET", "/api/me/notifications", s1, "")
 	if !strings.Contains(fmt.Sprint(sn), "Даалгавар дүгнэгдлээ: 42/50") {
 		t.Fatalf("суралцагчид дүнгийн мэдэгдэл алга: %v", sn)
@@ -2034,7 +2057,7 @@ func TestAssignmentAndDueFlow(t *testing.T) {
 	if code, _ := call(t, srv, "POST", "/api/courses/"+cid+"/lessons/"+e6["id"].(string)+"/exam/start", s1, ""); code != 200 && code != 201 {
 		t.Fatalf("хоёр төлбөрөө төлсний дараа эхлэх ёстой: %d", code)
 	}
-	// Суралцагчийн өөрийн хуудас: даалгавар дүнтэйгээ, цол харагдана.
+	// Суралцагчийн өөрийн хуудас: даалгавар дүнтэйгээ, эрэмбэ харагдана.
 	_, home := call(t, srv, "GET", "/api/me/home", s1, "")
 	tasks := home["tasks"].([]any)
 	var mine map[string]any
@@ -2047,7 +2070,7 @@ func TestAssignmentAndDueFlow(t *testing.T) {
 		t.Fatalf("өөрийн хуудсанд даалгаврын дүн алга: %v", mine)
 	}
 	if home["rank"] == nil || home["rank"].(map[string]any)["name"] == "" {
-		t.Fatalf("өөрийн хуудсанд цол алга: %v", home["rank"])
+		t.Fatalf("өөрийн хуудсанд эрэмбэ алга: %v", home["rank"])
 	}
 	// Хөтөлбөрт даалгаврын мэдээлэл олон нийтэд харагдана (хугацаа).
 	_, pc := call(t, srv, "GET", "/api/courses/"+cid, s1, "")
@@ -2808,7 +2831,7 @@ func TestAnalyticsEventsPaging(t *testing.T) {
 	}
 }
 
-// Нэгдсэн цол: хичээлд цол олгохгүй; бүлэг, сургалтын бүх хичээлийг шударгаар дуусгавал интеграцын нэмэлт.
+// Нэгдсэн эрэмбэ: хичээлд эрэмбэ олгохгүй; бүлэг, сургалтын бүх хичээлийг шударгаар дуусгавал интеграцын нэмэлт.
 func TestRankIntegration(t *testing.T) {
 	now := time.Now()
 	lessons := []store.Lesson{{ID: "a1", Section: "А"}, {ID: "a2", Section: "А"}, {ID: "b1", Section: "Б"}}
@@ -2843,14 +2866,14 @@ func TestRankIntegration(t *testing.T) {
 	if in := ri.Integration; in.Sections != 1 || in.Courses != 0 || in.Bonus != 10 || ri.Cheated != 1 {
 		t.Fatalf("хуулсан бол интеграц хаагдана: %+v %+v", in, ri)
 	}
-	// Бүх сургалтын цол: оноо нь сургалтуудын дундаж, интеграцын задаргаа нийлбэр.
+	// Бүх сургалтын эрэмбэ: оноо нь сургалтуудын дундаж, интеграцын задаргаа нийлбэр.
 	m := mergeRanks(nil, []RankInfo{ri, ri}, []string{"Х", "Ү"})
 	if m.Points != ri.Points || !m.Average || m.Integration.Bonus != 20 || m.Integration.CoursesAll != 2 || m.Name != RankFor(m.Points).Name {
 		t.Fatalf("нэгтгэл: %+v", m)
 	}
 }
 
-// Нэгдсэн цол: элсээгүй сургалтын үнэгүй хичээлээр авсан оноо ч "Миний хэсэг"-ийн цолд нэгтгэгдэж,
+// Нэгдсэн эрэмбэ: элсээгүй сургалтын үнэгүй хичээлээр авсан оноо ч "Миний хэсэг"-ийн эрэмбэд нэгтгэгдэж,
 // систем олгосон нийт оноотой ижил байна.
 func TestIntegratedRankAllCourses(t *testing.T) {
 	srv, _ := newTestServer(t)
@@ -2882,7 +2905,7 @@ func TestIntegratedRankAllCourses(t *testing.T) {
 	_, home := call(t, srv, "GET", "/api/me/home", s1, "")
 	rk := home["rank"].(map[string]any)
 	if rk["points"].(float64) != total || len(home["course_ranks"].([]any)) != 2 || rk["integration"].(map[string]any)["courses"].(float64) != 2 {
-		t.Fatalf("Миний хэсгийн цол (%v) олгосон нийт оноотой (%v) ижил, 2 сургалт нэгтгэсэн байх ёстой: %v", rk["points"], total, rk)
+		t.Fatalf("Миний хэсгийн эрэмбэ (%v) олгосон нийт оноотой (%v) ижил, 2 сургалт нэгтгэсэн байх ёстой: %v", rk["points"], total, rk)
 	}
 }
 

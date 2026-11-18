@@ -127,17 +127,17 @@ func (s *Server) pageAdmin(w http.ResponseWriter, r *http.Request) {
 // handleAdminLogin: POST /api/admin/login {login, password}
 func (s *Server) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	if !s.adminPassOn() {
-		writeErr(w, http.StatusNotFound, "нууц үгээр нэвтрэх тохируулаагүй (ADMIN_LOGIN, ADMIN_PASSWORD_HASH)")
+		writeErr(w, http.StatusNotFound, "нууц үгээр нэвтрэх тохиргоо хийгдээгүй байна (ADMIN_LOGIN, ADMIN_PASSWORD_HASH)")
 		return
 	}
 	if !s.sameOrigin(r) {
-		writeErr(w, http.StatusForbidden, "хүсэлтийн эх сурвалж буруу")
+		writeErr(w, http.StatusForbidden, "хүсэлт зөвшөөрөгдөөгүй эх сурвалжаас ирлээ — хуудсаа сэргээгээд дахин оролдоно уу")
 		return
 	}
 	ip := s.clientIP(r)
 	if !s.admLim.Allow(ip) {
 		w.Header().Set("Retry-After", "60")
-		writeErr(w, http.StatusTooManyRequests, "олон удаа оролдлоо — 1 минутын дараа дахин оролдоно уу")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон удаа оролдлоо — 1 минутын дараа дахин оролдоно уу")
 		return
 	}
 	var in struct {
@@ -149,7 +149,7 @@ func (s *Server) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	ok, err := auth.CheckPassword(r.Context(), s.cfg.AdminPassHash, in.Password)
 	if err != nil {
-		writeErr(w, http.StatusServiceUnavailable, "түр завгүй байна")
+		writeErr(w, http.StatusServiceUnavailable, "систем түр ачаалалтай байна — дахин оролдоно уу")
 		return
 	}
 	if !ok || !constantEq(strings.TrimSpace(in.Login), s.cfg.AdminLogin) {
@@ -159,7 +159,7 @@ func (s *Server) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	tok, err := s.tokens.Seal(adminSess{L: s.cfg.AdminLogin, H: s.adminHashTag()}, adminTTL)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "дотоод алдаа")
+		writeErr(w, http.StatusInternalServerError, "системд алдаа гарлаа — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: adminCookie, Value: tok, Path: "/api/admin", MaxAge: int(adminTTL.Seconds()),
@@ -1110,13 +1110,13 @@ func (s *Server) handleAdminAddExpense(w http.ResponseWriter, r *http.Request) {
 	d, err := time.ParseInLocation("2006-01-02", in.Date, time.Local)
 	switch {
 	case err != nil:
-		writeErr(w, http.StatusBadRequest, "огноо буруу")
+		writeErr(w, http.StatusBadRequest, "огноо буруу байна")
 		return
 	case d.After(time.Now().AddDate(0, 0, 1)):
-		writeErr(w, http.StatusBadRequest, "ирээдүйн огноогоор зардал бүртгэхгүй")
+		writeErr(w, http.StatusBadRequest, "ирээдүйн огноогоор зардал бүртгэх боломжгүй")
 		return
 	case in.Amount <= 0 || in.Amount > 1_000_000_000_000:
-		writeErr(w, http.StatusBadRequest, "дүн буруу")
+		writeErr(w, http.StatusBadRequest, "дүн буруу байна")
 		return
 	}
 	in.Category = strings.Join(strings.Fields(in.Category), " ")
@@ -1125,7 +1125,7 @@ func (s *Server) handleAdminAddExpense(w http.ResponseWriter, r *http.Request) {
 		in.Category = "Бусад"
 	}
 	if utf8.RuneCountInString(in.Category) > 40 || utf8.RuneCountInString(in.Note) > 300 {
-		writeErr(w, http.StatusBadRequest, "ангилал 40, тайлбар 300 тэмдэгтээс хэтрэхгүй")
+		writeErr(w, http.StatusBadRequest, "ангилал 40, тайлбар 300 тэмдэгтээс хэтрэхгүй байх ёстой")
 		return
 	}
 	e := &store.Expense{Date: d, Category: in.Category, Amount: in.Amount, Note: in.Note, CreatedBy: admin.DisplayName}

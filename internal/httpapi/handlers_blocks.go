@@ -57,7 +57,7 @@ func fixBlockID(id string, seen map[string]bool) string {
 // validateBlocks нь блокуудыг шалгаж, хоосон зайг цэвэрлэнэ. Алдаа бол монгол мессеж буцаана.
 func validateBlocks(bs []store.Block, teacherID string) string {
 	if len(bs) > maxBlocks {
-		return "агуулга хэт олон хэсэгтэй (дээд тал нь 120)"
+		return "агуулгын хэсэг хэт олон байна (дээд тал нь 120)"
 	}
 	seen := map[string]bool{}
 	total := 0
@@ -74,7 +74,7 @@ func validateBlocks(bs []store.Block, teacherID string) string {
 			b.HTML = ""
 		}
 		if utf8.RuneCountInString(b.Name) > 200 || b.Size < 0 {
-			return "файлын нэр хэт урт"
+			return "файлын нэр хэт урт байна"
 		}
 		switch b.Type {
 		case "text":
@@ -86,7 +86,7 @@ func validateBlocks(bs []store.Block, teacherID string) string {
 				}
 				b.HTML, b.Text, imgs = sanitizeRich(b.HTML, teacherID)
 				if imgs >= maxRichImages {
-					return "нэг текстийн хэсэгт 40 хүртэл зураг"
+					return "нэг текстийн хэсэгт 40 хүртэл зураг оруулах боломжтой"
 				}
 			}
 			if strings.TrimSpace(b.Text) == "" && imgs == 0 {
@@ -96,31 +96,31 @@ func validateBlocks(bs []store.Block, teacherID string) string {
 				b.Text = ""
 			}
 			if utf8.RuneCountInString(b.Text) > maxTextRunes {
-				return "нэг текстийн хэсэг 20,000 тэмдэгтээс хэтрэхгүй"
+				return "нэг текстийн хэсэг 20,000 тэмдэгтээс хэтрэхгүй байх ёстой"
 			}
 		case "embed": // HTML embed: суралцагчид sandbox iframe-д (эх хуудастай холбоогүй) харагдана
 			b.URL, b.Quiz = "", nil
 			b.Text = strings.TrimSpace(b.Text)
 			if b.Text == "" || len(b.Text) > 60_000 {
-				return "HTML embed 1-60,000 тэмдэгт"
+				return "HTML embed код 1-60,000 тэмдэгт байх ёстой"
 			}
 			if b.Height == 0 {
 				b.Height = 420
 			}
 			if b.Height < 80 || b.Height > 2000 {
-				return "embed-ийн өндөр 80-2000 px"
+				return "embed-ийн өндөр 80-2000 px хооронд байх ёстой"
 			}
 		case "cloud": // үүлэн үг: асуулт (Text) + нэг хүн хэдэн үг илгээх (Max)
 			b.URL, b.Quiz = "", nil
 			b.Text = strings.TrimSpace(b.Text)
 			if b.Text == "" || utf8.RuneCountInString(b.Text) > 200 {
-				return "үүлэн үгийн асуулт 1-200 тэмдэгт"
+				return "үүлэн үгийн асуулт 1-200 тэмдэгт байх ёстой"
 			}
 			if b.Max == 0 {
 				b.Max = 1
 			}
 			if b.Max < 1 || b.Max > 3 {
-				return "нэг хүн 1-3 үг илгээнэ"
+				return "нэг хүний илгээх үгийн тоо 1-3 байх ёстой"
 			}
 		case "board": // цагаан самбар: гарчиг/даалгавар (Text) + анхдагч багийн тоо (Max)
 			b.URL, b.Quiz = "", nil
@@ -129,19 +129,19 @@ func validateBlocks(bs []store.Block, teacherID string) string {
 				b.Text = "Цагаан самбар"
 			}
 			if utf8.RuneCountInString(b.Text) > 300 {
-				return "самбарын гарчиг 300 тэмдэгтээс ихгүй"
+				return "самбарын гарчиг 300 тэмдэгтээс хэтрэхгүй байх ёстой"
 			}
 			if b.Max == 0 {
 				b.Max = 4
 			}
 			if b.Max < 2 || b.Max > 12 {
-				return "самбарын багийн тоо 2-12"
+				return "самбарын багийн тоо 2-12 хооронд байх ёстой"
 			}
 		case "heading":
 			b.URL, b.Quiz = "", nil
 			b.Text = strings.TrimSpace(b.Text)
 			if b.Text == "" || utf8.RuneCountInString(b.Text) > 200 {
-				return "гарчиг 1-200 тэмдэгт"
+				return "гарчиг 1-200 тэмдэгт байх ёстой"
 			}
 		case "image", "audio", "video", "file":
 			b.Quiz = nil
@@ -150,10 +150,10 @@ func validateBlocks(bs []store.Block, teacherID string) string {
 				return "файл хавсаргаагүй хэсэг байна — файлаа оруулах эсвэл устгана уу"
 			}
 			if len(b.URL) > maxBlockURL || (!validURL(b.URL) && !files.OwnedBy(b.URL, teacherID)) {
-				return "медиа: http(s) холбоос эсвэл өөрийн файлын сангийн файл"
+				return "медиа нь http(s) холбоос эсвэл өөрийн файлын сангийн файл байх ёстой"
 			}
 			if utf8.RuneCountInString(b.Text) > 500 {
-				return "тайлбар 500 тэмдэгтээс хэтрэхгүй"
+				return "тайлбар 500 тэмдэгтээс хэтрэхгүй байх ёстой"
 			}
 		case "quiz":
 			b.URL, b.Text = "", ""
@@ -226,7 +226,7 @@ func (s *Server) handleAnswerQuiz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !course.Published && !teaches(course, uid) {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	if uid == "" { // хичээл (үнэгүйг ч) нэвтэрсэн хэрэглэгч л үзэж, хариулна
@@ -239,7 +239,7 @@ func (s *Server) handleAnswerQuiz(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !has {
-			writeErr(w, http.StatusPaymentRequired, "энэ хичээл төлбөртэй")
+			writeErr(w, http.StatusPaymentRequired, "энэ хичээл төлбөртэй — үзэхийн тулд худалдаж авна уу")
 			return
 		}
 	}
@@ -255,7 +255,7 @@ func (s *Server) handleAnswerQuiz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if l.Exam != nil {
-		writeErr(w, http.StatusForbidden, "шалгалтын асуултыг дуусгаад нэг дор шалгана")
+		writeErr(w, http.StatusForbidden, "шалгалтын асуултуудыг бүгдийг нь хариулж дуусгасны дараа нэг дор шалгана")
 		return
 	}
 	var in struct {
@@ -270,7 +270,7 @@ func (s *Server) handleAnswerQuiz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	correct := gradeQuiz(bid, q, in.QuizAnswer)
-	if uid != "" && uid != course.TeacherID {
+	if uid != "" && !teaches(course, uid) { // багш (хамтран заагч ч) өөрийн сургалтын асуултад хариулбал бичихгүй
 		if err := s.store.SaveQuizResult(r.Context(), uid, course.ID, l.ID, bid, correct); s.storeErr(w, r, err) {
 			return
 		}
@@ -280,7 +280,7 @@ func (s *Server) handleAnswerQuiz(w http.ResponseWriter, r *http.Request) {
 	out := revealQuiz(bid, q)
 	out["correct"] = correct
 	// Хичээлийн бүх асуултад зөв хариулсан эсэх — дараагийн хичээл үүнээс хамаарч нээгдэнэ.
-	if uid != "" && uid != course.TeacherID {
+	if uid != "" && !teaches(course, uid) {
 		prog, err := s.store.LessonProgress(r.Context(), uid, course.ID)
 		if s.storeErr(w, r, err) {
 			return

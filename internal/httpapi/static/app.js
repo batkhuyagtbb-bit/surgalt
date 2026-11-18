@@ -97,6 +97,17 @@ function heroStars() {
 // холдсон ч үргэлжилнэ.
 function homeFilm() {
   const fig = $(".home-film"), box = fig && $(".hf-frame", fig);
+  // Видео: товч дарахад дуутай тоглож, удирдлага гарна; дуусахад зурагт хуудас буцна.
+  const vid = box && $("video", box), play = box && $(".hf-play", box);
+  if (vid && play) {
+    play.addEventListener("click", () => {
+      // Утсанд босоо (9:16) хувилбар — дэлгэцээ дүүргэж харагдана
+      if (vid.dataset.mobile && matchMedia("(max-width: 700px)").matches && !box.classList.contains("tall")) { box.classList.add("tall"); vid.src = vid.dataset.mobile; }
+      play.hidden = true; vid.controls = true; vid.play().catch(() => { play.hidden = false; vid.controls = false; });
+    });
+    vid.addEventListener("ended", () => { vid.controls = false; play.hidden = false; try { vid.currentTime = 0; } catch {} });
+    return;
+  }
   if (!box?.dataset.src) return;
   let fr = null, over = false, tapped = false;
   const win = () => { try { return fr?.contentWindow; } catch { return null; } };
@@ -182,14 +193,38 @@ async function apiList(path) {
   return { items, total: +(res.headers.get("X-Total-Count") || items.length) };
 }
 
-function toast(msg, err) {
+// onClick өгвөл дарж болох мэдэгдэл (жишээ нь шинэ мессеж → чат нээх), арай удаан харагдана.
+function toast(msg, err, onClick) {
   const t = document.createElement("div");
-  t.className = "toast" + (err ? " err" : "");
+  t.className = "toast" + (err ? " err" : "") + (onClick ? " act" : "");
   t.textContent = msg;
+  if (onClick) {
+    t.setAttribute("role", "button"); t.tabIndex = 0;
+    const go = () => { t.remove(); onClick(); };
+    t.addEventListener("click", go); t.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  }
   $("#toasts")?.append(t);
-  setTimeout(() => { t.style.transition = ".4s"; t.style.opacity = "0"; t.style.transform = "translateY(10px)"; }, 3200);
-  setTimeout(() => t.remove(), 3700);
+  const ms = onClick ? 6500 : 3200;
+  setTimeout(() => { t.style.transition = ".4s"; t.style.opacity = "0"; t.style.transform = "translateY(10px)"; }, ms);
+  setTimeout(() => t.remove(), ms + 500);
 }
+// Чатын холбоос (/me#chat=<яриа>): нэвтэрсэн хүнд хажуугийн чатын самбарт тухайн яриаг шууд нээнэ.
+const chatIdOf = (link) => { const m = /#chat=([A-Za-z0-9_-]+)$/.exec(link || ""); return m && m[1] !== "group" ? m[1] : ""; };
+// «⚠️ Хамтын үнэлгээ» (peer_alert): /c/<сургалт>#chat=group&peer=<суралцагч> → бүлэг чат + үнэлгээний самбар тэр мөрийг дэлгэсэн;
+// &peer_lesson=<хичээл> — самбарыг тэр хичээлээр нээнэ.
+const peerLinkOf = (link) => {
+  const m = /^\/c\/([^/?#]+)#(.+)$/.exec(link || ""); if (!m) return null;
+  const h = new URLSearchParams(m[2]); if (h.get("chat") !== "group") return null;
+  try { return { cid: decodeURIComponent(m[1]), uid: h.get("peer") || "", lesson: h.get("peer_lesson") || "" }; } catch { return null; }
+};
+// Тэр сургалтын хуудсан дээр байвал хуудас шилжилгүй нээнэ (true); эс бөгөөс холбоосоор шилжинэ.
+const openPeerLink = (link) => {
+  const p = peerLinkOf(link);
+  if (!p || page !== "course" || $(".course-page")?.dataset.course !== p.cid || !window.railStartGroup) return false;
+  window.railStartGroup(p.cid, { peer: p.uid, lesson: p.lesson }).catch((e) => toast(e.message, true));
+  return true;
+};
+const openChatLink = (link) => { const id = chatIdOf(link); if (!id || !window.openRailChat) return false; window.openRailChat(id); return true; };
 
 /* ---------- кино маягийн хөдөлгөөн ---------- */
 function splitText() {
@@ -326,7 +361,7 @@ async function coverPicker({ title, lead, current = "", allowNone = false, hue =
   document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="coverPickModal"><div class="modal-card" style="width:min(820px,100%)"><button class="icon-btn modal-x" data-close aria-label="Хаах">${icon("x", 18)}</button>
     <h3>${esc(title)}</h3><p class="muted small">${esc(lead)}</p>
     ${sources ? `<div class="cv-tabs" role="tablist"><button type="button" class="cv-tab on" data-src="tpl" role="tab">${icon("layers", 15)}Загвар</button><button type="button" class="cv-tab" data-src="file" role="tab">${icon("upload", 15)}Компьютерээс</button><button type="button" class="cv-tab" data-src="url" role="tab">${icon("link", 15)}Холбоос</button><button type="button" class="cv-tab" data-src="embed" role="tab">${icon("ext", 15)}Embed</button></div>
-    <div class="cv-pane" data-pane="file" hidden><p class="muted small">Зураг (JPG, PNG, WebP…) компьютерээсээ оруулна — автоматаар WebP болж багасна, нээлттэй файлын санд хадгалагдана. Зөвлөмж: 1600×500 орчим, өргөн зураг.</p><input type="file" accept="image/*" class="cv-file"><p class="form-error" aria-live="polite"></p></div>
+    <div class="cv-pane" data-pane="file" hidden><p class="muted small">Зургаа (JPG, PNG, WebP…) компьютерээсээ оруулна уу — автоматаар WebP болж шахагдаад нээлттэй файлын санд хадгалагдана. Зөвлөмж: 1600×500 орчим хэмжээтэй, хэвтээ зураг.</p><input type="file" accept="image/*" class="cv-file"><p class="form-error" aria-live="polite"></p></div>
     <div class="cv-pane" data-pane="url" hidden><form class="form cv-url-form"><label>Зургийн холбоос (https://…)<input name="url" type="url" required placeholder="https://example.com/cover.jpg" maxlength="2000"></label><div class="dr-acts"><button class="btn btn-gold btn-sm">Тавих</button></div><p class="form-error" aria-live="polite"></p></form></div>
     <div class="cv-pane" data-pane="embed" hidden><form class="form cv-embed-form"><label>Embed код эсвэл холбоос<textarea name="embed" rows="5" required maxlength="20000" placeholder="YouTube/Vimeo холбоос, Canva, Google Slides… эсвэл &lt;iframe …&gt; код"></textarea></label><p class="muted small">Суралцагчид хамгаалагдсан (sandbox) хүрээнд харагдана — хичээлийн HTML embed хэсэгтэй ижил.</p><div class="dr-acts"><button class="btn btn-gold btn-sm">Тавих</button></div><p class="form-error" aria-live="polite"></p></form></div>` : ""}
     <div class="cv-pane" data-pane="tpl">
@@ -462,13 +497,15 @@ function chatRail() {
       <label class="rail-search">${I.search}<input type="search" id="railSearch" placeholder="Нэрээр хайх…" aria-label="Чат хайх"></label>
       <div class="rail-list" id="railList">${[1, 2, 3, 4].map(() => `<div class="rail-skel"><i></i><span><b></b><b></b></span></div>`).join("")}</div></div>
     <div class="rail-view" id="railThread" hidden>
-      <header class="rail-head"><button class="icon-btn" id="railBack" aria-label="Жагсаалт руу буцах">${I.back}</button><div class="grow" id="railWho"></div><button class="icon-btn rail-close" data-rail-close aria-label="Чат хаах">${I.x}</button></header>
+      <header class="rail-head"><button class="icon-btn" id="railBack" aria-label="Жагсаалт руу буцах">${I.back}</button><div class="grow" id="railWho"></div><button type="button" class="peer-open" id="railPeer" aria-haspopup="dialog" title="Ангийн найзуудын хамтын ажиллагааны үнэлгээ" hidden><span aria-hidden="true">⭐</span><span class="peer-open-t">Үнэлгээ</span></button><button class="icon-btn rail-close" data-rail-close aria-label="Чат хаах">${I.x}</button></header>
+      <div class="peer-strip" id="railPeerStrip" role="region" aria-label="Хамтын ажиллагааны рейтинг" hidden></div>
       <div class="chat-body" id="railBody"><ol class="chat-msgs" id="railMsgs"></ol></div>
       <form class="chat-input" id="railForm">${teacher ? `<button type="button" id="railMeet" data-plus>${I.live} Google Meet үүсгээд илгээх</button>` : ""}</form></div>
   </aside><div class="rail-scrim" id="railScrim"></div>`);
   $(".nav-links").insertAdjacentHTML("afterbegin", `<button class="icon-btn rail-toggle" id="railToggle" aria-label="Чат" aria-controls="studioRail" aria-expanded="false">${I.chat}<span class="bell-badge" id="railBadge" hidden></span></button>`);
   const rail = $("#studioRail"), home = $("#railHome"), thread = $("#railThread"), msgs = $("#railMsgs"), body = $("#railBody"), form = $("#railForm");
   let convs = [], unread = new Map(), timer = 0, cur = null, curGroup = false, myRole = "visitor";
+  let peerWait = ""; // самбар харагдахгүй үед сэргээсэн бүлэг чат: үнэлгээг самбар нээгдэхэд л татна
   let online = new Set(), seenAt = {}; // жагсаалтын хүмүүсээс одоо сайтад байгаа нь, сүүлд идэвхтэй байсан мөч (/api/me/presence)
   // Өргөн дэлгэцэд чат баруун талд наалддаг; хумих (⟩) товчоор нуугдаж, баруун ирмэгийн хавтсаар дахин нээгдэнэ.
   const wide = () => matchMedia("(min-width:1280px)").matches;
@@ -478,6 +515,7 @@ function chatRail() {
   // Нээлттэй яриа, самбарын төлөвийг тухайн табд хадгална: refresh хийхэд яг тэр яриа дахин нээгдэнэ.
   const ss = { get: (k) => { try { return sessionStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch {} } };
   const setRail = (open) => {
+    if (open && peerWait) { const pc = peerWait; peerWait = ""; if (curConv?.course_id === pc) Peer.get(pc).catch(() => {}); }
     if (wide()) { setCollapsed(!open); }
     document.body.classList.toggle("rail-open", open && !wide()); $("#railToggle").setAttribute("aria-expanded", String(open));
     ss.set("sg_rail_open", open ? "1" : null);
@@ -497,7 +535,7 @@ function chatRail() {
       list.forEach((c) => out.set(c.id, { id: c.id, kind: c.kind || "", title: c.visitor_name, sub: c.kind === "group" ? "Бүлэг · сургалтын суралцагчид" : c.user_id ? "Суралцагч" : "Зочин", peer: c.kind === "group" || c.kind === "team" ? "" : (c.teacher_id === u.id ? c.user_id : c.teacher_id) || "", last: c.last_message, at: c.last_message_at }));
     }
     const h = await meHome(true).catch(() => null);
-    (h?.chats || []).forEach((c) => { if (!out.has(c.id)) out.set(c.id, { id: c.id, kind: c.kind || "", title: c.kind === "group" || c.kind === "team" ? c.title : c.teacher?.display_name || "", sub: c.kind === "group" ? "Бүлэг · " + (c.teacher?.display_name || "") : c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : "Багш", user: c.kind === "team" ? null : c.teacher, peer: c.kind === "group" || c.kind === "team" ? "" : c.teacher?.id || "", course: c.course_id || "", last: c.last_message, at: c.last_message_at }); });
+    (h?.chats || []).forEach((c) => { if (!out.has(c.id)) out.set(c.id, { id: c.id, kind: c.kind || "", title: c.kind === "group" || c.kind === "team" ? c.title : c.teacher?.display_name || "", sub: c.kind === "group" ? "Бүлэг · " + (c.teacher?.display_name || "") : c.kind === "team" ? "Суралцагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : "Багш", user: c.kind === "team" ? null : c.teacher, peer: c.kind === "group" || c.kind === "team" ? "" : c.teacher?.id || "", course: c.course_id || "", last: c.last_message, at: c.last_message_at }); });
     return [...out.values()].sort((a, b) => new Date(b.at) - new Date(a.at));
   };
   // Хүмүүс: багшид — суралцагчид нь, суралцагчид — багш нар нь (яриа эхлээгүй байсан ч нэг дарж эхэлнэ).
@@ -563,7 +601,7 @@ function chatRail() {
     const sec = (title, n, cls = "") => `<div class="rail-sec ${cls}"><span>${title}</span><em>${n}</em></div>`;
     $("#railList").innerHTML = (lv.length ? sec("Онлайн", lv.length, "live") + `<div class="rail-live">${lv.map(liveItem).join("")}</div>` : "") +
       (shown.length ? sec("Сүүлийн яриа", shown.length) + shown.map(item).join("") : "") + (ppl.length ? sec("Хүмүүс", !q && peopleTotal > peopleBase ? peopleTotal : ppl.length) + ppl.map(person).join("") + (!q && peopleTotal > peopleBase ? `<p class="muted small rail-more-hint">Бусад ${peopleTotal - peopleBase} хүнийг нэрээр нь хайж олно уу</p>` : "") : "") ||
-      `<p class="muted small" style="padding:16px">${q ? "Илэрц алга" : teacher ? "Одоогоор чат алга. Профайлаа түгээгээрэй!" : "Багшийн профайл дээрх «Чатлах» эсвэл сургалтын «Бүлэг чат»-аар яриа эхэлнэ."}</p>`;
+      `<p class="muted small" style="padding:16px">${q ? "Илэрц алга" : teacher ? "Одоогоор чат алга. Профайлаа түгээгээрэй!" : "Багшийн профайл дээрх «Чатлах», эсвэл сургалтын «Бүлэг чат» товчоор яриа эхлүүлээрэй."}</p>`;
   };
   const load = async () => { convs = await norm(); draw(); };
   const startWith = async (pid) => {
@@ -582,7 +620,7 @@ function chatRail() {
     } else {
       const mates = people.filter((p) => p.mate);
       pop.innerHTML = `<b>Ангийн найзуудтайгаа бүлэг үүсгэх</b><form class="team-form"><input name="title" maxlength="60" required placeholder="Бүлгийн нэр (ж: Математикийн баг)">
-        <div class="team-list">${mates.map((m) => `<label><input type="checkbox" name="m" value="${esc(m.id)}">${avatarHTML(m.user)}<span>${esc(m.name)}<small>${esc(m.sub)}</small></span></label>`).join("") || `<p class="muted small">Ангийн найз хараахан алга — нэг багшид дагасан сурагчид энд гарна.</p>`}</div>
+        <div class="team-list">${mates.map((m) => `<label><input type="checkbox" name="m" value="${esc(m.id)}">${avatarHTML(m.user)}<span>${esc(m.name)}<small>${esc(m.sub)}</small></span></label>`).join("") || `<p class="muted small">Ангийн найз хараахан алга — нэг багшийг дагадаг суралцагчид энд харагдана.</p>`}</div>
         <button class="btn btn-gold btn-sm btn-block">Бүлэг үүсгэх</button></form>`;
       pop.querySelector("form").onsubmit = async (ev) => {
         ev.preventDefault();
@@ -595,7 +633,7 @@ function chatRail() {
     }
     setTimeout(() => document.addEventListener("click", (ev) => { if (!pop.contains(ev.target)) pop.remove(); }, { once: true }), 0);
   });
-  const th = new ChatThread({ ol: msgs, body, form, token: () => Auth.token, convId: () => cur, role: () => myRole, group: () => curGroup });
+  const th = new ChatThread({ ol: msgs, body, form, token: () => Auth.token, convId: () => cur, role: () => myRole, group: () => curGroup, course: () => (curConv?.kind === "group" && curConv.id === cur ? curConv.course_id || "" : "") });
   const append = (m) => th.append(m);
   // Ярианы гарчиг: жагсаалтаас нэр (суралцагчид багшийн нэр), эс бөгөөс ярианы мэдээллээс.
   let curConv = null;
@@ -609,7 +647,7 @@ function chatRail() {
     // Чатлаж буй багш дээр дарвал профайл руу, сургалтын бүлэг дээр дарвал сургалт руу (суралцагч, ангийн найз — нээлттэй профайлгүй).
     const course = known?.course || c.course_id || "";
     const href = c.kind === "group" && course ? `/c/${encodeURIComponent(course)}` : !teacher && !c.kind && known?.user?.username ? `/t/${encodeURIComponent(known.user.username)}` : "";
-    const role = c.kind === "team" ? "Сурагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин");
+    const role = c.kind === "team" ? "Суралцагчдын бүлэг" : c.kind === "dm" ? "Ангийн найз" : curGroup ? "Бүлэг чат · сургалтын суралцагчид" : known?.sub || (c.user_id ? "Суралцагч" : "Зочин");
     const body = `<span class="rw-av ${on ? "on" : ""}">${av}</span><span class="rw-txt"><strong>${esc(name)}</strong><small class="muted">${on ? `<b class="rw-on">Онлайн</b> · ` : was ? `Идэвхтэй байсан · ${seenAgo(was)} · ` : ""}${role}</small></span>`;
     return href ? `<a class="rw-link" href="${href}" title="${c.kind === "group" ? "Сургалт руу очих" : "Багшийн профайл руу очих"}">${body}</a>` : body;
   };
@@ -620,19 +658,41 @@ function chatRail() {
     cur = id; unread.delete(id); badge(); if (show) setRail(true); draw();
     ss.set("sg_rail_conv", id);
     home.hidden = true; thread.hidden = false;
-    if (!same) { $("#railWho").innerHTML = `<span class="muted small">Ачаалж байна…</span>`; msgs.innerHTML = ""; }
+    if (!same) { $("#railWho").innerHTML = `<span class="muted small">Ачаалж байна…</span>`; msgs.innerHTML = ""; $("#railPeer").hidden = true; peerStrip(); }
     try {
       const d = await api(`/api/chat/${id}/messages`);
       if (cur !== id) return;
       const c = d.conversation; curGroup = c.kind === "group" || c.kind === "team"; myRole = d.me; curConv = c;
       $("#railWho").innerHTML = whoHTML(c);
+      const pc = c.kind === "group" ? c.course_id || "" : ""; // сургалтын бүлэг чат: «⭐ Үнэлгээ» + нэрийн хажууд дундаж
+      $("#railPeer").hidden = !pc || Peer.denied.has(pc); // архивласан суралцагч (403) — товчгүй
       th.set(d); if (show) form.body.focus();
+      peerStrip(); // санасан өгөгдлөөр шууд, дараа нь шинэчилсэнээр
+      // Нээхэд: 30 секундээс хуучин бол шинэчилнэ; сэргээхэд (самбар харагдахгүй) татахгүй — нээгдэхэд (setRail). Ирмэгц (Peer.on) дахин зурна.
+      peerWait = "";
+      if (pc) { if (show || railShown()) Peer.get(pc, show ? 30000 : undefined).catch(() => {}); else peerWait = pc; }
       if (!same) { msgs.classList.remove("fade-in"); void msgs.offsetWidth; msgs.classList.add("fade-in"); } // өөр яриа нээгдэхэд зөөлөн
     } catch (e) {
       if (!show && e.status >= 400 && e.status < 500) { ss.set("sg_rail_conv", null); cur = null; thread.hidden = true; home.hidden = false; draw(); return; } // хадгалсан яриа байхгүй болсон
-      $("#railWho").innerHTML = `<span class="form-error" style="margin:0">${esc(e.message)}</span>`;
+      $("#railWho").innerHTML = `<span class="form-error" style="margin:0">${esc(e.message)}</span>`; $("#railPeer").hidden = true; peerStrip();
     }
   };
+  $("#railPeer").addEventListener("click", (e) => { const c = curConv; if (c?.kind === "group" && c.course_id && c.id === cur) peerPanel(c.course_id, { title: convs.find((x) => x.id === c.id)?.title || c.visitor_name || "", opener: e.currentTarget }); });
+  Peer.on((cid) => { if (curConv?.kind === "group" && curConv.course_id === cid && curConv.id === cur && !thread.hidden) { $("#railPeer").hidden = Peer.denied.has(cid); th.rerender(); peerStrip(); } });
+  function railShown() { return wide() ? !document.documentElement.classList.contains("rail-collapsed") : document.body.classList.contains("rail-open"); }
+  // Багшийн бүлэг чат: толгойн доор хүүхдүүд бие биеэ хэрхэн үнэлснийг байнга харуулна (шилдэг 5, дундаж, нийт үнэлгээ).
+  function peerStrip() {
+    const el = $("#railPeerStrip"), c = curConv, pc = c?.kind === "group" && c.id === cur ? c.course_id : "";
+    const d = pc && Peer.peek(pc)?.data;
+    if (!d || d.role !== "teacher") { el.hidden = true; el.innerHTML = ""; $("#railPeer").classList.remove("compact"); return; }
+    const f = document.activeElement, keep = el.contains(f) ? (f.dataset.peerUid ? `[data-peer-uid="${CSS.escape(f.dataset.peerUid)}"]` : "[data-peer-more]") : "";
+    el.innerHTML = peerStripHTML(d); el.hidden = false; $("#railPeer").classList.add("compact"); // зурвасанд «Дэлгэрэнгүй» байгаа тул толгойн товч жижиг
+    if (keep) $(keep, el)?.focus({ preventScroll: true });
+  }
+  $("#railPeerStrip").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-peer-more], [data-peer-uid]"), c = curConv; if (!b || c?.kind !== "group" || !c.course_id) return;
+    peerPanel(c.course_id, { title: convs.find((x) => x.id === c.id)?.title || c.visitor_name || "", opener: b, uid: b.dataset.peerUid || "" });
+  });
   $("#railBack").onclick = () => { meetOff(); cur = null; ss.set("sg_rail_conv", null); thread.hidden = true; home.hidden = false; draw(); };
   $("#railSearch").addEventListener("input", () => { draw(); findPeople(); });
   $("#railList").addEventListener("click", (e) => { const mo = e.target.closest("[data-more]"); if (mo) return moreMenu(mo); const lv = e.target.closest("[data-live]"); if (lv) return lv.dataset.conv ? open(lv.dataset.conv) : startWith(lv.dataset.live); const p = e.target.closest("[data-person]"); if (p) return startWith(p.dataset.person); const it = e.target.closest(".rail-item"); if (it) open(it.dataset.id); });
@@ -648,7 +708,7 @@ function chatRail() {
     m.addEventListener("click", async (e) => {
       const b = e.target.closest("[data-rm]"); if (!b) return;
       e.stopPropagation();
-      if (b.dataset.rm === "ask") { m.innerHTML = `<p><b>«${esc(conv.title || "Чат")}» чатыг устгах уу?</b>Мессежүүд зөвхөн таны талд устгагдана — нөгөө тал харсаар байна.</p><div class="rm-acts"><button type="button" data-rm="no">Болих</button><button type="button" class="rm-del" data-rm="yes">Устгах</button></div>`; place(); $(".rm-del", m).focus(); return; }
+      if (b.dataset.rm === "ask") { m.innerHTML = `<p><b>«${esc(conv.title || "Чат")}» чатыг устгах уу?</b>Мессежүүд зөвхөн таны талаас устгагдана — нөгөө талд хэвээр харагдана.</p><div class="rm-acts"><button type="button" data-rm="no">Болих</button><button type="button" class="rm-del" data-rm="yes">Устгах</button></div>`; place(); $(".rm-del", m).focus(); return; }
       if (b.dataset.rm === "no") return closeMenu();
       b.disabled = true;
       try {
@@ -698,7 +758,7 @@ function chatRail() {
     if (mb === "new") return meetNew();
     if (mb === "paste") {
       try { if (meetFrom(await navigator.clipboard.readText())) return; } catch {}
-      toast("Хуулсан Meet холбоос олдсонгүй — meet.google.com/… холбоосыг хуулаад дахин «Тавих» дарна уу", true); return;
+      toast("Хуулсан Meet холбоос олдсонгүй — meet.google.com/… холбоосыг хуулаад «Тавих» товчийг дахин дарна уу", true); return;
     }
     if (mb === "send") {
       const conv = meetConv, url = meetUrl; if (!conv || !url) return;
@@ -746,9 +806,16 @@ function chatRail() {
   { const saved = ss.get("sg_rail_conv"); if (saved) open(saved, false); } // жагсаалт хүлээлгүй шууд яриа (жагсаалт→яриа солигдож анивчихгүй)
   loadPeople().then(load).then(() => { if (curConv && cur === curConv.id) $("#railWho").innerHTML = whoHTML(curConv); pollPresence(); });
   window.openRailChat = (id) => (id ? open(id) : setRail(true));
+  // Мэдэгдлийн холбоосоор (/me#chat=<яриа> → энд) ирсэн бол тухайн яриаг шууд нээнэ; багшийн өөрийн студид студийн чат нээгдэнэ.
+  { const id = chatIdOf(location.hash), studio = teacher && page === "profile" && location.pathname === "/t/" + u.username;
+    if (id && !studio) { history.replaceState(null, "", location.pathname + location.search); open(id); } }
   // Сургалтын хуудасны товчнууд: нэвтэрсэн хүнд яриа энэ самбарт нээгдэнэ.
   window.railStartDirect = async (username) => { const d = await api(`/api/teachers/${username}/chat`, { method: "POST" }); await load(); open(d.conversation.id); };
-  window.railStartGroup = async (courseId) => { const d = await api(`/api/courses/${courseId}/chat`, { method: "POST" }); Live.reconnect(); await load(); open(d.conversation.id); };
+  // peer — үнэлгээний самбарыг нээж тэр суралцагчийн мөрийг дэлгэнэ (peer_alert мэдэгдэл); lesson — самбарыг тэр хичээлээр.
+  window.railStartGroup = async (courseId, { peer = "", lesson = "" } = {}) => {
+    const d = await api(`/api/courses/${courseId}/chat`, { method: "POST" }); Live.reconnect(); await load(); await open(d.conversation.id);
+    if (peer || lesson) peerPanel(courseId, { title: convs.find((x) => x.id === d.conversation.id)?.title || d.conversation.visitor_name || "", opener: $("#railPeer"), uid: peer, lesson });
+  };
 }
 
 /* ---------- навигаци, мэдэгдлийн хонх ---------- */
@@ -817,7 +884,7 @@ function smsVerify(box, v, check, done, restart) {
     <div class="sv-code" aria-label="Илгээх код">${esc(v.text).split("").map((c) => `<i>${c}</i>`).join("")}</div>
     <a class="btn btn-gold btn-block sv-sms" href="${esc(v.sms_uri)}">${icon("chat", 18)} SMS бичих</a>
     <p class="sv-status" role="status"><span class="sv-dot"></span><span class="sv-msg">SMS хүлээж байна…</span><b class="sv-left"></b></p>
-    <p class="sv-note">Компьютер дээр байгаа бол утаснаасаа <b>${esc(v.shortcode)}</b> дугаар руу <b>${esc(v.text)}</b> гэж бичиж илгээнэ үү. SMS-ийн үнэ 150₮ (операторын тарифаар).</p>
+    <p class="sv-note">Компьютерээс орж байгаа бол утаснаасаа <b>${esc(v.shortcode)}</b> дугаар руу <b>${esc(v.text)}</b> гэж бичиж илгээнэ үү. SMS-ийн үнэ 150₮ (операторын тарифаар).</p>
     <button type="button" class="linkish sv-again" hidden>Дахин код авах</button></div>`;
   const msg = $(".sv-msg", box), left = $(".sv-left", box), again = $(".sv-again", box), st = $(".sv-status", box);
   const end = new Date(v.expires_at).getTime();
@@ -857,7 +924,7 @@ async function phoneGate() {
   el.innerHTML = `<div class="cg-card">
     <span class="cg-ico" aria-hidden="true">${icon("phone", 26)}</span>
     <h3 id="pgT">Утасны дугаараа үлдээнэ үү</h3>
-    <p>Нууц үгээ мартвал энэ дугаараараа хялбар сэргээнэ. Дугаар тань бусдад харагдахгүй.</p>
+    <p>Нууц үгээ мартвал энэ дугаараар хялбар сэргээх боломжтой. Дугаар тань бусдад харагдахгүй.</p>
     <form class="pg-form"><label>Гар утасны дугаар<input name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="12" placeholder="9911 2233" required value="${esc((u.phone || "").replace(/^(\d{4})(\d{4})$/, "$1 $2"))}"></label>
       <button class="btn btn-gold btn-block">Хадгалах</button></form>
     <p class="cg-err" role="alert"></p>
@@ -874,7 +941,7 @@ async function phoneGate() {
       const me = await api("/api/me/phone", { method: "PUT", body: { phone: f.phone.value } });
       Auth.set(Auth.token, me); behind.forEach((c) => (c.inert = false));
       el.remove(); document.documentElement.classList.remove("cg-open");
-      toast("✅ Дугаар хадгалагдлаа. Нууц үгээ мартвал «Утсаар» сэргээнэ.");
+      toast("✅ Дугаар хадгалагдлаа. Нууц үгээ мартвал «Утсаар» сонголтоор сэргээх боломжтой.");
     } catch (x) { errEl.textContent = x.message; b.disabled = false; }
   };
 }
@@ -889,7 +956,7 @@ async function consentGate() {
   if (!u.consent_needed || $(".cg")) return;
   const teacher = u.role === "teacher", again = !!u.consent_version && u.consent_version !== ver;
   const pts = teacher
-    ? ["Оруулсан агуулгынхаа зохиогчийн эрхийг та хариуцна.", "Суралцагчдын мэдээллийг зөвхөн сургалт явуулахад ашиглана.", "Профайлаа үзсэн, дугаараа нээсэн хүний нэр танд харагдана."]
+    ? ["Оруулсан агуулгынхаа зохиогчийн эрхийг та хариуцна.", "Суралцагчдын мэдээллийг зөвхөн сургалт явуулахад ашиглана.", "Таны профайлыг үзсэн, дугаарыг тань нээсэн хүний нэр танд харагдана."]
     : ["Хичээл, шалгалтын үеэр идэвх тань тэмдэглэгдэнэ — камер, микрофон ашиглахгүй.", "Багш зөвхөн өөрийн сургалтын суралцагчдын ахиц, дүнг харна.", "Таны мэдээллийг худалдахгүй, зар сурталчилгаанд ашиглахгүй."];
   const el = document.createElement("div");
   el.className = "cg"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "cgT");
@@ -932,7 +999,7 @@ function bell() {
     <div class="bell-wrap"><button class="icon-btn bell" id="bell" aria-label="Мэдэгдэл" aria-haspopup="dialog" aria-expanded="false" aria-controls="bellPanel">${icon("bell", 21)}<span class="bell-badge" hidden></span></button>
     <section class="np" id="bellPanel" role="dialog" aria-labelledby="npTitle" hidden>
       <header class="np-head"><h2 id="npTitle">Мэдэгдэл</h2><button type="button" class="np-more" id="npMore" aria-label="Мэдэгдлийн тохиргоо" aria-haspopup="menu" aria-expanded="false">${dots}</button>
-        <div class="np-menu" id="npMenu" role="menu" hidden><button type="button" role="menuitem" data-np="readall">${icon("check", 18)}<span>Бүгдийг уншсан болгох</span></button><button type="button" role="menuitem" data-np="perm" hidden>${icon("bell", 18)}<span>Браузерт мэдэгдэх</span></button></div></header>
+        <div class="np-menu" id="npMenu" role="menu" hidden><button type="button" role="menuitem" data-np="readall">${icon("check", 18)}<span>Бүгдийг уншсан болгох</span></button><button type="button" role="menuitem" data-np="perm" hidden>${icon("bell", 18)}<span>Браузерын мэдэгдэл асаах</span></button></div></header>
       <div class="np-tabs" role="tablist"><button type="button" role="tab" class="on" aria-selected="true" data-np-tab="all">Бүгд</button><button type="button" role="tab" aria-selected="false" data-np-tab="unread">Уншаагүй</button></div>
       <div class="np-body" id="bellList"><div class="np-skel" aria-hidden="true"><i></i><i></i><i></i></div></div>
     </section></div>`);
@@ -944,8 +1011,8 @@ function bell() {
   const setSeen = (id) => { try { localStorage.setItem(SEEN, id); } catch {} };
   let items = [], tab = "all", limit = 12, floor = getSeen(), loaded = false, hasOlder = false, busy = false;
   // Мэдэгдэл бүрийн дүрс: гарчгийн эхний emoji-оос, эс бөгөөс төрлөөс; өнгө нь төрлөөр (чат — цэнхэр, мөнгө — ногоон г.м.).
-  const N_EMOJI = { "💬": "chat", "↩": "chat", "👥": "users", "📅": "cal", "❌": "cal", "🏦": "money", "💰": "money", "✅": "check", "⚠️": "alert", "⚠": "alert", "🚩": "alert", "⛔": "lock", "🔓": "lock", "🔒": "lock", "🔑": "lock", "📹": "live", "📣": "bell", "📞": "phone", "📎": "clip", "💾": "files", "🎓": "courses", "📚": "book", "👀": "eye", "👁": "eye", "📝": "exam", "🏆": "medal", "🎖": "medal", "🛒": "card", "💳": "card" };
-  const N_TYPE = { message: "chat", comment: "chat", reply: "chat", booking: "cal", payout: "money", purchase: "card", enroll: "courses", profile_view: "eye", course_view: "eye", lesson_view: "play", phone_view: "phone", storage: "files", report: "alert", violation: "alert", account: "shield", blocked: "lock", unblock: "lock", assignment: "clip", grade: "check", exam: "exam", remind: "bell", rank: "medal", review: "book" };
+  const N_EMOJI = { "💬": "chat", "↩": "chat", "👥": "users", "📅": "cal", "❌": "cal", "🏦": "money", "💰": "money", "✅": "check", "⚠️": "alert", "⚠": "alert", "🚩": "alert", "⛔": "lock", "🔓": "lock", "🔒": "lock", "🔑": "lock", "🔐": "lock", "📹": "live", "📣": "bell", "📞": "phone", "📎": "clip", "💾": "files", "🎓": "courses", "📚": "book", "👀": "eye", "👁": "eye", "📝": "exam", "🏆": "medal", "🎖": "medal", "🛒": "card", "💳": "card" };
+  const N_TYPE = { message: "chat", comment: "chat", reply: "chat", booking: "cal", payout: "money", purchase: "card", enroll: "courses", profile_view: "eye", course_view: "eye", lesson_view: "play", phone_view: "phone", storage: "files", report: "alert", violation: "alert", account: "shield", blocked: "lock", unblock: "lock", access_request: "lock", access_granted: "lock", assignment: "clip", grade: "check", exam: "exam", remind: "bell", rank: "medal", review: "book", peer_alert: "alert" };
   const TONE = { chat: "blue", users: "blue", money: "green", card: "green", check: "green", phone: "green", courses: "violet", medal: "violet", exam: "violet", book: "violet", cal: "orange", bell: "orange", alert: "red", lock: "red", live: "red", clip: "teal", files: "teal", play: "teal", eye: "gray", shield: "gray" };
   const kind = (n) => {
     const t = (n.title || "").trim(), m = /^(\p{Extended_Pictographic}️?|↩)\s*/u.exec(t);
@@ -956,14 +1023,20 @@ function bell() {
     const m = (Date.now() - new Date(t)) / 60000;
     return m < 1 ? "Саяхан" : m < 60 ? Math.floor(m) + " мин" : m < 1440 ? Math.floor(m / 60) + " цаг" : m < 10080 ? Math.floor(m / 1440) + " өдөр" : m < 50400 ? Math.floor(m / 10080) + " 7 хоног" : fmtDay(t, new Date(t).getFullYear() !== new Date().getFullYear());
   };
+  // «unblock:…», «grant:…» — хуудасны холбоос биш, самбар дотор товчоор гүйцэтгэх үйлдэл.
+  const actLink = (l) => /^(unblock|grant):/.test(l || "");
+  const granted = new Map(); // мэдэгдлийн ID → «✓ Нээгдлээ…» (самбар дахин ачаалагдсан ч товч гүйцэтгэсэн хэвээр)
   const item = (n) => {
     const k = kind(n), unread = !n.read;
     const ub = n.type === "blocked" && /^unblock:([^:]+):(.+)$/.exec(n.link || "");
+    // Нээлгэх хүсэлт: grant:<uid>:<сургалт>:<хичээл|хоосон> → «Нээх» (тэр суралцагчид л).
+    const gr = n.type === "access_request" && /^grant:([^:]+):([^:]+):([^:]*)$/.exec(n.link || "");
     const av = n.actor ? `${avatarHTML(n.actor, "np-avatar")}<i class="np-badge t-${k.tone}">${icon(k.name, 13)}</i>` : `<span class="np-sys t-${k.tone}">${icon(k.name, 26)}</span>`;
-    const acts = ub ? `<span class="np-acts"><button type="button" class="np-btn" data-unblock-user="${esc(ub[1])}" data-unblock-lesson="${esc(ub[2])}">Дахин нээх</button></span>` : "";
+    const acts = ub ? `<span class="np-acts"><button type="button" class="np-btn" data-unblock-user="${esc(ub[1])}" data-unblock-lesson="${esc(ub[2])}">Дахин нээх</button></span>`
+      : gr ? `<span class="np-acts"><button type="button" class="np-btn${granted.has(n.id) ? " done" : ""}" data-grant-user="${esc(gr[1])}" data-grant-course="${esc(gr[2])}" data-grant-lesson="${esc(gr[3])}"${granted.has(n.id) ? " disabled" : ""}>${esc(granted.get(n.id) || "🔓 Нээх")}</button></span>` : "";
     const inner = `<span class="np-av">${av}</span><span class="np-txt"><span class="np-t">${esc(k.title)}</span>${n.body ? `<span class="np-b">${esc(n.body)}</span>` : ""}<time datetime="${esc(n.created_at)}" title="${esc(fmtDate(n.created_at))}">${ago(n.created_at)}</time>${acts}</span>${unread ? `<i class="np-dot" aria-label="Уншаагүй"></i>` : ""}`;
     const cls = "np-item" + (unread ? " unread" : "");
-    return ub || !n.link ? `<div class="${cls}" data-nid="${esc(n.id)}">${inner}</div>` : `<a class="${cls}" href="${esc(n.link)}" data-nid="${esc(n.id)}">${inner}</a>`;
+    return ub || gr || !n.link || actLink(n.link) ? `<div class="${cls}" data-nid="${esc(n.id)}">${inner}</div>` : `<a class="${cls}" href="${esc(n.link)}" data-nid="${esc(n.id)}">${inner}</a>`;
   };
   // «Шинэ» = самбарыг энэ удаа нээхээс өмнө хараагүй нь (анх энэ төхөөрөмж дээр бол — уншаагүй нь).
   const isNew = (n) => (floor ? n.id > floor : !n.read);
@@ -1055,6 +1128,19 @@ function bell() {
       } catch (x) { toast(x.message, true); b.disabled = false; }
       return;
     }
+    const g = e.target.closest("[data-grant-user]");
+    if (g) { // нээлгэх хүсэлт → тэр суралцагчид сургалт / хичээлийг нээнэ
+      e.preventDefault(); if (g.disabled) return;
+      g.disabled = true; g.textContent = "Нээж байна…";
+      try {
+        const r = await api(`/api/me/students/${encodeURIComponent(g.dataset.grantUser)}/grant`, { method: "POST", body: { course_id: g.dataset.grantCourse, lesson_id: g.dataset.grantLesson || "" } });
+        const label = r.open && !r.granted ? "✓ Аль хэдийн нээлттэй" : "✓ Нээгдлээ — суралцагчид мэдэгдлээ";
+        if (n) granted.set(n.id, label);
+        g.classList.add("done"); g.textContent = label;
+      } catch (x) { toast(x.message, true); g.disabled = false; g.textContent = "🔓 Нээх"; }
+      return;
+    }
+    if (it.tagName === "A" && n && (openChatLink(n.link) || openPeerLink(n.link))) { e.preventDefault(); open(false); return; } // чат, хамтын үнэлгээ: хуудас шилжилгүй шууд нээнэ
     if (it.tagName === "A") open(false);
   });
   let refetch = 0;
@@ -1067,10 +1153,18 @@ function bell() {
     setBadge();
     if (n.actor_id) { clearTimeout(refetch); refetch = setTimeout(load, 700); } // үүсгэсэн хүний зураг, нэрийг серверээс
     btn.animate([{ transform: "rotate(0)" }, { transform: "rotate(18deg)" }, { transform: "rotate(-14deg)" }, { transform: "rotate(0)" }], { duration: 600 });
-    toast(n.title);
+    // Дарвал: чат бол тухайн яриа шууд нээгдэнэ, бусад нь холбоос руу; уншсан болно.
+    const go = () => {
+      if (!n.read) { n.read = true; markOne(n.id); setBadge(); }
+      if (openChatLink(n.link) || openPeerLink(n.link)) return;
+      if (n.link && !actLink(n.link)) location.href = n.link; else open(true);
+    };
+    const isChat = !!chatIdOf(n.link);
+    // Нээлгэх хүсэлтийн toast дээр дарвал самбар нээгдэж «Нээх» товч харагдана.
+    toast(isChat && n.body ? n.title + " — " + n.body : n.title, false, isChat || (n.link && !n.link.startsWith("unblock:")) ? go : null);
     if (document.hidden && "Notification" in window && Notification.permission === "granted") {
       const bn = new Notification(n.title, { body: n.body || "", tag: n.id });
-      bn.onclick = () => { focus(); if (n.link && !n.link.startsWith("unblock:")) { markOne(n.id); location.href = n.link; } else open(true); };
+      bn.onclick = () => { focus(); bn.close(); go(); };
     }
   });
   Live.connect(Auth.token);
@@ -1135,20 +1229,27 @@ const fmtBytes = (b) => !b ? "" : b >= 1 << 20 ? (b / (1 << 20)).toFixed(1) + " 
 // (px) тогтмол — агуулга урт бол дотроо гүйлгэнэ (өөрөө сунаж томрохгүй). Өндөр (height) заасан дотоод
 // iframe (Google Forms гэх мэт) тэр өндрөөрөө; өндөргүй ганц iframe цонхыг бүтэн дүүргэнэ.
 // HTML embed доторх маркер: эх хуудасны lessonMarker-тэй postMessage-ээр ажиллана (sandbox тул DOM-д хүрэхгүй).
-// эх → embed: {sgHL:{list, marking, quiz}}; embed → эх: {sgHLready}, {sgHLsel:{s,e,t}}, {sgHLclick:{id,x,y}}.
+// эх → embed: {sgHL:{list, marking, quiz}}; embed → эх: {sgHLready}, {sgHLsel:{s,e,t}}, {sgHLclick:{id,x,y}},
+// {sgHLq:{id,x,y,y2,shown}} (давтах горимд картын асуулт/хариуг эх хуудас харуулна), {sgHLqx} (тэр бөмбөлгийг хаах).
+// Embed-д багшийн HTML ажилладаг тул суралцагчийн хувийн текст (тэмдэглэл, асуулт, санах хэсэг) ТЭНД ОРОХГҮЙ:
+// list-ийн мөр бүр {id, s, e, c, t (багшийн өөрийн текст — дахин олоход), n: тэмдэглэлтэй эсэх, card: карттай эсэх}.
 const EMBED_HL_JS = `(function(){var list=[],marking=false,B=document.body;
-var st=document.createElement("style");st.textContent="mark.hl{color:inherit;border-radius:3px;padding:0 1px;cursor:pointer;-webkit-box-decoration-break:clone;box-decoration-break:clone}.hl-y{background:rgba(255,214,0,.45)}.hl-g{background:rgba(52,199,89,.35)}.hl-r{background:rgba(255,69,58,.3)}.hl-b{background:rgba(10,132,255,.3)}mark.has-note{border-bottom:2px dotted currentColor}.hlq mark.hl:not(.shown){color:transparent;background:repeating-linear-gradient(135deg,#cbd2e1 0 6px,#e1e6f0 6px 12px)}.hlq mark.hl:not(.shown) *{visibility:hidden}.hlm,.hlm *{user-select:text;-webkit-user-select:text;cursor:text}.hlm ::selection{background:rgba(255,214,0,.6)}";document.head.appendChild(st);
+var st=document.createElement("style");st.textContent="mark.hl{color:inherit;border-radius:3px;padding:0 1px;cursor:pointer;-webkit-box-decoration-break:clone;box-decoration-break:clone}.hl-y{background:rgba(255,214,0,.45)}.hl-g{background:rgba(52,199,89,.35)}.hl-r{background:rgba(255,69,58,.3)}.hl-b{background:rgba(10,132,255,.3)}mark.has-note{border-bottom:2px dotted currentColor}.hlq mark.hl:not(.shown){color:transparent;background:repeating-linear-gradient(135deg,#cbd2e1 0 6px,#e1e6f0 6px 12px)}.hlq mark.hl:not(.shown) *{visibility:hidden}.hlm,.hlm *{user-select:text;-webkit-user-select:text;cursor:text}.hlm ::selection{background:rgba(255,214,0,.6)}mark.hl.has-card::after{content:'🃏';margin-left:2px;font-size:.72em;vertical-align:.18em;color:#5b6478}.hlq mark.hl.asked:not(.shown){outline:2px dashed #1f3c8f;outline-offset:1px}.hlq mark.hl:focus-visible{outline:2px solid #1f3c8f;outline-offset:2px}";document.head.appendChild(st);
 function tn(){var w=document.createTreeWalker(B,NodeFilter.SHOW_TEXT,{acceptNode:function(n){return n.parentNode.closest("script,style")?2:1}}),o=[];while(w.nextNode())o.push(w.currentNode);return o}
 function txt(){return tn().map(function(n){return n.data}).join("")}
 function off(node,o){var r=document.createRange();r.setStart(B,0);r.setEnd(node,o);var n=0,a=tn();for(var i=0;i<a.length;i++){var t=a[i];if(t===node)return n+o;if(r.comparePoint(t,t.length)===0)n+=t.length;else break}return n}
 function unwrap(){[].slice.call(document.querySelectorAll("mark.hl")).forEach(function(m){var p=m.parentNode;while(m.firstChild)p.insertBefore(m.firstChild,m);m.remove();p.normalize()})}
-function wrap(h){var pos=0;tn().forEach(function(t){var a=pos,b=pos+t.data.length;pos=b;if(b<=h.s||a>=h.e)return;var node=t,s=Math.max(h.s,a)-a,e=Math.min(h.e,b)-a;if(e<node.data.length)node.splitText(e);if(s>0)node=node.splitText(s);var m=document.createElement("mark");m.className="hl hl-"+h.c+(h.n?" has-note":"");m.dataset.hid=h.id;if(h.n)m.title=h.n;node.parentNode.insertBefore(m,node);m.appendChild(node)})}
+function wrap(h){var pos=0,f=null,l=null,c=!!h.card;tn().forEach(function(t){var a=pos,b=pos+t.data.length;pos=b;if(b<=h.s||a>=h.e)return;var node=t,s=Math.max(h.s,a)-a,e=Math.min(h.e,b)-a;if(e<node.data.length)node.splitText(e);if(s>0)node=node.splitText(s);var m=document.createElement("mark");m.className="hl hl-"+h.c+(h.n?" has-note":"")+(c?" fc":"");m.dataset.hid=h.id;node.parentNode.insertBefore(m,node);m.appendChild(node);if(!f)f=m;l=m});if(!f)return;if(c)l.classList.add("has-card");if(document.documentElement.classList.contains("hlq")){f.tabIndex=0;f.setAttribute("role","button");f.setAttribute("aria-pressed","false");var lb=c?"Flash card — асуултыг харахын тулд Enter дарна уу":"Нуусан хэсэг — харахын тулд Enter дарна уу";f.setAttribute("aria-label",lb);f.dataset.lbl=lb}}
+function frags(m){return[].slice.call(document.querySelectorAll("mark.hl")).filter(function(x){return x.dataset.hid===m.dataset.hid})}
+function rev(m,on){var all=frags(m);all.forEach(function(x){x.classList.toggle("shown",on);if(!on)x.classList.remove("asked")});var f=all[0];if(f&&f.hasAttribute("tabindex")){if(on)f.removeAttribute("aria-label");else f.setAttribute("aria-label",f.dataset.lbl||"");f.setAttribute("aria-pressed",String(on))}}
+function quiz(m){var all=frags(m),f=all[0]||m,shown=m.classList.contains("shown"),r=f.getBoundingClientRect(),at={id:m.dataset.hid,x:r.left,y:r.top,y2:r.bottom};if(!m.classList.contains("fc")||shown){rev(m,!shown);parent.postMessage({sgHLqx:1},"*");return}if(!m.classList.contains("asked")){all.forEach(function(x){x.classList.add("asked")});if(f.hasAttribute("tabindex"))f.setAttribute("aria-label","Хариугаа санаад, харахын тулд дахин Enter дарна уу");at.shown=false;parent.postMessage({sgHLq:at},"*");return}rev(m,true);at.shown=true;parent.postMessage({sgHLq:at},"*")}
 function paint(){unwrap();var full=txt();list.forEach(function(h){if(full.slice(h.s,h.e)!==h.t){var i=full.indexOf(h.t);if(i<0)return;h.s=i;h.e=i+h.t.length}wrap(h)})}
 function isW(c){return!!c&&/[\\p{L}\\p{N}]/u.test(c)}
 function sel(){var g=getSelection();if(!marking||!g.rangeCount||g.isCollapsed)return;var r=g.getRangeAt(0),full=txt(),s=off(r.startContainer,r.startOffset),e=off(r.endContainer,r.endOffset);while(s<e&&/\\s/.test(full[s]))s++;while(e>s&&/\\s/.test(full[e-1]))e--;if(e>s){var lo=0,hi=full.length,pos=0,a=tn();for(var i=0;i<a.length;i++){var x=pos,y=pos+a[i].data.length;pos=y;if(x<=s&&s<y)lo=x;if(x<e&&e<=y){hi=y;break}}while(s>lo&&isW(full[s-1])&&isW(full[s]))s--;while(e<hi&&isW(full[e])&&isW(full[e-1]))e++}e=Math.min(e,s+5000);g.removeAllRanges();if(e-s>=1)parent.postMessage({sgHLsel:{s:s,e:e,t:full.slice(s,e)}},"*")}
 addEventListener("message",function(ev){var d=ev.data&&ev.data.sgHL;if(!d||ev.source!==parent)return;list=d.list||[];marking=!!d.marking;document.documentElement.classList.toggle("hlq",!!d.quiz);document.documentElement.classList.toggle("hlm",marking);paint()});
 document.addEventListener("pointerup",function(){if(marking)setTimeout(sel,0)});
-document.addEventListener("click",function(ev){var ln=ev.target.closest&&ev.target.closest("a[href]");if(ln&&/^https?:/i.test(ln.href)){ev.preventDefault();parent.postMessage({sgLink:ln.href},"*");return}var m=ev.target.closest&&ev.target.closest("mark.hl");if(!m)return;if(document.documentElement.classList.contains("hlq")){m.classList.toggle("shown");return}if(!getSelection().isCollapsed)return;var rc=m.getBoundingClientRect();parent.postMessage({sgHLclick:{id:m.dataset.hid,x:rc.left,y:rc.bottom}},"*")});
+document.addEventListener("click",function(ev){var ln=ev.target.closest&&ev.target.closest("a[href]");if(ln&&/^https?:/i.test(ln.href)){ev.preventDefault();parent.postMessage({sgLink:ln.href},"*");return}var m=ev.target.closest&&ev.target.closest("mark.hl"),q=document.documentElement.classList.contains("hlq");if(!m){if(q)parent.postMessage({sgHLqx:1},"*");return}if(q){quiz(m);return}if(!getSelection().isCollapsed)return;var rc=m.getBoundingClientRect();parent.postMessage({sgHLclick:{id:m.dataset.hid,x:rc.left,y:rc.bottom}},"*")});
+document.addEventListener("keydown",function(ev){if(ev.key==="Escape"){parent.postMessage({sgHLqx:1},"*");return}if((ev.key==="Enter"||ev.key===" ")&&document.documentElement.classList.contains("hlq")&&ev.target.matches&&ev.target.matches("mark.hl[tabindex]")){ev.preventDefault();quiz(ev.target)}});
 parent.postMessage({sgHLready:1},"*")})()`;
 const embedDoc = (html) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;height:100%;font-family:system-ui,sans-serif}html{overflow:auto}body{display:flow-root}iframe,video,img{max-width:100%}iframe[height]{width:100%;border:0;display:block}body>iframe:only-child:not([height]){width:100%;height:100%;border:0;display:block}</style></head><body>${html}<script>${EMBED_HL_JS}</script></body></html>`;
 // Embed-д зөвхөн холбоос (https://…) буулгасан бол: хичээл дотор шууд ажиллах хаяг. Түгээмэл үйлчилгээг
@@ -1190,7 +1291,7 @@ function blockHTML(b) {
       // PDF, PowerPoint, Word, Excel: хичээл дотор шууд (попапгүй), татах боломжгүй — багш зөвшөөрсөн бол л татна.
       if (kind && kind !== "legacy") return `<figure class="rb-doc" data-bid="${esc(b.id || "")}" ${b.download ? "data-dl" : "data-nodl"}>${docViewHTML(b.url, b.name || DOC_LABEL[kind])}${cap}</figure>`;
       return b.download ? `<a class="rb-file" href="${esc(b.url)}" target="_blank" rel="noopener" download><span class="rb-file-ico">${icon("doc", 22)}</span><span><b>${esc(b.name || "Файл")}</b><small>${meta}</small></span><span class="btn btn-sm btn-glass">⬇ Татах</span></a>`
-        : `<div class="rb-file"><span class="rb-file-ico">🔒</span><span><b>${esc(b.name || "Файл")}</b><small>${meta} · ${kind === "legacy" ? "Хуучин форматыг шууд үзүүлэх боломжгүй — багш PDF, .pptx, .docx болгож оруулна" : "Зөвхөн хичээл дотор үзнэ"}</small></span></div>`;
+        : `<div class="rb-file"><span class="rb-file-ico">🔒</span><span><b>${esc(b.name || "Файл")}</b><small>${meta} · ${kind === "legacy" ? "Хуучин форматыг шууд харуулах боломжгүй — багш PDF, .pptx, .docx болгон хөрвүүлж оруулах шаардлагатай" : "Зөвхөн хичээл дотор үзнэ"}</small></span></div>`;
     }
     case "cloud": { // үүлэн үг: суралцагч 1-3 үг илгээж, бүгдийн хариулт үүл болно (mountClouds)
       const n = Math.max(1, Math.min(3, +b.max || 1));
@@ -1274,7 +1375,7 @@ function bindQuizPicks(box) {
 /* ---------- Цагаан самбар: Fabric ба board.js-ийг зөвхөн «Самбар нээх» үед ачаална ---------- */
 function loadCSS(href) {
   if (document.querySelector(`link[href="${href}"]`)) return Promise.resolve();
-  return new Promise((res, rej) => { const l = document.createElement("link"); l.rel = "stylesheet"; l.href = href; l.onload = res; l.onerror = () => { l.remove(); rej(new Error("Самбарын загвар ачаалагдсангүй — интернэтээ шалгана уу")); }; document.head.append(l); });
+  return new Promise((res, rej) => { const l = document.createElement("link"); l.rel = "stylesheet"; l.href = href; l.onload = res; l.onerror = () => { l.remove(); rej(new Error("Самбарыг ачаалж чадсангүй — интернэт холболтоо шалгана уу")); }; document.head.append(l); });
 }
 async function openBoard(opts) {
   const v = document.querySelector('script[src*="/static/app.js"]')?.src.split("v=")[1] || "";
@@ -1298,15 +1399,16 @@ function mountBoards(root, base, owner = false) {
 }
 /* ---------- Үүлэн үг: суралцагчдын хариулт үүл болж, шинэ хариулт WebSocket-оор шууд ирнэ ---------- */
 const CLOUD_HUES = ["#2f56d6", "#d9622b", "#1f9a4a", "#b45309", "#7c3aed", "#0e7490", "#be185d", "#1f3c8f"];
-// viewOnly — багш (өөрийн хичээл): маягтгүй, зөвхөн үр дүн.
-function mountClouds(root, base, viewOnly = false) {
+// viewOnly — багш (өөрийн хичээл): маягтгүй, зөвхөн үр дүн. dry — «👁 Суралцагчаар үзэх»: маягт суралцагчийнх шиг
+// харагдана, гэхдээ илгээхэд серверт бичихгүй (бодит суралцагчдын үүлийг бохирдуулахгүй).
+function mountClouds(root, base, viewOnly = false, dry = false) {
   $$(".rb-cloud[data-bid]:not([data-m])", root).forEach((fig) => {
     fig.dataset.m = 1;
     const url = base && `${base}/cloud/${encodeURIComponent(fig.dataset.bid)}`;
     const box = $(".cl-cloud", fig), meta = $(".cl-meta", fig), form = $(".cl-form", fig);
     // Багшийн засварлагч (өөр <form> дотор) — дотоод form-ыг хөтөч хасдаг тул оролтуудыг шууд нууна.
     const hideForm = () => $$(".cl-form, .cl-in, button[type=submit]", fig).forEach((x) => (x.hidden = true));
-    if (!url) { hideForm(); box.innerHTML = `<p class="muted small">Нэвтэрч орвол хариулж, бусдын үгийг харна.</p>`; return; }
+    if (!url) { hideForm(); box.innerHTML = `<p class="muted small">Нэвтэрч орсны дараа хариулж, бусдын үгийг харах боломжтой.</p>`; return; }
     if (viewOnly || !form) hideForm();
     let last = "", lastMine = [];
     const render = (d) => {
@@ -1329,6 +1431,7 @@ function mountClouds(root, base, viewOnly = false) {
       e.preventDefault();
       const words = $$(".cl-in", form).map((i) => i.value.trim()).filter(Boolean);
       if (!words.length) { $(".cl-in", form).focus(); return; }
+      if (dry) { toast("👁 Урьдчилан харах — илгээгдсэнгүй. Суралцагчийн үг үүлэнд шууд нэмэгдэнэ"); return; }
       const b = $("button", form); b.disabled = true;
       try { render(await api(url, { method: "POST", body: { words } })); toast("☁ Үг тань үүлэнд нэмэгдлээ"); }
       catch (err) { toast(err.message, true); } finally { b.disabled = false; }
@@ -1358,7 +1461,7 @@ function mountQuizzes(box, base, results = {}) {
   }, { threshold: 0.4 }) : null;
   $$(".rb-quiz", box).forEach((f) => {
     const prev = results[f.dataset.quiz], chip = $(".rq-prev", f);
-    if (prev !== undefined) { chip.hidden = false; chip.textContent = prev ? "✓ Өмнө нь зөв хариулсан" : "Өмнө нь буруу хариулсан"; chip.className = "rq-prev " + (prev ? "ok" : "bad"); }
+    if (prev !== undefined) { chip.hidden = false; chip.textContent = prev ? "✓ Өмнө нь зөв хариулсан" : "Өмнөх хариулт буруу — дахин оролдоорой"; chip.className = "rq-prev " + (prev ? "ok" : "bad"); }
     f.addEventListener("change", () => { if (f.classList.contains("answered")) quizReset(f); });
     if (io) io.observe(f); else f.dataset.shown = Date.now();
   });
@@ -1374,8 +1477,8 @@ function mountQuizzes(box, base, results = {}) {
       const r = await api(`${base}/quiz/${encodeURIComponent(f.dataset.quiz)}`, { method: "POST", body: ans });
       quizReveal(f, r, r.correct);
       // Хичээлийн асуулгын явц: бүгдэд нь зөв хариулбал дараагийн хичээл нээгдэнэ.
-      const prog = r.quiz_total ? ` · Асуулга ${r.quiz_correct}/${r.quiz_total}` : "";
-      $(".rq-res", f).textContent = (r.correct ? "✓ Зөв! Сайн байна" : "✗ Буруу байна — ногоон нь зөв хариулт") + prog;
+      const prog = r.quiz_total ? ` · Асуулт ${r.quiz_correct}/${r.quiz_total}` : "";
+      $(".rq-res", f).textContent = (r.correct ? "✓ Зөв! Сайн ажиллалаа" : "✗ Энэ удаад буруу — зөв хариултыг ногооноор харууллаа") + prog;
       btn.textContent = "Дахин оролдох";
       if (r.correct) celebrate?.();
       if (r.mastered && r.quiz_total) {
@@ -1398,7 +1501,7 @@ function timeAgo(t) {
 async function discussionPanel(box, { courseId, lessonId, preload }) {
   const base = `/api/courses/${courseId}/lessons/${lessonId}`;
   box.hidden = false;
-  if (!Auth.token) { box.innerHTML = `<div class="dc-head"><b>💬 Хэлэлцүүлэг</b></div><p class="muted small">Сэтгэгдэл бичих, лайк дарахын тулд <a href="/login?next=${encodeURIComponent(location.pathname)}">нэвтэрнэ үү</a>.</p>`; return; }
+  if (!Auth.token) { box.innerHTML = `<div class="dc-head"><b>💬 Хэлэлцүүлэг</b></div><p class="muted small">Сэтгэгдэл бичих, «Таалагдлаа» дарахын тулд <a href="/login?next=${encodeURIComponent(location.pathname)}">нэвтэрнэ үү</a>.</p>`; return; }
   const me = Auth.user || {};
   let d, openReply = null;
   const cm = (c, reply = false) => `<article class="dc-item ${reply ? "dc-reply" : ""}" data-cid="${esc(c.id)}">
@@ -1442,7 +1545,7 @@ async function discussionPanel(box, { courseId, lessonId, preload }) {
   await load(preload); // хичээлийн хариунд ирсэн бол дахин асуухгүй
 }
 
-/* ---------- Цол олгох ёслол: өнгөлөг салют + баяр хүргэх карт (систем өөрөө) ---------- */
+/* ---------- Эрэмбэ олгох ёслол: өнгөлөг салют + баяр хүргэх карт (систем өөрөө) ---------- */
 function fireworks(canvas, ms = 5000) {
   const ctx = canvas.getContext("2d"), dpr = Math.min(2, devicePixelRatio || 1);
   const fit = () => { canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr; };
@@ -1469,15 +1572,80 @@ function fireworks(canvas, ms = 5000) {
   raf = requestAnimationFrame(tick);
   return () => { cancelAnimationFrame(raf); removeEventListener("resize", fit); };
 }
+// Системийн бэлэг: систем суралцахуйг оноогоор дүгнэж (дүн) суралцахуйн зоос өгнө; зоосоор бэлгийн хайрцаг нээхэд
+// дүр гарч урамшуулна. Хайрцаг эрэмбэ ахих тусам нээгдэж, ховор дүртэй болно. Магадлалыг ил харуулна.
+// Суралцахуйн эрэмбийн медаль: 6 үе тус бүр өөрийн өнгөтэй (хүрэл → мөнгө → хаш → алт → бадмаараг → домогт).
+const RANK_EMOJI = ["✨", "💎", "🐝", "🐿️", "🦊", "🦉", "⚒️", "⚗️", "🧭", "🐆", "🐻", "🦁", "🐦‍🔥", "🐋", "🦅", "⏳", "🐉", "🌌"];
+const rankTier = (lvl) => ["bronze", "silver", "jade", "gold", "ruby", "legend"][Math.min(5, Math.max(0, Math.floor(lvl / 3)))];
+const COIN = `<i class="coin" aria-label="зоос"></i>`;
+async function loadGifts(box) {
+  if (!box) return;
+  let g;
+  try { g = await api("/api/me/gifts"); } catch (e) { box.innerHTML = `<p class="muted small">${esc(e.message)}</p>`; return; }
+  const tile = $("#giftTileCoins"); if (tile) tile.innerHTML = g.coins + " " + COIN;
+  const A = g.animals, lvl = g.level || 0;
+  // Эрэмбээрээ хүрсэн эсвэл хайрцагнаас олсон дүр ил; бусад нь нууц хэвээр (хүрэхэд нээгдэнэ).
+  const known = (a) => a.level <= lvl || a.count > 0;
+  const who = (a) => (known(a) ? `${esc(a.emoji)} ${esc(a.name)}` : "❔ Нууц дүр");
+  const boxCard = (b) => `<div class="gift-box gb-${esc(b.id)}${b.unlocked ? "" : " locked"}">
+      <div class="gb-art" aria-hidden="true"><span class="gb-lid"></span><span class="gb-body">${b.unlocked ? "?" : "🔒"}</span></div>
+      <strong>${esc(b.name)}</strong>
+      <small class="gb-range">${who(A[b.min])} — ${who(A[b.max])}</small>
+      ${b.unlocked ? `<button class="btn ${g.coins >= b.cost ? "btn-gold" : ""}" data-gift-open="${esc(b.id)}" ${g.coins >= b.cost ? "" : "disabled"}>Нээх · ${b.cost} ${COIN}</button>`
+        : `<span class="chip">🔒 ${b.unlock_points} оноонд нээгдэнэ · ${b.unlock_era}-р үе</span>`}
+      <details class="gb-odds"><summary>Магадлал</summary><ul>${b.chances.map((c) => `<li><span>${who(A[c.level])}${A[c.level].count ? "" : " <em>шинэ</em>"}</span><b>${c.pct}%</b></li>`).join("")}</ul></details>
+    </div>`;
+  // Шат: давсан/одоогийн эрэмбэ ба хайрцагнаас олсон дүр ил, хүрээгүй нь нууц хайрцаг (хэдэн оноонд нээгдэхийг заана).
+  const qbox = (cls = "") => `<span class="ga-qbox${cls}" aria-hidden="true"><span class="gb-lid"></span><span class="gb-body">?</span></span>`;
+  const cell = (a) => {
+    if (!known(a)) {
+      const next = a.level === lvl + 1;
+      return `<li class="secret${next ? " next" : ""}" title="${a.points} оноонд нээгдэнэ">${qbox()}<span class="ga-name">Нууц хайрцаг</span><small class="ga-meaning">${next ? "Дараагийнх · " : ""}${a.points} оноонд нээгдэнэ</small></li>`;
+    }
+    const st = a.level === lvl ? "Одоогийн эрэмбэ" : a.level < lvl ? "✓ Давсан" : "🎁 Хайрцагнаас олсон";
+    return `<li class="${a.level <= lvl ? "reached" : "found"}${a.level === lvl ? " cur" : ""}${a.count ? " own" : ""}" data-tier="${rankTier(a.level)}" title="${esc(a.name)} (${esc(a.en || "")}) — ${esc(a.meaning)} · ${a.points} оноо"><span class="ga-emo medal">${esc(a.emoji)}</span><span class="ga-name">${esc(a.name)}</span><small class="ga-meaning">${esc(a.meaning)}</small><small class="ga-st">${st}</small>${a.count > 1 ? `<em>×${a.count}</em>` : a.count ? `<em title="Хайрцагнаас цуглуулсан">🎁</em>` : ""}</li>`;
+  };
+  // Үе: хүрсэн үе нэр, шаттайгаа ил; огт хүрээгүй (дүр ч олоогүй) үе нэг том нууц хайрцаг.
+  const eraCard = (e) => {
+    const list = A.slice(e * 3, e * 3 + 3), reached = lvl >= e * 3, passed = lvl > e * 3 + 2;
+    if (!list.some(known)) return `<div class="ga-era ga-secret" data-tier="${rankTier(e * 3)}">${qbox(" big")}<div><span class="ga-era-h">${e + 1}-р үе · Нууц үе</span><small>3 нууц дүр · ${list[0].points} оноонд нээгдэж эхэлнэ</small></div></div>`;
+    return `<div class="ga-era${reached ? "" : " ga-partial"}${passed ? " ga-passed" : ""}" data-tier="${rankTier(e * 3)}"><span class="ga-era-h">${e + 1}-р үе · ${reached ? esc(list[0].era_name || "") : "Нууц үе"}${passed ? " ✓" : reached ? " · одоо энд" : ""}</span><ul>${list.map(cell).join("")}</ul></div>`;
+  };
+  box.innerHTML = `<div class="gifts-head"><span class="gift-coin" aria-hidden="true"><i class="coin"></i></span><div class="grow"><strong>${g.coins} зоос</strong><small>Нийт ${g.earned} зоос цуглуулсан · ${g.coin_points} оноо = 1 зоос${g.rank ? ` · Эрэмбэ: ${esc(g.rank.emoji)} ${esc(g.rank.name)}` : ""}</small></div><span class="chip chip-teal">${g.collected}/${A.length} дүр</span></div>
+    <p class="gifts-lede">Систем таны суралцахуйг оноогоор дүгнэж, суралцахуйн зоос өгнө. Зоосоороо бэлгийн хайрцаг нээж дүр цуглуулаарай. Эрэмбэ ахих тусам суралцахуйн замын нууц хайрцгууд нээгдэж, илүү ховор дүртэй хайрцаг гарна. Зоос зөвхөн шударга суралцсан онооноос бүрдэх бөгөөд мөнгөөр худалдаж авах боломжгүй.</p>
+    <div class="gift-boxes">${g.boxes.map(boxCard).join("")}</div>
+    <div class="gift-album"><b>Суралцахуйн зам — 6 үе, 18 эрэмбэ</b>${[0, 1, 2, 3, 4, 5].map(eraCard).join("")}</div>`;
+  $$("[data-gift-open]", box).forEach((btn) => btn.addEventListener("click", () => openGift(btn.dataset.giftOpen, box)));
+}
+async function openGift(id, box) {
+  $$("[data-gift-open]", box).forEach((b) => (b.disabled = true));
+  let r;
+  try { r = await api("/api/me/gifts/open", { method: "POST", body: { box: id } }); } catch (e) { toast(e.message, true); loadGifts(box); return; }
+  const a = r.animal;
+  const el = document.createElement("div"); el.className = "gift-reveal" + (reduce ? " open" : ""); el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Бэлгийн хайрцаг");
+  el.innerHTML = `<div class="gr-card gb-${esc(r.box)}"><div class="gr-box" aria-hidden="true"><span class="gb-lid"></span><span class="gb-body">?</span></div>
+    <div class="gr-animal"><span class="gr-emo medal" data-tier="${rankTier(a.level)}">${esc(a.emoji)}</span><span class="eyebrow">${r.new ? "Шинэ дүр!" : `Давхардсан дүр — ${r.refund} зоос буцаалаа`} · ${a.era}-р үе</span>
+      <h2>${esc(a.name)} <small class="rank-shine" data-level="${a.level}">${esc(a.insignia)}</small></h2>${a.en ? `<p class="gr-en">${esc(a.en)}</p>` : ""}
+      <p class="gr-meaning">${esc(a.meaning)}</p><p class="gr-cheer">«${esc(a.cheer)}»</p>
+      <p class="muted small">Үлдсэн зоос: ${r.coins} ${COIN} · Цуглуулга ${r.collected}/${r.total}</p><button class="btn btn-gold btn-lg">Гайхалтай!</button></div></div>`;
+  document.body.append(el);
+  const done = () => { el.classList.add("open"); if (r.new) celebrate(); $("button", el).focus(); };
+  if (reduce) done(); else setTimeout(done, 1300);
+  const close = () => { el.classList.add("out"); setTimeout(() => el.remove(), 300); loadGifts(box); };
+  $("button", el).onclick = close;
+  el.addEventListener("click", (e) => { if (e.target === el) close(); });
+  el.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+}
 function rankSalute(rank) {
   if (!rank?.name || $(".salute")) return;
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const el = document.createElement("div"); el.className = "salute"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Шинэ цол");
+  const el = document.createElement("div"); el.className = "salute"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Шинэ эрэмбэ");
   el.innerHTML = `<canvas class="salute-sky" aria-hidden="true"></canvas>
     <div class="salute-card"><span class="eyebrow">Систем баяр хүргэж байна</span>
-      <div class="salute-sign rank-shine" data-level="${rank.level}">${esc(rank.insignia || "★")}</div>
-      <h2>🎖 Шинэ цол: <em class="rank-name">${esc(rank.name)}</em></h2>
-      <p>Идэвхтэй, шударга суралцсан тань үнэлэгдэж <b>${rank.points}</b> оноонд хүрлээ.${rank.next ? ` Дараагийн «${esc(rank.next_name)}» цол ${rank.next} оноонд.` : " Энэ бол дээд цол!"}</p>
+      <div class="salute-evo">${rank.level > 0 ? `<span class="medal evo-from" data-tier="${rankTier(rank.level - 1)}" aria-hidden="true">${RANK_EMOJI[rank.level - 1]}</span><span class="evo-arrow" aria-hidden="true">➜</span>` : ""}<span class="medal evo-to" data-tier="${rankTier(rank.level)}" title="${esc(rank.meaning || "")}">${esc(rank.emoji || rank.insignia || "★")}</span></div>
+      <h2>Шинэ эрэмбэ: <em class="rank-name">${esc(rank.name)}</em> <small class="rank-shine" data-level="${rank.level}">${esc(rank.insignia || "")}</small></h2>
+      ${rank.meaning ? `<p class="salute-meaning">${esc(rank.meaning)}</p>` : ""}
+      <p>Идэвхтэй, шударга суралцсан тань үнэлэгдэж <b>${rank.points}</b> оноонд хүрлээ.${rank.next ? ` Дараагийн нууц эрэмбэ ${rank.next} оноонд нээгдэнэ.` : " Энэ бол дээд эрэмбэ!"}</p>
       <button class="btn btn-gold btn-lg">Баярлалаа 🎉</button></div>`;
   document.body.append(el);
   const stop = reduce ? () => {} : fireworks($(".salute-sky", el), 6000);
@@ -1500,7 +1668,7 @@ function lockedControls(v, isFree, note, maxFn = () => 0) {
   const bar = document.createElement("div");
   bar.className = "vg-bar";
   bar.innerHTML = `<button type="button" class="vg-play" aria-label="Тоглуулах">▶</button><span class="vg-time">0:00 / 0:00</span>
-    <span class="vg-prog" title="Үзсэн хэсэг рүүгээ буцаж гүйлгэнэ — үзээгүй хэсэг рүү үгүй"><b class="vg-seen"></b><i></i></span><span class="vg-lock" aria-hidden="true">🔒</span>
+    <span class="vg-prog" title="Үзсэн хэсэг рүүгээ буцаж болно — үзээгүй хэсэг рүү гүйлгэх боломжгүй"><b class="vg-seen"></b><i></i></span><span class="vg-lock" aria-hidden="true">🔒</span>
     <button type="button" class="vg-mute" aria-label="Дуу">🔊</button><button type="button" class="vg-full" aria-label="Бүтэн дэлгэц">⛶</button>`;
   wrap.append(bar);
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
@@ -1589,25 +1757,27 @@ function lessonMarker(body, base, ctx = {}) {
   if (!units().length && !frames().length && !medias().length) return () => {};
   let hs = [], color = "y", saveT = 0, dirty = false, pop = null;
   const bar = document.createElement("div"); bar.className = "hl-bar";
-  bar.innerHTML = `<button type="button" class="hl-btn hl-toggle" aria-pressed="false" title="Асаагаад тодруулах текстээ чирж сонгоно" aria-label="Маркер">🖍<span class="hl-lbl"> Маркер</span></button>
-    <button type="button" class="hl-btn hl-a11y" data-a11y-open aria-expanded="false" aria-controls="a11yPanel" title="Хүртээмж — харааны бэрхшээлтэй хүмүүст: фонт, контраст, зай, zoom" aria-label="Хүртээмжийн тохиргоо">${A11Y_SVG('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="6.8" r="1.5" fill="currentColor" stroke="none"/><path d="M6.8 9.6 12 10.6l5.2-1M12 10.6v4.2M12 14.8l-2.6 4.4M12 14.8l2.6 4.4"/>', 18)}<span class="hl-lbl"> Хүртээмж</span></button>
-    <span class="hl-colors" role="radiogroup" aria-label="Маркерын өнгө" hidden>${HL_COLORS.map(([c, t], i) => { const ask = c === "r" && ctx.teacher, tt = ask ? `${t} — тодруулаад багшаасаа асууж эсвэл тэмдэглэж үлдээнэ` : t; return `<button type="button" role="radio" class="hl-sw" data-c="${c}" aria-checked="${i === 0}" title="${tt}" aria-label="${tt}"><i class="hl-dot hl-${c}"></i><span class="hl-lbl">${t}${ask ? " 💬" : ""}</span></button>`; }).join("")}</span>
+  bar.innerHTML = `<button type="button" class="hl-btn hl-toggle" aria-pressed="false" title="Асаагаад тодруулах текстээ чирж сонгоно уу" aria-label="Маркер">🖍<span class="hl-lbl"> Маркер</span></button>
+    <button type="button" class="hl-btn hl-a11y" data-a11y-open aria-expanded="false" aria-controls="a11yPanel" title="Хүртээмж — харааны бэрхшээлтэй хүмүүст: үсгийн хэмжээ, контраст, зай, томруулалт" aria-label="Хүртээмжийн тохиргоо">${A11Y_SVG('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="6.8" r="1.5" fill="currentColor" stroke="none"/><path d="M6.8 9.6 12 10.6l5.2-1M12 10.6v4.2M12 14.8l-2.6 4.4M12 14.8l2.6 4.4"/>', 18)}<span class="hl-lbl"> Хүртээмж</span></button>
+    <span class="hl-colors" role="radiogroup" aria-label="Маркерын өнгө" hidden>${HL_COLORS.map(([c, t], i) => { const ask = c === "r" && ctx.teacher, tt = ask ? `${t} — тодруулаад багшаасаа асуух эсвэл тэмдэглэл үлдээх боломжтой` : t; return `<button type="button" role="radio" class="hl-sw" data-c="${c}" aria-checked="${i === 0}" title="${tt}" aria-label="${tt}"><i class="hl-dot hl-${c}"></i><span class="hl-lbl">${t}${ask ? " 💬" : ""}</span></button>`; }).join("")}</span>
     <span class="grow"></span>
-    <button type="button" class="hl-btn hl-quiz-btn" aria-pressed="false" title="Тодруулсан хэсгүүдийг нууна — санаж байгаад дарж шалгана" aria-label="Давтах" disabled>🧠<span class="hl-lbl"> Давтах</span></button>
+    <button type="button" class="hl-btn hl-quiz-btn" aria-pressed="false" title="Тодруулсан хэсгүүдийг нууна — эхлээд санаж үзээд, дараа нь дарж шалгаарай" aria-label="Давтах" disabled>🧠<span class="hl-lbl"> Давтах</span></button>
     <button type="button" class="hl-btn hl-list-btn" aria-expanded="false" title="Миний тэмдэглэл" aria-label="Миний тэмдэглэл" disabled>📝<span class="hl-lbl"> Миний тэмдэглэл</span> <b>0</b></button>
     <div class="hl-list" hidden></div><div class="hl-ask" hidden></div>`;
   body.before(bar);
   if (!units().length && !frames().length) { $(".hl-toggle", bar).hidden = true; $(".hl-quiz-btn", bar).hidden = true; } // зөвхөн видео/баримт: тэмдэглэл л
   const listBox = $(".hl-list", bar), askBox = $(".hl-ask", bar);
+  // «Миний тэмдэглэл» жагсаалтыг хаана (засах цонх, асуулт нээгдэх, гадуур дарахад) — товчны aria-expanded-ийг хамт.
+  const hideList = () => { if (listBox.hidden) return; listBox.hidden = true; $(".hl-list-btn", bar)?.setAttribute("aria-expanded", "false"); };
   // «Ойлгоогүй» (улаан) тодруулга: тодруулмагц цонх гарна — багшаас асуух (ишлэлтэйгээр багштай чат руу шууд)
   // эсвэл зөвхөн тэмдэглээд үлдээх. Бичсэн зүйл тодруулгын тэмдэглэл болно (асуусан бол «❓ …»).
-  let marking = false, askIds = [];
+  let marking = false, askIds = [], cardIds = [];
   const clip = (s, n) => (s.length > n ? s.slice(0, n) + "…" : s);
   const askHs = () => hs.filter((h) => askIds.includes(h.id));
-  const closeAsk = () => { askBox.hidden = true; askBox.innerHTML = ""; askIds = []; };
+  const closeAsk = () => { askBox.hidden = true; askBox.innerHTML = ""; askIds = []; cardIds = []; };
   const openAsk = (ids) => {
-    askIds = ids; const items = askHs(); if (!items.length) return;
-    closePop(); listBox.hidden = true; askBox.hidden = false;
+    askIds = ids; cardIds = []; const items = askHs(); if (!items.length) return;
+    closePop(); hideList(); askBox.hidden = false;
     const note = items[0].n && !items[0].n.startsWith("❓ ") ? items[0].n : "";
     askBox.innerHTML = `<b><i class="hl-dot hl-r"></i> Ойлгоогүй хэсэг</b><blockquote>${esc(clip(items.map((h) => h.t).join(" … "), 300))}</blockquote>
       <textarea rows="2" maxlength="1000" placeholder="${ctx.teacher ? "Юуг ойлгосонгүй вэ? Багшаасаа асуух асуулт эсвэл өөртөө тэмдэглэл…" : "Өөртөө тэмдэглэл…"}">${esc(note)}</textarea>
@@ -1631,17 +1801,76 @@ function lessonMarker(body, base, ctx = {}) {
       await api(`/api/chat/${d.conversation.id}/messages`, { method: "POST", body: { body: msg } });
       for (const h of items) { h.c = "r"; h.n = clip("❓ " + q, 990); }
       paint(); save(); askIds = [];
-      askBox.innerHTML = `<b>✓ Багшид илгээлээ</b><p class="muted small" style="margin:6px 0 0">Хариуг чатаас харна. Хичээлээ үргэлжлүүлээрэй.</p>
+      askBox.innerHTML = `<b>✓ Багшид илгээлээ</b><p class="muted small" style="margin:6px 0 0">Хариуг нь чатаас харж болно. Хичээлээ үргэлжлүүлээрэй.</p>
         <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-ask-x>Хаах</button><button type="button" class="btn btn-glass btn-sm" data-ask-open="${esc(d.conversation.id)}">Чат нээх</button></div>`;
     } catch (e) { btn.disabled = false; toast(e.message, true); }
   };
-  askBox.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); ctx.teacher ? sendAsk() : keepAsk(); } });
+  /* 🃏 Flash card: тодруулга (эсвэл медиа тэмдэглэл) дээр асуулт + санах хэсэг. Хоёуланг нь бөглөсөн үед л хадгална —
+     нэг нь л бөглөгдсөн тодруулгыг сервер хүлээж авахгүй (400), тиймээс h.q/h.a-г үргэлж хамт тавьж, хамт арилгана.
+     Чухал / Ойлгосон / Нэр томьёо-гоор тодруулмагц самбар дор жижиг санал гарна (Ойлгоогүй — багшаас асуух урсгал). */
+  const hasCard = (h) => !!(h && h.q && h.a);
+  const FC_HINT = "Асуулт ба санах хэсгийг хоёуланг нь бөглөхөд хадгалагдана.";
+  const FC_PART = "⚠ Асуулт ба санах хэсгийг хоёуланг нь бөглөнө үү — дутуу бол хадгалагдахгүй";
+  const fcFields = (q, a, ph) => `<label class="hl-fc-f"><span>❓ Асуулт</span><textarea data-fc="q" rows="2" maxlength="300" placeholder="Жишээ нь: … гэж юу вэ? Яагаад …?">${esc(q)}</textarea></label>
+    <label class="hl-fc-f"><span>💡 Санах хэсэг</span><textarea data-fc="a" rows="3" maxlength="1000" placeholder="${esc(ph || "Асуултын хариу — давтахдаа санах ёстой зүйл")}">${esc(a)}</textarea></label>
+    <p class="hl-fc-hint muted small" aria-live="polite">${FC_HINT}</p>`;
+  const fcVals = (root) => ({ q: ($('[data-fc="q"]', root)?.value || "").trim(), a: ($('[data-fc="a"]', root)?.value || "").trim() });
+  const fcState = (v) => (v.q && v.a ? "ok" : !v.q && !v.a ? "empty" : "part");
+  const fcHint = (root, text, tone = "") => { const p = $(".hl-fc-hint", root); if (p) { p.textContent = text; p.className = "hl-fc-hint small " + (tone || "muted"); } };
+  // clear — хаахад талбаруудыг хоосолно (медиа тэмдэглэлийн форм: хаасан бол «картгүй» гэсэн үг, нуугдсан карт хадгалагдахгүй).
+  const fcToggle = (btn, clear) => {
+    const box = btn.nextElementSibling; if (!box?.classList.contains("hl-fc-box")) return;
+    box.hidden = !box.hidden; btn.setAttribute("aria-expanded", String(!box.hidden));
+    if (clear) {
+      btn.textContent = box.hidden ? "🃏 Flash card болгох" : "✕ Flash card-аа болих";
+      if (box.hidden) { $$("[data-fc]", box).forEach((x) => (x.value = "")); fcHint(box, FC_HINT); }
+    }
+    if (!box.hidden) $('[data-fc="q"]', box)?.focus();
+  };
+  const offerCard = (ids) => {
+    const h = hs.find((x) => x.id === ids[0]); if (!h) return;
+    // Өмнөх картаа бичиж байх үед шинэ тодруулга бичсэнийг нь арилгахгүй (шинэ тодруулга өөрөө хадгалагдсан).
+    if ($("[data-fc-save]", askBox) && !askBox.hidden && fcState(fcVals(askBox)) !== "empty" && hs.some((x) => x.id === cardIds[0])) return;
+    closePop(); hideList(); askIds = []; cardIds = ids; askBox.hidden = false;
+    askBox.innerHTML = `<div class="hl-fc-offer"><span class="hl-fc-ask">🃏 <b>Flash card болгох уу?</b> <span class="muted small">Асуулт бичвэл давтахад карт болж гарна</span></span>
+      <span class="hl-fc-btns"><button type="button" class="btn btn-ghost btn-sm" data-ask-x>Үгүй</button><button type="button" class="btn btn-gold btn-sm" data-fc-on>Идэвхжүүлэх</button></span></div>`;
+    $("[data-fc-on]", askBox).focus({ preventScroll: true });
+  };
+  const openCard = () => {
+    const items = hs.filter((h) => cardIds.includes(h.id)), h = items[0]; if (!h) return closeAsk();
+    const text = items.map((x) => x.t || "").join(" … ");
+    askBox.hidden = false;
+    askBox.innerHTML = `<b><i class="hl-dot hl-${h.c}"></i> 🃏 Flash card</b>${text ? `<blockquote class="hl-fc-quote">${esc(clip(text, 220))}</blockquote>` : ""}
+      ${fcFields(h.q || "", h.a || (h.k ? "" : text.slice(0, 1000)))}
+      <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-ask-x>Болих</button><button type="button" class="btn btn-gold btn-sm" data-fc-save disabled>💾 Хадгалах</button></div>`;
+    fcSyncAsk(); $('[data-fc="q"]', askBox).focus();
+  };
+  const fcSyncAsk = () => {
+    const st = fcState(fcVals(askBox)), b = $("[data-fc-save]", askBox); if (!b) return;
+    b.disabled = st !== "ok";
+    fcHint(askBox, st === "part" ? FC_PART : st === "ok" ? "✓ Хадгалахад бэлэн" : FC_HINT, st === "part" ? "warn" : st === "ok" ? "ok" : "");
+  };
+  const saveCard = () => {
+    const v = fcVals(askBox), h = hs.find((x) => x.id === cardIds[0]);
+    if (!h) { closeAsk(); toast("Тодруулга олдсонгүй — дахин тодруулна уу", true); return; }
+    if (fcState(v) !== "ok") { toast("Асуулт ба санах хэсгийг хоёуланг нь бөглөнө үү", true); $(`[data-fc="${v.q ? "a" : "q"}"]`, askBox)?.focus(); return; }
+    h.q = v.q.slice(0, 300); h.a = v.a.slice(0, 1000);
+    paint(); save(); closeAsk(); toast("🃏 Flash card хадгалагдлаа — нүүр хуудасны «Миний тэмдэглэл»-д давтана");
+  };
+  askBox.addEventListener("input", (e) => { if (cardIds.length && e.target.matches?.("[data-fc]")) fcSyncAsk(); });
+  askBox.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && cardIds.length) { e.preventDefault(); closeAsk(); return; }
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (cardIds.length) { if ($("[data-fc-save]", askBox)) saveCard(); return; } ctx.teacher ? sendAsk() : keepAsk(); }
+  });
   // Блокийн текст доторх байрлал (тэмдэгтээр) — тэмдэглэгээ (mark) байсан ч ижил.
   const offsetIn = (u, node, off) => { const r = document.createRange(); r.setStart(u, 0); r.setEnd(node, off); return r.toString().length; };
   const textNodes = (u) => { const w = document.createTreeWalker(u, NodeFilter.SHOW_TEXT), out = []; while (w.nextNode()) out.push(w.currentNode); return out; };
   const unwrap = () => $$("mark.hl", body).forEach((m) => { const p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); m.remove(); p.normalize(); });
+  // Давтах горимд нуусан хэсгийн шошго (дэлгэц уншигчид хариуг нь хэлэхгүй).
+  const quizLabel = (h) => (hasCard(h) ? `❓ ${h.q} — хариуг харахын тулд Enter дарна уу` : "Нуусан хэсэг — харахын тулд Enter дарна уу");
   const wrap = (u, h) => {
-    let pos = 0;
+    let pos = 0, first = null, last = null;
+    const isCard = hasCard(h), tip = [isCard ? "🃏 " + h.q : "", h.n || ""].filter(Boolean).join("\n");
     for (const t of textNodes(u)) {
       const a = pos, b = pos + t.data.length; pos = b;
       if (b <= h.s || a >= h.e) continue;
@@ -1649,9 +1878,23 @@ function lessonMarker(body, base, ctx = {}) {
       if (e < node.data.length) node.splitText(e);
       if (s > 0) node = node.splitText(s);
       const m = document.createElement("mark"); m.className = `hl hl-${h.c}${h.n ? " has-note" : ""}`; m.dataset.hid = h.id;
-      if (h.n) m.title = h.n;
+      if (tip) m.title = tip;
       node.before(m); m.append(node);
+      if (!first) first = m; last = m;
     }
+    if (!first) return;
+    // Flash card: асуулт нь нуусан хэсгийн өмнө (CSS ::before), санах хэсэг нь тодруулсан текстээс өөр бол ил болоход төгсгөлд нь.
+    // Псевдо элемент тул textContent, байрлалын тооцоонд нөлөөлөхгүй.
+    if (isCard) { first.dataset.q = h.q; last.classList.add("has-card"); if (h.a.trim() !== (h.t || "").trim()) last.dataset.a = h.a; }
+    if (body.classList.contains("hl-quiz")) { first.tabIndex = 0; first.setAttribute("role", "button"); first.setAttribute("aria-pressed", "false"); first.setAttribute("aria-label", quizLabel(h)); }
+  };
+  // Давтах горим: нуусан хэсгийг (бүх хэсэгтэй нь) ил болгох / дахин нуух.
+  const reveal = (m) => {
+    const all = $$(`mark.hl[data-hid="${CSS.escape(m.dataset.hid)}"]`, body), on = !m.classList.contains("shown"), h = hs.find((x) => x.id === m.dataset.hid);
+    all.forEach((x) => x.classList.toggle("shown", on));
+    const f = all[0]; if (!f?.hasAttribute("tabindex")) return;
+    f.setAttribute("aria-pressed", String(on));
+    if (on) f.removeAttribute("aria-label"); else if (h) f.setAttribute("aria-label", quizLabel(h));
   };
   // Багш агуулгаа засвал: хадгалсан текстийг блок дотроос дахин хайж олно; олдохгүй бол жагсаалтад л үлдэнэ.
   const locate = (h) => {
@@ -1704,31 +1947,48 @@ function lessonMarker(body, base, ctx = {}) {
     const segs = selSegs(); if (!segs.length) return;
     const ids = [];
     for (const g of segs) {
-      if (hs.length >= 1000) { toast("Нэг хичээл дээр 1000 хүртэл тодруулга хийнэ", true); break; }
+      if (hs.length >= 1000) { toast("Нэг хичээлд 1000 хүртэл тодруулга хийх боломжтой", true); break; }
       hs = hs.filter((h) => h.b !== g.b || h.e <= g.s || h.s >= g.e); // давхацсан хуучныг шинээр солино
       const id = hid(); hs.push({ id, ...g, c: color }); ids.push(id);
     }
     if (!ids.length) return;
     paint(); save();
     if (color === "r") openAsk(ids); // ойлгоогүй: багшаас асуух эсвэл тэмдэглээд үлдээх
+    else offerCard(ids); // чухал, ойлгосон, нэр томьёо: flash card болгох санал
   };
-  const closePop = () => { pop?.remove(); pop = null; };
+  const closePop = () => { const p = pop; pop = null; p?._leave?.(); p?.remove(); };
   const openPop = (h, mark) => {
-    closePop();
+    closePop(); hideList();
+    const fc = hasCard(h);
     pop = document.createElement("div"); pop.className = "hl-pop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Тодруулга");
     pop.innerHTML = `${h.img ? `<img class="hl-pop-img" src="${esc(h.img)}" alt="">` : ""}<div class="hl-pop-colors">${HL_COLORS.map(([c, t]) => `<button type="button" class="hl-sw" data-pc="${c}" aria-pressed="${h.c === c}" title="${t}"><i class="hl-dot hl-${c}"></i>${t}</button>`).join("")}</div>
-      <textarea rows="3" maxlength="1000" placeholder="Тэмдэглэл: өөрийн үгээр тайлбарлах, асуулт, жишээ…">${esc(h.n || "")}</textarea>
+      <textarea class="hl-pop-note" rows="3" maxlength="1000" placeholder="Тэмдэглэл: өөрийн үгээр тайлбарлах, асуулт, жишээ…" aria-label="Тэмдэглэл">${esc(h.n || "")}</textarea>
+      <button type="button" class="hl-fc-tog" data-fc-tog aria-expanded="${fc}">🃏 Flash card<span>${fc ? " ✓" : " болгох"}</span></button><div class="hl-fc-box" ${fc ? "" : "hidden"}>${fcFields(h.q || "", h.a || (h.k ? "" : (h.t || "").slice(0, 1000)), h.k ? "Энэ тэмдэглэлээс санах ёстой гол зүйл…" : "")}<button type="button" class="hl-fc-clear" data-fc-clear ${fc ? "" : "hidden"}>✕ Картыг устгах</button></div>
       <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-pdel>🗑 Устгах</button>${ctx.teacher ? `<button type="button" class="btn btn-glass btn-sm" data-pask>💬 Багшаас асуух</button>` : ""}<button type="button" class="btn btn-gold btn-sm" data-pok>Болсон</button></div>`;
     card.append(pop);
     const rc = mark.getBoundingClientRect(), cr = card.getBoundingClientRect();
     pop.style.top = `${rc.bottom - cr.top + card.scrollTop + 6}px`;
     pop.style.left = `${Math.max(8, Math.min(rc.left - cr.left, cr.width - pop.offsetWidth - 8))}px`;
-    const ta = $("textarea", pop);
+    const ta = $(".hl-pop-note", pop);
     ta.oninput = () => { h.n = ta.value.trim() || undefined; save(); };
+    // Flash card: хоёулаа бөглөгдвөл шууд хадгална, хоёуланг нь арилгавал карт устгагдана, дутуу бол өмнөх хэвээр + анхааруулга.
+    let fcTouched = false;
+    const fcSync = () => {
+      const v = fcVals(pop), st = fcState(v);
+      if (st === "ok") { h.q = v.q.slice(0, 300); h.a = v.a.slice(0, 1000); save(); fcHint(pop, "✓ Flash card хадгалагдлаа", "ok"); }
+      else if (st === "empty") { if (hasCard(h)) { delete h.q; delete h.a; save(); fcHint(pop, "Карт устгагдлаа"); } else fcHint(pop, FC_HINT); }
+      else fcHint(pop, FC_PART, "warn");
+      $(".hl-fc-tog span", pop).textContent = hasCard(h) ? " ✓" : " болгох";
+      const clr = $("[data-fc-clear]", pop); clr.hidden = st === "empty" && !hasCard(h); clr.textContent = hasCard(h) ? "✕ Картыг устгах" : "✕ Арилгах";
+    };
+    pop.addEventListener("input", (e) => { if (e.target.matches?.("[data-fc]")) { fcTouched = true; fcSync(); } });
+    pop._leave = () => { if (fcTouched && fcState(fcVals(pop)) === "part") toast(hasCard(h) ? "🃏 Flash card-ийн өөрчлөлт хадгалагдсангүй — асуулт ба санах хэсгийг хоёуланг нь бөглөнө үү" : "🃏 Flash card хадгалагдсангүй — асуулт ба санах хэсгийг хоёуланг нь бөглөнө үү", true); };
     pop.onclick = (e) => {
       const c = e.target.closest("[data-pc]");
       if (c) { h.c = c.dataset.pc; $$("[data-pc]", pop).forEach((x) => x.setAttribute("aria-pressed", x === c)); paint(); save(); return; }
-      if (e.target.closest("[data-pdel]")) { hs = hs.filter((x) => x !== h); closePop(); paint(); save(); return; }
+      const tg = e.target.closest("[data-fc-tog]"); if (tg) return fcToggle(tg);
+      if (e.target.closest("[data-fc-clear]")) { $$("[data-fc]", pop).forEach((x) => (x.value = "")); fcTouched = true; fcSync(); $('[data-fc="q"]', pop).focus(); return; }
+      if (e.target.closest("[data-pdel]")) { pop._leave = null; hs = hs.filter((x) => x !== h); closePop(); paint(); save(); return; }
       if (e.target.closest("[data-pask]")) { paint(); openAsk([h.id]); return; }
       if (e.target.closest("[data-pok]")) { closePop(); paint(); }
     };
@@ -1738,13 +1998,37 @@ function lessonMarker(body, base, ctx = {}) {
     listBox.innerHTML = HL_COLORS.map(([c, t]) => {
       const items = hs.filter((h) => h.c === c);
       return items.length ? `<div class="hl-grp"><h5><i class="hl-dot hl-${c}"></i>${t} <span class="muted">${items.length}</span></h5>${items.map((h) => `<button type="button" class="hl-item" data-go="${esc(h.id)}" ${h._lost ? "disabled" : ""}>
-        ${h.k ? `<span>${h.img ? `<img class="hl-thumb" src="${esc(h.img)}" alt="">` : ""}<b class="hl-when">${h.k === "time" ? "▶" : "📄"} ${esc(h.t || "")}</b> ${esc(clip(mediaTitle(h.b), 60))}</span>` : `<span>${esc(h.t.length > 160 ? h.t.slice(0, 160) + "…" : h.t)}</span>`}${h.n ? `<small>📝 ${esc(h.n)}</small>` : ""}${h._lost ? `<small class="muted">Багш агуулгыг өөрчилсөн тул байршил олдсонгүй</small>` : ""}</button>`).join("")}</div>` : "";
+        ${h.k ? `<span>${h.img ? `<img class="hl-thumb" src="${esc(h.img)}" alt="">` : ""}<b class="hl-when">${h.k === "time" ? "▶" : "📄"} ${esc(h.t || "")}</b> ${esc(clip(mediaTitle(h.b), 60))}</span>` : `<span>${esc(h.t.length > 160 ? h.t.slice(0, 160) + "…" : h.t)}</span>`}${hasCard(h) ? `<small class="hl-fc-li">🃏 ${esc(clip(h.q, 140))}</small>` : ""}${h.n ? `<small>📝 ${esc(h.n)}</small>` : ""}${h._lost ? `<small class="muted">Багш агуулгыг өөрчилсөн тул тэмдэглэсэн байршил олдсонгүй</small>` : ""}</button>`).join("")}</div>` : "";
     }).join("") || `<p class="muted small">Тэмдэглэл алга.</p>`;
+    const nc = hs.filter(hasCard).length;
+    if (nc) listBox.insertAdjacentHTML("afterbegin", `<p class="hl-fc-sum small">🃏 <b>${nc}</b> flash card — нүүр хуудасны «Миний тэмдэглэл»-д асуултаар давтана</p>`);
   };
-  const syncFrames = () => frames().forEach((f) => {
-    const b = frameBid(f);
-    f.contentWindow?.postMessage({ sgHL: { list: hs.filter((h) => h.b === b).map(({ id, s, e, c, n, t }) => ({ id, s, e, c, n, t })), marking, quiz: body.classList.contains("hl-quiz") } }, "*");
-  });
+  // Embed-д багшийн HTML ажилладаг (бусад скрипт sgHL-ийг уншиж чадна): суралцагчийн тэмдэглэл, асуулт, санах хэсгийг
+  // ИЛГЭЭХГҮЙ — зөвхөн байрлал, өнгө, багшийн өөрийн текст (t — дахин олоход) ба тугууд. Агуулгыг эх хуудас харуулна (openPop, qb).
+  const syncFrames = () => {
+    closeQb(); // embed дахин зурагдвал ил болгосон хэсгүүд хаагдана
+    frames().forEach((f) => {
+      const b = frameBid(f);
+      f.contentWindow?.postMessage({ sgHL: { list: hs.filter((h) => h.b === b).map((h) => ({ id: h.id, s: h.s, e: h.e, c: h.c, t: h.t, n: !!h.n, card: hasCard(h) })), marking, quiz: body.classList.contains("hl-quiz") } }, "*");
+    });
+  };
+  // «🧠 Давтах» горимд embed доторх карт: асуултыг (дараагийн дарахад — санах хэсгийг) iframe-ийн дээр жижиг бөмбөлгөөр харуулна.
+  // Дэлгэц уншигч: role=status (aria-live) — фокус embed дотор үлдэнэ; Esc, гадна дарах, ✕-ээр хаагдана.
+  let qb = null;
+  const closeQb = () => { qb?.remove(); qb = null; };
+  const openQb = (f, h, at, shown) => {
+    closeQb();
+    const num = (v) => (Number.isFinite(+v) ? +v : 0), extra = shown && h.a.trim() !== (h.t || "").trim();
+    qb = document.createElement("div"); qb.className = "hl-qbub"; qb.setAttribute("role", "status"); qb.setAttribute("aria-live", "polite");
+    qb.innerHTML = `<button type="button" class="icon-btn hl-qbub-x" aria-label="Хаах">✕</button><p class="hl-qbub-q">❓ ${esc(h.q)}</p>${extra ? `<p class="hl-qbub-a">💡 ${esc(h.a)}</p>` : shown ? "" : `<p class="hl-qbub-hint">Хариугаа эхлээд өөрөө санаад, тэр хэсэг дээр дахин дарж шалгаарай</p>`}`;
+    card.append(qb);
+    qb.onclick = (e) => { if (e.target.closest(".hl-qbub-x")) closeQb(); };
+    const fr = f.getBoundingClientRect(), cr = card.getBoundingClientRect(), cy = (v) => Math.max(0, Math.min(fr.height, num(v)));
+    const top = fr.top + cy(at.y) - cr.top + card.scrollTop, bottom = fr.top + cy(at.y2) - cr.top + card.scrollTop, above = top - qb.offsetHeight - 8;
+    qb.style.top = `${above >= card.scrollTop ? above : bottom + 8}px`; // нуусан хэсгийн дээр, багтахгүй бол доор
+    qb.style.left = `${Math.max(8, Math.min(fr.left + Math.max(0, Math.min(fr.width, num(at.x))) - cr.left, cr.width - qb.offsetWidth - 8))}px`;
+  };
+  const onQbKey = (e) => { if (e.key === "Escape" && qb) closeQb(); };
   // Гадны холбоос: шинэ таб биш, хичээлийн цонх дотор (курсор хичээлээс гарсанд тооцогдохгүй) нээнэ.
   let lwKey = null;
   const closeLink = () => { $(".lw", card)?.remove(); if (lwKey) { document.removeEventListener("keydown", lwKey, true); lwKey = null; } };
@@ -1756,7 +2040,7 @@ function lessonMarker(body, base, ctx = {}) {
     const w = document.createElement("div"); w.className = "lw"; w.setAttribute("role", "dialog"); w.setAttribute("aria-modal", "true"); w.setAttribute("aria-label", "Холбоос");
     w.innerHTML = `<div class="lw-card"><div class="lw-head"><b>🔗 ${esc(u.hostname.replace(/^www\./, ""))}</b><span class="lw-url">${esc(clip(u.href, 90))}</span><button type="button" class="icon-btn" data-lw-x aria-label="Хаах">✕</button></div>
       <div class="lw-body">${lk?.video ? `<div class="player">${mediaHTML(lk.src)}</div>` : lk ? `<iframe src="${esc(lk.src)}" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" allow="fullscreen; autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="Холбоос"></iframe>` : `<p class="muted lw-none">Энэ холбоосыг нээх боломжгүй.</p>`}</div>
-      <p class="muted small lw-foot">Хуудас харагдахгүй байвал тухайн сайт өөр сайт дотор харагдахыг хориглосон байна.</p></div>`;
+      <p class="muted small lw-foot">Хуудас харагдахгүй байвал тухайн сайт өөр сайт дотор нээгдэхийг хориглосон байж болзошгүй.</p></div>`;
     card.append(w);
     w.onclick = (e) => { if (e.target === w || e.target.closest("[data-lw-x]")) closeLink(); };
     lwKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); closeLink(); } };
@@ -1769,11 +2053,18 @@ function lessonMarker(body, base, ctx = {}) {
     if (e.data.sgHLready) return syncFrames();
     if (typeof e.data.sgLink === "string") return openLink(e.data.sgLink);
     if (sl && marking && Number.isInteger(sl.s) && Number.isInteger(sl.e) && sl.e > sl.s && typeof sl.t === "string") {
-      if (hs.length >= 1000) return toast("Нэг хичээл дээр 1000 хүртэл тодруулга хийнэ", true);
+      if (hs.length >= 1000) return toast("Нэг хичээлд 1000 хүртэл тодруулга хийх боломжтой", true);
       hs = hs.filter((h) => h.b !== b || h.e <= sl.s || h.s >= sl.e);
       const id = hid(); hs.push({ id, b, s: sl.s, e: Math.min(sl.e, sl.s + 5000), t: sl.t.slice(0, 5000), c: color });
-      paint(); save(); if (color === "r") openAsk([id]);
+      paint(); save(); if (color === "r") openAsk([id]); else offerCard([id]);
       return;
+    }
+    if (e.data.sgHLqx) return closeQb();
+    const qm = e.data.sgHLq;
+    if (qm && typeof qm === "object") { // давтах горим: тэр embed-ийн блокийн карт л
+      if (!body.classList.contains("hl-quiz")) return;
+      const h = hs.find((x) => x.id === qm.id && x.b === b); if (!h || !hasCard(h)) return;
+      return openQb(f, h, qm, qm.shown === true);
     }
     if (ck) { const h = hs.find((x) => x.id === ck.id && x.b === b); if (!h) return; const fr = f.getBoundingClientRect(); openPop(h, { getBoundingClientRect: () => ({ left: fr.left + (+ck.x || 0), bottom: fr.top + (+ck.y || 0) }) }); }
   };
@@ -1785,8 +2076,8 @@ function lessonMarker(body, base, ctx = {}) {
   };
   const setQuiz = (q) => {
     body.classList.toggle("hl-quiz", q); $(".hl-quiz-btn", bar).setAttribute("aria-pressed", q);
-    $$("mark.hl.shown", body).forEach((m) => m.classList.remove("shown")); syncFrames();
-    if (q) { setOn(false); closeAsk(); closePop(); toast("Тодруулсан хэсгүүд нуугдлаа — эхлээд өөрөө санаад, дараа нь дарж шалгаарай 🧠"); }
+    paint(); // тэмдэглэгээг дахин зурна: нуусан хэсэг бүгд хаалттай, давтах горимд гараар (Tab, Enter) нээгдэх шошготой
+    if (q) { setOn(false); closeAsk(); closePop(); toast(hs.some(hasCard) ? "Тодруулсан хэсгүүд нуугдлаа — ❓ асуултад эхлээд өөрөө хариулаад, дараа нь дарж шалгаарай 🧠" : "Тодруулсан хэсгүүд нуугдлаа — эхлээд өөрөө санаад, дараа нь дарж шалгаарай 🧠"); }
   };
   bar.onclick = (e) => {
     if (e.target.closest(".hl-toggle")) return setOn(!marking);
@@ -1794,6 +2085,8 @@ function lessonMarker(body, base, ctx = {}) {
     if (sw) { color = sw.dataset.c; $$("[data-c]", bar).forEach((x) => x.setAttribute("aria-checked", x === sw)); return; }
     if (e.target.closest(".hl-quiz-btn")) return setQuiz(!body.classList.contains("hl-quiz"));
     if (e.target.closest("[data-ask-x]")) return closeAsk();
+    if (e.target.closest("[data-fc-on]")) return openCard();
+    if (e.target.closest("[data-fc-save]")) return saveCard();
     if (e.target.closest("[data-ask-keep]")) return keepAsk();
     if (e.target.closest("[data-ask-send]")) return sendAsk();
     const oc = e.target.closest("[data-ask-open]");
@@ -1801,7 +2094,7 @@ function lessonMarker(body, base, ctx = {}) {
     if (e.target.closest(".hl-list-btn")) { closeAsk(); listBox.hidden = !listBox.hidden; $(".hl-list-btn", bar).setAttribute("aria-expanded", !listBox.hidden); if (!listBox.hidden) renderList(); return; }
     const go = e.target.closest("[data-go]");
     if (go) {
-      const m = $(`mark.hl[data-hid="${CSS.escape(go.dataset.go)}"]`, body), h = hs.find((x) => x.id === go.dataset.go); listBox.hidden = true;
+      const m = $(`mark.hl[data-hid="${CSS.escape(go.dataset.go)}"]`, body), h = hs.find((x) => x.id === go.dataset.go); hideList();
       if (h?.k) return goMedia(h);
       if (m) { m.scrollIntoView({ behavior: "smooth", block: "center" }); m.classList.remove("flash"); void m.offsetWidth; m.classList.add("flash"); }
       else if (h) $(`.rb-embed[data-bid="${CSS.escape(h.b)}"]`, body)?.scrollIntoView({ behavior: "smooth", block: "center" }); // embed доторх тодруулга
@@ -1812,11 +2105,15 @@ function lessonMarker(body, base, ctx = {}) {
     const a = e.target.closest?.("a[href]");
     if (a && /^https?:/i.test(a.href)) { let ext = false; try { ext = new URL(a.href).host !== location.host; } catch {} if (ext) { e.preventDefault(); openLink(a.href); return; } }
     const m = e.target.closest?.("mark.hl"); if (!m) return;
-    if (body.classList.contains("hl-quiz")) { m.classList.toggle("shown"); return; }
+    if (body.classList.contains("hl-quiz")) { reveal(m); return; }
     if (!getSelection().isCollapsed) return;
     const h = hs.find((x) => x.id === m.dataset.hid); if (h) openPop(h, m);
   };
-  const onDoc = (e) => { if (pop && !pop.contains(e.target) && !e.target.closest?.("mark.hl, [data-mn-go]")) { closePop(); paint(); } };
+  const onDoc = (e) => {
+    if (qb && !qb.contains(e.target)) closeQb();
+    if (pop && !pop.contains(e.target) && !e.target.closest?.("mark.hl, [data-mn-go]")) { closePop(); paint(); }
+    if (!listBox.hidden && !listBox.contains(e.target) && !e.target.closest?.(".hl-list-btn")) hideList();
+  };
   /* медиа тэмдэглэл: «📝 Энэ мөчид / хуудсанд тэмдэглэх» + тэмдэглэлүүд (дарж тэр мөч, хуудас руу) */
   const fmtT = (s) => { s = Math.max(0, Math.floor(+s || 0)); const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = String(s % 60).padStart(2, "0"); return hh ? `${hh}:${String(mm).padStart(2, "0")}:${ss}` : `${mm}:${ss}`; };
   const isDoc = (fig) => fig.classList.contains("rb-doc");
@@ -1836,7 +2133,7 @@ function lessonMarker(body, base, ctx = {}) {
     for (const fig of medias()) {
       if (fig.querySelector(":scope > .mn")) continue;
       const doc = isDoc(fig), el = document.createElement("div"); el.className = "mn"; el.dataset.mn = fig.dataset.bid;
-      el.innerHTML = `<div class="mn-line" hidden></div><div class="mn-row"><button type="button" class="mn-add" title="${doc ? "Одоо харж буй хуудсанд тэмдэглэл хөтлөх" : "Энэ мөчид тэмдэглэл хөтлөх — дараа нь дарж яг энэ мөч рүү очно"}">📝 <span>${doc ? "Энэ хуудсанд тэмдэглэх" : "Энэ мөчид тэмдэглэх"}</span><b class="mn-at"></b></button>${doc ? `<button type="button" class="mn-add mn-box" title="Хуудсан дээрх чухал хэсгийг дөрвөлжингөөр хүрээлж, зургийг нь тэмдэглэлд хадгална">▢ <span>Хэсгийг хүрээлж тэмдэглэх</span></button>` : ""}<div class="mn-chips"></div></div><div class="mn-form" hidden></div>`;
+      el.innerHTML = `<div class="mn-line" hidden></div><div class="mn-row"><button type="button" class="mn-add" title="${doc ? "Одоо харж буй хуудсанд тэмдэглэл хөтлөх" : "Энэ мөчид тэмдэглэл хөтлөх — дараа нь дарахад яг энэ мөч рүү очно"}">📝 <span>${doc ? "Энэ хуудсанд тэмдэглэх" : "Энэ мөчид тэмдэглэх"}</span><b class="mn-at"></b></button>${doc ? `<button type="button" class="mn-add mn-box" title="Хуудсан дээрх чухал хэсгийг дөрвөлжингөөр хүрээлж, зургийг нь тэмдэглэлд хадгална">▢ <span>Хэсгийг хүрээлж тэмдэглэх</span></button>` : ""}<div class="mn-chips"></div></div><div class="mn-form" hidden></div>`;
       const cap = fig.querySelector(":scope > figcaption"); cap ? cap.before(el) : fig.append(el);
     }
   }
@@ -1844,7 +2141,7 @@ function lessonMarker(body, base, ctx = {}) {
     for (const el of $$(".mn", body)) {
       const fig = el.parentElement, b = el.dataset.mn, d = +el.dataset.dur || 0;
       const list = hs.filter((h) => h.k && h.b === b).sort((x, y) => (x.sec || x.p || 0) - (y.sec || y.p || 0));
-      $(".mn-chips", el).innerHTML = list.map((h) => `<button type="button" class="mn-chip" data-mn-go="${esc(h.id)}" title="${esc(h.n || "Тэмдэглэл")}"><i class="hl-dot hl-${h.c}"></i>${h.img ? `<img src="${esc(h.img)}" alt="">` : ""}<b>${esc(h.t || "")}</b>${h.n ? `<span>${esc(clip(h.n, 38))}</span>` : ""}</button>`).join("");
+      $(".mn-chips", el).innerHTML = list.map((h) => `<button type="button" class="mn-chip" data-mn-go="${esc(h.id)}" title="${esc([hasCard(h) ? "🃏 " + h.q : "", h.n || ""].filter(Boolean).join("\n") || "Тэмдэглэл")}"><i class="hl-dot hl-${h.c}"></i>${h.img ? `<img src="${esc(h.img)}" alt="">` : ""}<b>${esc(h.t || "")}</b>${hasCard(h) ? `<em class="mn-fc" aria-label="Flash card">🃏</em>` : ""}${h.n ? `<span>${esc(clip(h.n, 38))}</span>` : ""}</button>`).join("");
       const line = $(".mn-line", el);
       line.hidden = isDoc(fig) || !d || !list.length;
       if (!line.hidden) line.innerHTML = list.map((h) => `<button type="button" class="mn-dot" data-mn-go="${esc(h.id)}" style="left:${Math.min(100, (h.sec / d) * 100)}%" title="${esc(h.t + (h.n ? " — " + h.n : ""))}"><i class="hl-dot hl-${h.c}"></i></button>`).join("");
@@ -1869,15 +2166,21 @@ function lessonMarker(body, base, ctx = {}) {
     if (form._url) URL.revokeObjectURL(form._url);
     form._url = nw.blob ? URL.createObjectURL(nw.blob) : "";
     form.innerHTML = `${form._url ? `<img class="mn-shot" src="${form._url}" alt="Хүрээлсэн хэсэг">` : ""}<div class="mn-fh"><b>${doc ? "📄" : "▶"} ${esc(nw.t)}</b><span class="mn-sw">${HL_COLORS.map(([c, t]) => `<button type="button" class="hl-sw" data-mc="${c}" aria-pressed="${c === nw.c}" title="${t}"><i class="hl-dot hl-${c}"></i><span class="hl-lbl">${t}</span></button>`).join("")}</span></div>
-      <textarea rows="2" maxlength="1000" placeholder="${doc ? "Энэ хуудсанд юу чухал байв? Өөрийн үгээр тэмдэглэнэ…" : "Энэ мөчид юу ярьсан бэ? Гол санаа, асуултаа тэмдэглэнэ…"}"></textarea>
+      <textarea class="mn-note" rows="2" maxlength="1000" placeholder="${doc ? "Энэ хуудсанд юу чухал байв? Өөрийн үгээр тэмдэглээрэй…" : "Энэ мөчид юу ярьсан бэ? Гол санаа, асуултаа тэмдэглээрэй…"}" aria-label="Тэмдэглэл"></textarea>
+      <button type="button" class="hl-fc-tog" data-fc-tog aria-expanded="false">🃏 Flash card болгох</button><div class="hl-fc-box" hidden>${fcFields("", "", doc ? "Энэ хуудаснаас санах ёстой гол зүйл…" : "Энэ мөчөөс санах ёстой гол зүйл…")}</div>
       <div class="hl-pop-acts"><button type="button" class="btn btn-ghost btn-sm" data-mn-x>Болих</button><button type="button" class="btn btn-gold btn-sm" data-mn-save>Хадгалах</button></div>`;
-    $("textarea", form).focus();
+    form.oninput = (e) => { if (!e.target.matches?.("[data-fc]")) return; const st = fcState(fcVals(form)); fcHint(form, st === "part" ? FC_PART : st === "ok" ? "✓ Тэмдэглэлтэй хамт хадгалагдана" : FC_HINT, st === "part" ? "warn" : st === "ok" ? "ok" : ""); };
+    $(".mn-note", form).focus();
   };
   const saveForm = async (el) => {
     const form = $(".mn-form", el), nw = form._new; if (!nw || form._busy) return;
-    if (hs.length >= 1000) return toast("Нэг хичээл дээр 1000 хүртэл тэмдэглэл хөтөлнө", true);
-    const n = $("textarea", form).value.trim();
+    if (hs.length >= 1000) return toast("Нэг хичээлд 1000 хүртэл тэмдэглэл хөтлөх боломжтой", true);
+    const n = $(".mn-note", form).value.trim();
+    // Flash card: дутуу (нэг нь л бөглөгдсөн) бол юу ч хадгалахгүй — бөглөх эсвэл хоёуланг нь хоослохыг сануулна.
+    const fcBox = $(".hl-fc-box", form), fc = fcBox && !fcBox.hidden ? fcVals(form) : { q: "", a: "" };
+    if (fcState(fc) === "part") { toast("🃏 Flash card-ийн асуулт ба санах хэсгийг хоёуланг нь бөглөнө үү (эсвэл хоёуланг нь хоосон үлдээнэ үү)", true); $(`[data-fc="${fc.q ? "a" : "q"}"]`, form)?.focus(); return; }
     const h = { id: hid(), b: el.dataset.mn, s: 0, e: 0, c: nw.c, t: nw.t, k: nw.k };
+    if (fc.q && fc.a) { h.q = fc.q.slice(0, 300); h.a = fc.a.slice(0, 1000); }
     if (nw.k === "time") h.sec = nw.sec; else h.p = nw.p;
     if (nw.box) h.box = nw.box;
     if (nw.blob) { // хүрээлсэн хэсгийн зургийг серверт
@@ -1893,7 +2196,7 @@ function lessonMarker(body, base, ctx = {}) {
     if (n) h.n = n.slice(0, 1000);
     if (form._url) { URL.revokeObjectURL(form._url); form._url = ""; }
     hs.push(h); form._new = null; form.hidden = true; form.innerHTML = "";
-    paint(); save(); toast("📝 Тэмдэглэгдлээ — «Миний тэмдэглэл»-ээс бүгдийг харна");
+    paint(); save(); toast(hasCard(h) ? "🃏 Тэмдэглэл, flash card хадгалагдлаа — нүүр хуудсанд асуултаар давтана" : "📝 Тэмдэглэгдлээ — «Миний тэмдэглэл»-ээс бүгдийг харна");
   };
   const onMn = (e) => {
     const el = e.target.closest?.(".mn"); if (!el || !body.contains(el)) return;
@@ -1902,12 +2205,17 @@ function lessonMarker(body, base, ctx = {}) {
     if (e.target.closest(".mn-add")) { if (!form.hidden) { form.hidden = true; form._new = null; return; } return openForm(el); }
     const sw = e.target.closest("[data-mc]");
     if (sw && form._new) { form._new.c = sw.dataset.mc; $$("[data-mc]", form).forEach((x) => x.setAttribute("aria-pressed", x === sw)); return; }
+    const tg = e.target.closest("[data-fc-tog]"); if (tg && form.contains(tg)) { fcToggle(tg, true); if (tg.getAttribute("aria-expanded") === "false") tg.focus(); return; }
     if (e.target.closest("[data-mn-x]")) { form.hidden = true; form._new = null; form.innerHTML = ""; return; }
     if (e.target.closest("[data-mn-save]")) return saveForm(el);
     const g = e.target.closest("[data-mn-go]");
     if (g) { const h = hs.find((x) => x.id === g.dataset.mnGo); if (h) { goMedia(h); openPop(h, g); } }
   };
-  const onMnKey = (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && e.target.closest?.(".mn-form")) { e.preventDefault(); saveForm(e.target.closest(".mn")); } };
+  const onMnKey = (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && e.target.closest?.(".mn-form")) { e.preventDefault(); saveForm(e.target.closest(".mn")); return; }
+    // Давтах горим: нуусан хэсэг дээр Enter / Space — ил болгоно (гараар).
+    if ((e.key === "Enter" || e.key === " ") && body.classList.contains("hl-quiz") && e.target.matches?.("mark.hl[tabindex]")) { e.preventDefault(); reveal(e.target); }
+  };
   /* ▢ Хэсгийг хүрээлж тэмдэглэх: баримтын хуудсан дээр дөрвөлжин зурж, тэр хэсгийн зургийг хадгална. */
   let boxSel = null;
   const pageEl = (dv, p) => $(`.face[data-p="${p}"]`, dv) || $$("section.docx", dv)[p - 1] || (dv._dv?.page?.() === p ? $(".sl-slide", dv) : null);
@@ -1918,7 +2226,7 @@ function lessonMarker(body, base, ctx = {}) {
     cancelBox();
     dv.scrollIntoView({ behavior: "smooth", block: "center" });
     const ov = document.createElement("div"); ov.className = "mn-sel";
-    ov.innerHTML = `<p class="mn-sel-hint">▢ Чухал хэсгийг хулганаар (утсанд хуруугаар) дөрвөлжин хүрээлнэ · <button type="button">Болих</button></p><i class="mn-rect" hidden></i>`;
+    ov.innerHTML = `<p class="mn-sel-hint">▢ Чухал хэсгийг хулганаар (утсанд хуруугаар) дөрвөлжин хүрээлнэ үү · <button type="button">Болих</button></p><i class="mn-rect" hidden></i>`;
     host.append(ov);
     const key = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancelBox(); } };
     document.addEventListener("keydown", key, true);
@@ -2000,17 +2308,17 @@ function lessonMarker(body, base, ctx = {}) {
   mountMedia(); mTick();
   body.addEventListener("click", onMn); body.addEventListener("keydown", onMnKey);
   body.addEventListener("pointerup", onUp); body.addEventListener("keyup", onUp); body.addEventListener("click", onClick);
-  document.addEventListener("pointerdown", onDoc); addEventListener("message", onMsg);
+  document.addEventListener("pointerdown", onDoc); addEventListener("message", onMsg); document.addEventListener("keydown", onQbKey);
   (ctx.preload ? Promise.resolve(ctx.preload) : api(base)).then((d) => { // хичээлийн хариунд ирсэн бол дахин асуухгүй
     hs = d.highlights || []; paint();
     const nid = new URLSearchParams(location.hash.slice(1)).get("n"), h = nid && hs.find((x) => x.id === nid);
     if (h) setTimeout(() => { if (h.k) return goMedia(h); const m = $(`mark.hl[data-hid="${CSS.escape(h.id)}"]`, body); if (m) { m.scrollIntoView({ behavior: "smooth", block: "center" }); m.classList.remove("flash"); void m.offsetWidth; m.classList.add("flash"); } }, 900);
   }).catch(() => {});
   return () => {
-    flush(); closePop(); closeLink(); clearInterval(mTimer);
+    flush(); closePop(); closeQb(); closeLink(); clearInterval(mTimer);
     body.removeEventListener("click", onMn); body.removeEventListener("keydown", onMnKey);
     body.removeEventListener("pointerup", onUp); body.removeEventListener("keyup", onUp); body.removeEventListener("click", onClick);
-    document.removeEventListener("pointerdown", onDoc); removeEventListener("message", onMsg);
+    document.removeEventListener("pointerdown", onDoc); removeEventListener("message", onMsg); document.removeEventListener("keydown", onQbKey);
   };
 }
 
@@ -2071,10 +2379,12 @@ function cursorAlert(n) {
 const WATCH_PING_SEC = 300, WATCH_PING_ANSWER = 30, WATCH_IDLE_MS = 120000;
 // lazy — хичээл суралцагчийн оролцоогүйгээр (багш хоригийг цуцлахад) нээгдсэн: суралцагч анх хөдлөх хүртэл
 // идэвхгүй, гадуур, идэвхийн шалгалтыг тоолохгүй (компьютерийн дэргэд байхгүй үед дахин хаагдахаас сэргийлнэ).
-function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn, lazy }) {
+// dry — «👁 Суралцагчаар үзэх» (багш): суралцагчийнх шиг сануулга, идэвхийн шалгалт, хуулах хамгаалалт ажиллана, гэхдээ
+// сесс нээхгүй, beat/зөрчил серверт илгээхгүй, хичээлийг хэзээ ч хаахгүй (идэвхтэй хугацааг зөвхөн энд тоолно).
+function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn, lazy, dry = false }) {
   const WATCH_MAX_WARN = Math.max(1, +maxWarn || 3); // багш сургалтын тохиргоонд тоогоор оруулна
   if (!Auth.token) return () => {};
-  let sid = null, owner = false, warns = 0, stopped = false, away = false, awayAt = 0, last = Date.now(), lastInput = Date.now(), idleLogged = false, armed = !lazy;
+  let sid = null, owner = false, warns = 0, stopped = false, away = false, awayAt = 0, last = Date.now(), lastInput = Date.now(), idleLogged = false, armed = !lazy, dryActive = 0;
   let acc = { active: 0, idle: 0, away: 0 }, events = [], pingAt = Date.now() + WATCH_PING_SEC * 1000, pingTimer = null, wmTimer = null;
   // Идэвхийн оноо E = идэвхтэй / нийт (сүүлийн 5 минут). 3+ минут хэмжээд E < 0.1 бол хичээл зогсоно.
   const win = [];
@@ -2084,8 +2394,8 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn, laz
   badge.className = "watch-badge";
   // «Юуг тэмдэглэдэг вэ?» — шинэ таб нээвэл таб сольсонд тооцогдох тул тайлбарыг хичээлийн цонхон дотор харуулна.
   const why = document.createElement("div"); why.className = "wb-info"; why.id = "wbInfo"; why.hidden = true;
-  why.innerHTML = `<b>Хичээлийн цонх нээлттэй үед л</b> таб, цонх сольсон, курсор цонхноос гарсан, 2 минутаас удаан хөдөлгөөнгүй байсан, хуулах гэсэн үйлдлийг тэмдэглэнэ. Камер, микрофон ашиглахгүй, дэлгэц бичихгүй. Тэмдэглэлийг тухайн сургалтын багш харж, 180 хоногийн дараа устна.`;
-  const paint = () => { badge.innerHTML = `${icon("eye", 14)} Анхаарлын горим · <span class="wb-long">өөр таб руу шилжвэл </span>сануулга <b>${warns}/${WATCH_MAX_WARN}</b><button type="button" class="wb-why" aria-controls="wbInfo" aria-expanded="${!why.hidden}">Юуг тэмдэглэдэг вэ?</button>`; badge.classList.toggle("warned", warns > 0); };
+  why.innerHTML = `<b>Хичээлийн цонх нээлттэй үед л</b> таб, цонх сольсон, курсор цонхноос гарсан, 2 минутаас удаан хөдөлгөөнгүй байсан, хуулах гэсэн үйлдлийг тэмдэглэнэ. Камер, микрофон ашиглахгүй, дэлгэц бичихгүй. Тэмдэглэлийг тухайн сургалтын багш харах бөгөөд 180 хоногийн дараа устгагдана.`;
+  const paint = () => { badge.innerHTML = `${icon("eye", 14)} Анхаарлын горим${dry ? ` <span class="wb-dry" title="Урьдчилан харах — юу ч бүртгэгдэхгүй, хичээл хаагдахгүй">туршилт</span>` : ""} · <span class="wb-long">өөр таб руу шилжвэл </span>сануулга <b>${warns}/${WATCH_MAX_WARN}</b><button type="button" class="wb-why" aria-controls="wbInfo" aria-expanded="${!why.hidden}">Юуг тэмдэглэдэг вэ?</button>`; badge.classList.toggle("warned", warns > 0); };
   badge.addEventListener("click", (e) => { const b = e.target.closest(".wb-why"); if (!b) return; why.hidden = !why.hidden; b.setAttribute("aria-expanded", String(!why.hidden)); });
   paint(); card.prepend(badge); badge.after(why);
   const wm = document.createElement("div"); wm.className = "wm"; wm.setAttribute("aria-hidden", "true");
@@ -2102,14 +2412,35 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn, laz
   const send = (end) => {
     tick();
     win.push([acc.active, acc.active + acc.idle + acc.away]); while (win.length > 20) win.shift();
+    // Серверт юу ч илгээхгүй. Хаах үед (end) onActive дуудахгүй — дараагийн хичээлийн «дууслаа» товчийг хуучин тоогоор дарж бичихгүй.
+    if (dry) { dryActive += acc.active; acc = { active: 0, idle: 0, away: 0 }; events = []; if (!end) onActive?.(dryActive); return; }
     if (!sid) return;
     const body = JSON.stringify({ sessionId: sid, ...acc, events, end: end || "" });
     acc = { active: 0, idle: 0, away: 0 }; events = [];
     // Protobuf API (Connect-JSON): BeatOnce — gRPC Beat урсгалтай ижил логик.
     fetch("/surgalt.v1.Surgalt/BeatOnce", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json", Authorization: "Bearer " + Auth.token }, body })
-      .then((r) => r.json()).then((d) => { if (d?.activeDoneSec != null || d?.ok) onActive?.(d.activeDoneSec || 0); }).catch(() => {});
+      .then((r) => r.json()).then((d) => {
+        if (d?.code === "not_found") { if (!end) restart(); return; } // сесс устгагдсан — шинээр эхлүүлж үргэлжлүүлнэ
+        if (d?.activeDoneSec != null || d?.ok) onActive?.(d.activeDoneSec || 0);
+      }).catch(() => {});
   };
-  api("/surgalt.v1.Surgalt/StartSession", { method: "POST", body: { courseId, lessonId } })
+  // Сесс серверт алга болсон (багш энэ сургалт дахь явцыг шинэчилж устгасан г.м.): идэвхтэй хугацаа тоологдохоо
+  // болихгүйн тулд шинэ сесс нээнэ. Хичээл хаагдсан/зогссон бол нээхгүй.
+  let restarting = false;
+  const restart = () => {
+    if (restarting || stopped || done) return;
+    restarting = true; sid = null;
+    api("/surgalt.v1.Surgalt/StartSession", { method: "POST", body: { courseId, lessonId } })
+      .then((d) => { if (!done && !stopped) { sid = d.sessionId; onActive?.(d.policy?.activeDoneSec || 0); } })
+      .catch(() => {}).finally(() => { restarting = false; });
+  };
+  if (dry) { // сесс нээхгүй; усан тэмдгийг суралцагчийнх шиг харуулна
+    onActive?.(0);
+    wm.textContent = `${Auth.user?.display_name || Auth.user?.username || ""} · 👁 урьдчилан харах`;
+    card.append(wm);
+    const move = () => { wm.style.left = 5 + Math.random() * 55 + "%"; wm.style.top = 12 + Math.random() * 70 + "%"; };
+    move(); wmTimer = setInterval(move, 6000);
+  } else api("/surgalt.v1.Surgalt/StartSession", { method: "POST", body: { courseId, lessonId } })
     .then((d) => {
       sid = d.sessionId; owner = !!d.policy?.owner;
       onActive?.(d.policy?.activeDoneSec || 0);
@@ -2146,31 +2477,41 @@ function watchLesson({ courseId, lessonId, modal, onStop, onActive, maxWarn, laz
       <p>Хичээл үзэж байхдаа өөр таб, цонх руу шилжихгүй байна уу. Видео түр зогслоо.</p>
       <div class="wa-meter" aria-label="Сануулга ${warns}/${WATCH_MAX_WARN}">${Array.from({ length: WATCH_MAX_WARN }, (_, i) => `<i class="${i < warns ? "used" : ""} ${i === WATCH_MAX_WARN - 1 ? "last" : ""}">${i === WATCH_MAX_WARN - 1 ? "⛔" : i + 1}</i>`).join("")}</div>
       <p class="wa-left">${left === 1 ? "Дахиад гарвал хичээл <b>хаагдаж</b>, багшид мэдэгдэнэ!" : `Дахиад <b>${left}</b> удаа гарвал хичээл хаагдана`}</p>
-      <p class="wa-away">⏱ ${sec} секунд өөр цонхонд байсан · багшид тэмдэглэгдлээ</p>`, "Ойлголоо, хичээл рүүгээ буцах", null, "danger");
+      <p class="wa-away">⏱ ${sec} секунд өөр цонхонд байсан · ${dry ? "👁 урьдчилан харах — бүртгэгдээгүй" : "багшид тэмдэглэгдлээ"}</p>`, "Ойлголоо, хичээл рүүгээ буцах", null, "danger");
   };
   const stop = (detail, msg) => {
+    if (done || stopped) return; // хичээл аль хэдийн хаагдсан — хаалт, мэдэгдэл давхардуулахгүй
+    if (dry) { // урьдчилан харах: суралцагчид юу болохыг харуулаад үргэлжлүүлнэ — хаахгүй, мэдэгдэхгүй
+      warns = 0; win.length = 0; paint(); pauseMedia(); flashOff();
+      watchAlert(`<span class="wa-ico" aria-hidden="true"><i>⛔</i></span>
+        <span class="wa-eyebrow">👁 Урьдчилан харах</span>
+        <h3>Суралцагчид энд хичээл зогсож хаагдана</h3>
+        <p>${msg} Бодит суралцагчийн хувьд хичээл хаагдаж, багшид мэдэгдэл очно.</p>
+        <p class="wa-away">Таны хувьд хаагдаагүй, юу ч бүртгэгдээгүй — сануулгын тоо дахин эхэллээ.</p>`, "Ойлголоо, үргэлжлүүлэх", null, "stop");
+      return;
+    }
     stopped = true;
     events.push({ type: "auto_block", detail });
     send("auto_block"); cleanup(true);
     onStop?.();
     watchAlert(`<span class="wa-ico" aria-hidden="true"><i>⛔</i></span>
       <span class="wa-eyebrow">Хичээл хаагдлаа</span>
-      <h3>Анхаарал идэвхгүй тул хичээл зогслоо</h3>
+      <h3>Идэвхгүй байсан тул хичээл зогслоо</h3>
       <p>${msg} Энэ тухай багшид мэдэгдсэн. Идэвхгүй байсан хугацаа суралцсан цагт тооцогдохгүй.</p>
       <p class="wa-away">Дахин үзэхдээ бусад цонхоо хаагаад, анхааралтай үзээрэй.</p>`, "Ойлголоо", null, "stop");
   };
   // 5 минут тутам идэвхийн шалгалт: 30 секундэд хариулахгүй бол хичээл зогсоно.
   const ping = () => {
-    if (stopped || owner || !sid) return;
+    if (stopped || done || owner || (!sid && !dry)) return;
     pauseMedia();
     let left = WATCH_PING_ANSWER, answered = false;
     watchAlert(`<span class="watch-ico">🙋</span><h3>Та хичээлээ үргэлжлүүлэн үзэж байна уу?</h3>
-      <p>Идэвхийн шалгалт. <b class="ping-left">${left}</b> секундэд хариулахгүй бол хичээл зогсоно.</p>`, "Тийм, үзэж байна", () => { answered = true; lastInput = Date.now(); flashOff(); });
+      <p>Идэвх шалгах асуулт. <b class="ping-left">${left}</b> секундэд хариулахгүй бол хичээл зогсоно.</p>`, "Тийм, үзэж байна", () => { answered = true; lastInput = Date.now(); flashOff(); });
     alarm("ping"); flashOn("🙋 Та хичээлээ үзэж байна уу?"); // өөр зүйл рүү харж байсан ч анзаарна
     const t = setInterval(() => {
-      if (answered || stopped) { clearInterval(t); return; }
+      if (answered || stopped || done) { clearInterval(t); return; } // хичээл хаагдсан бол тоолол зогсоно
       left--; const el = $(".watch-alert .ping-left"); if (el) el.textContent = left;
-      if (left <= 0) { clearInterval(t); $(".watch-alert")?.remove(); flashOff(); events.push({ type: "ping_missed", detail: "30 секундэд хариулаагүй" }); stop("Идэвхийн шалгалтад хариулаагүй", "Та идэвхийн шалгалтад 30 секундэд хариулаагүй тул хичээл зогслоо."); }
+      if (left <= 0) { clearInterval(t); $(".watch-alert")?.remove(); flashOff(); events.push({ type: "ping_missed", detail: "30 секундэд хариулаагүй" }); stop("Идэвх шалгах асуултад хариулаагүй", "Та идэвх шалгах асуултад 30 секундэд хариулаагүй тул хичээл зогслоо."); }
     }, 1000);
   };
   pingTimer = setInterval(() => { if (armed && !away && Date.now() >= pingAt) { pingAt = Date.now() + WATCH_PING_SEC * 1000; ping(); } }, 1000);
@@ -2249,7 +2590,7 @@ function loadYT() {
 // progressBase: "/api/courses/{id}/lessons/{lid}" — өгөгдсөн бол үзэлтийн зураглалыг 10 секундийн
 // хэсгүүдээр бичиж, багшид аль хэсгийг давтаж, аль хэсгийг алгассаныг харуулна.
 function guardVideos(box, { watched = {}, owner = false, onWatched, modal, progressBase }) {
-  const note = () => toast("Үзээгүй хэсэг рүү гүйлгэх боломжгүй — үзсэн хэсэгтээ буцаж болно. Бүрэн үзсэний дараа чөлөөтэй.");
+  const note = () => toast("Үзээгүй хэсэг рүү гүйлгэх боломжгүй — үзсэн хэсэгтээ буцаж болно. Бүрэн үзсэний дараа чөлөөтэй гүйлгэнэ.");
   const BUCKET = 10;
   const stoppers = [];
   const blocks = [...$$("[data-bid] video, [data-bid] iframe[data-yt]", box), ...$$("#player video, #player iframe[data-yt]", modal)];
@@ -2351,25 +2692,31 @@ function guardVideos(box, { watched = {}, owner = false, onWatched, modal, progr
 /* ---------- Шалгалт: нэг дор өгнө, хугацаатай, хатуу хамгаалалттай ----------
    Шалгалтын үеэр өөр таб/цонх руу шилжих, хуулах, тайрах үйлдэл хийвэл шалгалт шууд хаагдаж,
    тэр хүртэлх хариултаар дүгнэгдэнэ. Бүгд багшийн логт бичигдэнэ. */
-async function examCard(box, { courseId, lessonId, title, onFinish }) {
+// dry — «👁 Суралцагчаар үзэх» (багш): шинэ суралцагчийн харагдац (өмнөх оролдлогогүй); эхлүүлэх, төлбөр — зөвхөн тайлбар,
+// оролдлого, сесс, захиалга үүсгэхгүй.
+const DRY_MSG = (m) => toast("👁 Урьдчилан харах: " + m);
+const dryLatePay = (card) => { const b = $("[data-late-pay]", card); if (b) b.onclick = () => DRY_MSG("суралцагчид энд төлбөрийн цонх гарна (захиалга үүсээгүй)"); };
+async function examCard(box, { courseId, lessonId, title, onFinish, dry = false }) {
   const base = `/api/courses/${courseId}/lessons/${lessonId}`;
   const card = document.createElement("section"); card.className = "exam-card"; box.append(card);
   if (!Auth.token) { card.innerHTML = `<h3>${icon("exam", 20)} Шалгалт</h3><p>Шалгалт өгөхийн тулд нэвтэрнэ үү.</p><a class="btn btn-gold" href="/login?next=${encodeURIComponent(location.pathname)}">Нэвтрэх</a>`; return; }
   const draw = async () => {
     let info;
     try { info = await api(`${base}/exam`); } catch (e) { card.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
+    if (dry) info = { ...info, attempts: [], left: info.left < 0 ? -1 : info.left + (info.attempts?.length || 0) }; // шинэ суралцагч
     const ex = info.exam, best = info.attempts.filter((a) => a.status !== "active").reduce((m, a) => Math.max(m, a.pct), -1);
     const active = info.attempts.find((a) => a.status === "active"), due = info.due || { open: true };
     card.innerHTML = `<h3>${icon("exam", 20)} Шалгалт</h3>
       <ul class="exam-facts"><li>❓ <b>${info.questions}</b> асуулт</li><li>⏱ ${ex.time_min ? `<b>${ex.time_min}</b> минут` : "Хугацаа хязгааргүй"}</li>${due.start_at ? `<li>▶ Эхлэх: <b>${fmtDate(due.start_at)}</b></li>` : ""}${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : ""}${due.entry_fee ? `<li>💳 Оролцооны төлбөр: <b>${money(due.entry_fee)}</b>${due.paid ? " ✓" : ""}</li>` : ""}
         <li>🎯 Тэнцэх: <b>${ex.pass_pct}%</b></li><li>🔁 ${info.left < 0 ? "Оролдлого хязгааргүй" : `Үлдсэн оролдлого: <b>${info.left}</b>`}</li>${best >= 0 ? `<li>🏆 Таны шилдэг: <b>${best}%</b></li>` : ""}</ul>
-      <div class="exam-rules"><b>⚠️ Дүрэм:</b> Шалгалтын үеэр өөр таб, цонх руу шилжих эсвэл текст хуулах үед шалгалт <b>шууд хаагдаж</b>, тэр хүртэлх хариултаар дүгнэгдэнэ. Энэ тухай багшид мэдэгдэнэ.</div>
+      <div class="exam-rules"><b>⚠️ Дүрэм:</b> Шалгалтын үеэр өөр таб, цонх руу шилжих эсвэл текст хуулбал шалгалт <b>шууд хаагдаж</b>, тэр хүртэл өгсөн хариултаар дүгнэгдэнэ. Энэ тухай багшид мэдэгдэнэ.</div>
       ${info.attempts.length ? `<table class="tbl"><thead><tr><th>Огноо</th><th>Оноо</th><th>Төлөв</th></tr></thead><tbody>${info.attempts.map((a) => `<tr><td>${fmtDate(a.started_at)}</td><td>${a.status === "active" ? "—" : a.pct + "%" + (a.passed ? " ✓" : "")}</td><td>${a.status === "terminated" ? `⛔ Хаагдсан · ${esc(a.reason || "")}` : a.status === "submitted" ? (a.passed ? "Тэнцсэн" : "Тэнцээгүй") : a.status === "expired" ? "Хугацаа хэтэрсэн" : "Үргэлжилж байна"}</td></tr>`).join("")}</tbody></table>` : ""}
       ${dueNotice(due)}
-      ${due.closed || due.not_started ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж шалгалтаа нээх</button>` : active || info.left !== 0 ? `<button class="btn btn-gold btn-lg" data-exam-start>${active ? "▶ Шалгалтаа үргэлжлүүлэх" : "▶ Шалгалт эхлүүлэх"}</button>` : `<p class="muted">Оролдлогын тоо дууссан.</p>`}`;
-    bindLatePay(card, base, title ? `«${title}» — шалгалтын төлбөр` : "Шалгалтын төлбөр", draw);
+      ${due.closed || due.not_started ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж шалгалтаа нээх</button>` : active || info.left !== 0 ? `<button class="btn btn-gold btn-lg" data-exam-start>${active ? "▶ Шалгалтаа үргэлжлүүлэх" : "▶ Шалгалт эхлүүлэх"}</button>` : `<p class="muted">Оролдлогын эрх дууссан.</p>`}`;
+    if (dry) dryLatePay(card); else bindLatePay(card, base, title ? `«${title}» — шалгалтын төлбөр` : "Шалгалтын төлбөр", draw);
     const b = $("[data-exam-start]", card);
     if (b) b.onclick = async () => {
+      if (dry) return DRY_MSG("суралцагчид энд шалгалт эхэлнэ — оролдлого үүсээгүй");
       if (!active && !confirm("Шалгалт эхлүүлэх үү? Эхэлсний дараа өөр цонх руу шилжвэл шалгалт хаагдана.")) return;
       b.disabled = true;
       try { const d = await api(`${base}/exam/start`, { method: "POST" }); runExam({ base, courseId, lessonId, title, data: d, onClose: () => { draw(); onFinish?.(); } }); }
@@ -2388,7 +2735,7 @@ function dueNotice(due) {
     const parts = [];
     if (due.need_entry) parts.push(`оролцооны төлбөр ${money(due.entry_fee)}`);
     if (due.need_late) parts.push(`хоцролтын төлбөр ${money(due.late_fee)}`);
-    return `<div class="exam-rules"><b>${due.need_late ? "⏰ Хугацаа хоцорсон." : "💳 Төлбөртэй."}</b> Үргэлжлүүлэхийн тулд ${parts.join(" + ")} = <b>${money(due.fee)}</b> төлнө.</div>`;
+    return `<div class="exam-rules"><b>${due.need_late ? "⏰ Хугацаа хоцорсон." : "💳 Төлбөртэй."}</b> Үргэлжлүүлэхийн тулд ${parts.join(" + ")} = <b>${money(due.fee)}</b> төлнө үү.</div>`;
   }
   if (due.paid) return `<div class="exam-rules">✓ Төлбөр төлсөн — үргэлжлүүлж болно.</div>`;
   if (due.late) return `<div class="exam-rules">⏰ Хугацаа өнгөрсөн ч төлбөргүй үргэлжлүүлж болно (хоцорсон гэж тэмдэглэгдэнэ).</div>`;
@@ -2418,28 +2765,28 @@ function rubricViewHTML(r, picks) {
     ${picks ? `<tfoot><tr><th colspan="${r.levels.length + 1}">Нийт дүн</th><td class="rb-got"><b>${got}</b><small>/${max}</small></td></tr></tfoot>` : ""}</table></div>`;
 }
 
-async function assignmentCard(box, { courseId, lessonId }) {
+async function assignmentCard(box, { courseId, lessonId, dry = false }) {
   const base = `/api/courses/${courseId}/lessons/${lessonId}`;
   const card = document.createElement("section"); card.className = "exam-card asg-card"; box.append(card);
   if (!Auth.token) { card.innerHTML = `<h3>${icon("clip", 20)} Даалгавар</h3><p>Хариу илгээхийн тулд нэвтэрнэ үү.</p><a class="btn btn-gold" href="/login?next=${encodeURIComponent(location.pathname)}">Нэвтрэх</a>`; return; }
   const draw = async () => {
     let info;
     try { info = await api(`${base}/assignment`); } catch (e) { card.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
-    const a = info.assignment, due = info.due || { open: true }, sub = info.submission;
+    const a = info.assignment, due = info.due || { open: true }, sub = dry ? null : info.submission; // урьдчилан: шинэ суралцагчийн маягт
     card.innerHTML = `<h3>${icon("clip", 20)} Даалгавар</h3>
       <ul class="exam-facts">${due.start_at ? `<li>▶ Эхлэх: <b>${fmtDate(due.start_at)}</b></li>` : ""}${due.at ? `<li>📅 ${due.late ? `<span class="an-bad">Хугацаа дууссан</span> (${fmtDate(due.at)})` : `<b>${fmtDate(due.at)}</b> хүртэл`}</li>` : "<li>📅 Хугацаагүй</li>"}<li>🎯 ${a.grading === "rubric" ? `Рубрикаар · <b>${a.max_score}</b> оноо` : `Дээд оноо: <b>${a.max_score || 100}</b>`}</li>${due.entry_fee ? `<li>💳 Төлбөр: <b>${money(due.entry_fee)}</b>${due.paid ? " ✓" : ""}</li>` : ""}<li>✍️ Хариу: текст ба холбоос</li></ul>
       ${dueNotice(due)}
       ${sub ? `<div class="sub-mine"><b>Таны хариу</b> <small class="muted">${fmtDate(sub.submitted_at)}${sub.late ? " · хоцорсон" : ""}</small>${sub.html ? `<div class="rb-text sub-html">${sub.html}</div>` : sub.text ? `<p>${esc(sub.text)}</p>` : ""}${sub.links?.length ? `<p>${sub.links.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(u.replace(/^https?:\/\//, "").slice(0, 60))}</a>`).join("<br>")}</p>` : ""}${sub.files?.length ? `<p>${sub.files.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${icon("doc", 14)} ${esc(f.name)}</a>`).join(" · ")}</p>` : ""}
-        ${sub.score !== undefined ? `<div class="sub-score">✅ Дүн: <b>${sub.score}/${a.max_score || 100}</b>${a.grading === "rubric" ? rubricViewHTML(a.rubric, sub.rubric || {}) : ""}${sub.feedback ? `<p class="sub-fb"><b>Багшийн тайлбар:</b> ${esc(sub.feedback)}</p>` : ""}</div>` : `<p class="muted small">Багш хараахан дүгнээгүй байна — дүгнэмэгц энд автоматаар гарч ирнэ.</p>`}</div>` : ""}
+        ${sub.score !== undefined ? `<div class="sub-score">✅ Дүн: <b>${sub.score}/${a.max_score || 100}</b>${a.grading === "rubric" ? rubricViewHTML(a.rubric, sub.rubric || {}) : ""}${sub.feedback ? `<p class="sub-fb"><b>Багшийн эргэх холбоо:</b> ${esc(sub.feedback)}</p>` : ""}</div>` : `<p class="muted small">Багш хараахан дүгнээгүй байна — дүгнэмэгц энд автоматаар гарч ирнэ.</p>`}</div>` : ""}
       ${a.grading === "rubric" && sub?.score === undefined ? `<details class="asg-rubric" open><summary>Үнэлэх шалгуур (рубрик) · ${a.max_score} оноо</summary>${rubricViewHTML(a.rubric)}</details>` : ""}
       ${due.closed || due.not_started ? "" : due.need_pay ? `<button class="btn btn-gold btn-lg" data-late-pay>💳 ${money(due.fee)} төлж даалгавраа илгээх</button>`
-        : sub && !a.resubmit ? `<p class="muted small">✅ Хариу илгээгдсэн — энэ даалгаварт хариуг нэг л удаа илгээнэ.</p>`
+        : sub && !a.resubmit ? `<p class="muted small">✅ Хариу илгээгдсэн — энэ даалгаварт хариуг зөвхөн нэг удаа илгээх боломжтой.</p>`
         : `<form class="sub-form" data-words="${a.words || 500}"><label>${sub ? "Хариугаа шинэчлэх" : "Хариу"}<div class="rt-ans-wrap"><div class="rt-ans-bar" role="toolbar" aria-label="Хэлбэржүүлэх">${[["bold", "<b>B</b>", "Тод"], ["italic", "<i>I</i>", "Налуу"], ["underline", "<u>U</u>", "Доогуур зураас"], ["strikeThrough", "<s>S</s>", "Дундуур зураас"], ["h2", "H", "Гарчиг"], ["insertUnorderedList", "•", "Жагсаалт"], ["insertOrderedList", "1.", "Дугаарласан"], ["quote", "❝", "Ишлэл"], ["link", "🔗", "Холбоос"], ["removeFormat", "✕", "Хэлбэржүүлэлт арилгах"]].map(([c, l, t]) => `<button type="button" data-rt="${c}" title="${t}" aria-label="${t}">${l}</button>`).join("")}</div>
             <div class="rt-ans rb-text" contenteditable="true" data-placeholder="Хариугаа өөрөө бичнэ үү (хуулж буулгах боломжгүй)…">${sub?.html || (sub?.text ? esc(sub.text).replace(/\n/g, "<br>") : "")}</div></div><small class="asg-wc muted" aria-live="polite"></small></label>
-          <details class="asg-howto"><summary>🔗 Бүтээлч ажлаа холбоосоор илгээх аргачлал</summary><ol><li><b>Canva, Google Docs/Slides/Sheets, Figma:</b> «Хуваалцах» → «Холбоостой хүн бүр үзэх боломжтой» болгоод холбоосыг хуулна.</li><li><b>Видео:</b> YouTube-д «Unlisted» (жагсаалтад оруулахгүй) эсвэл Google Drive-д байршуулж хуваалцах холбоосыг авна.</li><li><b>Код:</b> GitHub repository/Gist-ийн холбоос.</li><li>Холбоосоо доорх талбарт мөр тус бүрд нэгийг буулгана (5 хүртэл). Илгээхийн өмнө холбоосоо өөр хөтчөөр нээж, багш үзэх боломжтой эсэхийг шалгаарай.</li></ol></details>
+          <details class="asg-howto"><summary>🔗 Бүтээлч ажлаа холбоосоор илгээх заавар</summary><ol><li><b>Canva, Google Docs/Slides/Sheets, Figma:</b> «Хуваалцах» → «Холбоостой хүн бүр үзэх боломжтой» болгоод холбоосыг хуулна.</li><li><b>Видео:</b> YouTube-д «Unlisted» (жагсаалтад оруулахгүй) эсвэл Google Drive-д байршуулж хуваалцах холбоосыг авна.</li><li><b>Код:</b> GitHub-ийн репозитори эсвэл Gist-ийн холбоос.</li><li>Холбоосуудаа доорх талбарт мөр бүрд нэгээр буулгана (5 хүртэл). Илгээхийн өмнө холбоосоо өөр хөтчөөр нээж, багш үзэх боломжтой эсэхийг шалгаарай.</li></ol></details>
           <label>Холбоос (мөр тус бүрд нэг, 5 хүртэл)<textarea name="links" rows="2" placeholder="https://…">${esc((sub?.links || []).join("\n"))}</textarea></label>
           <p class="form-error" role="alert"></p><button class="btn btn-gold">${sub ? "Дахин илгээх" : "Илгээх"}</button></form>`}`;
-    bindLatePay(card, base, "Даалгаврын төлбөр", draw);
+    if (dry) dryLatePay(card); else bindLatePay(card, base, "Даалгаврын төлбөр", draw);
     if (!card._live) { // багш дүгнэмэгц дүн, рубрик автоматаар орж ирнэ
       card._live = (d) => { if (!card.isConnected) return Live.handlers.delete(card._live); if (d.type === "notification" && d.notification?.type === "grade" && (d.notification.link || "").endsWith("#l=" + lessonId)) draw(); };
       Live.on(card._live);
@@ -2463,6 +2810,7 @@ async function assignmentCard(box, { courseId, lessonId }) {
     }
     if (f) f.onsubmit = async (e) => {
       e.preventDefault();
+      if (dry) return DRY_MSG("суралцагчийн хариу багшид илгээгдэнэ — илгээгдээгүй");
       const err = $(".form-error", f), b = $("button", f); err.textContent = ""; b.disabled = true;
       try {
         await api(`${base}/submit`, { method: "POST", body: { text: $(".rt-ans", f).innerText, html: $(".rt-ans", f).innerHTML, links: f.links.value.split(/[\n,\s]+/).filter(Boolean), tab_switches: f._tabs || 0 } });
@@ -2537,7 +2885,7 @@ function runExam({ base, courseId, lessonId, title, data, onClose }) {
   // Зөрчил: шалгалт шууд хаагдана; суралцагч буцаж ирэхэд анхаарал татахуйц (улаан, дохиотой) цонх гарна.
   const stopAlert = (label) => {
     const show = () => watchAlert(`<span class="wa-ico" aria-hidden="true"><i>⛔</i></span><span class="wa-eyebrow">Шалгалт хаагдлаа</span>
-      <h3>Шалгалтын үеэр ${esc(label)}!</h3><p>Дүрмийн дагуу шалгалт тань тэр мөчийн хариултаар дүгнэгдэж хаагдлаа. Энэ тухай багшид мэдэгдсэн — багш дахин нээж өгч болно.</p>`, "Ойлголоо", null, "stop");
+      <h3>Шалгалтын үеэр ${esc(label)}!</h3><p>Дүрмийн дагуу шалгалт тань хаагдаж, тэр мөч хүртэлх хариултаар дүгнэгдлээ. Энэ тухай багшид мэдэгдсэн — багш дахин нээж өгч болно.</p>`, "Ойлголоо", null, "stop");
     if (!document.hidden) return show();
     const once = () => { if (document.hidden) return; document.removeEventListener("visibilitychange", once); show(); };
     document.addEventListener("visibilitychange", once);
@@ -2570,7 +2918,7 @@ function runExam({ base, courseId, lessonId, title, data, onClose }) {
     if (a?.results) forms.forEach((f, i) => { navBtns[i]?.classList.remove("done"); navBtns[i]?.classList.add(a.results[f.dataset.quiz] ? "ok" : "bad"); });
     const pass = a?.passed;
     $(".exam-body", el).insertAdjacentHTML("afterbegin", `<div class="exam-result ${a?.status === "terminated" ? "bad" : pass ? "ok" : ""}">
-      <span class="exam-score">${a ? a.pct + "%" : "—"}</span><div><h3>${a?.status === "terminated" ? "Шалгалт хаагдлаа" : pass ? "🎉 Тэнцлээ!" : "Тэнцсэнгүй"}</h3>
+      <span class="exam-score">${a ? a.pct + "%" : "—"}</span><div><h3>${a?.status === "terminated" ? "Шалгалт хаагдлаа" : pass ? "🎉 Тэнцлээ!" : "Энэ удаад тэнцсэнгүй"}</h3>
       <p>${esc(msg || (a ? `${a.score}/${a.max} оноо` : ""))}${a?.status === "terminated" ? " Энэ тухай багшид мэдэгдсэн." : ""}</p></div>
       <button class="btn btn-gold" data-exam-close>Хаах</button></div>`);
     $(".exam-body", el).scrollTop = 0;
@@ -2913,7 +3261,7 @@ const DocView = {
     });
     const body = $(".dv-body", el);
     if (kind === "legacy") {
-      body.innerHTML = `<div class="dv-msg">${icon("doc", 28)}<b>Энэ хуучин форматыг шууд үзүүлэх боломжгүй</b><span>Багш файлаа PDF, .pptx эсвэл .docx болгож оруулбал хичээл дотор шууд харагдана.</span></div>`;
+      body.innerHTML = `<div class="dv-msg">${icon("doc", 28)}<b>Энэ хуучин форматыг шууд харуулах боломжгүй</b><span>Багш файлаа PDF, .pptx эсвэл .docx болгож оруулбал хичээл дотор шууд харагдана.</span></div>`;
       return;
     }
     try {
@@ -3305,7 +3653,7 @@ const BookReader = {
   noteAdd() {
     const p = $(".rd-notes", this.el), ta = p && $("textarea", p); if (!ta) return;
     const n = ta.value.trim(); if (!n) { ta.focus(); return toast("Тэмдэглэлээ бичнэ үү"); }
-    if (this.notes.length >= 1000) return toast("1000 хүртэл тэмдэглэл хөтөлнө", true);
+    if (this.notes.length >= 1000) return toast("1000 хүртэл тэмдэглэл хөтлөх боломжтой", true);
     const pg = this.notePage();
     this.notes.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), b: "book", s: 0, e: 0, k: "page", p: pg, c: this.noteColor, t: `${pg}-р хуудас`, n: n.slice(0, 1000) });
     ta.value = ""; this.notesPaint(); this.notesSave(); toast("📝 Тэмдэглэгдлээ");
@@ -3352,7 +3700,7 @@ const BookReader = {
   faceHTML(p, side) {
     if (this.paywall && p === this.n) return `<div class="face ${side} rd-paywall"><div class="rd-pw">
         <span class="rd-pw-ico">🔒</span><h3>Үргэлжлүүлэн унших</h3>
-        <p>Та эхний ${this.readable} хуудсыг үнэгүй уншлаа. ${this.price ? "Үлдсэн хэсгийг унших бол номыг худалдаж авна уу." : "Үлдсэн хэсгийг унших бол нэвтэрнэ үү."}</p>
+        <p>Та эхний ${this.readable} хуудсыг үнэгүй уншлаа. ${this.price ? "Үлдсэн хэсгийг уншихын тулд номыг худалдаж авна уу." : "Үлдсэн хэсгийг уншихын тулд нэвтэрнэ үү."}</p>
         <button class="btn btn-gold" data-buy>${this.price ? "Худалдаж авах · " + money(this.price) : "Нэвтрэх"}</button></div></div>`;
     const u = this.urls.get(p);
     return `<div class="face ${side}" data-p="${p}">${u ? `<img src="${u}" alt="" draggable="false">` : `<div class="page-loading">${p}</div>`}<span class="pnum">${p}</span></div>`;
@@ -3500,7 +3848,7 @@ function bookPage() {
     if (access.full) {
       readBtn.textContent = "📖 Бүтнээр нь унших";
       if (buyBtn) buyBtn.hidden = true;
-      note.textContent = access.owner ? "Энэ таны ном — уншигчид хуудас бүр дээр өөрийн нэр шингэсэн байдлаар харна." : "✓ Танд энэ ном бүтнээрээ нээлттэй. Хуудас бүрд таны нэр шингэсэн тул бусдад тараахгүй байна уу.";
+      note.textContent = access.owner ? "Энэ таны ном — уншигч бүр хуудас бүрийг өөрийн нэрийн усан тэмдэгтэй харна." : "✓ Танд энэ ном бүтнээрээ нээлттэй. Хуудас бүрд таны нэр усан тэмдгээр шингэсэн тул бусдад тараахгүй байна уу.";
     }
     const dl = $("#bkBuyDl");
     if (dl && access.download) dl.textContent = "⬇ Эх файлыг татаж авах";
@@ -3538,7 +3886,7 @@ function bookPage() {
   if (buyBtn) buyBtn.onclick = () => buy(false);
   const dlBtn = $("#bkBuyDl");
   if (dlBtn) dlBtn.onclick = () => (access.download ? save() : buy(true));
-  $("#bkLike").onclick = async (e) => { const b = e.currentTarget; await api(`/api/books/${id}/interest`, { method: "POST" }).catch(() => {}); b.textContent = "♥ Сонирхлоо"; b.disabled = true; toast("Багшид таны сонирхлыг мэдэгдлээ"); };
+  $("#bkLike").onclick = async (e) => { const b = e.currentTarget; await api(`/api/books/${id}/interest`, { method: "POST" }).catch(() => {}); b.textContent = "♥ Сонирхол илгээлээ"; b.disabled = true; toast("Багшид таны сонирхлыг мэдэгдлээ"); };
   if (new URLSearchParams(location.hash.slice(1)).has("read")) refresh().then(read);
 }
 
@@ -3586,8 +3934,335 @@ function dayLabel(t) {
 const THREAD_EVENTS = ["reaction", "read", "typing", "edit", "delete", "block"];
 const REPORT_REASONS = [["harass", "Доромжилсон, дарамталсан"], ["inappropriate", "Зохисгүй агуулга"], ["spam", "Спам, залилан"], ["other", "Бусад"]];
 
+/* ---------- ⭐ Бүлэг чатын харилцан үнэлгээ (хамтын ажиллагаа): суралцагчид ангийн найз бүрээ 0–100 үнэлнэ ----------
+   Суралцагч зөвхөн дундажийг (min_raters-аас доошгүй хүн үнэлсэн үед) ба өөрийн өгсөн оноогоо харна; хэн хэдийг
+   өгснийг зөвхөн багш харна (дорамжлал, хариу барихаас сэргийлнэ). Сургалт бүрийн хариуг 2 минут санана;
+   өөрчлөгдвөл (subs) чатын мессежийн нэрийн хажуугийн «⭐ 82» шинэчлэгдэнэ. */
+const Peer = {
+  cache: new Map(), pending: new Map(), subs: new Set(), denied: new Map(), // denied: сургалт → серверийн 403 мессеж
+  TTL: 120000,
+  on(fn) { this.subs.add(fn); },
+  off(fn) { this.subs.delete(fn); },
+  emit(cid) { this.subs.forEach((f) => { try { f(cid); } catch {} }); },
+  // Кэш (сургалт, хичээл) тус бүрт: санах ой + sessionStorage (хэрэглэгч бүрт, 2 мин) — хуудас шилжихэд дахин татахгүй.
+  // lid "" = сургалтын нийт (чатын ⭐, багшийн зурвас). Архивласан суралцагчид 403 → denied (сургалтаар).
+  id: (cid, lid = "") => cid + "|" + lid,
+  key: (cid, lid = "") => "sg_peer:" + cid + (lid ? "|" + lid : ""),
+  entry(data) { return { data, at: Date.now(), byId: new Map((data?.members || []).map((m) => [m.user_id, m])) }; },
+  load(cid, lid = "") {
+    let o = null; try { o = JSON.parse(sessionStorage.getItem(this.key(cid, lid))); } catch {}
+    if (!o || o.u !== Auth.user?.id || !(Date.now() - o.at < this.TTL)) return null;
+    if (o.denied) { this.denied.set(cid, o.msg || ""); return null; }
+    const e = { ...this.entry(o.data), at: o.at };
+    this.cache.set(this.id(cid, lid), e);
+    return e;
+  },
+  peek(cid, lid = "") { return this.cache.get(this.id(cid, lid)) || this.load(cid, lid); }, // санах ой эсвэл sessionStorage — сүлжээгүй
+  save(cid, v, lid = "") { try { sessionStorage.setItem(this.key(cid, lid), JSON.stringify({ u: Auth.user?.id, at: Date.now(), ...v })); } catch {} },
+  put(cid, data, lid = "") {
+    this.denied.delete(cid);
+    this.cache.set(this.id(cid, lid), this.entry(data));
+    this.save(cid, { data }, lid);
+    this.emit(cid);
+    return data;
+  },
+  // Сургалтын бүх (сургалт, хичээл) кэшийг устгана (багш үнэлгээ устгасны дараа — нийт оноо ч өөрчлөгдөнө).
+  drop(cid) {
+    for (const k of [...this.cache.keys()]) if (k.startsWith(cid + "|")) this.cache.delete(k);
+    try { for (let i = sessionStorage.length - 1; i >= 0; i--) { const k = sessionStorage.key(i); if (k === this.key(cid) || k?.startsWith(this.key(cid) + "|")) sessionStorage.removeItem(k); } } catch {}
+  },
+  // force: true — заавал шинээр; тоо (мс) — үүнээс хуучин бол шинээр; эс бөгөөс 2 минутын кэш.
+  get(cid, force, lid = "") {
+    const maxAge = force === true ? 0 : typeof force === "number" ? force : this.TTL, k = this.id(cid, lid);
+    const c = this.peek(cid, lid);
+    if (c && Date.now() - c.at < maxAge) return Promise.resolve(c.data);
+    if (maxAge && this.denied.has(cid)) return Promise.reject(Object.assign(new Error(this.denied.get(cid) || "Үнэлгээ харах эрхгүй"), { status: 403 }));
+    if (force !== true && this.pending.has(k)) return this.pending.get(k);
+    const p = api(`/api/courses/${encodeURIComponent(cid)}/peer-ratings${lid ? "?lesson_id=" + encodeURIComponent(lid) : ""}`).then((d) => this.put(cid, d || {}, lid))
+      .catch((e) => { if (e.status === 403) { this.denied.set(cid, e.message); this.drop(cid); this.save(cid, { denied: true, msg: e.message }); this.emit(cid); } throw e; })
+      .finally(() => { if (this.pending.get(k) === p) this.pending.delete(k); });
+    this.pending.set(k, p);
+    return p;
+  },
+  min(d) { return +d?.min_raters || 3; },
+  // Мессежийн нэрийн хажууд (сургалтын нийт оноо): суралцагчид зөвхөн оноо «⭐ 80» (сервер өдөрт нэг удаа, хангалттай үнэлэгчтэй
+  // үед л өгнө); багшид бодит дундаж + хэдэн хүн «⭐ 82 · 5» (count < 3 ч).
+  badge(cid, uid) {
+    const c = cid && this.peek(cid), m = c?.byId.get(uid);
+    if (!c || !m || m.avg == null) return "";
+    const avg = Math.round(+m.avg);
+    if (c.data?.role === "teacher") {
+      const n = +m.count || 0; if (!n) return "";
+      return `<span class="peer-badge${n < this.min(c.data) ? " few" : ""}" title="Хамтын ажиллагааны дундаж ${avg} · ${n} хүн үнэлсэн${m.collab != null ? ` · рейтинг ${Math.round(+m.collab)}` : ""}">⭐ ${avg} · ${n}<span class="sr-only"> хүн үнэлсэн</span></span>`;
+    }
+    return `<span class="peer-badge" title="Хамтын ажиллагааны оноо"><span class="sr-only">Хамтын ажиллагааны оноо </span>⭐ ${avg}</span>`;
+  },
+};
+// Багшийн бүлэг чатын толгойн доорх зурвас: шилдэг 5 (байр, нэр, рейтинг), ангийн дундаж, нийт үнэлгээ, «Дэлгэрэнгүй».
+function peerStripHTML(d) {
+  const all = d?.members || [], total = all.reduce((n, m) => n + (+m.count || 0), 0);
+  const top = all.filter((m) => m.collab != null).sort((a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9) || b.collab - a.collab).slice(0, 5);
+  const head = `<span class="peer-strip-t"><span aria-hidden="true">⭐</span><span class="peer-strip-tl">Хамтын ажиллагаа</span></span>`;
+  const more = `<button type="button" class="peer-strip-more" data-peer-more aria-haspopup="dialog">Дэлгэрэнгүй</button>`;
+  if (!total || !top.length) return `${head}<span class="peer-strip-e">Хүүхдүүд бие биенээ үнэлэхэд энд харагдана</span>${more}`;
+  const first = (n) => String(n || "Суралцагч").trim().split(/\s+/)[0];
+  return `${head}${more}<div class="peer-strip-row"><span class="peer-strip-s">Дундаж <b>${d.class_avg != null ? Math.round(+d.class_avg) : "—"}</b> · ${total} үнэлгээ</span>
+    <ol class="peer-strip-top" aria-label="Хамтын ажиллагаагаар шилдэг ${top.length}">${top.map((m) => `<li><button type="button" data-peer-uid="${esc(m.user_id)}" title="${esc(m.name || "")} — рейтинг ${Math.round(+m.collab)}, ${+m.count || 0} хүн үнэлсэн"><i>${m.rank != null ? +m.rank : "·"}</i><span>${esc(first(m.name))}</span><b>${Math.round(+m.collab)}</b></button></li>`).join("")}</ol></div>`;
+}
+// Онооны түвшин (гулсуурын хажууд, хүүхдэд ойлгомжтой).
+const peerLevel = (v) => (v >= 85 ? "Маш сайн хамтарсан" : v >= 65 ? "Сайн хамтарсан" : v >= 45 ? "Дунд зэрэг" : v >= 25 ? "Бага хамтарсан" : "Бараг хамтраагүй");
+const peerAv = (m) => avatarHTML({ username: m.username, display_name: m.name || m.username || "?", avatar_url: m.avatar_url });
+const PEER_UNC = "шинэ эсвэл идэвхгүй суралцагчийн үнэлгээ тоологдохгүй";
+const PEER_CHEV = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`;
+// «⭐ Үнэлгээ» цонх (баруунаас гулсана): суралцагчид — ангийн найзуудаа үнэлэх; багшид — хамтын ажиллагааны рейтинг
+// (рейтингийн хүснэгт + «Хэн хэнийг» хүснэгт). uid — багшид тэр суралцагчийн мөрийг дэлгэж нээнэ.
+function peerPanel(cid, { title = "", opener = null, uid: focusUid = "", lesson = "" } = {}) {
+  if (!cid) return;
+  $("#peerWin")?.remove();
+  const el = document.createElement("div");
+  el.className = "modal peer-win"; el.id = "peerWin"; el.setAttribute("aria-hidden", "true");
+  el.innerHTML = `<div class="modal-card peer-card" role="dialog" aria-modal="true" aria-labelledby="peerT"><button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
+    <span class="eyebrow">Хамтын ажиллагаа</span><h3 class="h3" id="peerT" tabindex="-1">⭐ Үнэлгээ</h3>${title ? `<p class="peer-sub">${esc(title)}</p>` : ""}
+    <div class="peer-lbar" hidden></div>
+    <div class="peer-body"><div class="peer-load" role="status"><span class="loader"></span><span class="sr-only">Ачаалж байна…</span></div></div></div>`;
+  document.body.append(el);
+  const body = $(".peer-body", el), H = $("#peerT", el), lbar = $(".peer-lbar", el);
+  // lid — сонгосон хичээл ("" = суралцагчид «Ерөнхий», багшид «Бүх хичээл»); lessons — хариуны харагдах хичээлүүд (дарааллаар).
+  let d = null, dl = null, q = "", openUid = focusUid || "", view = "rank", lid = lesson || "", lessons = []; // dl — d аль хичээлийнх
+  const teacherView = () => d?.role === "teacher";
+  const lessonTitle = (id) => lessons.find((x) => x.id === id)?.title || "";
+  const match = (m) => !q || `${m.name || ""} ${m.username || ""}`.toLowerCase().includes(q);
+  const searchHTML = (n) => n > 8 ? `<label class="peer-search"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" data-peer-q placeholder="Нэрээр хайх…" aria-label="Суралцагч хайх" value="${esc(q)}"></label>` : "";
+  const loader = `<div class="peer-load" role="status"><span class="loader"></span><span class="sr-only">Ачаалж байна…</span></div>`;
+  const fail = (x) => { body.innerHTML = `<div class="peer-empty" role="alert"><b>⚠️ ${esc(x.message)}</b><button type="button" class="btn btn-ghost btn-sm" data-peer-retry>Дахин оролдох</button></div>`; };
+  const load = async (force) => {
+    const want = lid;
+    if (!d || dl !== want) body.innerHTML = loader;
+    try {
+      const r = await Peer.get(cid, force, want);
+      if (want !== lid) return; // энэ хооронд өөр хичээл сонгосон
+      d = r; dl = want; if (Array.isArray(d.lessons)) lessons = d.lessons;
+      if (want && !lessons.some((x) => x.id === want) && lessons.length) { lid = ""; return load(false); } // хичээл харагдахгүй болсон
+      draw();
+    } catch (x) { if (want !== lid) return; if (d && dl === want) toast(x.message, true); else fail(x); }
+  };
+  // Хичээл сонгогч: суралцагч — «Ерөнхий» эсвэл тухайн хичээлээр үнэлнэ; багш — «Бүх хичээл» эсвэл нэг хичээлээр шүүнэ.
+  const drawLbar = () => {
+    if (!lessons.length) { lbar.hidden = true; lbar.innerHTML = ""; return; }
+    const t = teacherView(), keep = document.activeElement?.matches?.("[data-peer-lesson]");
+    lbar.innerHTML = `<label class="peer-lsel"><span>${t ? "Хичээл" : "Юугаар үнэлэх вэ?"}</span><select data-peer-lesson aria-label="${t ? "Хичээлээр шүүх" : "Үнэлэх хичээл"}">
+      <option value="">${t ? "Бүх хичээл (нийт)" : "Ерөнхий — сургалтын турш"}</option>${lessons.map((x, i) => `<option value="${esc(x.id)}"${x.id === lid ? " selected" : ""}>${i + 1}. ${esc(x.title || "Хичээл")}</option>`).join("")}</select></label>
+      ${t ? "" : `<small class="peer-lhint">${lid ? "Энэ хичээл дээр хэрхэн хамтарч ажилласныг үнэлнэ." : "Сургалтын турш ерөнхийдөө хэрхэн хамтарсныг үнэлнэ. Хичээл сонгож тус бүрээр нь ч үнэлж болно."}</small>`}`;
+    lbar.hidden = false;
+    if (keep) $("[data-peer-lesson]", lbar)?.focus({ preventScroll: true });
+  };
+  const draw = () => {
+    H.textContent = teacherView() ? "⭐ Хамтын ажиллагааны рейтинг" : "⭐ Ангийн найзуудаа үнэлэх";
+    drawLbar();
+    if (teacherView()) drawTeacher(); else drawStudent();
+  };
+
+  /* ---- Суралцагч ---- */
+  // null-ийг («цөөн» эсэх, «бага» эсэхийг ялгахгүй) нэг төвийг сахисан «—»-ээр.
+  const stars = (m) => m.avg != null ? `<span class="peer-avg" title="Хамтын ажиллагааны оноо">⭐ ${Math.round(+m.avg)}</span>`
+    : `<span class="peer-avg few" title="Оноо одоогоор харагдахгүй"><span aria-hidden="true">—</span><span class="sr-only">Оноо одоогоор харагдахгүй</span></span>`;
+  const editor = (m) => {
+    const v = m.mine ?? 50, uid = esc(m.user_id), lt = lid ? ` — «${lessonTitle(lid)}» хичээлд` : "";
+    return `<div class="peer-ed" id="peerEd-${uid}">
+      <div class="peer-val"><output class="peer-out" for="peerRg-${uid}">${v}</output><span class="peer-lvl">${peerLevel(v)}</span></div>
+      <input type="range" class="peer-rg" id="peerRg-${uid}" min="0" max="100" step="1" value="${v}" style="--v:${v}%" aria-label="${esc((m.name || "Найз") + lt)} — хамтарч ажилласан оноо (0–100)" aria-valuetext="${v} — ${peerLevel(v)}">
+      <div class="peer-quick" role="group" aria-label="Хурдан сонгох">${[0, 25, 50, 75, 100].map((n) => `<button type="button" data-peer-qv="${n}" aria-pressed="${n === v}">${n}</button>`).join("")}</div>
+      <div class="peer-acts"><button type="button" class="btn btn-gold btn-sm" data-peer-save>Хадгалах</button>${m.mine != null ? `<button type="button" class="btn btn-ghost btn-sm peer-del" data-peer-del>Устгах</button>` : ""}<button type="button" class="btn btn-ghost btn-sm" data-peer-cancel>Болих</button></div>
+      <p class="peer-err" role="alert"></p></div>`;
+  };
+  const row = (m) => {
+    const open = openUid === m.user_id, uid = esc(m.user_id);
+    return `<li class="peer-row${open ? " open" : ""}" data-uid="${uid}"><div class="peer-line">${peerAv(m)}
+      <span class="peer-nm"><b>${esc(m.name || m.username || "Суралцагч")}</b>${stars(m)}</span>
+      <button type="button" class="peer-edit${m.mine != null ? " has" : ""}" data-peer-edit aria-expanded="${open}" aria-controls="peerEd-${uid}">${m.mine != null ? `Таны оноо <b>${+m.mine}</b>` : "Үнэлэх"}</button></div>${open ? editor(m) : ""}</li>`;
+  };
+  const meHTML = () => {
+    const me = d.me || {}, min = Peer.min(d), l = lid ? "Энэ хичээл дэх миний оноо" : "Миний хамтын ажиллагааны оноо";
+    return me.enough && me.avg != null ? `<span class="peer-me-l">${l}</span><b>⭐ ${Math.round(+me.avg)}</b>`
+      : `<span class="peer-me-l">${l}</span><b class="few">${min} хүн үнэлсний дараа харагдана</b>`;
+  };
+  const progHTML = () => {
+    const all = d.members || [], n = all.filter((m) => m.mine != null).length;
+    return all.length ? `Та <b>${n}</b>/${all.length} найзаа ${lid ? "энэ хичээлд " : ""}үнэлсэн${n && n === all.length ? " — баярлалаа! 🙌" : ""}` : "";
+  };
+  const drawRows = () => {
+    const ul = $(".peer-list", body); if (!ul) return;
+    const list = (d.members || []).filter(match);
+    ul.innerHTML = list.map(row).join("") || `<li class="peer-none muted small">«${esc(q)}» нэртэй найз олдсонгүй</li>`;
+    const p = $(".peer-prog", body); if (p) p.innerHTML = progHTML();
+    const me = $(".peer-me", body); if (me) me.innerHTML = meHTML();
+  };
+  const drawStudent = () => {
+    const all = d.members || [];
+    body.innerHTML = `<div class="peer-me" aria-live="polite">${meHTML()}</div>
+      <p class="peer-note">🔒 Хэн хэдэн оноо өгснийг зөвхөн багш харна. Шударга, эелдэг үнэлээрэй.<br><span class="peer-daily">🕛 Оноо өдөрт нэг удаа шинэчлэгдэнэ.</span></p>
+      ${all.length ? `${searchHTML(all.length)}<p class="peer-prog">${progHTML()}</p><ul class="peer-list"></ul>`
+        : `<div class="peer-empty"><b>Ангийн найз хараахан алга</b><small>Энэ сургалтад өөр суралцагч элсэхэд энд харагдана.</small></div>`}`;
+    drawRows();
+  };
+  const setVal = (ed, v) => {
+    v = Math.max(0, Math.min(100, Math.round(+v || 0)));
+    const rg = $(".peer-rg", ed); rg.value = v; rg.style.setProperty("--v", v + "%"); rg.setAttribute("aria-valuetext", `${v} — ${peerLevel(v)}`);
+    $(".peer-out", ed).textContent = v; $(".peer-lvl", ed).textContent = peerLevel(v);
+    $$("[data-peer-qv]", ed).forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.peerQv === v)));
+  };
+  const focusRow = (uid, sel = "[data-peer-edit]") => $(`.peer-row[data-uid="${CSS.escape(uid)}"] ${sel}`, body)?.focus();
+
+  /* ---- Багш ---- */
+  const dash = (v) => (v == null ? "—" : Math.round(+v));
+  const rLesson = (r) => r.lesson_title || (r.lesson_id ? lessonTitle(r.lesson_id) || "Хичээл" : "Ерөнхий");
+  const detail = (m) => {
+    const rs = (m.ratings || []).slice().sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+    return `<div class="peer-dd"><p class="peer-dm">Дундаж <b>${dash(m.avg)}</b> · ${+m.count || 0} хүн үнэлсэн · Өгсөн <b>${+m.given || 0}</b>${m.given_avg != null ? ` (дундаж ${dash(m.given_avg)})` : ""}</p>
+      ${rs.length ? `<b class="peer-dh">${esc(m.name || "Суралцагч")}-д өгсөн оноо${lid ? ` · «${esc(lessonTitle(lid))}»` : ""}</b><ul class="peer-rl">${rs.map((r) => `<li${r.counted === false ? ` class="unc"` : ""}><span class="peer-rn">${esc(r.rater_name || "Суралцагч")}${lid ? "" : `<small class="peer-rlsn">${esc(rLesson(r))}</small>`}</span>${r.counted === false ? `<span class="peer-unc" title="${PEER_UNC}">тоологдоогүй</span>` : ""}<b class="peer-sc${+r.score < 40 ? " low" : ""}">${+r.score}</b>${r.at ? `<time datetime="${esc(r.at)}">${esc(fmtDate(r.at))}</time>` : ""}<button type="button" class="btn btn-ghost btn-sm peer-del" data-peer-rm="${esc(r.rater_id)}" data-peer-rl="${esc(r.lesson_id || "")}" data-peer-sc="${+r.score}" data-peer-rn="${esc(r.rater_name || "")}" aria-label="${esc(r.rater_name || "Суралцагч")}-ийн «${esc(rLesson(r))}»-д өгсөн ${+r.score} оноог устгах">Устгах</button></li>`).join("")}</ul>`
+        : `<p class="muted small" style="margin:0">${lid ? "Энэ хичээлээр" : "Энэ суралцагчийг"} хараахан хэн ч үнэлээгүй.</p>`}</div>`;
+  };
+  const trow = (m) => {
+    const open = openUid === m.user_id, uid = esc(m.user_id);
+    return `<tr class="peer-tr${open ? " open" : ""}" data-uid="${uid}"><td class="peer-rank">${m.rank != null ? +m.rank : "—"}</td>
+      <td><button type="button" class="peer-x" data-peer-row aria-expanded="${open}" aria-controls="peerD-${uid}">${peerAv(m)}<span><b>${esc(m.name || m.username || "Суралцагч")}</b>${m.username ? `<small>@${esc(m.username)}</small>` : ""}</span>${PEER_CHEV}</button></td>
+      <td><b class="peer-collab${m.collab == null ? " none" : ""}">${dash(m.collab)}</b></td><td class="peer-c2">${dash(m.avg)}</td><td>${+m.count || 0}</td>
+      <td class="peer-c2">${+m.given || 0}${m.given_avg != null ? ` <small class="muted">(${dash(m.given_avg)})</small>` : ""}</td></tr>
+      <tr class="peer-det" id="peerD-${uid}"${open ? "" : " hidden"}><td colspan="6">${open ? detail(m) : ""}</td></tr>`;
+  };
+  const drawTRows = () => {
+    const tb = $(".peer-tbl tbody", body); if (!tb) return;
+    const list = (d.members || []).filter(match);
+    tb.innerHTML = list.map(trow).join("") || `<tr><td colspan="6" class="muted small">«${esc(q)}» нэртэй суралцагч олдсонгүй</td></tr>`;
+  };
+  // «Хэн хэнийг»: мөр — үнэлсэн хүүхэд, багана — үнэлэгдсэн хүүхэд, нүдэнд оноо (бага / дунд / өндөр өнгөөр). «Бүх хичээл»-д
+  // нэг хос олон хичээлээр үнэлсэн бол дундаж (сервер ч хосын дунджаар тооцдог).
+  const MX_MAX = 80;
+  const matrixHTML = () => {
+    const all = d.members || [], byId = new Map(all.map((m) => [m.user_id, m])), cell = new Map(), raters = new Map();
+    for (const m of all) for (const r of m.ratings || []) {
+      const k = r.rater_id + "|" + m.user_id, c = cell.get(k) || { sum: 0, n: 0, unc: true };
+      c.sum += +r.score; c.n++; if (r.counted !== false) c.unc = false; cell.set(k, c);
+      if (!raters.has(r.rater_id)) raters.set(r.rater_id, byId.get(r.rater_id)?.name || r.rater_name || "Суралцагч");
+    }
+    if (!raters.size) return `<div class="peer-empty"><b>${lid ? "Энэ хичээлээр үнэлгээ алга" : "Үнэлгээ хараахан алга"}</b><small>Хүүхдүүд бие биенээ үнэлэхэд хэн хэнийг хэдэн оноогоор үнэлсэн нь энд харагдана.</small></div>`;
+    const colsAll = all.filter((m) => (m.ratings || []).length), rowsAll = [...raters].sort((a, b) => a[1].localeCompare(b[1]));
+    const cols = colsAll.slice(0, MX_MAX), rows = rowsAll.slice(0, MX_MAX);
+    const tone = (v) => (v < 40 ? "lo" : v < 70 ? "mid" : "hi");
+    const first = (n) => String(n || "Суралцагч").trim().split(/\s+/)[0];
+    return `<p class="peer-mx-help">Мөр — <b>үнэлсэн</b> хүүхэд, багана — <b>үнэлэгдсэн</b> хүүхэд${lid ? ` · «${esc(lessonTitle(lid))}» хичээл` : " · олон хичээлээр үнэлсэн бол дундаж"}. <span class="peer-mx-lg"><i class="peer-mx-lo">0–39</i><i class="peer-mx-mid">40–69</i><i class="peer-mx-hi">70–100</i><i class="peer-mx-unc" title="${PEER_UNC}">тоологдоогүй</i></span></p>
+      ${colsAll.length > MX_MAX || rowsAll.length > MX_MAX ? `<p class="peer-prog">Хэт олон тул эхний ${MX_MAX}×${MX_MAX} харагдаж байна — дэлгэрэнгүйг «Рейтинг» хэсгээс мөрийг дэлгэж үзнэ үү.</p>` : ""}
+      <div class="peer-mx-w" tabindex="0" role="region" aria-label="Хэн хэнийг үнэлсэн хүснэгт (хажуу тийш гүйлгэнэ)"><table class="peer-mx"><caption class="sr-only">Хэн хэнийг хэдэн оноогоор үнэлсэн: мөр — үнэлэгч, багана — үнэлэгдэгч</caption>
+        <thead><tr><th scope="col" class="peer-mx-c"><span aria-hidden="true">Үнэлсэн ↓ · Үнэлэгдсэн →</span><span class="sr-only">Үнэлэгч</span></th>${cols.map((m) => `<th scope="col" title="${esc(m.name || "")}"><span>${esc(first(m.name))}</span></th>`).join("")}</tr></thead>
+        <tbody>${rows.map(([rid, rn]) => `<tr><th scope="row" title="${esc(rn)}">${esc(rn)}</th>${cols.map((m) => {
+          if (m.user_id === rid) return `<td class="peer-mx-self"><span aria-hidden="true">—</span><span class="sr-only">өөрөө</span></td>`;
+          const c = cell.get(rid + "|" + m.user_id);
+          if (!c) return `<td class="peer-mx-no"><span class="sr-only">үнэлээгүй</span></td>`;
+          const v = Math.round(c.sum / c.n), many = c.n > 1 ? ` title="${c.n} үнэлгээний дундаж"` : "", more = c.n > 1 ? `<sup aria-hidden="true">×${c.n}</sup><span class="sr-only"> (${c.n} үнэлгээний дундаж)</span>` : "";
+          return c.unc ? `<td class="peer-mx-unc" title="${PEER_UNC}">${v}${more}<span class="sr-only"> (тоологдоогүй)</span></td>` : `<td class="peer-mx-${tone(v)}"${many}>${v}${more}</td>`;
+        }).join("")}</tr>`).join("")}</tbody></table></div>`;
+  };
+  const drawView = () => {
+    const v = $(".peer-view", body); if (!v) return;
+    $$("[data-peer-view]", body).forEach((b) => { const on = b.dataset.peerView === view; b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1; b.classList.toggle("on", on); });
+    v.setAttribute("aria-labelledby", "peerTab-" + view);
+    if (view === "matrix") { v.innerHTML = matrixHTML(); return; }
+    v.innerHTML = `${searchHTML((d.members || []).length)}<div class="peer-tw"><table class="peer-tbl"><caption class="sr-only">Хамтын ажиллагааны рейтинг${lid ? " — " + esc(lessonTitle(lid)) : ""}</caption><thead><tr><th scope="col" title="Байр">#</th><th scope="col">Суралцагч</th><th scope="col" title="Хамтын ажиллагааны рейтинг">Рейтинг</th><th scope="col" class="peer-c2" title="Бодит дундаж оноо">Дундаж</th><th scope="col" title="Хэдэн хүн үнэлсэн">Үнэлсэн</th><th scope="col" class="peer-c2" title="Бусдад хэдэн үнэлгээ өгсөн (дундаж)">Өгсөн</th></tr></thead><tbody></tbody></table></div>`;
+    drawTRows();
+  };
+  const drawTeacher = () => {
+    const all = d.members || [], total = all.reduce((n, m) => n + (+m.count || 0), 0);
+    body.innerHTML = `<div class="peer-sum"><span><small>${lid ? "Хичээлийн дундаж" : "Ангийн дундаж"}</small><b>${d.class_avg != null ? "⭐ " + Math.round(+d.class_avg) : "—"}</b></span><span><small>Суралцагч</small><b>${all.length}</b></span><span><small>Нийт үнэлгээ</small><b>${total}</b></span></div>
+      <p class="peer-note">Рейтинг нь цөөн хүн үнэлсэн үед ангийн дундаж руу ойртуулж тооцогдоно — 1–2 хүний хэт өндөр, бага оноо шууд нөлөөлөхгүй. Нэг хүүхэд олон хичээлээр үнэлсэн ч нийт оноонд нэг л хүн болж тооцогдоно. Суралцагчид хэн хэдийг өгснийг харахгүй. Мөрийг дэлгэж, зүй бус үнэлгээг устгана уу.</p>
+      ${!all.length ? `<div class="peer-empty"><b>Сургалтад суралцагч алга</b><small>Суралцагчид элсэхэд энд харагдана.</small></div>`
+        : `${!total ? `<p class="peer-prog">${lid ? "Энэ хичээлээр хараахан үнэлээгүй байна." : "Суралцагчид бие биеэ хараахан үнэлээгүй байна — бүлэг чатын «⭐ Үнэлгээ» товчоор үнэлнэ."}</p>` : ""}
+        <div class="peer-tabs" role="tablist" aria-label="Харах хэлбэр"><button type="button" role="tab" id="peerTab-rank" data-peer-view="rank" aria-controls="peerView">🏆 Рейтинг</button><button type="button" role="tab" id="peerTab-matrix" data-peer-view="matrix" aria-controls="peerView">🔀 Хэн хэнийг</button></div>
+        <div class="peer-view" id="peerView" role="tabpanel"></div>`}`;
+    drawView();
+    if (openUid) $(`.peer-tr[data-uid="${CSS.escape(openUid)}"]`, body)?.scrollIntoView({ block: "nearest" });
+  };
+
+  el.addEventListener("change", (e) => {
+    if (!e.target.matches("[data-peer-lesson]")) return;
+    lid = e.target.value; if (!teacherView()) openUid = ""; drawLbar(); load(false);
+  });
+  el.addEventListener("input", (e) => {
+    if (e.target.matches("[data-peer-q]")) { q = e.target.value.trim().toLowerCase(); teacherView() ? drawTRows() : drawRows(); return; }
+    if (e.target.matches(".peer-rg")) setVal(e.target.closest(".peer-ed"), e.target.value);
+  });
+  el.addEventListener("click", async (e) => {
+    if (e.target === el || e.target.closest("[data-close]")) { closeModal(el); return; }
+    if (e.target.closest("[data-peer-retry]")) { load(true); return; }
+    const li = e.target.closest(".peer-row"), uid = li?.dataset.uid;
+    if (e.target.closest("[data-peer-edit]")) { openUid = openUid === uid ? "" : uid; drawRows(); focusRow(uid, openUid ? ".peer-rg" : "[data-peer-edit]"); return; }
+    const qv = e.target.closest("[data-peer-qv]"); if (qv) { setVal(qv.closest(".peer-ed"), qv.dataset.peerQv); return; }
+    if (e.target.closest("[data-peer-cancel]")) { openUid = ""; drawRows(); focusRow(uid); return; }
+    const sv = e.target.closest("[data-peer-save]"), dl = e.target.closest("[data-peer-del]");
+    if ((sv || dl) && uid) {
+      const ed = li.querySelector(".peer-ed"), err = $(".peer-err", ed), btns = $$("button", ed), at = lid;
+      err.textContent = ""; btns.forEach((b) => (b.disabled = true));
+      const url = `/api/courses/${encodeURIComponent(cid)}/peer-ratings/${encodeURIComponent(uid)}`;
+      try {
+        if (sv) {
+          const r = await api(url, { method: "PUT", body: { score: +$(".peer-rg", ed).value, lesson_id: at } });
+          const next = { ...d, me: r?.me || d.me, members: (d.members || []).map((m) => (m.user_id === uid ? { ...m, ...(r?.member || {}) } : m)) };
+          Peer.put(cid, next, at); if (at === lid) d = next;
+          toast(teacherView() ? "⭐ Үнэлгээ хадгалагдлаа" : "Хадгаллаа — оноо маргааш шинэчлэгдэнэ");
+        } else {
+          await api(url + (at ? "?lesson_id=" + encodeURIComponent(at) : ""), { method: "DELETE" });
+          const r = await Peer.get(cid, true, at); if (at === lid) d = r;
+          toast("Үнэлгээгээ устгалаа — оноо маргааш шинэчлэгдэнэ");
+        }
+        openUid = ""; drawRows(); focusRow(uid);
+      } catch (x) { err.textContent = x.message; btns.forEach((b) => (b.disabled = false)); }
+      return;
+    }
+    const tab = e.target.closest("[data-peer-view]");
+    if (tab) { if (view !== tab.dataset.peerView) { view = tab.dataset.peerView; drawView(); } return; }
+    const tr = e.target.closest("[data-peer-row]");
+    if (tr) { const id = tr.closest(".peer-tr").dataset.uid; openUid = openUid === id ? "" : id; drawTRows(); $(`.peer-tr[data-uid="${CSS.escape(id)}"] [data-peer-row]`, body)?.focus(); return; }
+    const rm = e.target.closest("[data-peer-rm]");
+    if (rm) {
+      const ratee = rm.closest(".peer-det").previousElementSibling?.dataset.uid, rater = rm.dataset.peerRm, rl = rm.dataset.peerRl || "";
+      if (!ratee || !rater) return;
+      if (!confirm(`«${rm.dataset.peerRn || "Суралцагч"}»-ийн ${rl ? `«${lessonTitle(rl) || "хичээл"}» хичээлд` : "ерөнхий"} өгсөн ${rm.dataset.peerSc} оноог устгах уу? Энэ нь рейтингээс хасагдана.`)) return;
+      rm.disabled = true;
+      try {
+        await api(`/api/courses/${encodeURIComponent(cid)}/peer-ratings/${encodeURIComponent(ratee)}?rater=${encodeURIComponent(rater)}${rl ? "&lesson_id=" + encodeURIComponent(rl) : ""}`, { method: "DELETE" });
+        Peer.drop(cid); // нийт оноо, бусад хичээлийн харагдац ч өөрчлөгдөнө
+        const at = lid, r = await Peer.get(cid, true, at);
+        if (at) Peer.get(cid, true).catch(() => {}); // чатын ⭐, зурвас (сургалтын нийт)
+        if (at === lid) { d = r; draw(); }
+        toast("🗑 Үнэлгээ устгагдлаа");
+        $(`.peer-tr[data-uid="${CSS.escape(ratee)}"] [data-peer-row]`, body)?.focus();
+      } catch (x) { toast(x.message, true); rm.disabled = false; }
+    }
+  });
+  // Esc: эхлээд нээлттэй засварыг хаана, дараа нь цонхыг (чатын самбар нээлттэй хэвээр үлдэнэ).
+  el.addEventListener("keydown", (e) => {
+    const tab = e.target.closest?.("[data-peer-view]");
+    if (tab && (e.key === "ArrowRight" || e.key === "ArrowLeft")) { // табуудын хооронд сумаар
+      e.preventDefault(); view = view === "rank" ? "matrix" : "rank"; drawView(); $(`#peerTab-${view}`, body)?.focus(); return;
+    }
+    if (e.key !== "Escape") return;
+    e.stopPropagation();
+    if (e.target.matches("[data-peer-q]") && e.target.value) { e.preventDefault(); e.target.value = ""; q = ""; teacherView() ? drawTRows() : drawRows(); return; } // эхлээд хайлтыг цэвэрлэнэ
+    if (openUid && !teacherView()) { const uid = openUid; openUid = ""; drawRows(); focusRow(uid); return; }
+    closeModal(el);
+  });
+  openModal(el);
+  new MutationObserver((_, mo) => {
+    if (el.classList.contains("open")) return;
+    mo.disconnect(); setTimeout(() => el.remove(), 400);
+    (opener?.isConnected ? opener : $("#railPeerStrip:not([hidden]) [data-peer-more]") || $("#railPeer:not([hidden])"))?.focus({ preventScroll: true });
+  }).observe(el, { attributes: true, attributeFilter: ["class"] });
+  setTimeout(() => H.focus({ preventScroll: true }), 60);
+  load(false);
+}
+
 class ChatThread {
-  // opts: {ol, body, form, token(): string, convId(): string, role(): "teacher"|"visitor", group(): bool}
+  // opts: {ol, body, form, token(): string, convId(): string, role(): "teacher"|"visitor", group(): bool, course?(): string}
+  // course — сургалтын бүлэг чат (kind "group") бол сургалтын ID: суралцагчийн нэрийн хажууд хамтын ажиллагааны дундаж (⭐ 82).
   constructor(o) {
     Object.assign(this, { list: [], reads: {}, meKey: "", typing: new Map(), replyTo: null, lastReadSent: "", typeAt: 0, editing: null }, o);
     this.ol.classList.add("thread");
@@ -3602,6 +4277,8 @@ class ChatThread {
     document.addEventListener("click", (e) => { if (!e.target.closest(".react-pick, [data-react]")) $(".react-pick", this.ol)?.remove(); });
     if (this.form) this.bindForm();
   }
+  // Нэрийн хажуугийн үнэлгээ шинэчлэгдэхэд: засаж буй мессежийн бичвэр арилахгүйн тулд тэр үед дахин зурахгүй.
+  rerender() { if (!this.editing) this.render(); }
   mine(m) { const myId = Auth.user?.id; return this.group() && myId ? m.sender_id === myId : m.sender === this.role(); }
   set(d) { this.list = d.messages || []; this.reads = d.reads || {}; this.meKey = d.me_key || this.meKey; this.replyTo = null; this.block = d.block || {}; this.render(); this.renderBlock(); this.scroll(true); this.markRead(); }
   append(m) {
@@ -3651,7 +4328,8 @@ class ChatThread {
       else if (prev && new Date(m.created_at) - new Date(prev.created_at) > GAP) out.push(`<li class="msg-day msg-gap"><span>${fmtTime(m.created_at)}</span></li>`); // завсар их → цагийн шошго
       const same = (a, b) => a && b && who(a) === who(b) && Math.abs(new Date(a.created_at) - new Date(b.created_at)) < GAP && dayLabel(a.created_at) === dayLabel(b.created_at);
       const first = !same(prev, m), last = !same(m, next), mine = this.mine(m);
-      const name = this.group() && !mine && first && m.sender_name ? `<b class="msg-who">${esc(m.sender_name)}${m.sender === "teacher" ? ` <span class="dc-badge">Багш</span>` : ""}</b>` : "";
+      const star = this.group() && !mine && first && m.sender_id && m.sender !== "teacher" ? Peer.badge(this.course?.(), m.sender_id) : "";
+      const name = this.group() && !mine && first && m.sender_name ? `<b class="msg-who">${esc(m.sender_name)}${m.sender === "teacher" ? ` <span class="dc-badge">Багш</span>` : ""}${star}</b>` : "";
       const quote = m.reply_to ? `<button type="button" class="msg-quote" data-goto="${esc(m.reply_to)}"><b>${esc(m.reply_name || "")}</b><span>${esc((m.reply_body || "").replace(/^::sticker::/, ""))}</span></button>` : "";
       const rx = Object.entries(m.reactions || {}).filter(([, u]) => u.length);
       const reacts = rx.length ? `<div class="msg-reacts">${rx.map(([e, u]) => `<button type="button" class="${u.some((x) => x.key === this.meKey) ? "on" : ""}" data-react-one="${e}" title="${esc(u.map((x) => x.name).join(", "))}">${e}${u.length > 1 ? ` ${u.length}` : ""}</button>`).join("")}</div>` : "";
@@ -3663,7 +4341,7 @@ class ChatThread {
       const content = m.deleted ? `<span class="msg-text msg-deleted">Мессеж устгагдсан</span>` : editing ? `<form class="msg-edit"><textarea rows="2" maxlength="2000">${esc(m.body)}</textarea><div><button type="submit" class="btn btn-gold btn-sm">Хадгалах</button><button type="button" class="btn btn-ghost btn-sm" data-edit-cancel>Болих</button></div></form>` : sticker ? `<span class="msg-sticker">${esc(sticker[1])}</span>` : imgUrl ? `<a class="msg-img" href="${esc(imgUrl)}" target="_blank" rel="noopener"><img src="${esc(imgUrl)}" alt="" loading="lazy"></a>${m.attachment_url && m.body && m.body !== "📷 Зураг" ? `<span class="msg-text">${linkify(m.body)}</span>` : ""}` : `<span class="msg-text">${linkify(m.body)}</span>`;
       out.push(`<li class="msg ${mine ? "me" : "them"} ${first ? "first" : ""} ${last ? "last" : ""} ${sticker ? "is-sticker" : ""} ${imgUrl ? "has-img" : ""}" data-id="${esc(m.id)}">${av}<div class="msg-col">${name}
         <div class="msg-row"><div class="bubble" title="${fmtDate(m.created_at)}">${quote}${content}</div>
-          <div class="msg-tools">${m.deleted ? "" : `<button type="button" data-react="${esc(m.id)}" title="Реакц">☺</button>`}${m.deleted ? "" : `<button type="button" data-reply="${esc(m.id)}" title="Хариулах">↩</button>`}${mine && !m.deleted ? `<button type="button" data-edit="${esc(m.id)}" title="Засах">✎</button>` : ""}${(mine || this.role() === "teacher") && !m.deleted ? `<button type="button" data-del="${esc(m.id)}" title="Устгах">🗑</button>` : ""}${!mine && !m.deleted ? `<button type="button" data-report="${esc(m.id)}" title="Мэдүүлэх" aria-label="Мэдүүлэх">⚑</button>` : ""}</div></div>
+          <div class="msg-tools">${m.deleted ? "" : `<button type="button" data-react="${esc(m.id)}" title="Эможи хариу">☺</button>`}${m.deleted ? "" : `<button type="button" data-reply="${esc(m.id)}" title="Хариулах">↩</button>`}${mine && !m.deleted ? `<button type="button" data-edit="${esc(m.id)}" title="Засах">✎</button>` : ""}${(mine || this.role() === "teacher") && !m.deleted ? `<button type="button" data-del="${esc(m.id)}" title="Устгах">🗑</button>` : ""}${!mine && !m.deleted ? `<button type="button" data-report="${esc(m.id)}" title="Мэдүүлэх" aria-label="Мэдүүлэх">⚑</button>` : ""}</div></div>
         ${reacts}${foot}</div></li>`);
     });
     for (const [, v] of this.typing) out.push(`<li class="msg them typing"><span class="msg-av"></span><div class="msg-col"><div class="bubble"><span class="dots"><i></i><i></i><i></i></span></div><small class="muted">${esc(v.name)} бичиж байна…</small></div></li>`);
@@ -3711,7 +4389,7 @@ class ChatThread {
     this.form.classList.toggle("is-blocked", byMe || byThem);
     if (!byMe && !byThem) { bar?.remove(); return; }
     if (!bar) { bar = document.createElement("div"); bar.className = "chat-blocked"; this.form.before(bar); }
-    bar.innerHTML = byMe ? `<span>🚫 Та энэ хүнийг хориглосон — хоёулаа мессеж бичихгүй.</span><button type="button" class="btn btn-ghost btn-sm" data-unblock>Хоригоо цуцлах</button>`
+    bar.innerHTML = byMe ? `<span>🚫 Та энэ хүнийг хориглосон — та хоёр мессеж бичилцэх боломжгүй.</span><button type="button" class="btn btn-ghost btn-sm" data-unblock>Хоригоо цуцлах</button>`
       : `<span>Энэ ярианд мессеж илгээх боломжгүй.</span>`;
     const ub = bar.querySelector("[data-unblock]"); if (ub) ub.onclick = (e) => this.click({ target: e.target });
   }
@@ -3725,8 +4403,8 @@ class ChatThread {
       <blockquote class="rp-quote"><b>${esc(m.sender_name || (m.sender === "teacher" ? "Багш" : "Зочин"))}</b><span>${esc((m.body || "").replace(/^::sticker::/, "").slice(0, 240))}</span></blockquote>
       <fieldset class="rp-reasons"><legend>Шалтгаан</legend>${REPORT_REASONS.map(([k, t], i) => `<label><input type="radio" name="reason" value="${k}" ${i ? "" : "required"}><span>${t}</span></label>`).join("")}</fieldset>
       <label>Тайлбар <small class="muted">заавал биш</small><textarea name="note" rows="2" maxlength="500" placeholder="Юу болсныг товч бичнэ үү"></textarea></label>
-      ${one ? `<label class="consent"><input type="checkbox" name="block"><span>Мөн энэ хүнийг хориглох — цаашид хоёулаа энэ ярианд бичихгүй</span></label>` : ""}
-      <p class="rp-note">Мэдүүлсэн мессеж ба түүний өмнөх хэдэн мессежийг surgalt.mn-ийн хянагч харж шийдвэрлэнэ. Мэдүүлснийг тань нөгөө хүнд хэлэхгүй.</p>
+      ${one ? `<label class="consent"><input type="checkbox" name="block"><span>Мөн энэ хүнийг хориглох — цаашид та хоёр энэ ярианд бичилцэх боломжгүй</span></label>` : ""}
+      <p class="rp-note">Мэдүүлсэн мессеж болон түүний өмнөх хэдэн мессежийг surgalt.mn-ийн хянагч үзэж шийдвэрлэнэ. Таныг мэдүүлсэн гэдгийг нөгөө хүнд мэдэгдэхгүй.</p>
       <div class="rp-act"><button type="button" class="btn btn-ghost" data-rp-x>Болих</button><button class="btn btn-gold">Мэдүүлэх</button></div>
     </form>`;
     document.body.append(el);
@@ -3820,7 +4498,8 @@ function chatWidget() {
   const courseId = $(".course-page")?.dataset.course;
   let conv = null, group = false;
   const headText = $(".chat-head > div:nth-child(2)", panel);
-  const thread = new ChatThread({ ol: msgs, body, form, token: () => Auth.token, convId: () => conv?.id, role: () => "visitor", group: () => group });
+  const thread = new ChatThread({ ol: msgs, body, form, token: () => Auth.token, convId: () => conv?.id, role: () => "visitor", group: () => group, course: () => (group && conv?.kind === "group" ? conv.course_id || courseId || "" : "") });
+  Peer.on((cid) => { if (group && conv?.kind === "group" && (conv.course_id || courseId) === cid) { thread.rerender(); if (Peer.denied.has(cid)) $("[data-peer-open]", panel)?.remove(); } });
   const scroll = () => (body.scrollTop = body.scrollHeight);
   const open = async () => {
     panel.classList.add("open"); panel.setAttribute("aria-hidden", "false"); $(".chat-fab-dot").hidden = true;
@@ -3829,7 +4508,7 @@ function chatWidget() {
     await start();
   };
   // Сургалтын бүлэг чат: зөвхөн нэвтэрсэн, элссэн суралцагч. Багш нээгээгүй бол хэлнэ.
-  const openGroup = async () => {
+  const openGroup = async (peer = "", lesson = "") => {
     if (!Auth.token) { location.href = "/login?next=" + encodeURIComponent(location.pathname + "#chat=group"); return; }
     panel.classList.add("open"); panel.setAttribute("aria-hidden", "false"); $(".chat-fab-dot").hidden = true;
     if (conv && group) return;
@@ -3839,6 +4518,13 @@ function chatWidget() {
       headText.innerHTML = `<strong>${esc(conv.visitor_name)}</strong><small class="chat-status"><i></i>Бүлэг чат · сургалтын суралцагчид</small>`;
       intro.hidden = true; msgs.hidden = false; form.hidden = false;
       thread.set(d); Live.reconnect(); form.body.focus();
+      const pc = conv.kind === "group" ? conv.course_id || courseId : "";
+      if (pc && !Peer.denied.has(pc) && !$("[data-peer-open]", panel)) { // «⭐ Үнэлгээ»: ангийн найзуудаа үнэлэх / багшид рейтинг
+        $("[data-chat-close]", panel).insertAdjacentHTML("beforebegin", `<button type="button" class="peer-open" data-peer-open aria-haspopup="dialog"><span aria-hidden="true">⭐</span><span class="peer-open-t">Үнэлгээ</span></button>`);
+        $("[data-peer-open]", panel).addEventListener("click", (e) => peerPanel(pc, { title: conv?.visitor_name || "", opener: e.currentTarget }));
+      }
+      if (pc) Peer.get(pc).catch(() => {});
+      if (pc && (peer || lesson)) peerPanel(pc, { title: conv?.visitor_name || "", opener: $("[data-peer-open]", panel), uid: peer, lesson });
     } catch (e) { intro.hidden = true; msgs.hidden = false; form.hidden = true; msgs.innerHTML = `<li class="muted" style="text-align:center;padding:12px">${esc(e.message)}</li>`; }
   };
   const start = async () => {
@@ -3859,7 +4545,7 @@ function chatWidget() {
   $("[data-chat-close]", panel).addEventListener("click", close);
   $$("[data-open-chat]").forEach((b) => b.addEventListener("click", () => {
     if (window.railStartDirect) { window.railStartDirect(teacher).catch((e) => toast(e.message, true)); return; }
-    if (group) { conv = null; group = false; msgs.innerHTML = ""; } open();
+    if (group) { conv = null; group = false; msgs.innerHTML = ""; $("[data-peer-open]", panel)?.remove(); } open();
   }));
   $$("[data-open-group]").forEach((b) => b.addEventListener("click", () => {
     if (window.railStartGroup && courseId) { window.railStartGroup(courseId).catch((e) => toast(e.message, true)); return; }
@@ -3874,8 +4560,18 @@ function chatWidget() {
     if (!panel.classList.contains("open")) $(".chat-fab-dot").hidden = false;
   });
   // #chat холбоосоор (нүүр хуудасны "Чат" жагсаалтаас) ирсэн бол шууд нээнэ.
-  if (location.hash === "#chat=group" && courseId) { history.replaceState(null, "", location.pathname + location.search); window.railStartGroup ? window.railStartGroup(courseId).catch((e) => toast(e.message, true)) : openGroup(); }
-  else if (location.hash === "#chat") { history.replaceState(null, "", location.pathname + location.search); window.railStartDirect ? window.railStartDirect(teacher).catch((e) => toast(e.message, true)) : open(); }
+  // #chat=group[&peer=<суралцагч>][&peer_lesson=<хичээл>] (peer_alert мэдэгдэл → үнэлгээний самбар тэр мөрийг дэлгэсэн / тэр хичээлээр);
+  // хуудас дээр байхад hash солигдсон ч.
+  const groupHash = () => {
+    const h = new URLSearchParams(location.hash.slice(1));
+    if (h.get("chat") !== "group" || !courseId) return false;
+    const peer = h.get("peer") || "", lesson = h.get("peer_lesson") || "";
+    history.replaceState(null, "", location.pathname + location.search);
+    window.railStartGroup ? window.railStartGroup(courseId, { peer, lesson }).catch((e) => toast(e.message, true)) : openGroup(peer, lesson);
+    return true;
+  };
+  addEventListener("hashchange", groupHash);
+  if (!groupHash() && location.hash === "#chat") { history.replaceState(null, "", location.pathname + location.search); window.railStartDirect ? window.railStartDirect(teacher).catch((e) => toast(e.message, true)) : open(); }
   // Өмнө нь чатласан бол шинэ хариуг сонсохын тулд шууд холбогдоно.
   if (Auth.token && store.get("sg_chat:" + teacher)) start();
   panel.addEventListener("click", () => store.set("sg_chat:" + teacher, 1), { once: true });
@@ -4100,7 +4796,7 @@ function inlineName(el, done, can = () => true) {
     const v = el.textContent.replace(/\s+/g, " ").trim();
     el.contentEditable = "false"; el.classList.remove("editing"); el.setAttribute("role", "button"); hint?.remove(); hint = null;
     if (!save || v === orig.trim()) { el.textContent = orig; return; }
-    if (!v || [...v].length > 80) { el.textContent = orig; toast("Нэр 1–80 тэмдэгт байна", true); return; }
+    if (!v || [...v].length > 80) { el.textContent = orig; toast("Нэр 1–80 тэмдэгт байх ёстой", true); return; }
     el.textContent = v; el.classList.add("saving");
     try {
       const me = await api("/api/me/name", { method: "PUT", body: { display_name: v } });
@@ -4185,7 +4881,7 @@ function profileOwner(root, h) {
     const start = () => {
       if (!img()) return;
       orig = cur(); set(orig); show(true);
-      if (room() < 8) toast("Энэ зураг хайрцгаас өндөр биш тул дээш, доош зөөх зай бараг алга — өндөр (босоо) зураг тавибал тохируулах боломжтой");
+      if (room() < 8) toast("Энэ зураг хүрээнээсээ өндөр биш тул дээш, доош зөөх зай бараг алга — босоо зураг тавибал байрлалыг тохируулах боломжтой");
       $("[data-cover-save]", box)?.focus({ preventScroll: true });
     };
     const stop = () => { show(false); drag = null; box.classList.remove("dragging"); };
@@ -4242,7 +4938,7 @@ function profileOwner(root, h) {
   // «Загвараас сонгох»: сургалтын толгойн зургийн загварууд (/static/covers) нүүр зураг болно — байрлал тохируулах шаардлагагүй.
   $$("[data-cover-template]").forEach((b) => b.addEventListener("click", () => {
     const cur = $("img.pf-cover-img", $("#pfCover"))?.getAttribute("src") || "";
-    coverPicker({ title: "Толгойн зураг", lead: "120 загвар (салбар бүрээр, 20 хөдөлгөөнт) — профайлын толгойн зураг болгоно. Өөрийн зураг оруулахыг хүсвэл «Нүүр зураг солих».", current: cur.startsWith("/static/covers/") ? cur.slice(15, -4) : "", onPick: async (id) => {
+    coverPicker({ title: "Толгойн зураг", lead: "120 загвар (салбар бүрээр, үүнээс 20 нь хөдөлгөөнт) — профайлынхаа толгойн зургийг сонгоорой. Өөрийн зургаа оруулах бол «Нүүр зураг солих»-ыг дарна уу.", current: cur.startsWith("/static/covers/") ? cur.slice(15, -4) : "", onPick: async (id) => {
       const src = "/static/covers/" + id + ".svg", box = $("#pfCover");
       await save({ cover_url: src });
       $("img.pf-cover-img", box)?.remove(); box.insertAdjacentHTML("afterbegin", `<img class="pf-cover-img" src="${esc(src)}" alt="" style="object-position:50% 50%">`);
@@ -4259,7 +4955,7 @@ function profileOwner(root, h) {
   $$(".em-tab", modal).forEach((t) => t.addEventListener("click", () => emTab(t.dataset.em)));
   const subjects = () => form.subjects.value.split(/[,،\n]/).map((x) => x.trim()).filter(Boolean);
   const preview = () => ($("#subjPreview").innerHTML = subjects().slice(0, 8).map((x) => `<span class="tag">${esc(x)}</span>`).join(""));
-  const count = () => { const n = [...form.bio.value.trim()].length, c = $("#bioCount"); c.textContent = n >= 120 ? `${n} тэмдэгт ✓` : `${n}/120 — дор хаяж 120 тэмдэгт бичвэл сайн`; c.classList.toggle("ok", n >= 120); };
+  const count = () => { const n = [...form.bio.value.trim()].length, c = $("#bioCount"); c.textContent = n >= 120 ? `${n} тэмдэгт ✓` : `${n}/120 — дор хаяж 120 тэмдэгт бичихийг зөвлөж байна`; c.classList.toggle("ok", n >= 120); };
   form.subjects.addEventListener("input", preview); form.bio.addEventListener("input", count);
   // Профайлын холбоос: бичих зуур чөлөөтэй эсэхийг шалгана; солимогц шинэ холбоосоор дахин нээгдэнэ.
   const un = $("#unForm"), unIn = un.username, unBtn = $("button.btn-gold", un), unHint = $("#unHint");
@@ -4277,8 +4973,8 @@ function profileOwner(root, h) {
     unTimer = setTimeout(async () => { // багшийн нэртэй давхцвал энд; суралцагчийнхтай давхцлыг сервер хадгалахдаа шалгана
       const res = await api("/api/teachers/" + encodeURIComponent(v), { raw: true, token: null }).catch(() => null);
       if (my !== unSeq) return;
-      if (res?.status === 200) return say("Энэ холбоос эзэнтэй байна.", "bad");
-      say(`Чөлөөтэй: ${location.host}/t/${v}`, "ok"); unBtn.disabled = false;
+      if (res?.status === 200) return say("Энэ холбоосыг өөр хүн ашиглаж байна.", "bad");
+      say(`Сул байна: ${location.host}/t/${v}`, "ok"); unBtn.disabled = false;
     }, 350);
   });
   $("#unCopy").onclick = () => { const url = `${location.origin}/t/${unCur}`; navigator.clipboard.writeText(url).then(() => toast("Хуулагдлаа ✓"), () => toast(url)); };
@@ -4349,29 +5045,283 @@ const ST_CAT = { y: ["⭐", "Чухал"], g: ["✅", "Ойлгосон"], r: ["
 const ST_FX = ["st-rise", "st-zoom", "st-tilt", "st-slide", "st-blur", "st-flip"];
 const stTop = (notes) => { const c = { y: 0, g: 0, r: 0, b: 0 }; for (const n of notes) c[n.c] = (c[n.c] || 0) + 1; return Object.entries(c).sort((a, b) => b[1] - a[1])[0][0]; };
 const stKey = (s) => s.id + ":" + s.notes.length + ":" + (s.updated_at || "");
+const stIco = (s) => (s.kind === "cards" ? "🃏" : s.kind === "review" ? "💡" : s.kind === "book" ? "📕" : ST_CAT[stTop(s.notes)][0]);
+/* 🃏 Flash card (асуулт + санах хэсэгтэй тэмдэглэл): Leitner хайрцаг энэ төхөөрөмж дээр (localStorage, алдаа гарвал үл тооно).
+   «Санасан» → дараагийн хайрцаг (1–5), «Санасангүй» → 1-р хайрцаг. Дараалал: санаагүй нь түрүүнд, дараа нь шинэ,
+   дараа нь доод хайрцаг, удаан давтаагүй нь. Нэг удаад FC_MAX хүртэл карт (сервер нэг story-д 500 слайд хүртэл бүртгэнэ). */
+const FC_STORE = "sg_fc_leitner", FC_MAX = 100;
+const fcKey = (n, src) => ((src || n._s)?.id || "") + "/" + n.id;
+const fcLoad = () => { const m = store.get(FC_STORE); return m && typeof m === "object" && !Array.isArray(m) ? m : {}; };
+// Энэ удаагийн анхны үнэлгээнээс өмнөх төлөв (null — шинэ карт). Нэг картыг нэг удаад дахин үнэлэхэд (‹ буцах, ↺) хайрцаг
+// хоёр ахихгүй: шинэ үнэлгээ үргэлж энэ төлөвөөс тооцогдож өмнөхийгөө орлоно.
+const fcPeek = (key) => { try { const o = fcLoad()[key]; return o && typeof o === "object" ? { ...o } : null; } catch { return null; } };
+const fcGrade = (key, ok, base) => {
+  try {
+    const m = fcLoad(), o = (base === undefined ? m[key] : base) || {};
+    m[key] = { b: ok ? Math.min(5, (+o.b || 1) + 1) : 1, k: ok ? 1 : 0, t: Date.now() };
+    const ks = Object.keys(m);
+    if (ks.length > 3000) ks.sort((x, y) => (+m[x]?.t || 0) - (+m[y]?.t || 0)).slice(0, ks.length - 3000).forEach((k) => delete m[k]);
+    store.set(FC_STORE, m);
+  } catch {}
+};
+const fcOrder = (cards) => {
+  let m = {}; try { m = fcLoad(); } catch {}
+  const rank = (n) => { const o = m[fcKey(n)]; return !o || typeof o !== "object" ? [1, 1, 0] : [o.k ? 2 : 0, +o.b || 1, +o.t || 0]; };
+  return cards.map((n) => [rank(n), Math.random(), n]).sort((x, y) => x[0][0] - y[0][0] || x[0][1] - y[0][1] || x[0][2] - y[0][2] || x[1] - y[1]).map((x) => x[2]);
+};
+const fcForgot = (cards) => { try { const m = fcLoad(); return cards.filter((n) => m[fcKey(n)]?.k === 0).length; } catch { return 0; } };
+/* ---------- 🧠 Давтах сануулгын цонх: мартах муруй (1-3-7-14-30 хоног) ----------
+   Мэдэгдлийн «уншсан» төлвөөс хамаарахгүй — суралцагч хичээлээ бодитоор давтах хүртэл (сервер: тэр хичээлийн шинэ суралцах
+   сесс, story үзэлт эсвэл review_done) хуудас нээхэд гарсаар байна. Хойшлуулах нь хязгаартай: 1 цаг эсвэл маргааш 06:00
+   (✕, Esc, фон дээр дарвал = 1 цаг); бүрмөсөн хаах сонголтгүй. Хичээл үзэж, шалгалт өгч, самбар дээр байх, өөр цонх нээлттэй
+   эсвэл бичиж байх үед гарахгүй — дараа нь дахин оролдоно. Серверээс 10 минутад нэг удаа (sessionStorage), мөн «review»
+   мэдэгдэл ирмэгц шалгана. */
+const RV_STAGES = [1, 3, 7, 14, 30], RV_TTL = 10 * 60e3, RV_GRACE = 20 * 60e3;
+const RV_NO_CARDS = "🃏 Давтах flash card одоогоор алга байна";
+// fcCardsNow — нүүр хуудсанд ачаалсан flash card-ууд; fcOpenRing — «🃏 Flash card» цагирагийг нээх (noteStories тавина);
+// rvOpenLesson — сургалтын хуудсанд хичээлийг хуудас шилжилгүй нээх (coursePage тавина).
+let fcCardsNow = null, fcOpenRing = null, rvOpenLesson = null;
+// Хугацаа нь болсон flash card: Leitner хайрцаг 1–5 → сүүлд үнэлснээс 1, 3, 7, 14, 30 хоногийн дараа (1-р хайрцаг = санаагүй).
+const fcDueCount = () => {
+  try {
+    const m = fcLoad(), now = Date.now();
+    const keys = fcCardsNow ? fcCardsNow.map((n) => fcKey(n)) : Object.keys(m);
+    let n = 0;
+    for (const k of keys) {
+      const o = m[k]; if (!o || typeof o !== "object" || !(+o.t > 0)) continue;
+      const age = now - +o.t, b = Math.min(5, Math.max(1, Math.round(+o.b) || 1));
+      if (!fcCardsNow && age > 90 * 864e5) continue; // картын жагсаалтгүй үед удаан хүрээгүй (устгагдсан байж болох) картыг тоолохгүй
+      if (age >= RV_STAGES[b - 1] * 864e5) n++;
+    }
+    return n;
+  } catch { return 0; }
+};
+// stage — хоногоор (1, 3, 7, 14, 30) → 0–4.
+const rvStage = (s) => { const i = RV_STAGES.indexOf(+s); if (i >= 0) return i; let k = 0; RV_STAGES.forEach((d, j) => { if (+s >= d) k = j; }); return k; };
+const rvAgo = (x) => {
+  const t = new Date(x.viewed_at), day = (v) => new Date(v).setHours(0, 0, 0, 0);
+  const n = isNaN(t) || t.getFullYear() < 2000 ? +x.stage || 0 : Math.round((day(Date.now()) - day(t)) / 864e5);
+  return n <= 0 ? "өнөөдөр үзсэн" : n === 1 ? "өчигдөр үзсэн" : n < 30 ? `${n} хоногийн өмнө үзсэн` : `${Math.floor(n / 30)} сарын өмнө үзсэн`;
+};
+// Мартах муруйн жижиг зураг: давтвал (үргэлжилсэн шугам) санах ой сэргэж, дараагийн удаа илүү удаан буурна; давтахгүй бол
+// (тасархай) буурсаар. Тоо, хувь бичихгүй — зөвхөн хэлбэр. si — одоогийн үе шат (0–4) тодорно. Өнгө нь CSS хувьсагчаас.
+function rvCurve(si) {
+  const XS = [34, 84, 134, 184, 234, 284], XE = 310, YT = 28, YB = 100, y = (r) => (YB - (YB - YT) * r).toFixed(1);
+  const END = [0.42, 0.56, 0.66, 0.74, 0.81], K = 1 - Math.exp(-3);
+  const seg = (u, e) => 1 - (1 - e) * (1 - Math.exp(-3 * u)) / K; // эхэндээ огцом, дараа нь зөөлөн буурна
+  const at = (a, b, u) => (a + (b - a) * u).toFixed(1);
+  let line = `M${XS[0]} ${y(1)}`;
+  for (let i = 0; i < 5; i++) {
+    for (let j = 1; j <= 10; j++) line += ` L${at(XS[i], XS[i + 1], j / 10)} ${y(seg(j / 10, END[i]))}`;
+    line += ` L${XS[i + 1]} ${y(1)}`; // давтсан → дахин сэргэнэ
+  }
+  for (let j = 1; j <= 4; j++) line += ` L${at(XS[5], XE, j / 4)} ${y(seg(j / 4, 0.9))}`;
+  let miss = `M${XS[0]} ${y(1)}`;
+  for (let j = 1; j <= 10; j++) miss += ` L${at(XS[0], XS[1], j / 10)} ${y(seg(j / 10, END[0]))}`;
+  for (let j = 1; j <= 24; j++) miss += ` L${at(XS[1], XE, j / 24)} ${y(0.12 + (END[0] - 0.12) * Math.exp(-2.4 * j / 24))}`;
+  const top = y(1), mid = (YT + YB) / 2;
+  const dots = RV_STAGES.map((d, i) => {
+    const cx = XS[i + 1], cur = i === si, last = i === 4;
+    return `${cur ? `<line class="rv-guide" x1="${cx}" y1="${top}" x2="${cx}" y2="${YB}"/><circle class="rv-ring" cx="${cx}" cy="${top}" r="6"/>` : ""}<circle class="rv-dot ${i < si ? "done" : cur ? "cur" : "next"}" cx="${cx}" cy="${top}" r="${cur ? 6 : 4}"/>`
+      + `<text class="rv-t${cur ? " cur" : ""}" x="${last ? cx - 5 : cx}" y="${YB + 13}" text-anchor="${last ? "start" : "middle"}">${d}${last ? `<tspan class="rv-unit" dx="3">хоног</tspan>` : ""}</text>`;
+  }).join("");
+  return `<svg viewBox="0 0 320 118" role="img" aria-labelledby="rvCurveT" focusable="false"><title id="rvCurveT">Мартах муруй: давтах бүрт санах ой сэргэж, дараа нь илүү удаан мартагдана. Одоо ${RV_STAGES[si]} дахь хоногийн давталт (${si + 1}/5).</title>
+    <path class="rv-area" d="${line} L${XE} ${YB} L${XS[0]} ${YB} Z"/><path class="rv-miss" d="${miss}"/><path class="rv-line" d="${line}" pathLength="1"/>
+    <path class="rv-ax" d="M${XS[0]} ${YT - 10}V${YB}H${XE}"/>
+    <text class="rv-t" x="12" y="${mid}" transform="rotate(-90 12 ${mid})" text-anchor="middle">Санах ой</text><text class="rv-t" x="${XS[0]}" y="${YB + 13}" text-anchor="middle">0</text>
+    ${dots}<text class="rv-t cur" x="${XS[si + 1]}" y="${YT - 12}" text-anchor="middle">Одоо</text></svg>`;
+}
+const Review = (() => {
+  const uid = () => Auth.user?.id || "";
+  const ssGet = (k) => { try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } };
+  const ssSet = (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  const mine = (o) => (o && typeof o === "object" && o.u === uid() ? +o.t || 0 : 0); // нэг төхөөрөмж дээр хэд хэдэн хүүхэд орж болно
+  let items = [], timer = 0, el = null, back = null, off = false, inflight = null, started = false;
+  const eligible = () => !off && !!Auth.token && !!uid() && ["home", "course", "profile"].includes(page) && window.self === window.top;
+  // Хичээл (lp-focus, #lessonModal), шалгалт (.exam, reader-open), самбар (bd-on), story, ном, зөвшөөрлийн цонх, бусад цонх.
+  const BUSY_HTML = ["lp-focus", "bd-on", "cg-open", "reader-open", "stv-on", "dv-locked", "lbx-open", "intro-on", "svp-on"];
+  const BUSY_EL = "#lessonModal.open, .exam, .watch-alert, .drip-pop, .rp, .cg, .lw, .stv, .reader, .bd, .salute, .gift-reveal, .modal.open, .np:not([hidden])";
+  const busy = () => {
+    if (BUSY_HTML.some((c) => document.documentElement.classList.contains(c))) return true;
+    if (page === "course" && /(^#|&)l=/.test(location.hash)) return true; // хичээл нээгдэх гэж байна
+    if (page === "home" && location.hash === "#cards" && !fcOpenRing) return true; // flash card нээгдэх гэж байна
+    const a = document.activeElement;
+    if (editable(a) && a.value) return true; // бичиж буй зүйлийг таслахгүй
+    return !!document.querySelector(BUSY_EL);
+  };
+  const list = () => items.filter((x) => x && x.lesson_id);
+  async function check(force) {
+    if (!eligible()) return;
+    const c = ssGet("sg_rv");
+    if (!force && c && c.u === uid() && Date.now() - c.at < RV_TTL) items = Array.isArray(c.items) ? c.items : [];
+    else {
+      if (!inflight) inflight = api("/api/me/reviews/due")
+        .then((d) => { items = Array.isArray(d?.items) ? d.items : []; ssSet("sg_rv", { u: uid(), at: Date.now(), items }); })
+        .catch((e) => { if ([401, 403, 404, 405].includes(e.status)) off = true; ssSet("sg_rv", { u: uid(), at: Date.now(), items }); }) // 10 минут дахин асуухгүй
+        .finally(() => { inflight = null; });
+      await inflight;
+    }
+    maybeShow();
+  }
+  function maybeShow() {
+    clearTimeout(timer);
+    if (!eligible() || !list().length) { close(); return; }
+    if (el) { draw(); return; }
+    const now = Date.now(), until = Math.max(mine(store.get("sg_rv_snooze")), mine(ssGet("sg_rv_grace")));
+    if (until > now) { timer = setTimeout(() => check(), Math.min(until - now + 1000, 864e5)); return; }
+    if (document.hidden || busy()) { timer = setTimeout(maybeShow, 30000); return; }
+    show();
+  }
+  const item = (x, i) => {
+    const s = rvStage(x.stage), t = x.lesson_title || "Хичээл";
+    return `<li class="rv-item"><span class="rv-step" title="${s + 1}-р давталт (5-аас)"><span class="sr-only">Давталт </span>${s + 1}/5</span>
+      <span class="rv-txt"><b>${esc(t)}</b><small>${x.course_title ? esc(x.course_title) + " · " : ""}${esc(rvAgo(x))}</small></span>
+      <button type="button" class="btn btn-sm rv-do" data-rv-go="${i}" aria-label="«${esc(t)}» хичээлийг давтах">▶ Давтах</button></li>`;
+  };
+  function draw() {
+    const xs = list(), si = rvStage(xs[0].stage), fc = fcDueCount(), a = document.activeElement;
+    const keep = el.contains(a) ? (a.dataset.rv ? `[data-rv="${a.dataset.rv}"]` : a.dataset.rvGo != null ? `[data-rv-go="${a.dataset.rvGo}"]` : "") : "";
+    el.innerHTML = `<div class="rv-card">
+      <button type="button" class="icon-btn rv-x" data-rv="x" aria-label="Хаах — 1 цагийн дараа дахин сануулна" title="Хаах (1 цагийн дараа дахин сануулна)">✕</button>
+      <header class="rv-head"><span class="rv-brain" aria-hidden="true">🧠</span><div><h2 id="rvT">Давтах цаг боллоо!</h2>
+        <p id="rvD">${xs.length > 1 ? `${xs.length} хичээлээ` : "Хичээлээ"} мартахаас өмнө давтвал удаан тогтооно — хэдхэн минут л болно.</p></div></header>
+      <figure class="rv-fig">${rvCurve(si)}<figcaption><span class="rv-lg"><i class="rv-lg-a"></i>Давтвал</span><span class="rv-lg"><i class="rv-lg-b"></i>Давтахгүй бол</span><span class="rv-lg rv-lg-now"><i class="rv-lg-c"></i>Одоо: ${si + 1}-р давталт</span></figcaption></figure>
+      <ul class="rv-list" aria-label="Давтах хичээлүүд">${xs.map(item).join("")}</ul>
+      ${fc ? `<button type="button" class="rv-cards" data-rv="cards"><span class="rv-cards-i" aria-hidden="true">🃏</span><span class="grow">Мөн <b>${fc}</b> flash card давтах цаг болсон</span><span class="rv-go" aria-hidden="true">›</span></button>` : ""}
+      <div class="rv-acts"><button type="button" class="btn btn-gold rv-now" data-rv="now">▶ Одоо давтах</button>
+        <div class="rv-later" role="group" aria-label="Хойшлуулах"><button type="button" class="btn btn-ghost btn-sm" data-rv="hour">⏰ 1 цагийн дараа</button><button type="button" class="btn btn-ghost btn-sm" data-rv="tomorrow">Маргааш</button></div></div>
+    </div>`;
+    if (keep) ($(keep, el) || $("[data-rv=now]", el))?.focus({ preventScroll: true });
+  }
+  function show() {
+    back = document.activeElement;
+    el = document.createElement("div");
+    el.className = "rv"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "rvT"); el.setAttribute("aria-describedby", "rvD");
+    el.addEventListener("click", onClick);
+    document.body.append(el); document.documentElement.classList.add("rv-open");
+    draw();
+    document.addEventListener("keydown", onKey); document.addEventListener("focusin", onFocus);
+    $("[data-rv=now]", el)?.focus({ preventScroll: true });
+  }
+  function close(restore = true) {
+    if (!el) return;
+    document.removeEventListener("keydown", onKey); document.removeEventListener("focusin", onFocus);
+    el.remove(); el = null; document.documentElement.classList.remove("rv-open");
+    const b = back; back = null;
+    if (restore && b?.isConnected && b !== document.body) b.focus?.({ preventScroll: true });
+  }
+  function onClick(e) {
+    if (e.target === el) return later("hour"); // фон дээр дарвал — 1 цаг
+    const g = e.target.closest("[data-rv-go]"); if (g) return go(+g.dataset.rvGo);
+    const a = e.target.closest("[data-rv]")?.dataset.rv;
+    if (a === "now") go(0); else if (a === "cards") cards(); else if (a === "tomorrow") later("tomorrow"); else if (a === "x" || a === "hour") later("hour");
+  }
+  function onKey(e) {
+    if (!el) return;
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); later("hour"); return; } // чатын самбар, бусад цонх хаагдахгүй
+    if (e.key !== "Tab") return;
+    const f = $$("button:not([disabled]), a[href]", el); if (!f.length) return;
+    const i = f.indexOf(document.activeElement);
+    if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && (i < 0 || i === f.length - 1)) { e.preventDefault(); f[0].focus(); }
+  }
+  function onFocus(e) {
+    if (!el || el.contains(e.target)) return;
+    if (e.target.closest?.(".cg")) { close(false); timer = setTimeout(maybeShow, 30000); return; } // зөвшөөрлийн цонх түрүүлнэ
+    if (e.target.closest?.(".a11y-fab, .a11y-panel, #toasts")) return; // хүртээмжийн цэс, мэдэгдэл ашиглаж болно
+    $("[data-rv=now]", el)?.focus({ preventScroll: true });
+  }
+  function later(kind) {
+    const d = new Date(), t = kind === "tomorrow" ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 6, 0, 0, 0).getTime() : Date.now() + 3600e3;
+    store.set("sg_rv_snooze", { u: uid(), t });
+    close();
+    toast(kind === "tomorrow" ? "⏰ Маргааш өглөө дахин сануулна — мартахаас өмнө давтаарай!" : "⏰ 1 цагийн дараа дахин сануулна");
+    clearTimeout(timer); timer = setTimeout(() => check(), Math.min(t - Date.now() + 1000, 864e5));
+  }
+  const grace = () => ssSet("sg_rv_grace", { u: uid(), t: Date.now() + RV_GRACE }); // давтаж байхад нь дахин гарахгүй
+  function go(i) {
+    const x = list()[i]; if (!x) return;
+    grace(); close(false);
+    const url = /^\/[^/\\]/.test(x.url || "") ? x.url : `/c/${encodeURIComponent(x.course_id)}#l=${encodeURIComponent(x.lesson_id)}`; // зөвхөн сайтын дотоод зам
+    if (page === "course" && $(".course-page")?.dataset.course === x.course_id) { // энэ сургалтынх: хуудас шилжилгүй нээнэ
+      if (rvOpenLesson?.(x.lesson_id)) return;
+      location.replace(url); location.reload(); return;
+    }
+    location.href = url;
+  }
+  function cards() {
+    grace(); close(false);
+    if (page !== "home") { location.href = "/#cards"; return; }
+    if (fcOpenRing) { if (!fcOpenRing()) toast(RV_NO_CARDS); } else location.hash = "cards"; // тэмдэглэл ачаалж дуусмагц нээгдэнэ
+  }
+  // Сургалтын хуудсанд хичээл нээгдэхэд: шууд grace (үзэж байхад цонх гарахгүй); хаахад sg_rv-г хүчингүй болгоно (дараагийн
+  // шалгалт серверээс шинээр). Давтах хичээлийг 30 секунд үзсэн бол давтсан гэж тэмдэглэнэ (шалгалтын хичээлд сесс нээгддэггүй).
+  function opened(cid, lid) {
+    if (!eligible()) return;
+    grace();
+    const lm = $("#lessonModal");
+    if (lm && !lm._rvObs) {
+      lm._rvObs = new MutationObserver(() => { if (!lm.classList.contains("open")) { ssSet("sg_rv", null); lm._rvObs.disconnect(); lm._rvObs = null; } });
+      lm._rvObs.observe(lm, { attributes: true, attributeFilter: ["class"] });
+    }
+    const c = ssGet("sg_rv"), pool = items.length ? items : c?.u === uid() && Array.isArray(c.items) ? c.items : [];
+    if (!pool.some((x) => x?.lesson_id === lid && x.course_id === cid)) return;
+    setTimeout(async () => {
+      const h = new URLSearchParams(location.hash.slice(1)).get("l");
+      if (document.hidden || !$("#lessonModal")?.classList.contains("open") || (h && h !== lid)) return;
+      try { await api(`/api/me/reviews/${encodeURIComponent(lid)}/done`, { method: "POST" }); } catch (e) { if (e.status !== 404) return; }
+      items = items.filter((x) => x?.lesson_id !== lid);
+      const s = ssGet("sg_rv"); if (s && Array.isArray(s.items)) { s.items = s.items.filter((x) => x?.lesson_id !== lid); ssSet("sg_rv", s); }
+      if (el) maybeShow();
+    }, 30000);
+  }
+  function init() {
+    if (started || !eligible()) return;
+    started = true;
+    setTimeout(() => check(), 2500); // хуудас, зөвшөөрлийн цонх эхэлж угсрагдана
+    setInterval(() => { if (!document.hidden) check(); }, RV_TTL + 5000); // кэш (RV_TTL) хуучирсны дараа л асууна
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });
+    // «review» мэдэгдэл олон хүүхдэд нэг зэрэг очдог — сервер рүү зэрэг дайрахгүйн тулд 0–60 секунд санамсаргүй хүлээнэ.
+    Live.on((d) => { if (d.type === "notification" && d.notification?.type === "review") setTimeout(() => check(true), Math.random() * 60000); });
+  }
+  return { init, check, opened };
+})();
 async function noteStories(rail) {
   if (!rail || !Auth.token) return;
-  let d; try { d = await api("/api/me/notes"); } catch { return; }
+  // /#cards (давтах сануулгын цонхноос): «🃏 Flash card» цагирагийг шууд нээнэ; карт алга бол хэлнэ.
+  const wantCards = () => location.hash === "#cards";
+  const unhash = () => history.replaceState(history.state, "", location.pathname + location.search);
+  const noCards = (msg) => { fcOpenRing = () => false; if (wantCards()) { unhash(); toast(msg || RV_NO_CARDS, !!msg); } };
+  let d; try { d = await api("/api/me/notes"); } catch (e) { noCards(e.message); return; }
   const list = (d.stories || []).filter((s) => s.notes?.length);
-  if (!list.length) return;
+  if (!list.length) { fcCardsNow = []; noCards(); return; }
   const all = list.flatMap((s) => s.notes.map((n) => ({ ...n, _s: s })));
+  const cards = all.filter((n) => n.q && n.a);
+  fcCardsNow = cards; // давтах сануулгын цонхны «N flash card» тоонд
   const stories = [];
+  if (cards.length) stories.push({ id: "flashcards", kind: "cards", title: "Flash card", sub: `${cards.length} карт`, notes: cards, url: "" });
   if (all.length >= 3) stories.push({ id: "review-" + new Date().toDateString(), kind: "review", title: "Өнөөдрийн давталт", sub: `${all.length} тэмдэглэлээс`, notes: all.slice().sort(() => Math.random() - 0.5).slice(0, 8), url: "" });
   stories.push(...list);
   const seen = store.get("sg_story_seen") || {};
-  rail.innerHTML = `<div class="st-head"><h2><span class="sec-ico">${icon("book", 17)}</span>Миний тэмдэглэл</h2><span class="muted small">Тодруулсан, тэмдэглэсэн бүхэн тань story болно — зөвхөн танд харагдана</span></div>
-    <div class="st-list">${stories.map((s, i) => { const top = stTop(s.notes); return `<button type="button" class="st-ring st-c-${top} ${s.kind === "review" ? "st-review" : ""} ${seen[s.id] === stKey(s) ? "seen" : ""}" data-st="${i}" style="--i:${i}">
-      <span class="st-av"><span>${s.kind === "review" ? "💡" : s.kind === "book" ? "📕" : ST_CAT[top][0]}</span></span><b>${esc(s.title)}</b><small>${s.kind === "review" ? "Шинэ" : s.notes.length + " тэмдэглэл"}</small></button>`; }).join("")}</div>`;
+  const sub = (s) => { if (s.kind === "review") return "Шинэ"; if (s.kind !== "cards") return s.notes.length + " тэмдэглэл"; const f = fcForgot(s.notes); return f ? `${f} санаагүй` : `${s.notes.length} карт`; };
+  rail.innerHTML = `<div class="st-head"><h2><span class="sec-ico">${icon("book", 17)}</span>Миний тэмдэглэл</h2><span class="muted small">Тодруулсан, тэмдэглэсэн бүхнээ story хэлбэрээр давтаарай — зөвхөн танд харагдана${cards.length ? " · 🃏 flash card-аар өөрийгөө шалгаарай" : ""}</span></div>
+    <div class="st-list">${stories.map((s, i) => { const top = stTop(s.notes); return `<button type="button" class="st-ring st-c-${top} ${s.kind === "review" ? "st-review" : s.kind === "cards" ? "st-cards" : ""} ${seen[s.id] === stKey(s) ? "seen" : ""}" data-st="${i}" style="--i:${i}">
+      <span class="st-av"><span>${stIco(s)}</span></span><b>${esc(s.title)}</b><small>${esc(sub(s))}</small></button>`; }).join("")}</div>`;
   rail.hidden = false;
-  rail.onclick = (e) => {
-    const b = e.target.closest("[data-st]"); if (!b) return;
-    storyViewer(stories, +b.dataset.st, (s) => {
-      const m = store.get("sg_story_seen") || {}; m[s.id] = stKey(s); store.set("sg_story_seen", m);
-      rail.querySelector(`[data-st="${stories.indexOf(s)}"]`)?.classList.add("seen");
-    });
-  };
+  const view = (i) => storyViewer(stories, i, (s) => {
+    const m = store.get("sg_story_seen") || {}; m[s.id] = stKey(s); store.set("sg_story_seen", m);
+    rail.querySelector(`[data-st="${stories.indexOf(s)}"]`)?.classList.add("seen");
+  }, () => { // давтсаны дараа «N санаагүй» тоог шинэчилнэ
+    const k = stories.findIndex((s) => s.kind === "cards"), sm = k >= 0 && rail.querySelector(`[data-st="${k}"] small`);
+    if (sm) sm.textContent = sub(stories[k]);
+  });
+  rail.onclick = (e) => { const b = e.target.closest("[data-st]"); if (b) view(+b.dataset.st); };
+  const ci = stories.findIndex((s) => s.kind === "cards");
+  fcOpenRing = () => { if (ci < 0) return false; rail.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" }); view(ci); return true; };
+  const fromHash = () => { if (!wantCards()) return; unhash(); if (!fcOpenRing()) toast(RV_NO_CARDS); };
+  fromHash(); addEventListener("hashchange", fromHash);
 }
-function storyViewer(stories, si, onSeen) {
+function storyViewer(stories, si, onSeen, onClose) {
   $(".stv")?.remove();
   if (!document.querySelector("link[data-bd-font]")) { const l = document.createElement("link"); l.rel = "stylesheet"; l.dataset.bdFont = 1; l.href = "https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap"; document.head.append(l); }
   const el = document.createElement("div");
@@ -4384,25 +5334,59 @@ function storyViewer(stories, si, onSeen) {
   document.body.append(el); document.documentElement.classList.add("stv-on");
   const card = $(".stv-card", el), stage = $(".stv-stage", el), bars = $(".stv-bars", el), foot = $(".stv-foot", el);
   let s = null, slides = [], i = 0, t0 = 0, elapsed = 0, dur = 5000, paused = false, raf = 0, down = null, reached = 0;
-  // Багшийн статистикт: хэдэн слайд хүртэл үзсэн (хичээлийн story; ном тооцохгүй).
+  // 🃏 Flash card: энэ удаа үнэлсэн картууд (fcKey → {lesson, ok}); flipped — одоогийн карт ар талаараа; many — олон слайдтай
+  // (картын story) үед явцын мөр нэг урт зурвас болно.
+  // fcBase — карт бүрийн энэ удаагийн анхны үнэлгээнээс өмнөх Leitner төлөв (дахин үнэлэхэд хайрцаг давхар ахихгүй).
+  let graded = new Map(), fcBase = new Map(), flipped = false, many = false;
+  // Багшийн статистикт: хэдэн слайд хүртэл үзсэн (хичээлийн story; ном тооцохгүй) + хичээл бүрийн карт давталт (зөвхөн тоо).
   const logView = () => {
     if (!s || !slides.length) return;
-    const lessons = [...new Set((s.kind === "review" ? s.notes.map((n) => n._s) : [s]).filter((x) => x?.kind === "lesson").map((x) => x.id))];
+    const multi = s.kind === "review" || s.kind === "cards";
+    const cards = {};
+    for (const g of graded.values()) {
+      if (!g.lesson) continue;
+      const c = cards[g.lesson] ||= { seen: 0, known: 0 };
+      if (c.seen < 500) { c.seen++; if (g.ok) c.known++; }
+    }
+    // Сервер нэг хүсэлтэд 20 хүртэл хичээл авна — карт давтсан хичээлүүд түрүүнд. «🃏 Flash card» цагираг олон хичээлийн
+    // картыг агуулдаг тул зөвхөн үнэхээр хүрсэн (слайд нь ≤ reached) эсвэл үнэлсэн картын хичээлүүдийг бүртгэнэ —
+    // FC_MAX-аас хэтэрсэн, хүрээгүй картын хичээлд story үзэлт нэмэгдэхгүй.
+    const ids = s.kind === "cards"
+      ? [...new Set([...slides.filter((sl, k) => sl.card && sl.lesson && k <= reached).map((sl) => sl.lesson), ...Object.keys(cards)])]
+      : [...new Set((multi ? s.notes.map((n) => n._s) : [s]).filter((x) => x?.kind === "lesson").map((x) => x.id))];
+    const lessons = [...Object.keys(cards).filter((x) => ids.includes(x)), ...ids.filter((x) => !cards[x])].slice(0, 20);
     if (!lessons.length) return;
-    fetch("/api/me/story-view", { method: "POST", keepalive: true, headers: { Authorization: "Bearer " + Auth.token, "Content-Type": "application/json" }, body: JSON.stringify({ lessons, slides: reached + 1, total: slides.length, review: s.kind === "review" }) }).catch(() => {});
+    const body = { lessons, slides: Math.min(reached + 1, slides.length, 500), total: Math.min(slides.length, 500), review: multi };
+    const mine = Object.fromEntries(Object.entries(cards).filter(([k]) => lessons.includes(k)));
+    if (Object.keys(mine).length) body.cards = mine;
+    fetch("/api/me/story-view", { method: "POST", keepalive: true, headers: { Authorization: "Bearer " + Auth.token, "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {});
   };
   const noteURL = (src, n) => !src?.url ? "" : src.kind === "lesson" ? `${src.url}&n=${encodeURIComponent(n.id)}` : src.url;
   const ctaLabel = (src, n) => src.kind === "book" ? "Ном руу очих" : n?.k === "time" ? "Тэр мөч рүү очих" : n?.k === "page" ? "Тэр хуудас руу очих" : "Хичээл рүү очих";
   const floaters = (arr, n) => Array.from({ length: n }, (_, k) => `<i style="--x:${(k * 37) % 100}%;--d:${(k * 0.7) % 5}s;--s:${0.7 + ((k * 13) % 6) / 10}">${arr[k % arr.length]}</i>`).join("");
   const build = (st) => {
-    const out = [], cnt = st.notes.length, cats = Object.entries(ST_CAT).map(([c, [e, t]]) => [c, e, t, st.notes.filter((n) => n.c === c).length]).filter((x) => x[3]);
-    out.push({ cls: "stv-cover", fx: "st-zoom", dur: 3800, url: st.url, cta: st.url ? (st.kind === "book" ? "Ном руу очих" : "Хичээл рүү очих") : "",
-      html: `<div class="stv-blobs"><i></i><i></i><i></i></div><div class="stv-float">${floaters(st.kind === "review" ? ["💡", "✨", "💡", "⭐"] : ["📚", "✏️", "⭐", "💡", "🖍"], 12)}</div>
-        <div class="stv-emoji">${st.kind === "review" ? "💡" : st.kind === "book" ? "📕" : "📚"}</div><p class="stv-kick">${esc(st.kind === "review" ? "Өнөөдрийн давталт" : st.sub || "")}</p>
-        <h2 class="stv-big">${esc(st.title)}</h2><p class="stv-meta"><b>${cnt}</b> тэмдэглэл</p>
-        <div class="stv-cats">${cats.map(([c, e, t, k]) => `<span class="stv-chip stv-chip-${c}">${e} ${t} · ${k}</span>`).join("")}</div>` });
-    st.notes.forEach((n, k) => {
+    // cardsOnly — «🃏 Flash card» цагираг (бүх хичээлийн карт, санаагүй нь түрүүнд); бусад story-д карттай тэмдэглэл карт слайд болно.
+    const cardsOnly = st.kind === "cards", multi = cardsOnly || st.kind === "review", notes = cardsOnly ? st.notes.slice(0, FC_MAX) : st.notes;
+    const out = [], cnt = notes.length, nc = notes.filter((n) => n.q && n.a).length, cats = Object.entries(ST_CAT).map(([c, [e, t]]) => [c, e, t, notes.filter((n) => n.c === c).length]).filter((x) => x[3]);
+    out.push({ cls: cardsOnly ? "stv-cover stv-fc-cover" : "stv-cover", fx: "st-zoom", dur: 3800, url: st.url, cta: st.url ? (st.kind === "book" ? "Ном руу очих" : "Хичээл рүү очих") : "",
+      html: `<div class="stv-blobs"><i></i><i></i><i></i></div><div class="stv-float">${floaters(cardsOnly ? ["🃏", "💡", "🧠", "✨"] : st.kind === "review" ? ["💡", "✨", "💡", "⭐"] : ["📚", "✏️", "⭐", "💡", "🖍"], 12)}</div>
+        <div class="stv-emoji">${cardsOnly ? "🃏" : st.kind === "review" ? "💡" : st.kind === "book" ? "📕" : "📚"}</div><p class="stv-kick">${esc(cardsOnly ? "Flash card" : st.kind === "review" ? "Өнөөдрийн давталт" : st.sub || "")}</p>
+        <h2 class="stv-big">${esc(cardsOnly ? "Өөрийгөө шалгаарай" : st.title)}</h2><p class="stv-meta"><b>${cnt}</b> ${cardsOnly ? "карт" : "тэмдэглэл"}${!cardsOnly && nc ? ` · 🃏 ${nc} карт` : ""}</p>
+        ${cardsOnly ? `<p class="stv-meta stv-fc-how">Асуултыг уншаад хариугаа эхлээд өөрөө санаж үзээрэй, дараа нь эргүүлж шалгана.${st.notes.length > cnt ? `<br><small>${st.notes.length} картаас санаагүй, удаан давтаагүй ${cnt}-г нь эхэлж давтана</small>` : ""}</p>`
+          : `<div class="stv-cats">${cats.map(([c, e, t, k]) => `<span class="stv-chip stv-chip-${c}">${e} ${t} · ${k}</span>`).join("")}</div>`}` });
+    notes.forEach((n, k) => {
       const cat = ST_CAT[n.c] || ST_CAT.y, src = n._s || st;
+      if (n.q && n.a) { // 🃏 нүүр — асуулт (өөрөө урагшлахгүй), ар — санах хэсэг + эх ишлэл; «Санасан / Санасангүй»
+        const from = n.k ? `${n.k === "time" ? "▶" : "📄"} ${n.t || ""}` : (n.t || "").trim() !== n.a.trim() ? n.t || "" : "";
+        out.push({ cls: `stv-fc-slide stv-fc-${n.c}`, fx: "st-zoom", dur: Infinity, card: true, key: fcKey(n, src), lesson: src.kind === "lesson" ? src.id : "",
+          url: noteURL(src, n), cta: src.url ? ctaLabel(src, n) : "",
+          html: `<div class="stv-blobs"><i></i><i></i></div><span class="stv-cat">🃏 Flash card · ${cat[0]} ${cat[1]}</span>${multi ? `<p class="stv-from">${esc(src.title)}</p>` : ""}
+            <div class="stv-fc" data-fc tabindex="0" role="button" aria-pressed="false"><div class="stv-fc-in">
+              <div class="stv-fc-face stv-fc-front"><small>❓ Асуулт</small><p class="stv-fc-q ${n.q.length > 140 ? "long" : ""}">${esc(n.q)}</p><span class="stv-fc-tap" aria-hidden="true">👆 Дарж эргүүлнэ</span></div>
+              <div class="stv-fc-face stv-fc-back" aria-hidden="true"><small>💡 Санах хэсэг</small><p class="stv-fc-a ${n.a.length > 260 ? "long" : ""}">${esc(n.a)}</p>${n.img ? `<img class="stv-fc-img" src="${esc(n.img)}" alt="">` : ""}${from ? `<p class="stv-fc-src">${n.k ? "" : "📖 "}${esc(from.length > 200 ? from.slice(0, 200) + "…" : from)}</p>` : ""}</div>
+            </div></div>` });
+        return;
+      }
       let body;
       if (n.img) {
         body = `<figure class="stv-shot"><img src="${esc(n.img)}" alt=""><figcaption>📄 ${esc(n.t || "")}</figcaption></figure>
@@ -4417,11 +5401,17 @@ function storyViewer(stories, si, onSeen) {
       }
       out.push({ cls: `stv-hl stv-${n.c}`, fx: ST_FX[k % ST_FX.length], dur: Math.min(12000, 4200 + ((n.t || "").length + (n.n || "").length) * 32),
         url: noteURL(src, n), cta: src.url ? ctaLabel(src, n) : "",
-        html: `<div class="stv-blobs"><i></i><i></i></div><span class="stv-cat">${cat[0]} ${cat[1]}</span>${st.kind === "review" ? `<p class="stv-from">${esc(src.title)}</p>` : ""}${body}` });
+        html: `<div class="stv-blobs"><i></i><i></i></div><span class="stv-cat">${cat[0]} ${cat[1]}</span>${multi ? `<p class="stv-from">${esc(src.title)}</p>` : ""}${body}` });
     });
-    out.push({ cls: "stv-outro", fx: "st-zoom", dur: 4200, confetti: true, url: st.url, cta: st.url ? (st.kind === "book" ? "Ном руу очих" : "Хичээл рүү очих") : "", again: true,
-      html: `<div class="stv-blobs"><i></i><i></i><i></i></div><div class="stv-emoji">🎉</div><h2 class="stv-big">Сайн байна!</h2><p class="stv-meta"><b>${cnt}</b> тэмдэглэлээ давтлаа.<br>Тогтмол давтвал удаан санана 💡</p>` });
+    out.push({ cls: "stv-outro", fx: "st-zoom", dur: 4200, confetti: true, url: st.url, cta: st.url ? (st.kind === "book" ? "Ном руу очих" : "Хичээл рүү очих") : "", again: true, outro: true,
+      html: `<div class="stv-blobs"><i></i><i></i><i></i></div><div class="stv-emoji">🎉</div><h2 class="stv-big">Сайн ажиллалаа!</h2><p class="stv-meta"><b>${cnt}</b> ${cardsOnly ? "картаа" : "тэмдэглэлээ"} давтлаа.<br>Тогтмол давтах тусам удаан тогтооно 💡</p><!--fc-->` });
     return out;
+  };
+  // Энэ удаагийн карт давталтын дүн (төгсгөлийн слайдад).
+  const fcScore = () => {
+    if (!graded.size) return "";
+    let k = 0; for (const g of graded.values()) if (g.ok) k++;
+    return `<p class="stv-fc-score"><span>😊 <b>${k}</b> санасан</span><span>😕 <b>${graded.size - k}</b> санаагүй</span></p>`;
   };
   const confetti = () => {
     if (reduce) return;
@@ -4435,42 +5425,84 @@ function storyViewer(stories, si, onSeen) {
   };
   const header = () => {
     const top = stTop(s.notes);
-    $(".stv-av", el).className = `stv-av st-c-${top}`; $(".stv-av", el).textContent = s.kind === "review" ? "💡" : s.kind === "book" ? "📕" : ST_CAT[top][0];
+    $(".stv-av", el).className = `stv-av st-c-${top}`; $(".stv-av", el).textContent = stIco(s);
     $(".stv-ttl b", el).textContent = s.title;
-    $(".stv-ttl small", el).textContent = [s.kind === "review" ? "Санамсаргүй сонголт" : s.sub, s.updated_at ? fmtDate(s.updated_at) : ""].filter(Boolean).join(" · ");
-    bars.innerHTML = slides.map(() => `<i><b></b></i>`).join("");
+    $(".stv-ttl small", el).textContent = [s.kind === "review" ? "Санамсаргүй сонголт" : s.kind === "cards" ? "Санаагүй нь түрүүнд" : s.sub, s.updated_at ? fmtDate(s.updated_at) : ""].filter(Boolean).join(" · ");
+    many = slides.length > 30; // олон карт: хэрчмүүд хэт нарийсахаас сэргийлж нэг зурвас + «12/80»
+    bars.classList.toggle("stv-bars-one", many);
+    bars.innerHTML = many ? `<i><b></b></i><span class="stv-count"></span>` : slides.map(() => `<i><b></b></i>`).join("");
     $(".stv-sl", el).disabled = si === 0; $(".stv-sr", el).disabled = si === stories.length - 1;
+  };
+  const barAt = (p) => { const bs = $$("b", bars); if (many) { if (bs[0]) bs[0].style.width = ((i + Math.min(1, p)) / slides.length) * 100 + "%"; } else if (bs[i]) bs[i].style.width = p * 100 + "%"; };
+  const renderFoot = (sl) => {
+    if (sl.card) { // карт: эхлээд эргүүлэх, ар талд нь өөрийгөө үнэлэх (+ хичээл рүү)
+      foot.innerHTML = flipped ? `<button type="button" class="stv-cta stv-ghost" data-fc-no>😕 Санасангүй</button><button type="button" class="stv-cta stv-fc-yes" data-fc-yes>😊 Санасан</button>${sl.url ? `<a class="stv-cta stv-ghost stv-fc-go" href="${esc(sl.url)}" title="${esc(sl.cta)}" aria-label="${esc(sl.cta)}">↗</a>` : ""}`
+        : `<button type="button" class="stv-cta" data-fc-flip>👆 Санах хэсгийг харах</button>`;
+      return;
+    }
+    foot.innerHTML = (sl.again ? `<button type="button" class="stv-cta stv-ghost" data-again>↺ Дахин үзэх</button>` : "") + (sl.url ? `<a class="stv-cta" href="${esc(sl.url)}">${esc(sl.cta)} →</a>` : "");
   };
   const show = () => {
     const sl = slides[i];
-    stage.innerHTML = `<section class="stv-slide ${sl.cls} ${reduce ? "" : sl.fx}">${sl.html}</section>`;
-    foot.innerHTML = (sl.again ? `<button type="button" class="stv-cta stv-ghost" data-again>↺ Дахин үзэх</button>` : "") + (sl.url ? `<a class="stv-cta" href="${esc(sl.url)}">${esc(sl.cta)} →</a>` : "");
-    $$("b", bars).forEach((b, k) => { b.style.transition = "none"; b.style.width = k < i ? "100%" : "0%"; });
+    flipped = false;
+    stage.innerHTML = `<section class="stv-slide ${sl.cls} ${reduce ? "" : sl.fx}">${sl.outro ? sl.html.replace("<!--fc-->", fcScore()) : sl.html}</section>`;
+    renderFoot(sl);
+    const bs = $$("b", bars);
+    if (many) { if (bs[0]) { bs[0].style.transition = "none"; bs[0].style.width = (i / slides.length) * 100 + "%"; } const c = $(".stv-count", bars); if (c) c.textContent = `${i + 1}/${slides.length}`; }
+    else bs.forEach((b, k) => { b.style.transition = "none"; b.style.width = k < i ? "100%" : "0%"; });
     dur = sl.dur; elapsed = 0; t0 = performance.now(); reached = Math.max(reached, i);
     if (sl.confetti) setTimeout(confetti, 250);
     if (i === slides.length - 1) onSeen?.(s);
+    if (sl.card) $(".stv-fc", stage)?.focus({ preventScroll: true });
   };
-  const openStory = (k, fromEnd) => { logView(); si = k; s = stories[k]; slides = build(s); i = fromEnd ? slides.length - 1 : 0; reached = 0; header(); card.classList.remove("stv-swap"); void card.offsetWidth; card.classList.add("stv-swap"); show(); };
+  // 🃏 Картыг эргүүлэх (нүүр ↔ ар). Карт өөрөө урагшлахгүй — үнэлсний дараа л дараагийнх руу.
+  const flip = () => {
+    const sl = slides[i], fc = $(".stv-fc", stage); if (!sl?.card || !fc) return;
+    flipped = !flipped;
+    fc.classList.toggle("flipped", flipped); fc.setAttribute("aria-pressed", String(flipped));
+    $(".stv-fc-front", fc).setAttribute("aria-hidden", String(flipped)); $(".stv-fc-back", fc).setAttribute("aria-hidden", String(!flipped));
+    renderFoot(sl); fc.focus({ preventScroll: true });
+  };
+  const grade = (ok) => {
+    const sl = slides[i]; if (!sl?.card || sl._busy) return;
+    // Нэг удаад нэг картын хайрцаг нэг л удаа өөрчлөгдөнө: ижил үнэлгээг давтвал юу ч хийхгүй, өөр үнэлгээ өгвөл
+    // анхны төлөвөөс дахин тооцож өмнөхийг орлоно.
+    if (!fcBase.has(sl.key)) fcBase.set(sl.key, fcPeek(sl.key));
+    if (graded.get(sl.key)?.ok !== ok) fcGrade(sl.key, ok, fcBase.get(sl.key));
+    graded.set(sl.key, { lesson: sl.lesson, ok });
+    barAt(1);
+    const fc = $(".stv-fc", stage), at = i, ss = s;
+    if (reduce || !fc) return next();
+    sl._busy = true; fc.classList.add(ok ? "stv-fc-ok" : "stv-fc-no");
+    setTimeout(() => { sl._busy = false; if (s === ss && i === at) next(); }, 320);
+  };
+  const openStory = (k, fromEnd) => {
+    logView(); graded = new Map(); fcBase = new Map(); si = k; s = stories[k];
+    if (s.kind === "cards") s.notes = fcOrder(s.notes); // өмнөх үнэлгээгээр дахин эрэмбэлнэ
+    slides = build(s); i = fromEnd ? slides.length - 1 : 0; reached = 0; header(); card.classList.remove("stv-swap"); void card.offsetWidth; card.classList.add("stv-swap"); show();
+  };
   const next = () => { if (i < slides.length - 1) { i++; show(); } else if (si < stories.length - 1) openStory(si + 1); else close(); };
   const prev = () => { if (i > 0) { i--; show(); } else if (si > 0) openStory(si - 1, true); else show(); };
   const setPaused = (p) => { if (p === paused) return; const now = performance.now(); if (p) elapsed += now - t0; else t0 = now; paused = p; $(".stv-pause", el).textContent = p ? "▶" : "❚❚"; card.classList.toggle("paused", p); };
   const tick = (now) => {
-    if (!paused) {
-      const p = Math.min(1, (elapsed + now - t0) / dur), b = $$("b", bars)[i];
-      if (b) b.style.width = p * 100 + "%";
+    if (!paused && !slides[i]?.card) { // карт слайд цагаар урагшлахгүй
+      const p = Math.min(1, (elapsed + now - t0) / dur);
+      barAt(p);
       if (p >= 1) next();
     }
     raf = requestAnimationFrame(tick);
   };
   const onKey = (e) => {
-    if (e.key === "Escape") { e.stopPropagation(); close(); }
-    else if (e.key === "ArrowRight") next(); else if (e.key === "ArrowLeft") prev();
+    if (e.key === "Escape") { e.stopPropagation(); close(); return; }
+    const sl = slides[i], onBtn = !!e.target.closest?.(".stv button, .stv a");
+    if (e.key === "ArrowRight") next(); else if (e.key === "ArrowLeft") prev();
+    else if (sl?.card && (e.key === " " || e.key === "Enter")) { if (onBtn) return; e.preventDefault(); flip(); } // товч дээр бол өөрийнх нь үйлдэл
     else if (e.key === " ") { e.preventDefault(); setPaused(!paused); }
   };
-  function close() { logView(); s = null; cancelAnimationFrame(raf); document.removeEventListener("keydown", onKey, true); document.documentElement.classList.remove("stv-on"); el.classList.add("out"); setTimeout(() => el.remove(), 250); }
+  function close() { logView(); s = null; cancelAnimationFrame(raf); document.removeEventListener("keydown", onKey, true); document.documentElement.classList.remove("stv-on"); el.classList.add("out"); setTimeout(() => el.remove(), 250); onClose?.(); }
   card.addEventListener("pointerdown", (e) => {
     if (e.target.closest("a, button")) return;
-    down = { x: e.clientX, y: e.clientY, t: performance.now() }; setPaused(true);
+    down = { x: e.clientX, y: e.clientY, t: performance.now(), fc: !!e.target.closest("[data-fc]") }; setPaused(true);
   });
   card.addEventListener("pointermove", (e) => { if (down && e.clientY - down.y > 10) card.style.transform = `translateY(${Math.max(0, e.clientY - down.y)}px) scale(${1 - Math.min(0.08, (e.clientY - down.y) / 2000)})`; });
   const up = (e) => {
@@ -4478,7 +5510,10 @@ function storyViewer(stories, si, onSeen) {
     const d = down; down = null; card.style.transform = ""; setPaused(false);
     if (e.clientY - d.y > 110) return close(); // доош шудраж хаана
     if (Math.abs(e.clientX - d.x) > 60) return e.clientX < d.x ? (si < stories.length - 1 ? openStory(si + 1) : close()) : si > 0 ? openStory(si - 1) : show();
-    if (performance.now() - d.t < 260) { const r = card.getBoundingClientRect(); (e.clientX - r.left < r.width * 0.32 ? prev : next)(); }
+    if (performance.now() - d.t < 260) {
+      if (d.fc && slides[i]?.card) return flip(); // карт дээр товшвол эргэнэ; хоёр захаар нь өмнөх / дараагийнх
+      const r = card.getBoundingClientRect(); (e.clientX - r.left < r.width * 0.32 ? prev : next)();
+    }
   };
   card.addEventListener("pointerup", up); card.addEventListener("pointercancel", () => { down = null; card.style.transform = ""; setPaused(false); });
   el.addEventListener("click", (e) => {
@@ -4486,7 +5521,10 @@ function storyViewer(stories, si, onSeen) {
     if (e.target.closest(".stv-pause")) return setPaused(!paused);
     if (e.target.closest(".stv-sl")) return si > 0 && openStory(si - 1);
     if (e.target.closest(".stv-sr")) return si < stories.length - 1 && openStory(si + 1);
-    if (e.target.closest("[data-again]")) { i = 0; show(); }
+    if (e.target.closest("[data-again]")) { i = 0; show(); return; }
+    if (e.target.closest("[data-fc-flip]")) return flip();
+    if (e.target.closest("[data-fc-yes]")) return grade(true);
+    if (e.target.closest("[data-fc-no]")) return grade(false);
   });
   document.addEventListener("keydown", onKey, true);
   openStory(si);
@@ -4516,7 +5554,7 @@ async function homePage() {
   const accessLabel = { full: "Бүх хичээл нээлттэй", enrolled: "Элссэн", lessons: "" };
   const last = store.get("sg_last");
   const resume = last && h.courses.find((c) => c.course.id === last.course);
-  const SEC_ICO = { "my-rank": "medal", "my-study": "chart", "my-tasks": "exam", "my-pending": "money", "my-live": "live", "my-courses": "courses", "my-lessons": "play", "my-teachers": "teacher", "my-chats": "chat" };
+  const SEC_ICO = { "my-gifts": "medal", "my-study": "chart", "my-tasks": "exam", "my-pending": "money", "my-live": "live", "my-courses": "courses", "my-lessons": "play", "my-teachers": "teacher", "my-chats": "chat" };
   const sec = (id, title, body, extra = "") => `<section class="dash-sec" id="${id}"><header><h2>${SEC_ICO[id] ? `<span class="sec-ico">${icon(SEC_ICO[id], 17)}</span>` : ""}${title}</h2>${extra}</header>${body}</section>`;
   const courseCard = (c, i) => `<a class="course-card tilt" href="/c/${esc(c.course.id)}" style="--h:${hueOfName(c.course.title)}">
     <div class="course-art"><div class="course-flags"><span class="flag flag-own">✓ ${c.access === "lessons" ? c.owned_lessons + " хичээл" : accessLabel[c.access]}</span></div><span class="course-num">${String(i + 1).padStart(2, "0")}</span><span class="glare"></span></div>
@@ -4533,11 +5571,11 @@ async function homePage() {
       <a class="tile" href="#my-live"><em>${icon("live")}</em><b>${h.meetings.length}</b><span>Шууд хичээл</span></a>
       <a class="tile" href="#my-chats"><em>${icon("chat")}</em><b>${h.chats.length}</b><span>Чат</span></a>
       <a class="tile" href="#my-teachers"><em>${icon("teacher")}</em><b>${h.teachers.length}</b><span>Миний багш</span></a>
-      ${h.rank ? `<a class="tile tile-rank" href="#my-rank"><em class="rank-shine" data-level="${h.rank.level}">${esc(h.rank.insignia)}</em><b>${esc(h.rank.name)}</b><span>Миний цол · ${h.rank.points} оноо</span></a>` : ""}
+      <a class="tile tile-gift" href="#my-gifts"><em class="rank-emo medal" data-tier="gold">🎁</em><b id="giftTileCoins">…</b><span>Бэлгийн хайрцаг · зоос</span></a>
       ${h.tasks?.length ? `<a class="tile" href="#my-tasks"><em>${icon("exam")}</em><b>${h.tasks.filter((t) => ["open", "need_pay"].includes(t.status)).length}</b><span>Хийх даалгавар, шалгалт</span></a>` : ""}
     </div>`];
   parts.splice(1, 0, `<div class="st-rail" id="stRail" hidden></div>`); // тэмдэглэлийн story (noteStories)
-  // Цол: систем шинэ цол олгосон бол баяр хүргэж салют буудуулна.
+  // Эрэмбэ: систем шинэ эрэмбэ олгосон бол баяр хүргэж салют буудуулна.
   if (h.rank) {
     const lvlKey = "sg_rank_lvl_" + (u.id || "u");
     let seen = -1; try { seen = localStorage.getItem(lvlKey) === null ? -1 : +localStorage.getItem(lvlKey); } catch {}
@@ -4548,26 +5586,29 @@ async function homePage() {
   if (resume) parts.push(`<div class="resume"><span class="item-ico">${icon("play", 20)}</span><div class="grow"><span class="eyebrow">Үргэлжлүүлэх</span><strong>${esc(last.lessonTitle || resume.course.title)}</strong><span class="muted small">${esc(resume.course.title)}</span></div>
       <a class="btn btn-gold" href="/c/${esc(last.course)}${last.lesson ? "#l=" + esc(last.lesson) : ""}">Үзэх</a></div>`);
 
+  // Системийн бэлэг ба эрэмбэ нэг хэсэгт: зоос, бэлгийн хайрцаг, суралцахуйн зам (давсан үе ил, хүрээгүй нь нууц хайрцаг),
+  // доор нь одоогийн эрэмбийн явц, дараагийн алхам.
+  const giftsBox = `<div class="gifts" id="giftsBox"><p class="muted small">Ачаалж байна…</p></div>`;
+  if (!h.rank) parts.push(sec("my-gifts", "Системийн бэлэг · Миний эрэмбэ", giftsBox));
   if (h.rank) {
-    const rk = h.rank, left = rk.next ? rk.next - rk.points : 0, ladder = h.rank_ladder || [];
+    const rk = h.rank, left = rk.next ? rk.next - rk.points : 0;
     // Урам зоригийн үг: явцаас хамаарч өөрчлөгдөнө.
-    const cheer = !rk.next ? "Дээд цол! Та энэ сургалтын жинхэнэ генерал. 🫡" : rk.progress >= 80 ? `Бараг боллоо! Ердөө ${left} оноо дутуу — өнөөдөр нэг хичээл дуусгавал хүрнэ. 🔥` : rk.progress >= 40 ? `Сайн явж байна — замын тал нь ардаа үлдлээ. ${left} оноо үлдсэн. 💪` : rk.points > 0 ? `Сайн эхлэл! Хичээл бүр оноо нэмнэ — ${left} оноонд дараагийн цол. 🚀` : "Анхны хичээлээ дуусгаад анхны цолоо аваарай! 🎯";
-    const ring = `<div class="rank-ring" style="--p:${rk.progress}"><div class="rank-ring-in"><span class="rank-shine" data-level="${rk.level}">${esc(rk.insignia)}</span></div></div>`;
-    const steps = ladder.map((st, i) => `<li class="${i < rk.level ? "done" : i === rk.level ? "cur" : i === rk.level + 1 ? "next" : ""}" title="${esc(st.name)} · ${st.points} оноо"><b class="${i <= rk.level ? "rank-shine" : ""}" data-level="${i}">${esc(st.insignia)}</b><span>${esc(st.name)}</span><small>${st.points}</small></li>`).join("");
+    const cheer = !rk.next ? `Дээд эрэмбэ! Та ${esc(rk.name)} ${esc(rk.emoji || "")} боллоо — одоо мэдлэгээ бусдад хуваалцаарай.` : rk.progress >= 80 ? `Бараг боллоо! Ердөө ${left} оноо дутуу — өнөөдөр нэг хичээл дуусгавал хүрнэ. 🔥` : rk.progress >= 40 ? `Сайн явж байна — замын тал нь ардаа үлдлээ. ${left} оноо үлдсэн. 💪` : rk.points > 0 ? `Сайн эхлэл! Хичээл бүр оноо нэмнэ — ${left} оноонд дараагийн эрэмбэ. 🚀` : "Анхны хичээлээ дуусгаад анхны эрэмбээ аваарай! 🎯";
+    const ring = `<div class="rank-ring" style="--p:${rk.progress}"><div class="rank-ring-in"><span class="rank-emo medal" data-tier="${rankTier(rk.level)}" title="${esc(rk.meaning || "")}">${esc(rk.emoji || rk.insignia)}</span></div></div>`;
     const tipLine = (t) => { const m = /\(\+(\d+)/.exec(t); return `<li><i>${m ? "+" + m[1] : "✓"}</i><span>${esc(t.replace(/\s*\(\+.*$/, ""))}</span></li>`; };
-    parts.push(sec("my-rank", "Миний цол", `<div class="rank-hero">
+    parts.push(sec("my-gifts", "Системийн бэлэг · Миний эрэмбэ", `${giftsBox}<div class="rank-hero" id="my-rank">
       <div class="rank-hero-top">${ring}
-        <div class="grow"><span class="eyebrow">Нэгдсэн цол · ${rk.average && rk.integration?.courses_all > 1 ? `${rk.integration.courses_all} сургалтын цолны дундаж` : "бүх хичээлээ нэгтгэж систем олгоно"}</span><strong class="rank-title">${esc(rk.name)}</strong>
+        <div class="grow"><span class="eyebrow">Нэгдсэн эрэмбэ · ${rk.average && rk.integration?.courses_all > 1 ? `${rk.integration.courses_all} сургалтын эрэмбийн дундаж` : "бүх хичээлээ нэгтгэж систем олгоно"}</span><strong class="rank-title">${esc(rk.name)} <small class="rank-shine" data-level="${rk.level}">${esc(rk.insignia)}</small></strong>
+          ${rk.meaning ? `<p class="rank-meaning">${esc(rk.meaning)}</p>` : ""}
           <p class="rank-cheer">${cheer}</p>
-          <div class="rank-stats"><span><b>${rk.points}</b> ${rk.average && rk.integration?.courses_all > 1 ? "дундаж оноо" : "оноо"}</span>${rk.integration?.bonus ? `<span><b>+${rk.integration.bonus}</b> интеграц</span>` : ""}<span><b>${rk.honest}</b> шударга хичээл</span>${rk.integration?.sections_all ? `<span><b>${rk.integration.sections}/${rk.integration.sections_all}</b> бүлэг бүтэн</span>` : ""}${rk.cheated ? `<span class="bad"><b>${rk.cheated}</b> тооцогдоогүй</span>` : ""}${rk.next ? `<span><b>${left}</b> оноо дараагийн цолд</span>` : ""}</div>
-          ${rk.next ? `<div class="rank-next"><div class="meter"><i style="width:${rk.progress}%"></i></div><span>${esc(rk.name)} <em>→</em> ${esc(rk.next_name)} <b>${rk.progress}%</b></span></div>` : ""}</div></div>
-      ${ladder.length ? `<div class="rank-ladder-wrap"><ol class="rank-ladder">${steps}</ol></div>` : ""}
+          <div class="rank-stats"><span><b>${rk.points}</b> ${rk.average && rk.integration?.courses_all > 1 ? "дундаж оноо" : "оноо"}</span>${rk.integration?.bonus ? `<span><b>+${rk.integration.bonus}</b> интеграц</span>` : ""}<span><b>${rk.honest}</b> шударга хичээл</span>${rk.integration?.sections_all ? `<span><b>${rk.integration.sections}/${rk.integration.sections_all}</b> бүлэг бүтэн</span>` : ""}${rk.cheated ? `<span class="bad"><b>${rk.cheated}</b> тооцогдоогүй</span>` : ""}${rk.next ? `<span><b>${left}</b> оноо дараагийн эрэмбэд</span>` : ""}</div>
+          ${rk.next ? `<div class="rank-next"><div class="meter"><i style="width:${rk.progress}%"></i></div><span>${esc(rk.name)} <em>→</em> ❔ Нууц эрэмбэ <b>${rk.progress}%</b></span></div>` : ""}</div></div>
       <div class="rank-grid">
         ${rk.tips?.length ? `<div class="rank-box rank-todo"><b>Дараагийн алхам — оноо нэмэх</b><ul>${rk.tips.filter((t) => !t.startsWith("дараагийн")).map(tipLine).join("")}</ul></div>` : ""}
         ${h.course_ranks.length ? `<div class="rank-box"><b>Сургалт бүрээр</b><ul class="rank-courses">${h.course_ranks.map((c) => `<li><a href="/c/${esc(c.course_id)}"><span class="rank-shine" data-level="${c.rank.level}">${esc(c.rank.insignia)}</span><span class="grow"><strong>${esc(c.title)}</strong><small>${esc(c.rank.name)} · ${c.rank.points} оноо${c.rank.integration?.bonus ? ` (интеграц +${c.rank.integration.bonus})` : ""} · ${c.lessons.length} хичээл${c.rank.integration?.courses ? " · бүтэн ✓" : ""}</small></span><span class="chip chip-teal">Үргэлжлүүлэх</span></a></li>`).join("")}</ul></div>` : ""}
       </div></div>`));
   }
-  // 📊 Миний суралцсан байдал: бүх хичээлээр (сургалт бүрийн цолын мэдээллээс)
+  // 📊 Миний суралцсан байдал: бүх хичээлээр (сургалт бүрийн эрэмбийн мэдээллээс)
   const studied = (h.course_ranks || []).flatMap((c) => c.lessons || []);
   if (studied.length) {
     const sum = (f) => studied.reduce((a, l) => a + (f(l) || 0), 0);
@@ -4592,21 +5633,21 @@ async function homePage() {
           <td><b>${dur(l.active_sec)}</b>${l.total_sec ? `<small>${pct(l.active_sec, l.total_sec)}% идэвхтэй${l.tab_switches ? ` · ${l.tab_switches} таб` : ""}</small>` : ""}</td>
           <td>${l.quiz_total ? `<b>${l.quiz_correct}/${l.quiz_total}</b>${bar(pct(l.quiz_correct, l.quiz_total), l.quiz_correct === l.quiz_total ? "ok" : "")}` : `<span class="muted">—</span>`}</td>
           <td>${l.has_video ? `<b>${l.video_pct}%</b>${bar(l.video_pct, l.video_pct >= 90 ? "ok" : "")}` : `<span class="muted">—</span>`}</td>
-          <td><span class="st-pts ${l.disqualified ? "bad" : l.points >= 75 ? "ok" : ""}" title="${esc((l.reasons || []).join(", "))}"><b>${l.disqualified ? "0" : "+" + l.points}</b><small>${l.disqualified ? "тооцогдоогүй · дахин судал" : l.improved ? "оноо · ↻ сайжирсан" : "оноо"}</small></span></td></tr>`;
+          <td><span class="st-pts ${l.disqualified ? "bad" : l.points >= 75 ? "ok" : ""}" title="${esc((l.reasons || []).join(", "))}"><b>${l.disqualified ? "0" : "+" + l.points}</b><small>${l.disqualified ? "тооцогдоогүй · дахин судлаарай" : l.improved ? "оноо · ↻ сайжирсан" : "оноо"}</small></span></td></tr>`;
     const group = (g) => { const id = g.c.course_id, on = openSet.has(id), rk = g.c.rank || {};
       return `<div class="st-course ${on ? "open" : ""}" data-cid="${esc(id)}">
         <button type="button" class="st-ch" aria-expanded="${on}" aria-controls="stc-${esc(id)}">
           <span class="st-ch-ico" aria-hidden="true">${esc((g.c.title || "?").trim().charAt(0).toUpperCase())}</span>
           <span class="st-ch-main"><strong>${esc(g.c.title)}</strong><small>${g.done}/${g.total} хичээл дууссан · ${g.ls.length} хичээл судалсан${g.last ? " · сүүлд " + fmtDate(g.last) : ""}</small>${bar(pct(g.done, g.total), g.done && g.done === g.total ? "ok" : "")}</span>
           <span class="st-ch-stats"><span><b>${dur(g.active)}</b><small>идэвхтэй</small></span><span><b>${g.qT ? pct(g.qC, g.qT) + "%" : "—"}</b><small>асуултад зөв</small></span><span><b>${g.vPct >= 0 ? g.vPct + "%" : "—"}</b><small>видео</small></span><span class="${g.cheat ? "bad" : ""}"><b>${g.ls.length - g.cheat}/${g.ls.length}</b><small>шударга</small></span></span>
-          <span class="st-ch-rank" title="Энэ сургалтын цол"><b>${rk.points || 0}</b><small>${esc(rk.name || "оноо")}</small></span>
+          <span class="st-ch-rank" title="Энэ сургалтын эрэмбэ"><b>${rk.points || 0}</b><small>${esc(rk.name || "оноо")}</small></span>
           <span class="st-ch-chev" aria-hidden="true">${icon("chev", 18)}</span>
         </button>
         <div class="st-cbody" id="stc-${esc(id)}" ${on ? "" : "hidden"}>
-          <div class="st-table-wrap"><table class="st-table"><thead><tr><th>Хичээл</th><th>Төлөв</th><th>Идэвхтэй</th><th>Асуулга</th><th>Видео</th><th>Нэмсэн оноо</th></tr></thead><tbody>${g.ls.map(row).join("")}</tbody></table></div>
+          <div class="st-table-wrap"><table class="st-table"><thead><tr><th>Хичээл</th><th>Төлөв</th><th>Идэвхтэй</th><th>Асуулт</th><th>Видео</th><th>Нэмсэн оноо</th></tr></thead><tbody>${g.ls.map(row).join("")}</tbody></table></div>
           <a class="st-go" href="/c/${esc(id)}">Сургалт руу орох ${icon("next", 14)}</a>
         </div></div>`; };
-    parts.push(sec("my-study", "Миний суралцсан байдал", `<div class="study">
+    parts.push(sec("my-study", "Миний суралцах явц", `<div class="study">
       <div class="st-tiles">
         <div class="st-tile"><small>Идэвхтэй суралцсан</small><b>${dur(active)}</b><span>${studied.length} хичээлд · ${sum((l) => l.sessions)} удаа</span></div>
         <div class="st-tile"><small>Дуусгасан хичээл</small><b>${done}<em>/${lessonsTotal || studied.length}</em></b>${bar(pct(done, lessonsTotal || studied.length))}</div>
@@ -4615,7 +5656,7 @@ async function homePage() {
         <div class="st-tile"><small>Дүгнэлт бичсэн</small><b>${refl}</b><span>хичээлд</span></div>
         <div class="st-tile"><small>Шударга суралцсан</small><b>${honest}<em>/${studied.length}</em></b><span>хуулах оролдлогогүй</span></div>
       </div>
-      <div class="st-courses-head"><b>Сургалт бүрээр</b><span class="muted small">${groups.length} сургалт · дээр нь дарж хичээл бүрийг харна</span>${groups.length > 1 ? `<button type="button" class="link st-all" data-st-all>${openSet.size >= groups.length ? "Бүгдийг хумих" : "Бүгдийг дэлгэх"}</button>` : ""}</div>
+      <div class="st-courses-head"><b>Сургалт бүрээр</b><span class="muted small">${groups.length} сургалт · дээр нь дарж хичээл бүрийг харна уу</span>${groups.length > 1 ? `<button type="button" class="link st-all" data-st-all>${openSet.size >= groups.length ? "Бүгдийг хумих" : "Бүгдийг дэлгэх"}</button>` : ""}</div>
       <div class="st-courses">${groups.map(group).join("")}</div></div>`));
     if (!window._stBound) { // нэг л удаа: сургалтын толгой дарахад дэлгэрнэ/хумигдана, нээлттэйг санана
       window._stBound = true;
@@ -4630,7 +5671,7 @@ async function homePage() {
     }
   }
   if (h.tasks?.length) {
-    const label = (t) => ({ open: ["Хийх", "chip-amber"], not_started: [`${fmtDate(t.due.start_at)}-д эхэлнэ`, ""], need_pay: [(t.due.need_late ? "Хоцорсон · " : "Төлбөртэй · ") + money(t.due.fee) + " төлж нээнэ", "chip-amber"], closed: ["Хаалттай", ""], submitted: ["Илгээсэн · дүгнэхийг хүлээж байна", "chip-teal"],
+    const label = (t) => ({ open: ["Хийх", "chip-amber"], not_started: [`${fmtDate(t.due.start_at)}-д эхэлнэ`, ""], need_pay: [(t.due.need_late ? "Хоцорсон · " : "Төлбөртэй · ") + money(t.due.fee) + " төлж нээнэ", "chip-amber"], closed: ["Хаалттай", ""], submitted: ["Илгээсэн · дүгнэлт хүлээж байна", "chip-teal"],
       graded: [`Дүн: ${t.score}/${t.max_score || 100}`, "chip-teal"], passed: [`Тэнцсэн · ${t.exam_best}%`, "chip-teal"], failed: [`Тэнцээгүй · шилдэг ${t.exam_best}%`, "chip-amber"] })[t.status] || ["", ""];
     parts.push(sec("my-tasks", "Даалгавар, шалгалт", `<ul class="items">${h.tasks.map((t) => { const [txt, cls] = label(t); return `
       <li><a class="item ${["open", "need_pay"].includes(t.status) && t.due.at ? "warn" : ""}" href="/c/${esc(t.course_id)}#l=${esc(t.lesson_id)}"><span class="item-ico">${icon(t.kind === "exam" ? "exam" : "clip", 20)}</span><span class="grow"><strong>${esc(t.title)}</strong><small>${esc(t.course_title)}${t.due.at ? ` · ${t.due.late ? "хугацаа дууссан" : "хугацаа"}: ${fmtDate(t.due.at)}` : " · хугацаагүй"}${t.feedback ? ` · ${esc(t.feedback)}` : ""}</small></span><span class="chip ${cls}">${txt}</span></a></li>`; }).join("")}</ul>`));
@@ -4649,7 +5690,7 @@ async function homePage() {
 
   parts.push(sec("my-courses", "Миний сургалтууд", h.courses.length ? `<div class="course-grid">${h.courses.map(courseCard).join("")}</div>`
     : `<div class="empty">Та одоогоор сургалтад элсээгүй байна.<br>Багшийнхаа хэрэглэгчийн нэрийг оруулаад профайл руу нь ороорой — эсвэл QR кодыг нь уншуулаарай.
-       <form class="find" id="findTeacher"><input name="u" required pattern="[A-Za-z0-9_]{3,32}" placeholder="Багшийн нэр, жишээ: demo" aria-label="Багшийн хэрэглэгчийн нэр"><button class="btn btn-gold">Профайл нээх</button></form></div>`));
+       <form class="find" id="findTeacher"><input name="u" required pattern="[A-Za-z0-9_]{3,32}" placeholder="Багшийн хэрэглэгчийн нэр, ж: demo" aria-label="Багшийн хэрэглэгчийн нэр"><button class="btn btn-gold">Профайл нээх</button></form></div>`));
 
   if (h.lessons.length) parts.push(sec("my-lessons", "Дангаар авсан хичээлүүд", `<ul class="items">${h.lessons.map((l) => `
       <li><a class="item" href="/c/${esc(l.course_id)}#l=${esc(l.lesson_id)}"><span class="item-ico">${icon("play", 20)}</span><span class="grow"><strong>${esc(l.title)}</strong><small>${l.paid_at ? fmtDate(l.paid_at) + "-д авсан" : ""}</small></span><span class="chip chip-teal">Үзэх</span></a></li>`).join("")}</ul>`));
@@ -4658,7 +5699,7 @@ async function homePage() {
   const teachers = h.teachers.length ? sec("my-teachers", "Миний багш нар", `<div class="people">${h.teachers.map((t) => `
       <a class="person" href="/t/${esc(t.username)}">${avatarHTML(t)}<span class="grow"><strong>${esc(t.display_name)}</strong><small>${esc(t.headline || "@" + t.username)}</small></span></a>`).join("")}</div>`) : `<span id="my-teachers"></span>`;
   const chats = h.chats.length ? sec("my-chats", "Чат", `<ul class="items">${h.chats.map((c) => `
-      <li><a class="item" href="${c.kind === "group" ? `/c/${esc(c.course_id)}#chat=group` : c.teacher?.username && !c.kind ? `/t/${esc(c.teacher.username)}#chat` : "#my-chats"}" data-rail-open="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group">${c.kind === "team" ? "🧑‍🤝‍🧑" : "👥"}</span>` : c.teacher ? avatarHTML(c.teacher) : `<span class="avatar avatar-sm">?</span>`}<span class="grow"><strong>${esc(c.kind === "group" || c.kind === "team" ? c.title : c.teacher?.display_name || c.title || "")}</strong><small>${c.kind === "group" ? "Бүлэг · " + esc(c.teacher?.display_name || "") + " · " : c.kind === "team" ? "Сурагчдын бүлэг · " : c.kind === "dm" ? "Ангийн найз · " : ""}${esc(c.last_message || "")}</small></span><time class="muted small">${fmtDate(c.last_message_at)}</time></a></li>`).join("")}</ul>`) : `<span id="my-chats"></span>`;
+      <li><a class="item" href="${c.kind === "group" ? `/c/${esc(c.course_id)}#chat=group` : c.teacher?.username && !c.kind ? `/t/${esc(c.teacher.username)}#chat` : "#my-chats"}" data-rail-open="${esc(c.id)}">${c.kind === "group" || c.kind === "team" ? `<span class="avatar avatar-sm group">${c.kind === "team" ? "🧑‍🤝‍🧑" : "👥"}</span>` : c.teacher ? avatarHTML(c.teacher) : `<span class="avatar avatar-sm">?</span>`}<span class="grow"><strong>${esc(c.kind === "group" || c.kind === "team" ? c.title : c.teacher?.display_name || c.title || "")}</strong><small>${c.kind === "group" ? "Бүлэг · " + esc(c.teacher?.display_name || "") + " · " : c.kind === "team" ? "Суралцагчдын бүлэг · " : c.kind === "dm" ? "Ангийн найз · " : ""}${esc(c.last_message || "")}</small></span><time class="muted small">${fmtDate(c.last_message_at)}</time></a></li>`).join("")}</ul>`) : `<span id="my-chats"></span>`;
   parts.push(`<div class="dash-cols">${teachers}${chats}</div>`);
 
   dash.innerHTML = parts.join("") + (`<div class="modal" id="stuModal"><div class="modal-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
@@ -4666,6 +5707,7 @@ async function homePage() {
       <p class="muted small" style="margin:0">Имэйл: ${esc(u.email || "")}</p><p class="form-error" role="alert"></p>
       <div class="hero-cta" style="margin:0;justify-content:flex-end"><button type="button" class="btn btn-ghost" data-close>Болих</button><button class="btn btn-gold">Хадгалах</button></div></form></div></div>`);
   noteStories($("#stRail"));
+  loadGifts($("#giftsBox"));
   $("[data-student-settings]")?.addEventListener("click", () => openModal($("#stuModal")));
   // Нэрээ мэндчилгээн дээрээ шууд засна.
   inlineName($("#stuName"), (me) => {
@@ -4703,6 +5745,52 @@ async function coursePage() {
   if (!root) return;
   const id = root.dataset.course, bundle = +root.dataset.price, mode = root.dataset.mode, buy = $("#buyBtn"), drip = root.dataset.drip === "1", locked = root.dataset.locked === "1";
   let all = false, access = null;
+  /* 👁 «Суралцагчаар үзэх» (зөвхөн тухайн сургалтын багш): ?view=student эсвэл sessionStorage sg_sv:<сургалт>.
+     Сервер шинэ суралцагчийн эрхийг өгнө (access?view=student; багш биш бол параметрийг үл тооно). Энэ горимд юу ч
+     хадгалахгүй: худалдан авалт, элсэлт, нууц үг, явц, «дууслаа», дүгнэлт, видеоны явц, анхаарлын бүртгэл, нээлгэх хүсэлт.
+     Түгжээтэй бүх цонхонд «👁 Багшийн эрхээр үзэх» байх тул багш хэзээ ч түгжигдэхгүй.
+     svWant — хүссэн (URL / таб), preview — сервер баталсан (access.preview === true). Батлагдаагүй үед ЕРДИЙН горим:
+     ?view=student холбоос суралцагчид очсон ч түүний эрх, үйлдэл өөрчлөгдөхгүй. */
+  const svKey = "sg_sv:" + id;
+  let svWant = false, preview = false;
+  if (Auth.token) {
+    svWant = new URLSearchParams(location.search).get("view") === "student";
+    if (!svWant) try { svWant = sessionStorage.getItem(svKey) === "1"; } catch {}
+  }
+  const svURL = (on) => { const u = new URL(location.href); if (on) u.searchParams.set("view", "student"); else u.searchParams.delete("view"); return u.pathname + u.search + u.hash; };
+  const enterPreview = () => { try { sessionStorage.setItem(svKey, "1"); } catch {} location.assign(svURL(true)); };
+  const exitPreview = () => { // багшийн эрхээр дахин ачаална (хуудас бүхэлдээ — түгжээ, товчнууд багшийнхаар)
+    try { sessionStorage.removeItem(svKey); } catch {}
+    const u = svURL(false); if (u.split("#")[0] === location.pathname + location.search) location.reload(); else location.replace(u);
+  };
+  // Сервер урьдчилан харахыг зөвшөөрөөгүй (багш биш): чимээгүй унтраана — бодит эрхээрээ үргэлжилнэ.
+  const dropPreview = () => {
+    svWant = false; preview = false; try { sessionStorage.removeItem(svKey); } catch {}
+    $("#svBar")?.remove(); document.documentElement.classList.remove("svp-on");
+    if (new URLSearchParams(location.search).has("view")) history.replaceState(history.state, "", svURL(false));
+  };
+  const svBar = (state) => {
+    let b = $("#svBar");
+    if (!b) {
+      b = document.createElement("div"); b.id = "svBar"; b.className = "svp-bar"; b.setAttribute("role", "region"); b.setAttribute("aria-label", "Суралцагчаар үзэх горим");
+      document.body.append(b); document.documentElement.classList.add("svp-on");
+      b.addEventListener("click", (e) => { if (e.target.closest("[data-svp-exit]")) exitPreview(); });
+    }
+    if (b.dataset.state === state) return; // фокус алдагдахгүй
+    b.dataset.state = state; b.setAttribute("aria-busy", String(state === "loading"));
+    b.innerHTML = `<span class="svp-ico" aria-hidden="true">👁</span><p class="svp-txt" role="status">${state === "loading" ? "<b>Суралцагчийн харагдацыг ачаалж байна…</b>"
+      : "<b>Суралцагчаар үзэж байна</b> <span>— сургалт тань шинэ суралцагчид ингэж харагдана</span> <small>· Явц хадгалагдахгүй</small>"}</p>
+      <button type="button" class="btn btn-sm svp-x" data-svp-exit>✕ Багшийн горим</button>`;
+  };
+  // Батлагдахаас өмнө «ачаалж байна» зурвасыг зөвхөн энэ сургалтын багш байж болзошгүй хүнд (багшийн холбоос таарвал)
+  // харуулна — суралцагчид анивчихгүй. Баталгаажмагц (confirmPreview) табад хадгалж, URL-д ?view=student нэмнэ.
+  const maybeTeacher = () => !!Auth.user?.username && $$(".teacher-chip, .org-teacher").some((a) => a.getAttribute("href") === "/t/" + Auth.user.username);
+  if (svWant && maybeTeacher()) svBar("loading");
+  const confirmPreview = () => {
+    preview = true; try { sessionStorage.setItem(svKey, "1"); } catch {}
+    svBar("ok"); if (!new URLSearchParams(location.search).has("view")) history.replaceState(history.state, "", svURL(true));
+  };
+  const pvToast = (msg) => toast("👁 Урьдчилан харах: " + msg);
   // Дараалсан нээлтийн төлөв, явцыг хичээл бүр дээр харуулна.
   const applyStates = (a) => {
     access = a;
@@ -4717,7 +5805,7 @@ async function coursePage() {
       if (dripLocked) {
         lbl.hidden = false; lbl.className = "lesson-state " + (st.reason === "timer" ? "timer" : "");
         lbl.textContent = blk ? `⛔ Сануулга хэтэрсэн тул хаагдсан${blk.until ? " · " + fmtDate(blk.until) + " хүртэл" : " · багш нээх хүртэл"}` : st.reason === "timer" ? `⏳ ${fmtDate(st.unlock_at)}-д нээгдэнэ`
-          : st.reason === "quiz" ? `🔒 «${st.prev_title}» хичээлийн асуултуудад бүгдэд нь зөв хариулсны дараа нээгдэнэ (${st.quiz_left}/${st.quiz_total} үлдсэн)`
+          : st.reason === "quiz" ? `🔒 «${st.prev_title}» хичээлийн бүх асуултад зөв хариулсны дараа нээгдэнэ (${st.quiz_left}/${st.quiz_total} үлдсэн)`
           : st.reason === "active" ? `🕒 «${st.prev_title}» хичээлийг дахиад ${st.active_left} мин идэвхтэй судлаарай`
           : st.reason === "exam" ? `📝 «${st.prev_title}» шалгалтад тэнцсэний дараа нээгдэнэ`
           : st.reason === "complete" ? `☑️ «${st.prev_title}» хичээлийг дуусгасны дараа нээгдэнэ`
@@ -4737,14 +5825,14 @@ async function coursePage() {
     });
     const bar = $("#courseProgress");
     if (bar && a.total) { bar.hidden = false; $("i", bar).style.width = Math.round(a.done / a.total * 100) + "%"; $("span", bar).textContent = `${a.done}/${a.total} хичээл дууссан`; }
-    // Цол хичээл бүрт биш: хичээл бүр нэгдсэн цолд оноо НЭМНЭ (хуулах оролдлоготой бол тооцогдохгүй).
+    // Эрэмбэ хичээл бүрт биш: хичээл бүр нэгдсэн эрэмбэд оноо НЭМНЭ (хуулах оролдлоготой бол тооцогдохгүй).
     const ranks = a.ranks || {};
     $$(".lesson").forEach((li) => {
       const r = ranks[li.dataset.lesson]; let b = $(".lesson-rank", li);
       if (!r) { b?.remove(); return; }
       if (!b) { b = document.createElement("span"); b.className = "lesson-rank"; $(".lesson-title", li)?.append(b); }
       b.className = "lesson-rank " + (r.disqualified ? "disq" : r.points >= 75 ? "high" : "");
-      b.title = (r.disqualified ? "Зөрчилтэй (хуулах оролдлого эсвэл хичээлээс гарч зогссон) тул оноо тооцогдоогүй — дахин 10+ минут шударга судалбал тооцогдоно" : r.improved ? "Дахин судалж сайжруулсан оноо" : "Нэгдсэн цолд нэмсэн оноо") + ((r.reasons || []).length ? ": " + r.reasons.join(", ") : "");
+      b.title = (r.disqualified ? "Зөрчилтэй (хуулах оролдлого эсвэл хичээлээс гарч зогссон) тул оноо тооцогдоогүй — дахин 10+ минут шударга судалбал тооцогдоно" : r.improved ? "Дахин судалж сайжруулсан оноо" : "Нэгдсэн эрэмбэд нэмсэн оноо") + ((r.reasons || []).length ? ": " + r.reasons.join(", ") : "");
       b.textContent = r.disqualified ? "⛔ Тооцогдоогүй" : `+${r.points} оноо${r.improved ? " ↻" : ""}`;
     });
     if (a.rank && bar) {
@@ -4754,23 +5842,33 @@ async function coursePage() {
       rl.hidden = !rk.lessons;
       const tot = a.rank_total && a.rank_total.points > rk.points ? a.rank_total : null;
       const shown = tot || rk;
-      const avg = a.rank_total && a.rank_total.points !== rk.points ? a.rank_total : null; // бүх сургалтын цол (сургалтуудын дундаж)
-      // Шинэ цол: сервер дохио өгсөн эсвэл сүүлд харснаас түвшин дээшилсэн бол баяр хүргэж салют буудуулна.
+      const avg = a.rank_total && a.rank_total.points !== rk.points ? a.rank_total : null; // бүх сургалтын эрэмбэ (сургалтуудын дундаж)
+      // Шинэ эрэмбэ: сервер дохио өгсөн эсвэл сүүлд харснаас түвшин дээшилсэн бол баяр хүргэж салют буудуулна.
       const lvlKey = "sg_rank_lvl_" + (Auth.user?.id || "u");
       let seen = -1; try { seen = localStorage.getItem(lvlKey) === null ? -1 : +localStorage.getItem(lvlKey); } catch {}
       if (a.rank_awarded || (seen >= 0 && shown.level > seen)) rankSalute(shown);
       try { localStorage.setItem(lvlKey, shown.level); } catch {}
       const ig = rk.integration || {};
       rl.innerHTML = `<span class="cr-sign" data-level="${rk.level}">${esc(rk.insignia)}</span>
-        <span class="cr-main"><small class="cr-label">Сургалтын нэгдсэн цол</small><b class="rank-name">${esc(rk.name)}</b></span>
+        <span class="cr-main"><small class="cr-label">Сургалтын нэгдсэн эрэмбэ</small><b class="rank-name">${esc(rk.name)}</b></span>
         <span class="cr-pts"><b>${rk.points}</b> оноо</span>
         <span class="cr-sum">Хичээлүүд ${ig.lesson_points ?? rk.points}${ig.bonus ? ` + интеграц ${ig.bonus}` : ""}${ig.sections_all ? ` · ${ig.sections}/${ig.sections_all} бүлэг бүтэн` : ""}${ig.courses ? " · сургалт бүтэн ✓" : ""}${rk.cheated ? ` · <span class="cr-bad">${rk.cheated} хичээл тооцогдоогүй</span>` : ""}</span>
         <span class="meter cr-meter"><i style="width:${rk.progress}%"></i></span>
-        <span class="cr-next">${rk.next ? `Дараагийн «${esc(rk.next_name)}» цол ${rk.next} оноонд` : "Дээд цол"}${avg ? ` · бүх сургалтын дундаж: <b>${esc(avg.name)}</b> ${avg.points} оноо` : ""}</span>
+        <span class="cr-next">${rk.next ? `Дараагийн нууц эрэмбэ ${rk.next} оноонд` : "Дээд эрэмбэ"}${avg ? ` · бүх сургалтын дундаж: <b>${esc(avg.name)}</b> ${avg.points} оноо` : ""}</span>
         ${rk.tips?.length ? `<ul class="cr-tips">${rk.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}`;
     }
   };
-  const refreshAccess = () => api(`/api/courses/${id}/access`).then((a) => { applyStates(a); drawStage(); return a; }).catch(() => null);
+  // Урьдчилан харах үед үргэлж ?view=student (шинэ суралцагчийн эрх) — хаана ч шинэчилсэн.
+  const refreshAccess = () => api(`/api/courses/${id}/access${svWant || preview ? "?view=student" : ""}`).then((a) => {
+    if (svWant || preview) { if (a.preview === true) { if (!preview) confirmPreview(); } else dropPreview(); }
+    applyStates(a); drawStage(); return a;
+  }).catch((e) => {
+    if (preview) { toast(e.message, true); return null; } // баталгаажсан: горим хэвээр (дараагийн шинэчлэлт засна)
+    if (svWant) { dropPreview(); toast(e.message, true); return refreshAccess(); } // батлагдаагүй: ердийн горимоор нэг удаа дахин
+    return null;
+  });
+  // Урьдчилан харах хүссэн боловч батлагдаагүй бол эхлээд серверийн хариуг хүлээнэ (дараа нь preview-ээр шийднэ).
+  const svReady = async () => { if (svWant && !preview) await ready; };
   // Асуулга/шалгалт амжилттай → access шинэчилнэ; дараагийн хичээл нээгдсэн бол автоматаар шилжинэ.
   const autoAdvance = async (force) => {
     const curRow = $(".lesson.open"), rowsBefore = lessonRows(), i = curRow ? rowsBefore.indexOf(curRow) : -1;
@@ -4796,11 +5894,46 @@ async function coursePage() {
   };
   const ready = Auth.token ? refreshAccess().then((a) => {
     if (!a) return;
+    if (!preview && a.owner && !$("#svEnter")) { // багш: сургалтаа шинэ суралцагчийн нүдээр шалгах
+      const b = document.createElement("button"); b.type = "button"; b.id = "svEnter"; b.className = "btn btn-glass btn-lg svp-enter";
+      b.title = "Сургалтаа шинэ суралцагчийн нүдээр шалгах — юу ч хадгалагдахгүй"; b.textContent = "👁 Суралцагчаар үзэх";
+      b.onclick = enterPreview; buy.after(b);
+    }
     if (a.all) unlockAll(); a.lessons.forEach(unlockLesson);
     if (mode === "free" && a.enrolled && !locked) buy.textContent = "✓ Та элссэн — үзэж эхлэх";
     if (locked && a.need_code && location.hash === "#unlock") askCode(); // картан дээрх 🔒-оос ирсэн
     drawStage();
   }) : Promise.resolve();
+  // Сургалтыг хуваалцах цонх: QR (уншуулбал #join-оор нэвтэрнэ), Facebook, холбоос хуулах, утасны «Илгээх».
+  const shareM = $("#courseShareModal"), courseURL = location.origin + location.pathname;
+  $$("[data-course-share]").forEach((b) => b.addEventListener("click", () => openModal(shareM)));
+  if (shareM) {
+    $("[data-copy-course]", shareM)?.addEventListener("click", async () => { try { await navigator.clipboard.writeText(courseURL); toast("Холбоос хуулагдлаа ✓"); } catch { toast(courseURL); } });
+    const ns = $("[data-native-share]", shareM);
+    if (ns && navigator.share) { ns.hidden = false; ns.addEventListener("click", () => navigator.share({ title: $(".course-page h1")?.textContent.trim() || "Сургалт", url: courseURL }).catch(() => {})); }
+    $("[data-fb-share]", shareM)?.addEventListener("click", (e) => { // компьютер дээр жижиг цонхоор, утсан дээр апп/таб
+      if (!matchMedia("(pointer:fine) and (min-width:700px)").matches) return;
+      const a = e.currentTarget, w = 620, h = 640, win = window.open(a.href, "fbshare", `width=${w},height=${h},left=${Math.round((screen.width - w) / 2)},top=${Math.round((screen.height - h) / 2)}`);
+      if (win) { e.preventDefault(); win.opener = null; }
+    });
+    if (location.hash === "#share") { history.replaceState(null, "", location.pathname + location.search); openModal(shareM); } // студийн «QR · Facebook»-оос
+  }
+  // QR-аар ирсэн (#join): нэвтрээгүй бол нэвтрээд энд буцаж ирнэ; нууц үгтэй бол нууц үг асууна, үнэгүй бол шууд элсүүлнэ,
+  // төлбөртэй бол элсэх товч руу хөтөлнө, аль хэдийн эрхтэй бол хичээлүүд рүү.
+  if (location.hash === "#join") {
+    const toLogin = () => location.replace("/login?next=" + encodeURIComponent(location.pathname + "#join")); // «Буцах» дахин энд эргэлдэхгүй
+    if (!Auth.token) toLogin();
+    else ready.then(() => {
+      if (!Auth.token) return toLogin(); // хугацаа нь дууссан токен (401 → гарсан)
+      const a = access; if (!a) return;
+      history.replaceState(null, "", location.pathname + location.search);
+      if (locked && a.need_code) return askCode();
+      if (mode === "free" && !a.enrolled && !a.all) return buy.click();
+      if (a.enrolled || a.all) { toast("👋 Тавтай морил — хичээлээ үргэлжлүүлээрэй"); $("#lessons")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+      buy.scrollIntoView({ behavior: "smooth", block: "center" }); buy.focus({ preventScroll: true });
+      toast(mode === "lessons" ? "Хичээлүүдээс сонгож нээгээрэй" : "Сургалтад элсэхийн тулд «" + buy.textContent.trim() + "» товчийг дарна уу");
+    });
+  }
   // Багш хоригийг цуцлахад (WebSocket) хуудас шинэчлэхгүйгээр шууд нээгдэнэ; хаагдсан цонх/хичээл дээр байсан бол шууд үргэлжилнэ.
   let lazyWatch = false; // дараагийн нээх хичээлийн хяналт суралцагч хөдөлтөл хүлээнэ (play-д нэг удаа)
   if (Auth.token) Live.on(async (d) => {
@@ -4819,6 +5952,34 @@ async function coursePage() {
       lazyWatch = false;
     }
   });
+  // Багш нээлгэх хүсэлтийг зөвшөөрсөн (WebSocket access_granted): нууц үгтэй сургалт бол бүгд, эс бөгөөс тэр хичээл нь
+  // хуудас шинэчлэхгүйгээр нээгдэнэ; тэр хичээлийн цонх (нээлгэх хүсэлт) нээлттэй байсан бол шууд үзэж эхэлнэ.
+  if (Auth.token) Live.on(async (d) => {
+    if (d.type !== "access_granted" || d.course_id !== id) return;
+    const lid = d.lesson_id || "", code = $("#codeModal");
+    if (!lid) {
+      if (code) { closeModal(code); setTimeout(() => code.remove(), 300); }
+      unlockAll(); toast("🔓 Багш сургалтыг тань нээлээ — амжилт хүсье!"); celebrate();
+      await refreshAccess();
+      return;
+    }
+    await refreshAccess();
+    const li = rowById(lid), pop = $(".drip-pop");
+    toast(li ? `🔓 Багш «${rowTitle(li)}» хичээлийг тань нээлээ — үзэж болно` : "🔓 Багш хичээлийг тань нээлээ — үзэж болно");
+    if (pop && $(`.acc-req[data-acc-req="${CSS.escape(lid)}"]`, pop)) { pop.remove(); if (li && canOpen(li)) expandRow(li, true); }
+  });
+  // Багш энэ сургалт дахь явцыг тань шинэчилсэн (журнал → өгөгдөл устгах): хуудсыг дахин ачаалж эхнээс нь харуулна.
+  if (Auth.token) Live.on((d) => {
+    if (d.type !== "notification" || d.notification?.type !== "course_reset") return;
+    const m = /\/c\/([^/?#]+)/.exec(d.notification.link || "");
+    if (!m || m[1] !== id) return;
+    // Давтан шинэчлэлт хуудсыг тасралтгүй дахин ачаалуулахгүй: 60 секундэд нэг л удаа автоматаар ачаална.
+    let last = 0; try { last = +sessionStorage.getItem("sg_reset_reload") || 0; } catch {}
+    if (Date.now() - last < 60000) { toast("🔄 Багш таны явцыг шинэчиллээ — хуудсаа дахин ачаалж харна уу"); return; }
+    try { sessionStorage.setItem("sg_reset_reload", String(Date.now())); } catch {}
+    toast("🔄 Багш таны явцыг шинэчиллээ — хуудас дахин ачаалж байна…");
+    setTimeout(() => location.reload(), 2000);
+  });
   if (!Auth.token && locked && location.hash === "#unlock") setTimeout(() => askCode(), 300); // нэвтрэх рүү хөтөлнө
   if (!Auth.token) $$(".lesson.is-free [data-play]").forEach((b) => (b.textContent = "▶ Нэвтэрч үзэх")); // үнэгүй хичээлийг ч нэвтэрч үзнэ
   if (!Auth.token && drip) $$(".lesson:not(.is-free)").forEach((li) => { const lbl = $(".lesson-state", li); if (lbl && +li.dataset.unlock && li.dataset.always !== "1") { lbl.hidden = false; lbl.textContent = `⏱ Өмнөхийг үзснээс ${humanHours(li.dataset.unlock)}-ийн дараа`; } });
@@ -4828,7 +5989,7 @@ async function coursePage() {
         ${m.price ? `<span class="chip chip-amber">${m.bought ? "✓ Худалдаж авсан" : money(m.price)}${m.members_free && !m.bought ? " · элссэн бол үнэгүй" : ""}</span>` : ""}</span>
       ${m.meet_url ? `<a class="btn btn-accent btn-sm" href="${esc(m.meet_url)}" target="_blank" rel="noopener">Нэгдэх</a>`
         : m.price ? `<button class="btn btn-gold btn-sm" data-meet-buy="${esc(m.id)}" data-title="${esc(m.title)}">Худалдаж авах · ${money(m.price)}</button>`
-        : `<span class="chip">🔒 Сургалтад элссэн хүмүүст</span>`}</div>`).join("")}</div>`;
+        : `<span class="chip">🔒 Зөвхөн элссэн суралцагчдад</span>`}</div>`).join("")}</div>`;
   const loadMeets = () => api(`/api/courses/${id}/meetings`).then((d) => {
     $("#meetHead")?.remove(); $("#meetList")?.remove();
     if (!d.meetings.length) return;
@@ -4840,6 +6001,8 @@ async function coursePage() {
   document.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-meet-buy]"); if (!b) return;
     if (needLogin()) return;
+    await svReady();
+    if (preview) return pvToast("суралцагчид энд шууд хичээлийн төлбөрийн цонх гарна (захиалга үүсээгүй)");
     b.disabled = true;
     try {
       const d = await api(`/api/meetings/${b.dataset.meetBuy}/buy`, { method: "POST" });
@@ -4859,9 +6022,36 @@ async function coursePage() {
     start: () => api(`/api/courses/${id}/enroll`, { method: "POST" }),
     onPaid: async () => { unlockAll(); toast("🎉 Бүх хичээл нээгдлээ!"); celebrate(); await refreshAccess(); const li = lid && $(`.lesson[data-lesson="${CSS.escape(lid)}"]`); if (li) expandRow(li, true); },
   } : null;
+  // 👁 Урьдчилан харах: төлбөр, элсэлтийн оронд «суралцагчид энд юу гарах» тайлбар (drip-pop загвар). row — «👁 Багшийн
+  // эрхээр үзэх»-ээр тэр хичээлийг ямар ч түгжээгүй нээнэ (багш хэзээ ч түгжигдэхгүй). html-д хэрэглэгчийн текстийг esc().
+  const svPop = ({ ico = "💳", title, html, row }) => {
+    $(".drip-pop")?.remove();
+    const pop = document.createElement("div"); pop.className = "drip-pop svp-pop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-modal", "true"); pop.setAttribute("aria-label", title);
+    pop.innerHTML = `<div class="dp-card"><button class="icon-btn dp-x" aria-label="Хаах">✕</button>
+      <div class="dp-steps"><span class="dp-step lock" aria-hidden="true">${ico}</span></div>
+      <h3>${esc(title)}</h3><p>${html}</p><p class="svp-note">👁 Урьдчилан харах — захиалга, төлбөр, элсэлт үүсээгүй.</p>
+      <div class="dp-acts">${row ? `<button class="btn btn-gold" data-svp-open>👁 Багшийн эрхээр үзэх</button>` : ""}<button class="btn btn-ghost" data-dp-close>Ойлголоо</button></div></div>`;
+    document.body.append(pop);
+    const close = () => { pop.classList.add("out"); setTimeout(() => pop.remove(), 200); };
+    pop.addEventListener("click", (e) => {
+      if (e.target === pop || e.target.closest(".dp-x, [data-dp-close]")) return close();
+      if (e.target.closest("[data-svp-open]")) { close(); openStage(row); }
+    });
+    pop.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } });
+    $("[data-svp-open], [data-dp-close]", pop)?.focus();
+  };
+  const svPayInfo = (li) => {
+    const price = li ? +li.dataset.price : 0, t = li ? `«<b>${esc(rowTitle(li))}</b>»` : "";
+    const html = price > 0 ? `${t} хичээлийг <b>${money(price)}</b>-өөр дангаар нь${bundle > 0 ? `, эсвэл бүх хичээлийг багцаар <b>${money(bundle)}</b>-өөр` : ""} худалдаж авах QR төлбөрийн цонх гарна.`
+      : bundle > 0 ? `${li ? t + " хичээл зөвхөн багцаар нээгдэнэ: " : ""}бүх хичээлийг багцаар <b>${money(bundle)}</b>-өөр худалдаж авах QR төлбөрийн цонх гарна.`
+      : li ? `${t} хичээл одоогоор нээгдээгүй гэсэн мэдэгдэл гарна.` : "Суралцагч дарвал сургалтад шууд (үнэгүй) элсэнэ.";
+    svPop({ ico: price > 0 || bundle > 0 ? "💳" : "🎓", title: price > 0 || bundle > 0 ? "Суралцагчид энд төлбөрийн цонх гарна" : "Суралцагчид энд элсэлт хийгдэнэ", html, row: li });
+  };
   // Төлбөртэй (худалдаж аваагүй) хичээл дээр дарах → шууд төлбөрийн цонх.
   const paywall = async (li) => {
     if (needLogin()) return;
+    await svReady();
+    if (preview) return locked ? askCode(() => openStage(li)) : svPayInfo(li); // захиалга, нууц үгийн шалгалт үүсгэхгүй
     if (locked) return askCode(() => expandRow(li, true)); // нууц үгтэй сургалт
     const lid = li.dataset.lesson, price = +li.dataset.price;
     try {
@@ -4881,21 +6071,56 @@ async function coursePage() {
       toast("Энэ хичээл одоогоор нээгдээгүй байна");
     } catch (err) { toast(err.message, true); }
   };
+  // 🙋 Багшаас нээлгэх хүсэлт: нууц үгтэй сургалт (lid хоосон) эсвэл багш гараар нээдэг хичээл. Сургалтын багш(ууд)ад
+  // мэдэгдэл «Нээх» товчтой очно; нээмэгц суралцагчид мэдэгдэл + WebSocket (access_granted). Давтан хүсэлтийг сервер 12 цагт нэг л удаа явуулна.
+  const reqHTML = (lid, lead) => `<div class="acc-req" data-acc-req="${esc(lid || "")}">
+      ${lead ? `<p class="acc-req-lead">${lead}</p>` : ""}<button type="button" class="acc-req-open" data-acc-open aria-expanded="false">🙋 Багшаас нээлгэх хүсэлт илгээх</button>
+      <div class="acc-req-form" hidden><label class="acc-req-lbl">Багшдаа хэлэх үг <small class="muted">(заавал биш)</small>
+        <textarea rows="2" maxlength="300" placeholder="Жишээ нь: аль ангийн суралцагч, хэзээ бүртгүүлснээ…"></textarea></label>
+        <div class="acc-req-acts"><button type="button" class="btn btn-ghost btn-sm" data-acc-x>Болих</button><button type="button" class="btn btn-gold btn-sm" data-acc-send>📨 Хүсэлт илгээх</button></div></div>
+      <p class="acc-req-msg" role="status" hidden></p></div>`;
+  // onOpen — сервер «аль хэдийн нээлттэй» гэвэл (open: true).
+  const bindReq = (box, onOpen) => {
+    if (!box) return;
+    const form = $(".acc-req-form", box), openBtn = $("[data-acc-open]", box), msg = $(".acc-req-msg", box), send = $("[data-acc-send]", box);
+    const say = (t, tone) => { msg.hidden = !t; msg.textContent = t || ""; msg.className = "acc-req-msg " + (tone || ""); };
+    box.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-acc-open]")) { const show = form.hidden; form.hidden = !show; openBtn.setAttribute("aria-expanded", String(show)); say(""); if (show) $("textarea", form).focus(); return; }
+      if (e.target.closest("[data-acc-x]")) { form.hidden = true; openBtn.setAttribute("aria-expanded", "false"); openBtn.focus(); return; }
+      if (!e.target.closest("[data-acc-send]") || send.disabled) return;
+      if (needLogin()) return;
+      if (preview) return pvToast("суралцагч дарвал танд мэдэгдэл очно (хүсэлт илгээгдээгүй)");
+      send.disabled = true; send.textContent = "Илгээж байна…"; say("");
+      try {
+        const d = await api(`/api/courses/${id}/access-request`, { method: "POST", body: { lesson_id: box.dataset.accReq || "", message: $("textarea", form).value.trim().slice(0, 300) } });
+        if (d.open) { onOpen?.(); return; }
+        form.hidden = true; openBtn.hidden = true;
+        say(d.already ? "✓ Хүсэлт тань өмнө нь илгээгдсэн байна — багш нээмэгц танд мэдэгдэл ирнэ." : "✓ Хүсэлт илгээгдлээ — багш нээмэгц танд мэдэгдэл ирнэ.", "ok");
+        toast(d.already ? "Хүсэлт аль хэдийн илгээгдсэн — багшийн хариуг хүлээнэ үү" : "📨 Багшид нээлгэх хүсэлт илгээлээ");
+      } catch (x) { say(x.message, "bad"); toast(x.message, true); }
+      finally { send.disabled = false; send.textContent = "📨 Хүсэлт илгээх"; }
+    });
+  };
   // Нууц үгтэй сургалт: багшаас авсан нууц үгээ оруулж бүх хичээлийг нээнэ.
   const askCode = (then) => {
     if (needLogin()) return;
     $("#codeModal")?.remove();
     document.body.insertAdjacentHTML("beforeend", `<div class="modal" id="codeModal"><div class="modal-card code-card"><button class="icon-btn modal-x" data-close aria-label="Хаах">✕</button>
       <div class="code-ico" aria-hidden="true">🔑</div><h3 class="h3">Нууц үгтэй сургалт</h3>
-      <p class="muted">Багшаасаа авсан нууц үгээ оруулаад сургалтын бүх хичээлийг нээнэ.</p>
+      <p class="muted">Багшаасаа авсан нууц үгээ оруулж, сургалтын бүх хичээлийг нээнэ үү.</p>
       <form class="form" id="codeForm" autocomplete="off"><input name="code" required minlength="4" maxlength="64" placeholder="Нууц үг" aria-label="Нууц үг" autocomplete="off" autocapitalize="off" spellcheck="false">
-        <p class="form-error" role="alert"></p><button class="btn btn-gold btn-block">🔓 Нээх</button></form></div></div>`);
+        <p class="form-error" role="alert"></p><button class="btn btn-gold btn-block">🔓 Нээх</button></form>
+      ${preview ? `<div class="svp-code"><p>👁 Урьдчилан харах: нууц үг шалгагдахгүй — суралцагч зөв нууц үгээ оруулбал бүх хичээл нээгдэнэ.</p><button type="button" class="btn btn-ghost btn-sm" data-svp-go>${then ? "👁 Багшийн эрхээр үзэх" : "Ойлголоо, үргэлжлүүлэх"}</button></div>` : ""}
+      ${reqHTML("", "Нууц үг алга уу?")}</div></div>`);
     const m = $("#codeModal"), f = $("#codeForm", m);
     const done = () => { closeModal(m); setTimeout(() => m.remove(), 300); };
     openModal(m); setTimeout(() => f.code.focus(), 60);
     m.addEventListener("click", (e) => { if (e.target === m || e.target.closest("[data-close]")) done(); });
+    bindReq($(".acc-req", m), async () => { done(); unlockAll(); toast("🔓 Сургалт аль хэдийн нээлттэй байна"); await refreshAccess(); then?.(); });
+    $("[data-svp-go]", m)?.addEventListener("click", () => { done(); then?.(); });
     f.onsubmit = async (e) => {
       e.preventDefault();
+      if (preview) { done(); pvToast("суралцагч нууц үгээ оруулбал бүх хичээл нээгдэнэ (шалгагдаагүй)"); then?.(); return; } // /unlock дуудахгүй
       const btn = $("button", f), err = $(".form-error", f); err.textContent = ""; btn.disabled = true;
       try {
         await api(`/api/courses/${id}/unlock`, { method: "POST", body: { code: f.code.value } });
@@ -4907,9 +6132,11 @@ async function coursePage() {
 
 
   buy.addEventListener("click", async () => {
+    await svReady();
     if (locked && !all) return askCode();
     if (all || mode === "lessons") { $("#lessons").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (needLogin()) return;
+    if (preview) return svPayInfo(null); // элсэлт, захиалга үүсгэхгүй
     buy.disabled = true;
     try {
       const d = await api(`/api/courses/${id}/enroll`, { method: "POST" });
@@ -4933,26 +6160,32 @@ async function coursePage() {
     curLesson = null;
   }).observe($("#lessonModal"), { attributes: true, attributeFilter: ["class"] });
   // Хичээлийг үзэж дууссаны дараа "юу сурсан бэ?" гэж товч дүгнэлт асууна — идэвхтэй суралцсаны нотолгоо.
+  const pvReflected = new Set(); // урьдчилан харах: хичээл бүрт хуудсанд нэг л удаа (localStorage-д юу ч бичихгүй)
   const askReflection = (cid, lid, title) => {
-    try { if (sessionStorage.getItem("sg_refl_" + lid)) return; } catch {}
     const key = "sg_reflect_at_" + lid;
-    let last = 0; try { last = +localStorage.getItem(key) || 0; } catch {}
-    if (Date.now() - last < 3600e3) return; // цагт нэг удаа л зовоохгүй
+    if (preview) { if (pvReflected.has(lid)) return; }
+    else {
+      try { if (sessionStorage.getItem("sg_refl_" + lid)) return; } catch {}
+      let last = 0; try { last = +localStorage.getItem(key) || 0; } catch {}
+      if (Date.now() - last < 3600e3) return; // цагт нэг удаа л зовоохгүй
+    }
     // Хяналт хичээлийг зогсоосон бол эхлээд тэр сануулгыг уншиж хаасны дараа асууна (дээр нь давхарлахгүй;
     // дараагийн сануулга watchAlert бичиж буй дүгнэлтийг устгахгүйн тулд).
     const busy = $(".watch-alert");
     if (busy) { new MutationObserver((_, mo) => { if (!busy.isConnected) { mo.disconnect(); askReflection(cid, lid, title); } }).observe(document.documentElement, { childList: true, subtree: true }); return; }
     const el = document.createElement("div"); el.className = "watch-alert"; el.innerHTML = `<div class="watch-card refl-card">
       <span class="watch-ico">✍️</span><h3>«${esc(title)}» хичээлээс юу сурсан бэ?</h3>
-      <p class="muted small">2-3 өгүүлбэрээр бичихэд хангалттай. Энэ нь идэвхтэй суралцсаны тэмдэглэгээ болно.</p>
+      <p class="muted small">2–3 өгүүлбэр бичихэд хангалттай. Сурснаа өөрийн үгээр бичих нь мэдлэгээ бататгаж, идэвхтэй суралцсаны тэмдэг болно.</p>
       <textarea rows="3" maxlength="2000" placeholder="Жишээ нь: Энэ хичээлээр … гэдгийг ойлголоо…"></textarea>
       <p class="form-error" role="alert"></p>
       <div class="refl-acts"><button class="btn btn-ghost btn-sm" data-skip>Алгасах</button><button class="btn btn-gold" data-send>Илгээх</button></div></div>`;
     overlayHost(true).append(el); $("textarea", el).focus();
-    try { localStorage.setItem(key, Date.now()); } catch {}
+    if (preview) { pvReflected.add(lid); $(".refl-card .muted", el).insertAdjacentHTML("afterend", `<p class="svp-note">👁 Урьдчилан харах — суралцагчид хичээлээ хаахад ингэж асууна. Хадгалагдахгүй.</p>`); }
+    else try { localStorage.setItem(key, Date.now()); } catch {}
     const close = () => el.remove();
     $(".refl-card [data-skip]", el).onclick = close;
     $(".refl-card [data-send]", el).onclick = async () => {
+      if (preview) { toast("👁 Урьдчилан харах — хадгалагдсангүй"); close(); return; }
       const ta = $("textarea", el), err = $(".form-error", el), b = $("[data-send]", el);
       err.textContent = ""; b.disabled = true;
       try {
@@ -4992,27 +6225,37 @@ async function coursePage() {
     let prev = rows.slice(0, i).reverse().find((r) => st.prev_title && rowTitle(r) === st.prev_title) || rows[i - 1];
     const pTitle = st.prev_title || (prev ? rowTitle(prev) : "");
     const reason = st.reason === "timer" ? `⏳ Энэ хичээл <b>${esc(fmtDate(st.unlock_at))}</b>-д нээгдэнэ. Өмнөх «${esc(pTitle)}» хичээлээ давтаж бэлдээрэй.`
-      : st.reason === "quiz" ? `🧩 «<b>${esc(pTitle)}</b>» хичээлийн асуултуудад бүгдэд нь зөв хариулбал цаг, өдрөөс үл хамааран энэ хичээл <b>шууд</b> нээгдэнэ. <span class="dp-left">${st.quiz_left}/${st.quiz_total} асуулт үлдсэн</span>`
-      : st.reason === "active" ? `🕒 «<b>${esc(pTitle)}</b>» хичээлийн идэвхтэй суралцах хугацаа (${st.active_min} мин) гүйцээгүй байна. <span class="dp-left">${st.active_left} мин дутуу</span>`
+      : st.reason === "quiz" ? `🧩 «<b>${esc(pTitle)}</b>» хичээлийн бүх асуултад зөв хариулбал хугацаанаас үл хамааран энэ хичээл <b>шууд</b> нээгдэнэ. <span class="dp-left">${st.quiz_left}/${st.quiz_total} асуулт үлдсэн</span>`
+      : st.reason === "active" ? `🕒 «<b>${esc(pTitle)}</b>» хичээлийг ${st.active_min} минут идэвхтэй судлах шаардлагатай. <span class="dp-left">${st.active_left} мин дутуу</span>`
       : st.reason === "exam" ? `📝 «<b>${esc(pTitle)}</b>» шалгалтад тэнцмэгц энэ хичээл шууд нээгдэнэ.`
       : st.reason === "complete" ? `☑️ «<b>${esc(pTitle)}</b>» хичээлийг судлаад «Дууслаа» дармагц энэ хичээл нээгдэнэ.`
-      : st.reason === "manual" ? `🔐 Энэ хичээлийг багш тань гараар нээнэ.`
-      : `📘 Эхлээд «<b>${esc(pTitle)}</b>» хичээлийг судалж дуусгаад дараа нь энэ хичээлийг үзнэ.`;
-    const pop = document.createElement("div"); pop.className = "drip-pop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Өмнөх хичээл");
+      : st.reason === "manual" ? `🔐 Энэ хичээлийг багш тань өөрөө нээж өгнө. Үзэх шаардлагатай бол багшдаа хүсэлт илгээгээрэй — нээмэгц танд мэдэгдэл ирнэ.`
+      : `📘 Эхлээд «<b>${esc(pTitle)}</b>» хичээлийг судалж дуусгаад, дараа нь энэ хичээлийг үзнэ үү.`;
+    const manual = st.reason === "manual";
+    const pop = document.createElement("div"); pop.className = "drip-pop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", manual ? "Багш нээж өгөх хичээл" : "Өмнөх хичээл");
     pop.innerHTML = `<div class="dp-card"><button class="icon-btn dp-x" aria-label="Хаах">✕</button>
-      <div class="dp-steps"><span class="dp-step cur">1<small>${esc(pTitle || "Өмнөх")}</small></span><i></i><span class="dp-step lock">🔒<small>${esc(rowTitle(row))}</small></span></div>
-      <h3>Эхлээд өмнөх хичээлээ судлаарай</h3><p>${reason}</p>
-      <div class="dp-acts">${prev && canOpen(prev) ? `<button class="btn btn-gold" data-dp-go>▶ «${esc(pTitle).slice(0, 34)}» үзэх</button>` : ""}<button class="btn btn-ghost" data-dp-close>Ойлголоо</button></div></div>`;
+      ${manual ? `<div class="dp-steps"><span class="dp-step lock">🔐<small>${esc(rowTitle(row))}</small></span></div><h3>Багш нээж өгөх хичээл</h3>`
+        : `<div class="dp-steps"><span class="dp-step cur">1<small>${esc(pTitle || "Өмнөх")}</small></span><i></i><span class="dp-step lock">🔒<small>${esc(rowTitle(row))}</small></span></div><h3>Эхлээд өмнөх хичээлээ судлаарай</h3>`}
+      <p>${reason}</p>${manual ? reqHTML(lid) : ""}
+      ${preview ? `<p class="svp-note">👁 Урьдчилан харах — суралцагчид энэ цонх яг ингэж гарна.</p>` : ""}
+      <div class="dp-acts">${!manual && prev && canOpen(prev) ? `<button class="btn btn-gold" data-dp-go>▶ «${esc(pTitle).slice(0, 34)}» үзэх</button>` : ""}${preview ? `<button class="btn btn-glass" data-svp-open>👁 Багшийн эрхээр үзэх</button>` : ""}<button class="btn btn-ghost" data-dp-close>Ойлголоо</button></div></div>`;
     document.body.append(pop);
     const close = () => { pop.classList.add("out"); setTimeout(() => pop.remove(), 200); };
+    if (manual) bindReq($(".acc-req", pop), async () => { // сервер: аль хэдийн нээгдсэн
+      close(); toast("🔓 Энэ хичээл аль хэдийн нээгдсэн байна"); await refreshAccess();
+      const li = rowById(lid); if (li && canOpen(li)) expandRow(li, true);
+    });
     pop.addEventListener("click", async (e) => {
       if (e.target === pop || e.target.closest(".dp-x, [data-dp-close]")) return close();
       if (e.target.closest("[data-dp-go]")) { close(); prev.scrollIntoView({ block: "center", behavior: "smooth" }); await expandRow(prev); }
+      if (e.target.closest("[data-svp-open]")) { close(); openStage(row); } // урьдчилан харах: түгжээг үл харгалзан
     });
-    $("[data-dp-go], [data-dp-close]", pop)?.focus();
+    if (preview) pop.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } });
+    $(manual ? "[data-acc-open]" : "[data-dp-go], [data-dp-close]", pop)?.focus();
   };
   const expandRow = async (row, opts) => {
     if (needLogin(row.dataset.lesson)) return; // хичээл (үнэгүйг ч) нэвтэрсэн хэрэглэгч л үзнэ
+    await svReady(); // урьдчилан харах батлагдтал хүлээнэ — түгжээ, горимыг серверийн хариугаар шийднэ
     const blk = access?.blocks?.[row.dataset.lesson];
     if (blk) { // сануулгын хязгаар хэтэрсэн: орж болохгүй
       $(".drip-pop")?.remove();
@@ -5040,7 +6283,7 @@ async function coursePage() {
     if (!Auth.token) return "";
     const p = access?.progress?.[lid], rk = access?.ranks?.[lid];
     return [p?.completed_at ? `<span class="st-chip ok">✓ Дууссан · ${fmtDate(p.completed_at)}</span>` : p?.viewed_at ? `<span class="st-chip">Үзэж эхэлсэн · ${fmtDate(p.viewed_at)}</span>` : `<span class="st-chip">Шинэ хичээл</span>`,
-      rk ? `<span class="st-chip ${rk.disqualified ? "bad" : rk.points >= 75 ? "ok" : ""}" title="${esc((rk.reasons || []).join(", "))}">${rk.disqualified ? "⛔ Оноо тооцогдоогүй" : `+${rk.points} оноо нэгдсэн цолд`}</span>` : ""].join("");
+      rk ? `<span class="st-chip ${rk.disqualified ? "bad" : rk.points >= 75 ? "ok" : ""}" title="${esc((rk.reasons || []).join(", "))}">${rk.disqualified ? "⛔ Оноо тооцогдоогүй" : `+${rk.points} оноо нэгдсэн эрэмбэд`}</span>` : ""].join("");
   };
   const tocItem = (r) => {
     const lid = r.dataset.lesson, cur = lid === stageLid;
@@ -5129,11 +6372,14 @@ async function coursePage() {
     const done = $("#lessonDone"), p = access?.progress?.[lid];
     if (done) {
       done.hidden = !Auth.token;
-      const b = $("[data-complete]", done); b.disabled = !!p?.completed_at; b.textContent = p?.completed_at ? "✓ Дууссан" : "✓ Энэ хичээлийг дууслаа";
-      b.onclick = async () => { b.disabled = true; try { await api(`/api/courses/${id}/lessons/${lid}/complete`, { method: "POST" }); b.textContent = "✓ Дууссан"; toast("Сайн байна! Дараагийн хичээл рүү 🎉"); await refreshAccess(); } catch (e) { toast(e.message, true); b.disabled = false; } };
+      const b = $("[data-complete]", done); b.disabled = !!p?.completed_at; b.textContent = p?.completed_at ? "✓ Дууссан" : "✓ Энэ хичээлийг дуусгалаа";
+      b.onclick = async () => {
+        if (preview) return pvToast("суралцагч дарвал хичээл дуусч, дараагийнх нь нээгдэнэ (хадгалагдсангүй)");
+        b.disabled = true; try { await api(`/api/courses/${id}/lessons/${lid}/complete`, { method: "POST" }); b.textContent = "✓ Дууссан"; toast("Сайн ажиллалаа! Дараагийн хичээл рүү 🎉"); await refreshAccess(); } catch (e) { toast(e.message, true); b.disabled = false; }
+      };
     }
     if (Auth.token && drip) setTimeout(refreshAccess, 300); // үзсэн нь дараагийнхыг нээж магадгүй
-    store.set("sg_last", { course: id, lesson: lid, lessonTitle: l.title, at: Date.now() }); // нүүр хуудасны "Үргэлжлүүлэх"
+    if (!preview) store.set("sg_last", { course: id, lesson: lid, lessonTitle: l.title, at: Date.now() }); // нүүр хуудасны "Үргэлжлүүлэх"
     const body = $("#lessonContent"), player = $("#player");
     player.innerHTML = mediaHTML(l.video_url, l.title); player.hidden = !l.video_url;
     if (l.blocks?.length) { // блоктой: текст, зураг, дуу, видео, файл, асуулт дарааллаараа
@@ -5145,18 +6391,21 @@ async function coursePage() {
     stopMarker?.(); // маркер: шалгалтаас бусад хичээлд, нэвтэрсэн суралцагчид (тодруулга зөвхөн өөрт нь)
     $$(".hl-bar, .hl-pop", body.parentElement).forEach((x) => x.remove());
     const tHref = $(".teacher-chip")?.getAttribute("href") || "", tUser = tHref.startsWith("/t/") ? tHref.slice(3) : "";
-    stopMarker = Auth.token && !l.exam ? lessonMarker(body, `/api/courses/${id}/lessons/${lid}/highlights`, { teacher: tUser, self: !!tUser && Auth.user?.username === tUser, title: l.title, preload: l._highlights }) : null;
+    // Багш эсэх: сервер (access.owner — хамтран заадаг багш ч) эсвэл (access ирээгүй бол) багшийн холбоосоор.
+    // Урьдчилан харах үед багш суралцагч шиг (isOwner=false), харин бодит өгөгдөлд бичих хэсэгт хуурай горимоор.
+    const teacher = !!access?.owner || (!!Auth.user?.username && tHref === "/t/" + Auth.user.username), isOwner = teacher && !preview;
+    // «Багшаас асуух»: урьдчилан харахад илгээхгүй (ctx.self — тайлбартай урьдчилсан харагдац).
+    stopMarker = Auth.token && !l.exam ? lessonMarker(body, `/api/courses/${id}/lessons/${lid}/highlights`, { teacher: tUser, self: preview || (!!tUser && Auth.user?.username === tUser), title: l.title, preload: l._highlights }) : null;
     const modal = $("#lessonModal");
-    const isOwner = !!Auth.user?.username && $(".teacher-chip")?.getAttribute("href") === "/t/" + Auth.user.username;
-    mountClouds(body, Auth.token ? `/api/courses/${id}/lessons/${lid}` : "", isOwner);
-    mountBoards(body, Auth.token ? `/api/courses/${id}/lessons/${lid}` : "", isOwner);
+    mountClouds(body, Auth.token ? `/api/courses/${id}/lessons/${lid}` : "", isOwner, preview); // урьдчилан: маягт харагдана, илгээхгүй
+    mountBoards(body, Auth.token ? `/api/courses/${id}/lessons/${lid}` : "", teacher); // самбар: багшийн эрхээр (бодит самбарт бичихээс сэргийлнэ)
     if (l.exam) { // шалгалт: асуултууд зөвхөн "эхлүүлэх"-ээр ирнэ
       if (done) done.hidden = true;
-      examCard(body, { courseId: id, lessonId: lid, title: l.title, onFinish: () => autoAdvance(false) });
+      examCard(body, { courseId: id, lessonId: lid, title: l.title, onFinish: () => autoAdvance(false), dry: preview });
     }
     if (l.assignment) { // даалгавар: хариу илгээснээр дуусна
       if (done) done.hidden = true;
-      assignmentCard(body, { courseId: id, lessonId: lid });
+      assignmentCard(body, { courseId: id, lessonId: lid, dry: preview });
     }
     const dbox = $("#lessonDiscuss");
     if (dbox) { dbox.hidden = true; dbox.innerHTML = ""; if (l.discussion && !l.exam) discussionPanel(dbox, { courseId: id, lessonId: lid, preload: l._discussion }); }
@@ -5164,9 +6413,11 @@ async function coursePage() {
     const watched = {};
     for (const [k, v] of Object.entries(access?.progress?.[lid]?.quiz || {})) if (k.startsWith("watch_") && v) watched[k.slice(6)] = true;
     stopVideos?.();
-    stopVideos = guardVideos(body, { watched, owner: isOwner, modal, progressBase: Auth.token && !isOwner ? `/api/courses/${id}/lessons/${lid}` : null,
+    // Урьдчилан харах: суралцагчийн хориг (owner=false), гэхдээ үзэлтийн явц, «бүрэн үзсэн»-ийг серверт илгээхгүй.
+    stopVideos = guardVideos(body, { watched, owner: isOwner, modal, progressBase: Auth.token && !isOwner && !preview ? `/api/courses/${id}/lessons/${lid}` : null,
       onWatched: (bid) => {
         if (!Auth.token) return;
+        if (preview) return pvToast("видеог бүрэн үзлээ — суралцагч одоо гүйлгэж болно (хадгалагдсангүй)");
         api(`/api/courses/${id}/lessons/${lid}/watched/${bid}`, { method: "POST" }).then(() => toast("✓ Видеог бүрэн үзлээ — одоо гүйлгэж болно")).catch(() => {});
       } });
     // Идэвхтэй суралцах хугацаа
@@ -5179,7 +6430,8 @@ async function coursePage() {
     const finishByTime = async () => {
       if (autoDone || l.exam || l.assignment || isOwner || !Auth.token) return;
       autoDone = true;
-      if (!quizzesOk()) { toast(`✓ ${l.active_min} мин гүйцлээ — одоо асуултуудаа дуусгаарай, дараагийн хичээл нээгдэнэ`); autoDone = false; return; }
+      if (preview) { pvToast(`${l.active_min} мин гүйцлээ — суралцагчид энд хичээл автоматаар дуусч, дараагийнх нь нээгдэнэ`); return; }
+      if (!quizzesOk()) { toast(`✓ ${l.active_min} мин гүйцлээ — одоо асуултуудад хариулж дуусгавал дараагийн хичээл нээгдэнэ`); autoDone = false; return; }
       for (let i = 0; i < 4; i++) { // сервер дээрх идэвхтэй хугацаа бага зэрэг хоцорч бүртгэгдэж болно
         try {
           await api(`/api/courses/${id}/lessons/${lid}/complete`, { method: "POST" });
@@ -5196,15 +6448,33 @@ async function coursePage() {
       meter.textContent = `🕒 Идэвхтэй суралцсан: ${Math.floor(Math.min(sec, need) / 60)}/${l.active_min} мин`;
       meter.classList.toggle("ok", sec >= need);
       cb.disabled = sec < need;
-      if (sec < need) cb.textContent = `🕒 ${l.active_min} мин идэвхтэй үзсний дараа дуусгана`; else { cb.textContent = "✓ Энэ хичээлийг дууслаа"; finishByTime(); }
+      if (sec < need) cb.textContent = `🕒 ${l.active_min} мин идэвхтэй үзсний дараа дуусгах боломжтой`; else { cb.textContent = "✓ Энэ хичээлийг дуусгалаа"; finishByTime(); }
     };
     stopWatch?.();
     const lazy = lazyWatch; lazyWatch = false;
-    stopWatch = l.exam ? null : watchLesson({ courseId: id, lessonId: lid, modal, onStop: () => { closeModal(modal); refreshAccess(); }, onActive, maxWarn: access?.max_warnings, lazy });
+    stopWatch = l.exam ? null : watchLesson({ courseId: id, lessonId: lid, modal, onStop: () => { closeModal(modal); refreshAccess(); }, onActive, maxWarn: access?.max_warnings, lazy, dry: preview });
     reflectDone = !!(Auth.token && access?.progress?.[lid]?.completed_at) || isOwner || !Auth.token || !!l.exam;
     curLesson = reflectDone ? null : { id, lid, title: l.title };
     openModal(modal);
+    if (Auth.token && !preview && !isOwner) Review.opened(id, lid); // давтах сануулгын хичээл бол давтсанд тооцно
+    peerLessonLink(lid, l, isOwner);
   };
+  // «🤝 Энэ хичээлд хамт ажилласан найзаа үнэлэх»: элссэн суралцагчид (багш, урьдчилан харах, шалгалтын хичээлд биш) — бүлэг чатын
+  // үнэлгээний самбарыг тэр хичээлээр нээнэ. Hash солихгүй (хичээл хаагдахгүй).
+  const peerLessonLink = (lid, l, owner) => {
+    const card = $("#lessonModal .modal-card"); if (!card) return;
+    let box = $("#lessonPeer");
+    const ok = Auth.token && !preview && !owner && !access?.owner && !l.exam && !Peer.denied.has(id) && (access?.enrolled || (access?.lessons || []).length > 0) && window.railStartGroup;
+    if (!ok) { if (box) box.hidden = true; return; }
+    if (!box) {
+      box = document.createElement("p"); box.id = "lessonPeer"; box.className = "peer-lesson-link"; card.append(box);
+      box.addEventListener("click", (e) => { const b = e.target.closest("[data-peer-lesson-open]"); if (b) window.railStartGroup?.(id, { lesson: b.dataset.peerLessonOpen }).catch((x) => toast(x.message, true)); });
+    }
+    box.innerHTML = `<button type="button" class="btn btn-ghost btn-sm" data-peer-lesson-open="${esc(lid)}" aria-haspopup="dialog">🤝 Энэ хичээлд хамт ажилласан найзаа үнэлэх</button>`;
+    box.hidden = false;
+  };
+  // Давтах сануулгын цонхноос энэ сургалтын хичээлийг хуудас шилжилгүй нээнэ (мөр олдохгүй бол false).
+  rvOpenLesson = (lid) => { const li = rowById(lid); if (!li) return false; expandRow(li); return true; };
 
   // Нүүр хуудаснаас #l=<хичээл> холбоосоор ирвэл тухайн хичээлийг шууд нээнэ (эрхгүй бол мөрийг тодруулна).
   const want = new URLSearchParams(location.hash.slice(1)).get("l");
@@ -5225,6 +6495,7 @@ async function coursePage() {
     const b = e.target.closest("[data-play]");
     if (b && !e.target.closest(".lesson-more") && canOpen(b.closest(".lesson"))) { await expandRow(b.closest(".lesson")); return; }
     if (!b) return;
+    await svReady();
     const li = b.closest(".lesson"), lid = li.dataset.lesson;
     if (access?.blocks?.[lid]) { await expandRow(li); return; }
     if (isLocked(li)) { b.disabled = true; try { await paywall(li); } finally { b.disabled = false; } return; } // хичээл, багц, шалгалт, даалгавар — төлбөрийн цонх
@@ -5256,7 +6527,7 @@ function payWindow(order, payment, label, onPaid, extra = {}) {
       <div class="pw-side"><p class="pw-amount">${money(p.amount || ord.amount)}</p>${p.fee > 0 ? `<p class="pw-fee">${money(p.base)} + үйлчилгээний хураамж ${money(p.fee)} (${p.fee_pct}%)</p>` : ""}
       <ol class="pw-steps"><li><span>${qpay ? "Банкны апп-аа нээгээд <b>QR уншуулах</b>-ыг сонгоно" : "Утасныхаа камераар QR-ыг уншуулна"}</span></li><li><span>${qpay ? "Дүнг шалгаад төлбөрөө баталгаажуулна" : "Нээгдсэн хуудсанд <b>«Төлөх»</b> дарна"}</span></li><li><span>Энэ цонх өөрөө шинэчлэгдэж <b>шууд нээгдэнэ</b></span></li></ol>
       <p class="pw-status" role="status"><i></i>Төлбөр хүлээж байна… <button type="button" class="pw-recheck" data-pw-check>Шалгах</button></p></div></div>
-      ${qpay && p.urls?.length ? `<div class="pw-banks ${mobile ? "open" : ""}"><button type="button" class="pw-banks-t" data-pw-banks aria-expanded="${mobile}">📱 Утсан дээрээ байна уу? Банкны апп-аар шууд төлөх</button>
+      ${qpay && p.urls?.length ? `<div class="pw-banks ${mobile ? "open" : ""}"><button type="button" class="pw-banks-t" data-pw-banks aria-expanded="${mobile}">📱 Утаснаас орсон уу? Банкны аппаар шууд төлөх</button>
         <div class="pw-bank-list">${p.urls.map((u) => `<a class="pw-bank" href="${esc(u.link)}" rel="noopener">${u.logo ? `<img src="${esc(u.logo)}" alt="" loading="lazy">` : ""}<span>${esc(u.description || u.name)}</span></a>`).join("")}</div></div>` : ""}
       ${!qpay && mobile && p.pay_url ? `<a class="btn btn-glass btn-sm pw-here" href="${esc(p.pay_url)}" target="_blank" rel="noopener">Энэ утсан дээр төлөх</a>` : ""}`;
   };
@@ -5433,7 +6704,7 @@ function findCourses() {
     list.innerHTML = d.items.map(card).join("");
     pager.innerHTML = d.pages > 1 ? `<button type="button" data-page="${d.page - 1}" ${d.page <= 1 ? "disabled" : ""} aria-label="Өмнөх">‹</button>
       ${pages(d.page, d.pages).map((x) => x === "…" ? `<span>…</span>` : `<button type="button" data-page="${x}" ${x === d.page ? 'aria-current="page"' : ""}>${x}</button>`).join("")}
-      <button type="button" data-page="${d.page + 1}" ${d.page >= d.pages ? "disabled" : ""} aria-label="Дараах">›</button>` : "";
+      <button type="button" data-page="${d.page + 1}" ${d.page >= d.pages ? "disabled" : ""} aria-label="Дараагийн">›</button>` : "";
   };
   // Google шиг: хайлтын үг оруулаагүй үед зөвхөн хайлтын мөр харагдана.
   const tags = $(".find-tags", box);
@@ -5565,7 +6836,7 @@ function loginPage() {
   $("[data-forgot-back]").addEventListener("click", () => showForgot(false));
   $("[data-captcha-new]", ff).addEventListener("click", () => { newCaptcha(); ff.captcha.focus(); });
   // Сэргээх арга: имэйл эсвэл (Verify.MN идэвхтэй бол) баталгаажуулсан утас — утаснаасаа SMS илгээж шууд сэргээнэ.
-  const LEDE = { email: "Бүртгэлтэй имэйлээ бичнэ үү. Нууц үг сэргээх холбоос илгээнэ.", phone: "Бүртгэлдээ үлдээсэн утасны дугаараа бичнэ үү. Тэр дугаараасаа нэг SMS илгээгээд нууц үгээ шууд солино." };
+  const LEDE = { email: "Бүртгэлтэй имэйл хаягаа бичнэ үү. Нууц үг сэргээх холбоосыг тань руу илгээнэ.", phone: "Бүртгэлдээ үлдээсэн утасны дугаараа бичнэ үү. Тэр дугаараасаа нэг SMS илгээгээд нууц үгээ шууд солих боломжтой." };
   let fgMode = "email";
   const sms = $(".fg-sms", ff), go = $(".fg-go", ff);
   const setMode = (m) => {
@@ -5599,7 +6870,7 @@ function loginPage() {
         smsVerify(sms, v, (token) => api("/api/auth/forgot/phone/check", { method: "POST", body: { token }, token: null }), phoneDone, () => { setMode("phone"); newCaptcha(); });
       } else {
         await api("/api/auth/forgot", { method: "POST", body: { email: ff.email.value, captcha_id: capId, captcha: ff.captcha.value }, token: null });
-        $(".forgot-lede", ff).innerHTML = `<b>Имэйлээ шалгана уу.</b> Хэрэв <b>${esc(ff.email.value)}</b> хаягаар бүртгэл байвал нууц үг сэргээх холбоос илгээлээ (Spam хавтсыг ч харна уу). Холбоос 1 цаг хүчинтэй.`;
+        $(".forgot-lede", ff).innerHTML = `<b>Имэйлээ шалгана уу.</b> Хэрэв <b>${esc(ff.email.value)}</b> хаягаар бүртгэл байвал нууц үг сэргээх холбоос илгээлээ (Spam хавтсаа ч шалгаарай). Холбоос 1 цаг хүчинтэй.`;
         go.textContent = "Дахин илгээх";
       }
     } catch (x) { err.textContent = x.message; if (x.data?.code === "captcha") ff.captcha.focus(); }
@@ -5636,7 +6907,7 @@ function deleteAccountDialog() {
   el.innerHTML = `<form class="rp-card">
     <h3 id="daT">Бүртгэлээ устгах уу?</h3>
     <ul class="da-list">
-      <li>Нэр, имэйл, профайл, суралцсан явц, дүн, хичээлийн хяналтын бүртгэл, мэдэгдэл бүрмөсөн устна.</li>
+      <li>Нэр, имэйл, профайл, суралцсан явц, дүн, хичээлийн хяналтын бүртгэл, мэдэгдэл бүрмөсөн устгагдана.</li>
       <li>Чатын мессежүүд тань «устгагдсан» болж, нэр тань арилна.</li>
       <li>Удахгүй болох цагийн захиалга цуцлагдаж, багшид мэдэгдэнэ.</li>
       <li>Худалдан авсан сургалт, номдоо дахин хандах боломжгүй. Төлбөрийн баримт хуулийн дагуу нэргүйгээр хадгалагдана.</li>
@@ -5709,7 +6980,7 @@ function lightbox(img) {
   el.className = "lbx"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", "Зураг томруулж харах");
   el.innerHTML = `<div class="lbx-stage"><img alt="" draggable="false"></div>
     <button type="button" class="lbx-x" aria-label="Хаах" title="Хаах (Esc)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
-    ${list.length > 1 ? `<button type="button" class="lbx-nav lbx-prev" aria-label="Өмнөх зураг">‹</button><button type="button" class="lbx-nav lbx-next" aria-label="Дараах зураг">›</button>` : ""}
+    ${list.length > 1 ? `<button type="button" class="lbx-nav lbx-prev" aria-label="Өмнөх зураг">‹</button><button type="button" class="lbx-nav lbx-next" aria-label="Дараагийн зураг">›</button>` : ""}
     <div class="lbx-bar"><span class="lbx-cap"></span>${list.length > 1 ? `<span class="lbx-n"></span>` : ""}</div>`;
   document.body.append(el); document.documentElement.classList.add("lbx-open");
   const stage = $(".lbx-stage", el), im = $("img", stage), last = document.activeElement, t0 = Date.now();
@@ -5776,8 +7047,8 @@ document.addEventListener("pointerup", (e) => {
 // Сонголт бүр дарах тутам түвшин нэмэгдэж (3 хүрээд унтарна), тохиргоо энэ төхөөрөмж дээр хадгалагдана.
 const A11Y_SVG = (p, w = 34) => `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 const A11Y = [ // [түлхүүр, нэр, түвшний тоо (1 = асаах/унтраах), түвшний нэр, дүрс]
-  ["fs", "Фонт томруулах", 3, ["", "Том", "Илүү том", "Маш том"], A11Y_SVG('<path d="M3 10h7M6.5 10v9M12 5h9M16.5 5v14"/>')],
-  ["cur", "Хулгана томруулах", 1, null, A11Y_SVG('<path d="M5 3l14 8-6.5 1.6L9.6 19z"/>')],
+  ["fs", "Үсэг томруулах", 3, ["", "Том", "Илүү том", "Маш том"], A11Y_SVG('<path d="M3 10h7M6.5 10v9M12 5h9M16.5 5v14"/>')],
+  ["cur", "Курсор томруулах", 1, null, A11Y_SVG('<path d="M5 3l14 8-6.5 1.6L9.6 19z"/>')],
   ["ln", "Холбоос тодруулах", 1, null, A11Y_SVG('<path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8"/>')],
   ["ct", "Контраст +", 3, ["", "Өндөр контраст", "Хар дэвсгэр", "Хар цагаан"], A11Y_SVG('<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>')],
   ["tx", "Текст тодруулах", 1, null, '<span class="a11y-df" aria-hidden="true">Df</span>'],
@@ -5804,7 +7075,7 @@ function mountA11y() {
     panel.innerHTML = `<div class="a11y-head"><b>Хүртээмж</b><button type="button" class="a11y-x" aria-label="Хаах">✕</button></div>
       <div class="a11y-grid">${A11Y.map(([k, t, n, subs, ic]) => { const v = st[k] | 0; return `<button type="button" class="a11y-opt" data-a11y="${k}" aria-pressed="${v > 0}" aria-label="${t}${n > 1 ? `, ${v ? v + "-р түвшин" : "унтраалттай"}` : ""}">
         <span class="a11y-ic">${ic}</span><span class="a11y-t">${t}</span>${n > 1 ? `<span class="a11y-sub">${subs[v] || ""}</span><span class="a11y-lv">${[1, 2, 3].map((x) => `<i class="${x <= v ? "on" : ""}"></i>`).join("")}</span>` : ""}</button>`; }).join("")}</div>
-      <button type="button" class="a11y-reset">${A11Y_SVG('<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>', 22)}Тохиргоог шинэчлэх</button><p class="a11y-live" aria-live="polite"></p>`;
+      <button type="button" class="a11y-reset">${A11Y_SVG('<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>', 22)}Анхны тохиргоонд буцаах</button><p class="a11y-live" aria-live="polite"></p>`;
   };
   const say = (t) => { const l = $(".a11y-live", panel); if (l) l.textContent = t; };
   const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); const a = anchor; toggle(false); (a || fab).focus(); } };
@@ -5846,9 +7117,10 @@ function mountA11y() {
 // Бүх хуудсанд (зүүн доод буланд); iframe дотор (хичээлд суулгасан хуудас) давхардуулахгүй.
 if (window.self === window.top) mountA11y();
 
-window.SG = { coverPicker, coverHTML, coverKind, embedLink, THREAD_EVENTS, panelIn, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, apiList, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
+window.SG = { Peer, peerPanel, peerStripHTML, coverPicker, coverHTML, coverKind, embedLink, THREAD_EVENTS, panelIn, mountClouds, mountBoards, openBoard, pay: payWindow, rubricView: rubricViewHTML, icon, embedDoc, ChatThread, pdfLib, BookReader, richHTML, blocksHTML, mountQuizzes, fmtBytes, extOf, $, $$, esc, api, apiList, Auth, toast, money, fmtDate, fmtTime, Live, mediaHTML, book3dHTML, hydrateBooks, Flipbook, openModal, closeModal, msgHTML, linkify, celebrate, reveals, counters, avatarHTML, ringHTML, hueOfName, fmtDay, WEEKDAYS, WEEKDAYS_SHORT };
 // Хөдөлгөөнийг цөөлсөн: хазайлт, соронзон товч, курсор дагасан гэрэл, нээлтийн хөшиг ашиглахгүй.
 splitText(); reveals(); counters(); navScroll(); ripples(); authNav(); chatRail(); hydrateBooks();
+Review.init(); // 🧠 давтах сануулгын цонх (нүүр, сургалт, профайл — нэвтэрсэн хэрэглэгчид)
 if (page === "me") { // өөрийн хуудас руу: багш профайл, суралцагч нүүр; нэвтрээгүй бол нэвтрэх
   const u = Auth.user, h = location.hash;
   if (!Auth.token) location.replace("/login?next=" + encodeURIComponent("/me" + h));
@@ -5870,7 +7142,7 @@ if (page === "home") {
 function startDemo(el, still) {
   const att = $(".hd-att", el), dots = $$(".hd-strikes i", el), cap = $(".hd-cap", el);
   const ATT = [96, 71, 48, 12, 12], HITS = [0, 1, 2, 3, 3], HOLD = [2200, 2500, 2500, 2700, 3000];
-  const CAP = ["Анхааралтай үзэж байна — идэвхтэй минут тоологдоно", "Таб сольсон — улаан дохио, дуут сануулга · 1/3", "Хичээлээс хөндийрсөн — курсор гарсан · 2/3",
+  const CAP = ["Анхааралтай үзэж байна — идэвхтэй минут тоологдоно", "Таб сольсон — улаан дохио, дуут сануулга · 1/3", "Анхаарал сарнисан — курсор гарсан · 2/3",
     "Хичээл түр хаагдлаа — 3/3, багшийн тогтоосон хугацаагаар", "Багшид мэдэгдэл очлоо — шалгаад дахин нээж болно"];
   let s = 0, t = 0, shown = 96;
   const set = (n) => {
@@ -5975,14 +7247,14 @@ function explore() {
 /* ---------- Нүүр: Шилдэг багш нар, Идэвхтэй суралцагчид — зэрэглэл × 10, гүйдэг карт (сум, чирэх, автоматаар) ---------- */
 const TT_BOARDS = [ // [түлхүүр, дүрс, таб, нэгж, тайлбар]
   ["views", "eye", "Хамгийн их хандалттай", "үзэлт", "Профайл нь хамгийн олон удаа үзэгдсэн"],
-  ["students", "users", "Хамгийн их авагдсан", "элсэлт", "Сургалтыг нь хамгийн олон суралцагч авсан"],
+  ["students", "users", "Хамгийн олон элсэлттэй", "элсэлт", "Сургалтад нь хамгийн олон суралцагч элссэн"],
   ["courses", "courses", "Хамгийн олон сургалттай", "сургалт", "Хамгийн олон сургалт нийтэлсэн"],
   ["talks", "chat", "Хамгийн идэвхтэй харилцаа", "хүнтэй харилцсан", "Хамгийн олон хүнтэй чат, сэтгэгдлээр харилцсан"],
 ];
 const TS_BOARDS = [
   ["courses", "courses", "Олон сургалтад суралцсан", "сургалт", "Хамгийн олон сургалтад идэвхтэй суралцсан"],
-  ["rank", "medal", "Өндөр цолтой", "оноо", "Цолын оноо хамгийн өндөр"],
-  ["creative", "edit", "Бүтээлч суралцагч", "бүтээл", "Хичээлийн дүгнэлт, даалгавар, үүлэн үг, тодруулга хамгийн их"],
+  ["rank", "medal", "Өндөр эрэмбэтэй", "оноо", "Эрэмбийн оноо хамгийн өндөр"],
+  ["creative", "edit", "Бүтээлч суралцагч", "бүтээл", "Хичээлийн дүгнэлт, даалгавар, үүлэн үг, тодруулга хамгийн олон"],
   ["discipline", "check", "Сахилга баттай", "мин сануулгагүй", "Сануулга авалгүй хамгийн удаан идэвхтэй суралцсан"],
   ["talks", "chat", "Харилцаа сайтай", "мессеж, сэтгэгдэл", "Чат, хичээлийн сэтгэгдлээр хамгийн идэвхтэй харилцсан"],
 ];
@@ -6008,9 +7280,9 @@ function ttDemo(kind) {
     ? { boards: { courses: board("courses"), rank: board("points"), creative: board("creative"), discipline: board("discipline"), talks: board("talks") } }
     : { boards: { views: board("views"), students: board("enrolls"), courses: board("courses"), talks: board("talks") } };
 }
-const RANK_STEPS = [[0, "Шинэ цэрэг", "·"], [60, "Байлдагч", "▪"], [150, "Ахлах байлдагч", "▪▪"], [260, "Дэд түрүүч", "▾"], [400, "Түрүүч", "▾▾"], [560, "Ахлах түрүүч", "▾▾▾"],
-  [750, "Сургагч ахлагч", "◆"], [980, "Дэд дэслэгч", "★"], [1250, "Дэслэгч", "★★"], [1560, "Ахлах дэслэгч", "★★★"], [1900, "Ахмад", "★★★★"], [2300, "Хошууч", "✦"],
-  [2750, "Дэд хурандаа", "✦✦"], [3300, "Хурандаа", "✦✦✦"], [4000, "Бригадын генерал", "✪"], [4800, "Хошууч генерал", "✪✪"], [5700, "Дэслэгч генерал", "✪✪✪"], [6800, "Генерал", "✪✪✪✪"]];
+const RANK_STEPS = [[0, "Оч", "·"], [60, "Болор хайрга", "▪"], [150, "Зөгий", "▪▪"], [260, "Цагаан хэрэм", "▾"], [400, "Зальжин үнэг", "▾▾"], [560, "Алсын шар шувуу", "▾▾▾"],
+  [750, "Одой дархан", "◆"], [980, "Алхимич", "★"], [1250, "Луужин баригч", "★★"], [1560, "Цасны ирвэс", "★★★"], [1900, "Хүрэл баавгай", "★★★★"], [2300, "Алтан арслан", "✦"],
+  [2750, "Галт шувуу / Феникс", "✦✦"], [3300, "Гүн далайн халим", "✦✦✦"], [4000, "Хангарьд", "✪"], [4800, "Цаг хугацааны эзэн", "✪✪"], [5700, "Тэнгэрийн луу", "✪✪✪"], [6700, "Ертөнцийг бүтээгч", "✪✪✪✪"]];
 
 // leaderboard — таб, гүйдэг карт, сум, цэг, автоматаар шилжих (хулгана/фокус/хүрэлт үед зогсоно).
 function leaderboard(root, data, defs, card, demo) {
@@ -6121,7 +7393,8 @@ async function topStudents() {
   if (!shown && Auth.user?.rank_hidden) root.hidden = false;
 }
 
-if (page === "home") { homePage(); explore(); topTeachers(); topStudents(); }
+// «Шилдэг 10» (Шилдэг багш нар, Идэвхтэй суралцагчид) түр нуугдсан: section нь hidden хэвээр; буцаан харуулах бол topTeachers(); topStudents(); дуудна.
+if (page === "home") { homePage(); explore(); }
 if (page === "profile") profilePage();
 if (page === "profile" || page === "course") chatWidget();
 if (page === "course") coursePage();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Surgalt.mn хэрхэн ажилладаг вэ: багш хичээлээ зохион байгуулж, платформ хүргэж, суралцагч алхам алхмаар сурдаг — 3D-ээр, энгийн тайлбартай.">
+<meta name="description" content="Surgalt.mn хэрхэн ажилладаг вэ: багш хичээлээ зохион байгуулж, платформ түүнийг хүргэж, суралцагч алхам алхмаар суралцдагийг 3D-ээр, энгийн тайлбартай үзнэ.">
 <meta property="og:title" content="Surgalt.mn — систем хэрхэн ажилладаг вэ">
 <meta property="og:description" content="Багш → surgalt.mn → Суралцагч: 27 шаттай 3D аялал, системийн бүх боломж.">
 <meta name="theme-color" content="#060914">
@@ -209,7 +209,8 @@ body.det-open #labels{visibility:hidden}
 @media (prefers-reduced-motion:reduce){.pm-i.live .pm-k{animation:none}}
 .det{position:fixed;inset:0;z-index:28;display:flex;justify-content:center;align-items:center;padding:16px;background:rgba(4,7,18,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;transition:opacity .22s;overflow:auto}
 .det.show{opacity:1}
-.det-card{width:min(640px,100%);max-height:calc(100dvh - 32px);overflow:auto;padding:20px 22px;border-radius:24px;background:#0c1330;border:1px solid rgba(34,195,181,.45);box-shadow:0 40px 120px -30px rgba(0,0,0,.9),0 0 50px -20px rgba(34,195,181,.6);transform:translateY(12px) scale(.98);transition:transform .3s cubic-bezier(.2,1.2,.4,1)}
+/* Дэлгэрэнгүй карт: тунгалаг биш бол WebGL canvas дээр байхад Chrome доорх 3D-г «халхлагдсан» гэж буруу байрлалд тасалдаг (таблет хар харагддаг); дэвсгэр бага зэрэг тунгалаг. */
+.det-card{width:min(640px,100%);max-height:calc(100dvh - 32px);overflow:auto;padding:20px 22px;border-radius:24px;background:rgba(12,19,48,.97);border:1px solid rgba(34,195,181,.45);box-shadow:0 40px 120px -30px rgba(0,0,0,.9),0 0 50px -20px rgba(34,195,181,.6);transform:translateY(12px) scale(.98);transition:transform .3s cubic-bezier(.2,1.2,.4,1)}
 .det.show .det-card{transform:none}
 .det-head{display:flex;align-items:center;gap:14px}
 .det-head img{flex:none;width:52px;height:52px;filter:drop-shadow(0 6px 16px rgba(0,0,0,.4))}
@@ -262,10 +263,6 @@ body.show3d .det-cols{grid-template-columns:1fr}
 .vn-go{color:#e11d48;font-weight:800}
 .pp-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:#fff;margin-top:6px}.pp-row i{width:9px;height:9px;border-radius:50%;background:#cbd2e1}.pp-row i.on{background:#34c759;box-shadow:0 0 0 3px #d9f7e2}.pp-row span{margin-left:auto;font-size:12px;color:#8a96bf}
 .pp-btn{margin-top:8px;padding:8px;border-radius:10px;border:1.5px dashed #22c3b5;color:#0f766e;text-align:center;font-weight:700;font-size:13px}
-.bd-teams{display:flex;flex-wrap:wrap;gap:6px}.bd-teams span{padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--c) 16%,#fff);color:var(--c);font:800 11.5px var(--f-body);border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
-.bd-wrap{display:grid;grid-template-columns:1.5fr 1fr;gap:8px;margin-top:10px}.bd-canvas{border-radius:10px;background:#fff;border:1px solid #dfe4ef;padding:4px}.bd-canvas svg{display:block;width:100%;height:auto}
-.bd-chat{display:grid;align-content:start;gap:5px;padding:8px;border-radius:10px;background:#e9edfa;font-size:12px}.bd-chat b{font-size:12px;color:#1d2f6e}.bd-chat span{padding:5px 7px;border-radius:8px;background:#fff}.bd-chat i{font-style:normal;font-weight:800;color:#ea580c}
-.bd-voice{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;font-size:12.5px}.bd-voice .live{color:#e11d48}.bd-voice span{padding:3px 9px;border-radius:999px;background:#eafbef;color:#15803d;font-weight:700}
 .pf-book{display:flex;justify-content:center;perspective:600px;padding:10px 0}.pf-pg{width:130px;height:150px;padding:12px;background:#fbfaf5;border:1px solid #e3e0d4;font:800 13px var(--f-body);color:#1d2f6e;box-shadow:0 6px 16px rgba(18,24,41,.12)}.pf-pg i{display:block;height:6px;margin-top:9px;border-radius:3px;background:#c7cde0}.pf-pg.flip{transform:rotateY(-22deg);transform-origin:left center;border-left:none}
 body.cat-open #labels{visibility:hidden}
 body.ov .lbl small{display:none}
@@ -304,6 +301,51 @@ body.ov .lbl small{display:none}
   .cat-grid{columns:1}
 }
 @media (max-width:420px){.top-title h1{font-size:14px}}
+/* Утас: босоо (mp) — бичгийн карт доор хумигдсан, дарвал дэлгэгдэнэ; хөндлөн (ml) — карт зүүн талд, 3D баруун талд.
+   Шошго жижиг; дарвал тайлбар мөр нь дэлгэгдэнэ (ar.js давхцлыг нь тооцож байрлуулна). */
+body.mob .toast{width:max-content;max-width:calc(100vw - 32px)}
+.card-grab,.card-more,.zc-s{display:none}
+.zc-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zone-chip{min-width:0}
+body.mob .zc-l{display:none}body.mob .zc-s{display:inline}
+body.mob .card-num{flex:none;white-space:nowrap}
+body.mob .lbl{padding:3px 9px 3px 8px;gap:0}
+body.mob .lbl b{font-size:11px;gap:5px}
+body.mob .lbl b::before{width:6px;height:6px}
+body.mob .lbl small{display:none;font-size:10.5px;margin-top:2px}
+body.mob .lbl.on{pointer-events:auto;cursor:pointer}
+body.mob .lbl.open{z-index:2;padding:6px 12px 7px 10px;border-radius:14px;border-color:color-mix(in srgb,var(--c) 60%,transparent);background:rgba(8,13,34,.94)}
+body.mob .lbl.open small{display:block;max-width:230px;white-space:normal;text-align:center}
+body.mob .lbl.hero{padding:5px 12px 5px 10px}body.mob .lbl.hero b{font-size:12.5px}
+body.mob .lbl.zone{padding:0}body.mob .lbl.zone b{font-size:10.5px;letter-spacing:.12em}
+body.mob .lbl.flow{padding:2px 8px}body.mob .lbl.flow b{font-size:10px}
+body.mp .card{padding:4px 16px 12px;max-height:none;overflow:visible}
+body.mp .card.open{max-height:74vh;max-height:74dvh;overflow:auto}
+body.mp .card-grab{display:block;position:relative;width:calc(100% + 32px);height:18px;margin:0 -16px 2px;padding:0;border:0;background:none;cursor:pointer}
+body.mp .card-grab::before{content:"";position:absolute;left:50%;top:6px;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:rgba(255,255,255,.3)}
+body.mp .card.open .card-grab{position:sticky;top:-4px;z-index:3;background:linear-gradient(rgba(12,19,46,.97) 60%,rgba(12,19,46,0))}
+body.mp .card-head,body.mp .card.hero .card-head{flex-wrap:nowrap}
+body.mp .card.hero .card-head::after,body.mp .hero-tag{display:none}
+body.mp .card.hero h2::before{content:"★ ";color:var(--gold)}
+body.mp .card h2{margin:8px 0 4px;font-size:16.5px}
+body.mp .card:not(.open) .card-body{cursor:pointer}
+body.mp .card:not(.open) #cText{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:13.5px;line-height:1.5}
+body.mp .card:not(.open) #cPoints,body.mp .card:not(.open) #cDet,body.mp .card:not(.open) #cProt,body.mp .card:not(.open) #cReward,body.mp .card:not(.open) .map{display:none!important}
+body.mp .card-nav{margin:10px -16px -12px;padding:8px 16px 12px;bottom:-12px}
+body.mp .nav-mid{display:none}
+body.mp .card-more{display:inline-flex;flex:1;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 10px;border:0;border-radius:999px;background:none;color:var(--text-2);font:700 13px var(--f-body);cursor:pointer}
+body.mp .card-more svg{width:15px;height:15px;transition:transform .25s}
+body.mp .card.open .card-more svg{transform:rotate(180deg)}
+body.ml .top{padding:10px 14px 18px;align-items:center}
+body.ml .xp{position:static;flex:1 1 auto;min-width:0;max-width:320px;margin:0 auto}
+body.ml .toast{top:60px}
+body.ml .card{top:58px;bottom:max(10px,env(safe-area-inset-bottom));left:max(12px,env(safe-area-inset-left));right:auto;width:min(330px,42vw);max-height:none;overflow:auto;padding:12px 14px 10px;scrollbar-width:thin}
+body.ml .card h2{margin:8px 0 4px;font-size:16px}
+body.ml .card p{font-size:13px;line-height:1.5}
+body.ml .card li{font-size:12.5px}
+body.ml .card-nav{margin:10px -14px -10px;padding:8px 14px 10px;bottom:-10px}
+body.ml.show3d .det{left:max(12px,env(safe-area-inset-left));right:auto;top:58px;bottom:max(10px,env(safe-area-inset-bottom));width:min(330px,42vw);height:auto}
+body.ml.show3d .det-card{transform:translateX(-16px)}
 @media (prefers-reduced-motion:reduce){.card-body.in{animation:none}.toast{transition:opacity .2s}}
 </style>
 </head>
@@ -324,8 +366,8 @@ body.ov .lbl small{display:none}
   </div>
   <div class="top-acts">
     <button type="button" class="btn" id="btnCat" title="Системийн бүх боломжийн жагсаалт"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Бүх боломж</span></button>
-    <button type="button" class="btn" id="btnOverview" title="Бүх системийг нэг дор (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/></svg><span class="lbl-wide">Тойм</span></button>
-    <button type="button" class="btn gold" id="btnPlay" aria-pressed="false" title="Алхмуудыг автоматаар үзүүлнэ (Space)"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg><span>Аялал</span></button>
+    <button type="button" class="btn" id="btnOverview" title="Системийг бүхэлд нь нэг дор харах (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/></svg><span class="lbl-wide">Тойм</span></button>
+    <button type="button" class="btn gold" id="btnPlay" aria-pressed="false" title="Шатуудыг автоматаар үзүүлнэ (Space)"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg><span>Аялал</span></button>
   </div>
 </header>
 
@@ -334,11 +376,12 @@ body.ov .lbl small{display:none}
   <span style="--c:var(--gold)"><i></i>Агуулга (багшаас)</span>
   <span style="--c:var(--teal)"><i></i>Нээгдсэн хичээл</span>
   <span style="--c:var(--green)"><i></i>Явц, дүн, хариу</span>
-  <span style="--c:var(--violet)"><i></i>Багш хооронд хуваалцах</span>
+  <span style="--c:var(--violet)"><i></i>Багш нарын хооронд хуваалцах</span>
   <span style="--c:#ffc83d"><i></i>QPay төлбөр → орлого</span>
 </aside>
 
 <section class="card" id="card" aria-live="polite" style="--c:var(--blue)">
+  <button type="button" class="card-grab" id="cGrab" aria-controls="card" aria-expanded="false" aria-label="Тайлбарыг дэлгэх"></button>
   <div class="card-head"><span class="zone-chip" id="cZone">Тойм</span><span class="hero-tag" id="cHero" hidden>★ Гол онцлог</span><span class="card-num" id="cNum"></span></div>
   <div class="card-body">
     <h2 id="cTitle">Гурван оролцогч — нэг урсгал</h2>
@@ -350,8 +393,9 @@ body.ov .lbl small{display:none}
   </div>
   <div class="map" id="map" aria-label="Шатууд"></div>
   <div class="card-nav">
-    <button type="button" class="nav-b" id="prev" aria-label="Өмнөх алхам"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+    <button type="button" class="nav-b" id="prev" aria-label="Өмнөх шат"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
     <span class="nav-mid" id="navMid"></span>
+    <button type="button" class="card-more" id="cMore" aria-controls="card" aria-expanded="false"><span>Дэлгэрэнгүй</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button>
     <button type="button" class="nav-b next" id="next"><span id="nextLbl">Эхлэх</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
   </div>
   <div class="bar" id="bar" hidden><i></i></div>
@@ -370,9 +414,9 @@ body.ov .lbl small{display:none}
     <div class="cat-grid" id="catGrid"></div>
   </div>
 </div>
-<p class="hint" id="hint">Чирж эргүүлнэ · дугуйгаар томруулна · объект дээр очвол нэр, дарвал тайлбар гарна · ← → алхам солино</p>
+<p class="hint" id="hint">Чирж эргүүлнэ · дугуйгаар томруулна · объект дээр очвол нэр нь, дарвал тайлбар нь гарна · ← → шат солино</p>
 <div class="fallback" id="fallback" hidden></div>
-<noscript><div class="fallback"><ol><li style="--c:#f0a83a"><h3>Багш</h3><p>Сургалт үүсгэж, бүлэг, хичээлээ зохион байгуулна.</p></li><li style="--c:#6f8cff"><h3>surgalt.mn</h3><p>Агуулгыг хадгалж, зөв хүнд зөв цагт нээнэ.</p></li><li style="--c:#22c3b5"><h3>Суралцагч</h3><p>Элсэж, бүтээлчээр суралцаж, цол ахина.</p></li></ol></div></noscript>
+<noscript><div class="fallback"><ol><li style="--c:#f0a83a"><h3>Багш</h3><p>Сургалт үүсгэж, бүлэг, хичээлээ зохион байгуулна.</p></li><li style="--c:#6f8cff"><h3>surgalt.mn</h3><p>Агуулгыг хадгалж, зөв хүнд зөв цагт нээнэ.</p></li><li style="--c:#22c3b5"><h3>Суралцагч</h3><p>Элсэж, бүтээлчээр суралцаж, эрэмбэ ахина.</p></li></ol></div></noscript>
 
 <script src="/static/vendor/three-r128.min.js"></script>
 <script src="/static/ar.js"></script>

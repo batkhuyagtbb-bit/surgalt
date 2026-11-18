@@ -5,7 +5,9 @@ import (
 	"time"
 )
 
-// 8 хэмжүүр: өгөгдөлгүй тал −1 (дундажид орохгүй), утга 0-100 хооронд; ангийн дундаж зөвхөн өгөгдөлтэй хүмүүсээр.
+// 8 хэмжүүр: Идэвх, Анхаарал, Ойлголт, Хэрэглээ, Үр дүн, Өөрийн зохицуулалт, Эргэцүүлэл, Хамтын ажиллагаа.
+// Өгөгдөлгүй тал −1 (дундажид орохгүй), бүрэлдэхүүн дутуу бол бусдынх нь жинг дахин хэвийн болгоно; ангийн дундаж
+// зөвхөн өгөгдөлтэй хүмүүсээр.
 func TestDimScores(t *testing.T) {
 	none := (&StudentStat{ExamBest: -1}).dimScores()
 	for i, v := range none {
@@ -13,10 +15,12 @@ func TestDimScores(t *testing.T) {
 			t.Fatalf("өгөгдөлгүй суралцагчийн %s = %d, −1 байх ёстой", dimNames[i], v)
 		}
 	}
-	a := &StudentStat{TotalSec: 600, ActivePct: 80, ActiveDays: 5, Attention: 90, QuizTotal: 10, QuizAccuracy: 90, QuizQuestions: 8, QuizFirstTry: 75,
-		QuizGuesses: 1, VideoClips: 2, VideoCoverage: 70, ExamBest: 85, Lessons: 4, Reflections: 2, ReflectionWords: 24, BoardDays: 1, CollabScore: 60, ReviewDue: 4, ReviewDone: 3}
+	a := &StudentStat{TotalSec: 600, ActivePct: 80, ActiveDays: 5, Attention: 82, QuizTotal: 10, QuizAccuracy: 90, QuizQuestions: 8, QuizFirstTry: 75,
+		QuizGuesses: 1, AssignOpen: 4, AssignDone: 2, AssignGraded: 2, AssignPct: 80, AssignOnTime: 1, ExamBest: 85, LessonsDone: 6, LessonsTotal: 10,
+		ReviewDue: 4, ReviewDone: 3, Regularity: 60, Lessons: 4, Reflections: 2, ReflectionWords: 24, BoardDays: 1, CollabScore: 60}
 	d := a.dimScores()
-	want := []int{88, 90, 79, 70, 85, 50, 60, 75} // 0.6·80+0.4·100; 90; 0.6·90+0.4·75−5; 70; 85; 2/4·100·1; 60; 3/4
+	// 0.6·80+0.4·100; 82; 0.6·90+0.4·75−5; 0.7·80+0.3·50; 0.6·85+0.4·60; 0.5·75+0.3·60+0.2·50; 2/4·100·1; 60
+	want := []int{88, 82, 79, 71, 75, 66, 50, 60}
 	for i := range want {
 		if d[i] != want[i] {
 			t.Fatalf("%s = %d, хүлээсэн %d (%v)", dimNames[i], d[i], want[i], d)
@@ -26,8 +30,14 @@ func TestDimScores(t *testing.T) {
 	b := &StudentStat{ExamBest: -1, TotalSec: 300, ActivePct: 40, Attention: 30}
 	b.Dims = b.dimScores()
 	avg := avgDims([]*StudentStat{a, b})
-	if avg[1] != 60 || avg[3] != 70 || avg[6] != 60 {
-		t.Fatalf("ангийн дундаж: %v (анхаарал 60, видео зөвхөн a-гаар 70, багаар 60)", avg)
+	if avg[1] != 56 || avg[3] != 71 || avg[7] != 60 {
+		t.Fatalf("ангийн дундаж: %v (анхаарал 56, хэрэглээ зөвхөн a-гаар 71, хамтын ажиллагаа 60)", avg)
+	}
+	// Дутуу бүрэлдэхүүн: шалгалтгүй бол үр дүн = хичээл дуусгалт; зөвхөн тогтмол байдалтай бол өөрийн зохицуулалт = түүнийх;
+	// үнэлээгүй даалгавар — гүйцэтгэлийн хувиар.
+	c := (&StudentStat{ExamBest: -1, LessonsTotal: 10, LessonsDone: 5, ActiveDays: 2, Regularity: 40, AssignOpen: 2, AssignDone: 1, AssignOnTime: 1}).dimScores()
+	if c[4] != 50 || c[5] != 64 || c[3] != 50 || c[0] != -1 { // өөрийн зохицуулалт: (0.3·40 + 0.2·100) / 0.5 = 64
+		t.Fatalf("дутуу бүрэлдэхүүн: %v", c)
 	}
 	if got := avgDims(nil); got[0] != -1 {
 		t.Fatalf("хоосон анги: %v", got)

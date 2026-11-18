@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Surgalt.mn — хичээл үзэх биш, ойлгож сурах газар. Нэг минут хагасын танилцуулга.">
 <meta property="og:title" content="Surgalt.mn — танилцуулга">
-<meta property="og:description" content="Маркер, багшаас асуух, давтах, цол, багшийн хяналт — ирээдүйн амжилт өнөөдөр эхэлнэ.">
+<meta property="og:description" content="Маркер, багшаас асуух, давтах, эрэмбэ, багшийн хяналт — ирээдүйн амжилт өнөөдөр эхэлнэ.">
 <title>Surgalt.mn Intro 2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -221,7 +221,7 @@ html.embed,html.embed body{overflow:hidden}</style>
         </div>
       </div></div>
       <div class="pn" style="transform:translate3d(0,0,0)"><span class="orb" id="orb"></span></div>
-      <!-- 8. Оноо, цол -->
+      <!-- 8. Оноо, эрэмбэ -->
       <div class="pn" style="transform:translate3d(-640px,-1500px,40px) rotateY(20deg)"><div class="card rank" id="pRank">
         <svg viewBox="0 0 260 260"><circle cx="130" cy="130" r="112" fill="none" stroke="#eef1f6" stroke-width="16"/><circle id="ring" cx="130" cy="130" r="112" fill="none" stroke="url(#rg)" stroke-width="16" stroke-linecap="round" transform="rotate(-90 130 130)" stroke-dasharray="703.7" stroke-dashoffset="703.7"/><defs><linearGradient id="rg"><stop offset="0" stop-color="#2f56d6"/><stop offset="1" stop-color="#f0a83a"/></linearGradient></defs></svg>
         <div><div class="pts" id="pts">140</div><div class="lbl">нийт оноо</div><div class="badge" id="badge">▪▪ Ахлах байлдагч</div></div>
@@ -229,12 +229,12 @@ html.embed,html.embed body{overflow:hidden}</style>
       <!-- 9. Журнал -->
       <div class="pn" style="transform:translate3d(0px,1200px,-100px) rotateX(18deg)"><div class="card journal" id="pJournal">
         <div style="display:flex;align-items:center;gap:10px"><b style="font-size:18px">Журнал · Биологи 7А</b><span class="chip" style="margin-left:auto">5 суралцагч</span></div>
-        <table><thead><tr><th>Суралцагч</th><th>Явц</th><th>Идэвх</th><th>Дүн</th><th>Цол</th></tr></thead><tbody>
+        <table><thead><tr><th>Суралцагч</th><th>Явц</th><th>Идэвх</th><th>Дүн</th><th>Эрэмбэ</th></tr></thead><tbody>
           <tr><td>Анужин</td><td><div class="pb"><i data-w="92"></i></div></td><td>96%</td><td class="score">98</td><td>▾ Дэд түрүүч</td></tr>
           <tr><td>Тэмүүлэн</td><td><div class="pb"><i data-w="78"></i></div></td><td>88%</td><td class="score">91</td><td>▪▪ Ахлах байлдагч</td></tr>
           <tr><td>Номин</td><td><div class="pb"><i data-w="64"></i></div></td><td>81%</td><td class="score">86</td><td>▪▪ Ахлах байлдагч</td></tr>
-          <tr><td>Баярсайхан</td><td><div class="pb"><i data-w="47"></i></div></td><td>63%</td><td class="score">72</td><td>▪ Байлдагч</td></tr>
-          <tr><td>Сувд</td><td><div class="pb"><i data-w="35"></i></div></td><td>58%</td><td class="score">69</td><td>▪ Байлдагч</td></tr>
+          <tr><td>Баярсайхан</td><td><div class="pb"><i data-w="47"></i></div></td><td>63%</td><td class="score">72</td><td>▪ Болор хайрга</td></tr>
+          <tr><td>Сувд</td><td><div class="pb"><i data-w="35"></i></div></td><td>58%</td><td class="score">69</td><td>▪ Болор хайрга</td></tr>
         </tbody></table>
       </div></div>
       <!-- 10. Анхаарлын горим -->
@@ -506,7 +506,7 @@ tl.to("#b2", { opacity: 1, y: 0, duration: .5, ease: "back.out(1.6)" }, 42.5);
 tl.call(() => tick(990, .12), null, 42.5);
 move(40.2, 4.6, { dist: 60, ry: 4 }, "sine.inOut");
 
-// ===== S5 Давтах ба цол (45–55) =====
+// ===== S5 Давтах ба эрэмбэ (45–55) =====
 chapter(45, "05", "Давтах");
 tl.call(() => { whoosh(1.4, false); chord([50, 57, 65]); }, null, 44.8);
 move(44.8, 2, { x: 0, y: -1500, z: 200, dist: -80, rx: 0, ry: 0 }, "power3.inOut");
@@ -514,11 +514,11 @@ blur("#pChat", 45, 8, 0); focus(["#pText"], 45.2); tl.to("#pAsk", { opacity: 0, 
 say(45.6, "«Давтах» горимд тодруулсан хэсгүүд нуугдаж, хүүхэд өөрөө санаад шалгана.", 4.6);
 tl.to(".hl .cv", { opacity: 1, duration: .5, stagger: .12 }, 46.4);
 ["#h1", "#h2", "#h3", "#h4"].forEach((id, i) => { tl.to(`${id} .cv`, { opacity: 0, duration: .35 }, 47.8 + i * .55); tl.call(() => tick(1600, .09), null, 47.8 + i * .55); });
-// цол
+// эрэмбэ
 move(50, 1.8, { x: -640, y: -1500, z: 40, dist: 160, ry: -14, rx: 0 }, "power3.inOut");
 blur("#pText", 50.2, 6, .3);
 show("#pRank", 50.3);
-say(50.4, "Асуултад зөв хариулж, идэвхтэй суралцах тусам оноо цуглуулж цол ахина.", 4.6);
+say(50.4, "Асуултад зөв хариулж, идэвхтэй суралцах тусам оноо цуглуулж эрэмбэ ахина.", 4.6);
 tl.to("#ring", { attr: { "stroke-dashoffset": 703.7 * (1 - .93) }, duration: 2, ease: "power2.out" }, 51.2);
 tl.to({ p: 140 }, { p: 160, duration: 2, ease: "power2.out", onUpdate() { $("#pts").textContent = Math.round(this.targets()[0].p); } }, 51.2);
 tl.to("#badge", { opacity: 1, scale: 1, duration: .6, ease: "back.out(2)" }, 52.6);

@@ -118,13 +118,13 @@ func captchaPNG(code string) ([]byte, error) {
 // handleCaptcha: GET /api/auth/captcha → {id, image (data:image/png)}.
 func (s *Server) handleCaptcha(w http.ResponseWriter, r *http.Request) {
 	if !s.capLim.Allow(s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон оролдлого")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон удаа оролдлоо — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	id, code := captchas.issue(time.Now())
 	b, err := captchaPNG(code)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "дотоод алдаа")
+		writeErr(w, http.StatusInternalServerError, "системд алдаа гарлаа — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")

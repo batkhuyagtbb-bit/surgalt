@@ -25,7 +25,7 @@ const meetCookie = "surgalt_meet"
 
 func (s *Server) meetEnabled(w http.ResponseWriter) bool {
 	if s.Meet == nil {
-		writeErr(w, http.StatusServiceUnavailable, "Google Meet тохируулаагүй (GOOGLE_CLIENT_ID)")
+		writeErr(w, http.StatusServiceUnavailable, "Google Meet-ийн тохиргоо хийгдээгүй байна (GOOGLE_CLIENT_ID)")
 		return false
 	}
 	return true
@@ -41,7 +41,7 @@ func (s *Server) handleMeetConnect(w http.ResponseWriter, r *http.Request) {
 	st := meetState{State: randHex(16), Verifier: oauth2.GenerateVerifier(), UID: c.UID}
 	sealed, err := s.tokens.Seal(st, 10*time.Minute)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "дотоод алдаа")
+		writeErr(w, http.StatusInternalServerError, "системд алдаа гарлаа — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: meetCookie, Value: sealed, Path: "/auth/", MaxAge: 600, HttpOnly: true,
@@ -154,7 +154,7 @@ func cleanMeetURL(raw string) (string, bool) {
 func meetingPriceErr(price int64, courseID string) string {
 	switch {
 	case price < 0 || price > maxPrice:
-		return "үнэ 0-100,000,000₮"
+		return "үнэ 0-100,000,000₮ хооронд байх ёстой"
 	case price > 0 && courseID == "":
 		return "төлбөртэй шууд хичээлийг сургалттай холбоно уу — суралцагчид сургалтын хуудаснаас худалдаж авна"
 	}
@@ -199,7 +199,7 @@ func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
 	if manual {
 		u, ok := cleanMeetURL(in.MeetURL)
 		if !ok {
-			writeErr(w, http.StatusBadRequest, "уулзалтын холбоос: https://meet.google.com/… (эсвэл Zoom, Teams)")
+			writeErr(w, http.StatusBadRequest, "уулзалтын холбоосоо оруулна уу: https://meet.google.com/… (эсвэл Zoom, Teams)")
 			return
 		}
 		in.MeetURL = u
@@ -213,10 +213,10 @@ func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case in.Title == "" || utf8.RuneCountInString(in.Title) > 200:
-		writeErr(w, http.StatusBadRequest, "гарчиг 1-200 тэмдэгт")
+		writeErr(w, http.StatusBadRequest, "гарчиг 1-200 тэмдэгт байх ёстой")
 		return
 	case in.DurationMin < 10 || in.DurationMin > 480:
-		writeErr(w, http.StatusBadRequest, "үргэлжлэх хугацаа 10-480 минут")
+		writeErr(w, http.StatusBadRequest, "үргэлжлэх хугацаа 10-480 минут байх ёстой")
 		return
 	case in.StartsAt.Before(time.Now().Add(-5 * time.Minute)):
 		writeErr(w, http.StatusBadRequest, "эхлэх цаг өнгөрсөн байна")
@@ -229,13 +229,13 @@ func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !teaches(course, c.UID) {
-			writeErr(w, http.StatusNotFound, "олдсонгүй")
+			writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 			return
 		}
 		// Байгууллагын сургалт: холбосон багш сургалтад элссэн суралцагчдад зориулсан үнэгүй шууд хичээл товлоно
 		// (төлбөртэйг байгууллага — орлого нь байгууллагынх).
 		if course.TeacherID != c.UID && in.Price > 0 {
-			writeErr(w, http.StatusBadRequest, "байгууллагын сургалтад төлбөртэй шууд хичээлийг байгууллага товлоно — үнэгүйгээр (элссэн суралцагчдад) товлоно уу")
+			writeErr(w, http.StatusBadRequest, "байгууллагын сургалтад төлбөртэй шууд хичээлийг зөвхөн байгууллага товлоно — та элссэн суралцагчдад зориулж үнэгүй товлоно уу")
 			return
 		}
 		if !s.planOpen(w, r, course.TeacherID) {
@@ -289,7 +289,7 @@ func (s *Server) handleMeetingPrice(w http.ResponseWriter, r *http.Request) {
 	}
 	m, err := s.store.MeetingByID(r.Context(), r.PathValue("id"))
 	if err != nil || m.TeacherID != c.UID {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	var in struct {
@@ -335,7 +335,7 @@ func (s *Server) handleBuyMeeting(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case m.Price <= 0:
-		writeErr(w, http.StatusBadRequest, "энэ шууд хичээлд сургалтад элссэн суралцагчид нэгдэнэ")
+		writeErr(w, http.StatusBadRequest, "энэ шууд хичээлд зөвхөн сургалтад элссэн суралцагчид нэгдэх боломжтой")
 		return
 	case m.StartsAt.Add(time.Duration(m.DurationMin) * time.Minute).Before(time.Now()):
 		writeErr(w, http.StatusGone, "шууд хичээл дууссан байна")
@@ -370,7 +370,7 @@ func (s *Server) handleCourseMeetings(w http.ResponseWriter, r *http.Request) {
 	}
 	access := teaches(course, uid) || (course.Price == 0 && course.Published) || enrolled // сургалтын (үнэгүй) шууд хичээлд
 	if !course.Published && !access {
-		writeErr(w, http.StatusNotFound, "олдсонгүй")
+		writeErr(w, http.StatusNotFound, "мэдээлэл олдсонгүй — устгагдсан байж магадгүй")
 		return
 	}
 	type courseMeeting struct {
@@ -396,7 +396,7 @@ func (s *Server) handleChatMeet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if role != store.SenderTeacher {
-		writeErr(w, http.StatusForbidden, "зөвхөн багш Meet үүсгэнэ")
+		writeErr(w, http.StatusForbidden, "Meet уулзалтыг зөвхөн багш үүсгэнэ")
 		return
 	}
 	m, err := s.createMeet(r.Context(), conv.TeacherID, "", "Уулзалт: "+conv.VisitorName, time.Now(), 60, 0, false)

@@ -23,7 +23,8 @@ func TestARPage(t *testing.T) {
 	}
 	for _, p := range []string{"/ar", "/ar.html"} {
 		code, body := get(p)
-		if code != 200 || !strings.Contains(body, `src="/static/ar.js"`) || !strings.Contains(body, `src="/static/vendor/three-r128.min.js"`) {
+		// Скрипт хувилбартай (?v=assetVersion): /static нь immutable кэштэй — өмнө орсон утас шинэ ar.js-ийг татна.
+		if code != 200 || !strings.Contains(body, `src="/static/ar.js?v=`+assetVersion+`"`) || !strings.Contains(body, `src="/static/vendor/three-r128.min.js?v=`+assetVersion+`"`) {
 			t.Fatalf("%s: %d", p, code)
 		}
 		if regexp.MustCompile(`<script>`).MatchString(body) || strings.Contains(body, " onclick=") {

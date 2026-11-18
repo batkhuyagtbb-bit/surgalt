@@ -94,7 +94,7 @@ func (s *Server) handleBuyStorage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Months < 1 || in.Months > 12 {
-		writeErr(w, http.StatusBadRequest, "хугацаа 1-12 сар")
+		writeErr(w, http.StatusBadRequest, "хугацаа 1-12 сар байх ёстой")
 		return
 	}
 	var plan *StoragePlan
@@ -105,7 +105,7 @@ func (s *Server) handleBuyStorage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if plan == nil {
-		writeErr(w, http.StatusBadRequest, "ийм багц байхгүй")
+		writeErr(w, http.StatusBadRequest, "ийм багц олдсонгүй")
 		return
 	}
 	o, err := s.store.CreateStorageOrder(r.Context(), c.UID, plan.MB, in.Months, plan.Price*int64(in.Months))

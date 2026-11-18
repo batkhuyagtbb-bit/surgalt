@@ -356,6 +356,20 @@ var chTables = []chTable{
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, lesson_id, stage) TTL toDateTime(sent_at) + INTERVAL 120 DAY`},
 	{"course_unlocks", `(user_id String, course_id String, code_hash String, at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, course_id)`},
+	// Дарааллын «багш гараар нээнэ» хичээлийг багш тодорхой суралцагчид нээсэн эрх (lesson_grants.go).
+	{"lesson_grants", `(user_id String, course_id String, lesson_id String, granted_by String, at ` + tsType + `, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, course_id, lesson_id)`},
+	// Журнал: багшийн сургалтын хүрээнд суралцагчид өгсөн нэр, бүлэг, архив, өгөгдөл устгасан тэмдэг (journal_meta.go).
+	{"course_student_meta", `(course_id String, user_id String, alias String, grp String, archived Bool,
+		archived_at Nullable(` + tsType + `), reset_at Nullable(` + tsType + `), reset_by String,
+		updated_by String, updated_at ` + tsType + `, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (course_id, user_id)`},
+	// Бүлэг чатын харилцан үнэлгээ: суралцагч ангийн найздаа өгсөн «хамтарч ажилласан» оноо, ерөнхий (lesson_id "")
+	// эсвэл хичээл бүрээр (peer_ratings.go).
+	// snap_* — суралцагчийн өдрийн snapshot-д: өнөөдрийн хилээс өмнөх төлөв (store.PeerRating).
+	{"peer_ratings", `(course_id String, rater_id String, ratee_id String, lesson_id String, score UInt8, updated_at ` + tsType + `,
+		ver UInt64, deleted UInt8, snap_score UInt8, snap_at ` + tsType + `, snap_ok UInt8)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (course_id, ratee_id, rater_id, lesson_id)`},
 	{"lesson_access", `(user_id String, lesson_id String, course_id String, teacher_id String,
 		created_at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, lesson_id)`},
@@ -395,6 +409,8 @@ var chTables = []chTable{
 	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, course_id)`},
 	{"rank_levels", `(user_id String, level Int32, awarded_at ` + tsType + `, ver UInt64)
 	ENGINE = ReplacingMergeTree(ver) ORDER BY user_id`},
+	{"box_opens", `(id String, user_id String, box String, animal Int32, cost Int32, refund Int32, opened_at ` + tsType + `, ver UInt64)
+	ENGINE = ReplacingMergeTree(ver) ORDER BY (user_id, id)`},
 	{"exam_attempts", `(id String, user_id String, user_name String, course_id String, lesson_id String,
 		teacher_id String, started_at ` + tsType + `, deadline_at Nullable(` + tsType + `),
 		finished_at Nullable(` + tsType + `), status String, reason String, score Float64, max Float64,

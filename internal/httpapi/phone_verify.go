@@ -98,7 +98,7 @@ func (s *Server) verifyErr(w http.ResponseWriter, err error) {
 		return
 	}
 	s.log.Warn("verify.mn", "err", err)
-	writeErr(w, http.StatusBadGateway, "Verify.MN-тэй холбогдож чадсангүй, түр хүлээгээд дахин оролдоно уу")
+	writeErr(w, http.StatusBadGateway, "Verify.MN үйлчилгээтэй холбогдож чадсангүй — түр хүлээгээд дахин оролдоно уу")
 }
 
 // phoneStatusView — PENDING/EXPIRED үеийн хариу.
@@ -172,7 +172,7 @@ func (s *Server) handleMyPhoneStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.authLim.Allow("ph:" + c.UID) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон оролдлого — түр хүлээнэ үү")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон удаа оролдлоо — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	v, err := s.startPhone(r.Context(), r, phonePurposeMe, c.UID, phone)
@@ -209,7 +209,7 @@ func (s *Server) handleMyPhoneCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if pc.UID != c.UID {
-		writeErr(w, http.StatusForbidden, "хандах эрхгүй")
+		writeErr(w, http.StatusForbidden, "танд хандах эрх байхгүй")
 		return
 	}
 	if status != verifymn.Verified {
@@ -231,7 +231,7 @@ func (s *Server) handleMyPhoneCheck(w http.ResponseWriter, r *http.Request) {
 // SMS-ээр дугаараа баталгаажуулсны дараа л тэр дугаартай бүртгэлийг харуулна.
 func (s *Server) handleForgotPhone(w http.ResponseWriter, r *http.Request) {
 	if !s.authLim.Allow(s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон оролдлого")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон удаа оролдлоо — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	if s.Verify == nil {
@@ -252,11 +252,11 @@ func (s *Server) handleForgotPhone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !captchas.check(in.CaptchaID, in.Captcha, time.Now()) {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Зурган дээрх тоог буруу бичлээ — шинэ кодыг дахин бичнэ үү", "code": "captcha"})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Зурган дээрх тоо таарсангүй — шинэ кодыг харж дахин бичнэ үү", "code": "captcha"})
 		return
 	}
 	if !s.resetLim.Allow("ph:" + phone) {
-		writeErr(w, http.StatusTooManyRequests, "Энэ дугаарт саяхан код үүсгэсэн — 2 минутын дараа дахин оролдоно уу")
+		writeErr(w, http.StatusTooManyRequests, "Энэ дугаарт саяхан код илгээсэн — 2 минутын дараа дахин оролдоно уу")
 		return
 	}
 	v, err := s.startPhone(r.Context(), r, phonePurposePwd, "", phone)
@@ -298,7 +298,7 @@ func (s *Server) handleForgotPhoneCheck(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if len(us) == 0 {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "none", "error": "Энэ дугаартай бүртгэл олдсонгүй. Имэйлээрээ сэргээнэ үү."})
+		writeJSON(w, http.StatusOK, map[string]any{"status": "none", "error": "Энэ дугаартай бүртгэл олдсонгүй. Нууц үгээ имэйлээр сэргээнэ үү."})
 		return
 	}
 	accts := make([]map[string]any, 0, len(us))
@@ -316,7 +316,7 @@ func (s *Server) handleForgotPhoneCheck(w http.ResponseWriter, r *http.Request) 
 		}
 		tok, err := s.tokens.Seal(resetClaim{K: resetKind, UID: u.ID, FP: s.resetFP(u)}, 15*time.Minute)
 		if err != nil {
-			writeErr(w, http.StatusInternalServerError, "дотоод алдаа")
+			writeErr(w, http.StatusInternalServerError, "системд алдаа гарлаа — түр хүлээгээд дахин оролдоно уу")
 			return
 		}
 		accts = append(accts, map[string]any{"name": u.DisplayName, "username": u.Username, "email": maskEmail(u.Email), "role": u.Role, "token": tok})

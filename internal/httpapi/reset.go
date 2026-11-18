@@ -39,7 +39,7 @@ func (s *Server) resetFP(u *store.User) string {
 // задлахгүйн тулд үргэлж ижил хариу өгч, захидлыг ар талд илгээнэ (хариуны хугацаа ч ижил).
 func (s *Server) handleForgot(w http.ResponseWriter, r *http.Request) {
 	if !s.authLim.Allow(s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон оролдлого")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон удаа оролдлоо — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	var in struct {
@@ -61,7 +61,7 @@ func (s *Server) handleForgot(w http.ResponseWriter, r *http.Request) {
 	}
 	// Хүн гэдгийг шалгана (робот олон хаяг руу захидал илгээлгэхээс сэргийлнэ).
 	if !captchas.check(in.CaptchaID, in.Captcha, time.Now()) {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Зурган дээрх тоог буруу бичлээ — шинэ кодыг дахин бичнэ үү", "code": "captcha"})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Зурган дээрх тоо таарсангүй — шинэ кодыг харж дахин бичнэ үү", "code": "captcha"})
 		return
 	}
 	if s.resetLim.Allow(email) { // нэг хаяг руу богино хугацаанд олон захидал илгээхгүй
@@ -115,13 +115,13 @@ func (s *Server) sendReset(email, base string) {
 		viaText, viaHTML = via+"\n\n", `<p style="background:#eef3ff;border-radius:10px;padding:10px 14px">`+html.EscapeString(via)+`</p>`
 	}
 	m := mail.Message{To: u.Email, Subject: "surgalt.mn — нууц үг сэргээх",
-		Text: name + ",\n\nsurgalt.mn дээрх бүртгэлийн тань нууц үгийг сэргээх хүсэлт ирлээ. Доорх холбоосоор орж шинэ нууц үг тавина уу (1 цагийн дотор):\n\n" +
-			link + "\n\n" + viaText + "Хэрэв та хүсэлт илгээгээгүй бол энэ захидлыг үл тоомсорлоно уу — нууц үг тань өөрчлөгдөхгүй.\n\nsurgalt.mn",
+		Text: name + ",\n\nsurgalt.mn дээрх бүртгэлийн тань нууц үгийг сэргээх хүсэлт ирлээ. Доорх холбоосоор орж 1 цагийн дотор шинэ нууц үгээ тавина уу:\n\n" +
+			link + "\n\n" + viaText + "Хэрэв та ийм хүсэлт илгээгээгүй бол энэ захидлыг анхааралгүй орхиж болно — нууц үг тань өөрчлөгдөхгүй.\n\nsurgalt.mn",
 		HTML: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#131b31;line-height:1.6">` +
 			`<p style="font-size:22px;font-weight:800;color:#1f3c8f;margin:0 0 16px">surgalt<span style="color:#eaa02e">.mn</span></p>` +
-			`<p>` + html.EscapeString(name) + `,</p><p>surgalt.mn дээрх бүртгэлийн тань нууц үгийг сэргээх хүсэлт ирлээ. Доорх товчоор орж шинэ нууц үг тавина уу. Холбоос 1 цагийн дотор хүчинтэй.</p>` +
+			`<p>` + html.EscapeString(name) + `,</p><p>surgalt.mn дээрх бүртгэлийн тань нууц үгийг сэргээх хүсэлт ирлээ. Доорх товчийг дарж шинэ нууц үгээ тавина уу. Холбоос 1 цагийн турш хүчинтэй.</p>` +
 			`<p style="margin:24px 0"><a href="` + html.EscapeString(link) + `" style="background:#1f3c8f;color:#fff;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:700">Шинэ нууц үг тавих</a></p>` + viaHTML +
-			`<p style="color:#647089;font-size:13px">Хэрэв та хүсэлт илгээгээгүй бол энэ захидлыг үл тоомсорлоно уу — нууц үг тань өөрчлөгдөхгүй.</p></div>`}
+			`<p style="color:#647089;font-size:13px">Хэрэв та ийм хүсэлт илгээгээгүй бол энэ захидлыг анхааралгүй орхиж болно — нууц үг тань өөрчлөгдөхгүй.</p></div>`}
 	if err := s.cfg.Mail.Send(ctx, m); err != nil {
 		s.log.Error("нууц үг сэргээх имэйл илгээж чадсангүй", "err", err, "to", email)
 	}
@@ -131,7 +131,7 @@ func (s *Server) sendReset(email, base string) {
 // энэ төхөөрөмж дээр шууд нэвтрүүлнэ.
 func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {
 	if !s.authLim.Allow(s.clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "хэт олон оролдлого")
+		writeErr(w, http.StatusTooManyRequests, "хэт олон удаа оролдлоо — түр хүлээгээд дахин оролдоно уу")
 		return
 	}
 	var in struct {
@@ -147,13 +147,13 @@ func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(in.Password) < minPassword || len(in.Password) > 72 {
-		writeErr(w, http.StatusBadRequest, "нууц үг 6-72 тэмдэгт")
+		writeErr(w, http.StatusBadRequest, "нууц үг 6-72 тэмдэгт байх ёстой")
 		return
 	}
 	ctx := r.Context()
 	hash, err := auth.HashPassword(ctx, in.Password)
 	if err != nil {
-		writeErr(w, http.StatusServiceUnavailable, "түр завгүй байна, дахин оролдоно уу")
+		writeErr(w, http.StatusServiceUnavailable, "систем түр ачаалалтай байна — дахин оролдоно уу")
 		return
 	}
 	now := time.Now()
@@ -173,6 +173,6 @@ func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {
 	}
 	s.alive.Delete(u.ID)
 	s.notify(ctx, &store.Notification{UserID: u.ID, Type: NotifAccount, Link: "/privacy#my-data",
-		Title: "🔒 Нууц үг тань солигдлоо", Body: "Бусад төхөөрөмж дээрх нэвтрэлт хаагдлаа. Хэрэв та биш бол бидэнтэй яаралтай холбогдоно уу."})
+		Title: "🔒 Нууц үг тань солигдлоо", Body: "Бусад төхөөрөмж дээрх нэвтрэлтийг хаалаа. Хэрэв үүнийг та хийгээгүй бол бидэнтэй яаралтай холбогдоно уу."})
 	s.issue(w, http.StatusOK, s.asTeacher(r, u))
 }

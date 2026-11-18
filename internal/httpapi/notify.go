@@ -29,6 +29,9 @@ const (
 	NotifAccount     = "account" // бүртгэлийн аюулгүй байдал (нууц үг солигдсон г.м.; reset.go)
 	NotifPayout      = "payout"  // багшийн орлого татах (payouts.go)
 	NotifPlan        = "plan"    // багшийн системийн эрх: сунгасан, дуусах гэж буй (plans.go)
+	// Нээлгэх хүсэлт (access_request.go): суралцагч → багш (Link "grant:<uid>:<сургалт>:<хичээл>"), багш нээсэн → суралцагч.
+	NotifAccessRequest = "access_request"
+	NotifAccessGranted = "access_granted"
 )
 
 type viewKey struct{ teacher, kind, id string }
@@ -149,18 +152,26 @@ func (s *Server) notify(ctx context.Context, ns ...*store.Notification) {
 }
 
 func (s *Server) saveNotifs(ctx context.Context, ns ...*store.Notification) {
+	if err := s.deliverNotifs(ctx, ns...); err != nil {
+		s.log.Warn("notifications", "err", err)
+	}
+}
+
+// deliverNotifs — мэдэгдлийг хадгалж түгээнэ; хадгалж чадаагүй бол алдааг буцаана (дуудагч хэрэглэгчид мэдэгдэх
+// эсвэл давхардлын тэмдгээ буцаах ёстой үед: access_request.go).
+func (s *Server) deliverNotifs(ctx context.Context, ns ...*store.Notification) error {
 	if len(ns) == 0 {
-		return
+		return nil
 	}
 	if err := s.store.AddNotifications(ctx, ns); err != nil {
-		s.log.Warn("notifications", "err", err)
-		return
+		return err
 	}
 	if s.PublishNotif != nil {
 		for _, n := range ns {
 			s.PublishNotif(*n)
 		}
 	}
+	return nil
 }
 
 func short(s string) string {
@@ -170,19 +181,35 @@ func short(s string) string {
 	return string([]rune(s)[:notifBodyLen]) + "…"
 }
 
-// notifyMessage: зочны мессежийг багшид мэдэгдэнэ (яриа тутамд 2 минутад нэг удаа).
-func (s *Server) notifyMessage(ctx context.Context, conv *store.Conversation, m *store.Message) {
-	if m.Sender != store.SenderVisitor {
-		return
-	}
+// msgFresh — яриа (ба чиглэл) тутамд 2 минутад нэг л мэдэгдэл: true бол мэдэгдэж болно.
+func (s *Server) msgFresh(key string) bool {
 	n := s.notif
 	n.mu.Lock()
-	if t, ok := n.msgLast[conv.ID]; ok && time.Since(t) < msgThrottle {
-		n.mu.Unlock()
+	defer n.mu.Unlock()
+	if t, ok := n.msgLast[key]; ok && time.Since(t) < msgThrottle {
+		return false
+	}
+	n.msgLast[key] = time.Now()
+	return true
+}
+
+// notifyMessage: зочны мессежийг багшид, багшийн хариуг бүртгэлтэй суралцагчид (хувийн яриа) мэдэгдэнэ
+// (яриа тутамд 2 минутад нэг удаа). Холбоос /me#chat=<яриа> — дарвал тухайн чат шууд нээгдэнэ.
+func (s *Server) notifyMessage(ctx context.Context, conv *store.Conversation, m *store.Message) {
+	if m.Sender == store.SenderTeacher {
+		if conv.Kind == "" && conv.UserID != "" && s.msgFresh(conv.ID+":t") {
+			who := m.SenderName
+			if who == "" {
+				who = "Багш"
+			}
+			s.notify(ctx, &store.Notification{UserID: conv.UserID, Type: NotifMessage, Count: 1, ActorID: m.SenderID,
+				Title: "💬 " + who + " танд хариу бичлээ", Body: short(m.Body), Link: "/me#chat=" + conv.ID})
+		}
 		return
 	}
-	n.msgLast[conv.ID] = time.Now()
-	n.mu.Unlock()
+	if m.Sender != store.SenderVisitor || !s.msgFresh(conv.ID) {
+		return
+	}
 	title := "💬 " + conv.VisitorName + " танд бичлээ"
 	if conv.Kind == store.ConvGroup {
 		who := m.SenderName
@@ -302,7 +329,7 @@ func (s *Server) notifyPaid(ctx context.Context, o *store.Order) {
 		&store.Notification{UserID: o.TeacherID, Type: NotifPurchase, Count: 1, ActorID: o.UserID,
 			Title: fmt.Sprintf("💰 Шинэ борлуулалт · %s", money(o.Amount)), Body: buyer + " — " + title, Link: "/me#overview"},
 		&store.Notification{UserID: o.UserID, Type: NotifPurchase, Count: 1, ActorID: o.TeacherID,
-			Title: "✅ Худалдан авалт амжилттай — нээгдлээ", Body: title, Link: "/c/" + o.CourseID},
+			Title: "✅ Худалдан авалт амжилттай — үзэх эрх нээгдлээ", Body: title, Link: "/c/" + o.CourseID},
 	)
 }
 

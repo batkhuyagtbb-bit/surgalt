@@ -78,14 +78,14 @@ func dueStateOf(d store.Due, latePass, feePass bool, now time.Time) DueState {
 func validateDue(d *store.Due) string {
 	switch {
 	case d.Late != "" && store.LatePolicies[d.Late] == "":
-		return "хоцорсон тохиолдлын бодлого: төлбөргүй, төлбөртэй, хаалттай"
+		return "хугацаа хэтэрсэн үеийн нөхцөлөө сонгоно уу: төлбөргүй, төлбөртэй эсвэл хаалттай"
 	case d.Late == "paid" && (d.LateFee <= 0 || d.LateFee > maxPrice):
-		return "хоцорсон тохиолдлын төлбөрийг заана уу (1-100,000,000₮)"
+		return "хугацаа хэтэрсэн үеийн төлбөрийг заана уу (1-100,000,000₮)"
 	case d.Late != "paid" && d.LateFee != 0:
 		d.LateFee = 0
 	}
 	if d.Fee < 0 || d.Fee > maxPrice {
-		return "оролцооны төлбөр 0-100,000,000₮"
+		return "оролцооны төлбөр 0-100,000,000₮ хооронд байх ёстой"
 	}
 	if d.StartAt != nil && d.StartAt.IsZero() {
 		d.StartAt = nil
@@ -94,7 +94,7 @@ func validateDue(d *store.Due) string {
 		d.At = nil
 	}
 	if d.StartAt != nil && d.At != nil && !d.At.After(*d.StartAt) {
-		return "дуусах цаг эхлэх цагаас хойш байна"
+		return "дуусах цаг эхлэх цагаас хойш байх ёстой"
 	}
 	return ""
 }
@@ -110,7 +110,7 @@ func validateAssignment(a *store.Assignment) string {
 			a.MaxScore = 100
 		}
 		if a.MaxScore > 1000 {
-			return "даалгаврын дээд оноо 1-1000"
+			return "даалгаврын дээд оноо 1-1000 хооронд байх ёстой"
 		}
 	case "rubric": // рубрикаар: дээд оноо = шалгуур бүрийн хамгийн их онооны нийлбэр
 		if msg := validateRubric(a.Rubric); msg != "" {
@@ -120,11 +120,11 @@ func validateAssignment(a *store.Assignment) string {
 			return "рубрикийн нийт оноо 0-ээс их байх ёстой"
 		}
 	default:
-		return "үнэлэх арга буруу"
+		return "үнэлэх аргаа сонгоно уу"
 	}
 	a.AllowFiles = false // хариу зөвхөн текст ба холбоосоор — файл илгээхгүй
 	if a.Words < 0 || a.Words > 5000 {
-		return "үгийн баримжаа 0-5000"
+		return "үгийн тооны баримжаа 0-5000 хооронд байх ёстой"
 	}
 	return validateDue(&a.Due)
 }
@@ -132,15 +132,15 @@ func validateAssignment(a *store.Assignment) string {
 // validateRubric — 2-8 түвшин (багана), 1-20 шалгуур (мөр); нүд бүр 0-1000 оноо, 500 хүртэл тэмдэгтийн тайлбартай.
 func validateRubric(r *store.Rubric) string {
 	if r == nil || len(r.Levels) < 2 || len(r.Levels) > 8 {
-		return "рубрикт 2-8 түвшин (багана) байна"
+		return "рубрик 2-8 түвшинтэй (багана) байх ёстой"
 	}
 	if len(r.Criteria) == 0 || len(r.Criteria) > 20 {
-		return "рубрикт 1-20 шалгуур (мөр) байна"
+		return "рубрик 1-20 шалгууртай (мөр) байх ёстой"
 	}
 	for i := range r.Levels {
 		r.Levels[i] = strings.TrimSpace(r.Levels[i])
 		if n := utf8.RuneCountInString(r.Levels[i]); n == 0 || n > 60 {
-			return fmt.Sprintf("%d-р түвшний нэр 1-60 тэмдэгт", i+1)
+			return fmt.Sprintf("%d-р түвшний нэр 1-60 тэмдэгт байх ёстой", i+1)
 		}
 	}
 	seen := map[string]bool{}
@@ -150,7 +150,7 @@ func validateRubric(r *store.Rubric) string {
 		seen[c.ID] = true
 		c.Name = strings.TrimSpace(c.Name)
 		if n := utf8.RuneCountInString(c.Name); n == 0 || n > 200 {
-			return fmt.Sprintf("%d-р шалгуурын нэр 1-200 тэмдэгт", i+1)
+			return fmt.Sprintf("%d-р шалгуурын нэр 1-200 тэмдэгт байх ёстой", i+1)
 		}
 		pts, desc := make([]int, len(r.Levels)), make([]string, len(r.Levels))
 		for j := range r.Levels {
@@ -158,30 +158,30 @@ func validateRubric(r *store.Rubric) string {
 				pts[j] = c.Points[j]
 			}
 			if pts[j] < 0 || pts[j] > 1000 {
-				return fmt.Sprintf("«%s» шалгуурын оноо 0-1000", c.Name)
+				return fmt.Sprintf("«%s» шалгуурын оноо 0-1000 хооронд байх ёстой", c.Name)
 			}
 			if j < len(c.Desc) {
 				desc[j] = strings.TrimSpace(c.Desc[j])
 			}
 			if utf8.RuneCountInString(desc[j]) > 500 {
-				return fmt.Sprintf("«%s» шалгуурын тайлбар 500 тэмдэгтээс хэтрэхгүй", c.Name)
+				return fmt.Sprintf("«%s» шалгуурын тайлбар 500 тэмдэгтээс хэтрэхгүй байх ёстой", c.Name)
 			}
 		}
 		c.Points, c.Desc = pts, desc
 	}
 	if r.Max() > 10000 {
-		return "рубрикийн нийт оноо 10000-аас хэтрэхгүй"
+		return "рубрикийн нийт оноо 10000-аас хэтрэхгүй байх ёстой"
 	}
 	return ""
 }
 
-// passes — хоцролтын ба оролцооны төлбөрийг төлсөн эсэх (явцын тэмдгүүд).
+// passes — хоцролтын ба оролцооны төлбөрийг төлсөн эсэх (явцын тэмдгүүд; хичээлийг үзээгүй, зөвхөн эрхтэй мөрийнх ч).
 func (s *Server) passes(r *http.Request, uid, courseID, lessonID string) (late, fee bool) {
-	prog, err := s.store.LessonProgress(r.Context(), uid, courseID)
+	ps, err := s.store.LessonPasses(r.Context(), uid, courseID)
 	if err != nil {
 		return false, false
 	}
-	q := prog[lessonID].Quiz
+	q := ps[lessonID]
 	return q[store.LatePassKey], q[store.FeePassKey]
 }
 
@@ -215,15 +215,15 @@ func (s *Server) boughtLesson(ctx context.Context, uid, courseID, lessonID strin
 func dueBlocked(w http.ResponseWriter, ds DueState) bool {
 	switch {
 	case ds.NotStarted:
-		writeJSON(w, http.StatusLocked, map[string]any{"error": "эхлэх цаг болоогүй: " + ds.StartAt.Local().Format("01/02 15:04"), "due": ds})
+		writeJSON(w, http.StatusLocked, map[string]any{"error": "даалгавар хараахан нээгдээгүй байна. Эхлэх цаг: " + ds.StartAt.Local().Format("01/02 15:04"), "due": ds})
 		return true
 	case ds.Closed:
-		writeJSON(w, http.StatusLocked, map[string]any{"error": "хугацаа дууссан — хаалттай", "due": ds})
+		writeJSON(w, http.StatusLocked, map[string]any{"error": "даалгаврын хугацаа дууссан тул хаагдсан", "due": ds})
 		return true
 	case ds.NeedPay:
-		msg := fmt.Sprintf("оролцооны төлбөр %d₮ төлж нээнэ", ds.Fee)
+		msg := fmt.Sprintf("%d₮ оролцооны төлбөр төлж нээнэ үү", ds.Fee)
 		if ds.NeedLate {
-			msg = fmt.Sprintf("хугацаа хоцорсон — %d₮ төлж нээнэ", ds.Fee)
+			msg = fmt.Sprintf("хугацаа хэтэрсэн — %d₮ төлж нээнэ үү", ds.Fee)
 		}
 		writeJSON(w, http.StatusPaymentRequired, map[string]any{"error": msg, "due": ds})
 		return true
@@ -320,7 +320,7 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if teaches(course, c.UID) {
-		writeErr(w, http.StatusBadRequest, "багш өөрийн даалгаварт хариу илгээхгүй")
+		writeErr(w, http.StatusBadRequest, "багш өөрийн даалгаварт хариу илгээх боломжгүй")
 		return
 	}
 	ds := s.dueFor(r, c.UID, course, l)
@@ -344,7 +344,7 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 			if err != nil {
-				writeErr(w, http.StatusBadRequest, "илгээлт тасарлаа")
+				writeErr(w, http.StatusBadRequest, "илгээлт тасарлаа — дахин оролдоно уу")
 				return
 			}
 			if part.FormName() == "text" {
@@ -361,11 +361,11 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			if !l.Assignment.AllowFiles { // одоогоор үргэлж: хариуг текст, холбоосоор илгээнэ
-				writeErr(w, http.StatusBadRequest, "даалгаврын хариуд файл илгээхгүй — текст болон холбоос (Google Docs, видео г.м) оруулна уу")
+				writeErr(w, http.StatusBadRequest, "энэ даалгаварт файл хавсаргах боломжгүй — хариугаа бичих эсвэл холбоос (Google Docs, видео г.м.) оруулна уу")
 				return
 			}
 			if len(sub.Files) >= maxSubmissionFiles {
-				writeErr(w, http.StatusBadRequest, fmt.Sprintf("дээд тал нь %d файл", maxSubmissionFiles))
+				writeErr(w, http.StatusBadRequest, fmt.Sprintf("дээд тал нь %d файл хавсаргах боломжтой", maxSubmissionFiles))
 				return
 			}
 			if quota < 0 { // багшийн сангийн багтаамжид хадгална
@@ -395,7 +395,7 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		sub.Text, rawLinks, sub.TabSwitches = in.Text, in.Links, max(0, min(in.TabSwitches, 1000))
 		if strings.TrimSpace(in.HTML) != "" {
 			if len(in.HTML) > 120_000 {
-				writeErr(w, http.StatusBadRequest, "хариу хэт урт")
+				writeErr(w, http.StatusBadRequest, "хариу хэт урт байна")
 				return
 			}
 			out, text, _ := sanitizeRich(in.HTML, "") // зураг, файл оруулахгүй — зөвхөн текстийн хэлбэржүүлэлт
@@ -408,28 +408,28 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if !validURL(u) || len(u) > 500 {
-			writeErr(w, http.StatusBadRequest, "холбоос http(s)://-ээр эхэлсэн байна: "+short(u))
+			writeErr(w, http.StatusBadRequest, "холбоос http(s)://-ээр эхэлсэн байх ёстой: "+short(u))
 			return
 		}
 		if len(sub.Links) >= 5 {
-			writeErr(w, http.StatusBadRequest, "дээд тал нь 5 холбоос")
+			writeErr(w, http.StatusBadRequest, "дээд тал нь 5 холбоос оруулах боломжтой")
 			return
 		}
 		sub.Links = append(sub.Links, u)
 	}
 	sub.Text = strings.TrimSpace(sub.Text)
 	if sub.Text == "" && len(sub.Files) == 0 && len(sub.Links) == 0 {
-		writeErr(w, http.StatusBadRequest, "хариугаа бичих, холбоос эсвэл файл хавсаргана уу")
+		writeErr(w, http.StatusBadRequest, "хариугаа бичих эсвэл холбоос, файл хавсаргана уу")
 		return
 	}
 	if utf8.RuneCountInString(sub.Text) > 20_000 {
-		writeErr(w, http.StatusBadRequest, "хариу хэт урт (20,000 тэмдэгт)")
+		writeErr(w, http.StatusBadRequest, "хариу хэт урт байна (дээд тал нь 20,000 тэмдэгт)")
 		return
 	}
 	// Хариуг нэг л удаа илгээнэ — багш «дахин илгээх»-ийг зөвшөөрсөн бол шинэчилнэ.
 	if !l.Assignment.Resubmit {
 		if _, err := s.store.SubmissionFor(r.Context(), c.UID, l.ID); err == nil {
-			writeErr(w, http.StatusConflict, "хариуг нэг л удаа илгээнэ — аль хэдийн илгээсэн байна")
+			writeErr(w, http.StatusConflict, "та хариугаа аль хэдийн илгээсэн байна — хариуг зөвхөн нэг удаа илгээдэг")
 			return
 		}
 	}
@@ -521,11 +521,11 @@ func (s *Server) handleGrade(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if in.Score < 0 || in.Score > maxScore {
-		writeErr(w, http.StatusBadRequest, fmt.Sprintf("оноо 0-%d", maxScore))
+		writeErr(w, http.StatusBadRequest, fmt.Sprintf("оноо 0-%d хооронд байх ёстой", maxScore))
 		return
 	}
 	if utf8.RuneCountInString(in.Feedback) > 5000 {
-		writeErr(w, http.StatusBadRequest, "тайлбар хэт урт")
+		writeErr(w, http.StatusBadRequest, "эргэх холбоо хэт урт байна")
 		return
 	}
 	uid := r.PathValue("uid")

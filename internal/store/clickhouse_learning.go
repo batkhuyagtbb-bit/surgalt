@@ -202,6 +202,7 @@ func (c *ClickHouse) SessionByID(ctx context.Context, id string) (*StudySession,
 	if c.sess == nil {
 		return c.sessionByIDDB(ctx, id)
 	}
+	gen := c.sess.generation() // уншилтын хооронд суралцагчийн өгөгдөл устгагдвал буферт оруулахгүй
 	if s, ok := c.sess.get(id); ok {
 		return s, nil
 	}
@@ -209,7 +210,9 @@ func (c *ClickHouse) SessionByID(ctx context.Context, id string) (*StudySession,
 	if err != nil {
 		return nil, err
 	}
-	c.sess.keep(s)
+	if !c.sess.keepFrom(s, gen) {
+		return nil, ErrNotFound
+	}
 	return s, nil
 }
 
@@ -462,9 +465,9 @@ func (c *ClickHouse) VideoWatches(ctx context.Context, f ActivityFilter) ([]Vide
 	return out, err
 }
 
-// ---- цэргийн цол ----
+// ---- суралцахуйн эрэмбэ ----
 
-// SaveRankPoints — сургалтын оноог хадгалж, нэгдсэн цолын оноог (сургалтуудын дундаж) буцаана. Хуудас нээх бүрт
+// SaveRankPoints — сургалтын оноог хадгалж, нэгдсэн эрэмбийн оноог (сургалтуудын дундаж) буцаана. Хуудас нээх бүрт
 // дуудагддаг тул эхлээд одоогийнхыг уншиж, оноо өөрчлөгдсөн үед л бичнэ; дундажийг уншсан мөрүүдээс тооцно.
 func (c *ClickHouse) SaveRankPoints(ctx context.Context, userID, courseID string, points int) (int, error) {
 	pts := map[string]int64{}
@@ -485,7 +488,7 @@ func (c *ClickHouse) SaveRankPoints(ctx context.Context, userID, courseID string
 		}
 		pts[courseID] = int64(points)
 	}
-	// Нэгдсэн цол — сургалт бүрийн онооны дундаж (бүхэл рүү тоймлоно).
+	// Нэгдсэн эрэмбэ — сургалт бүрийн онооны дундаж (бүхэл рүү тоймлоно).
 	var total int64
 	for _, p := range pts {
 		total += p
@@ -514,6 +517,34 @@ func (c *ClickHouse) UserRankLevel(ctx context.Context, userID string) (int, err
 
 func (c *ClickHouse) SetUserRankLevel(ctx context.Context, userID string, level int) error {
 	return c.insert(ctx, "rank_levels", []string{"user_id", "level", "awarded_at", "ver"}, userID, int32(level), time.Now().UTC(), ver())
+}
+
+// ---- системийн бэлэг (суралцахуйн зоос, бэлгийн хайрцаг) ----
+
+func (c *ClickHouse) RankPointsSum(ctx context.Context, userID string) (int, error) {
+	var n int64
+	err := c.query(ctx, "SELECT toInt64(sum(points)) FROM rank_points FINAL WHERE user_id = ? AND points > 0", []any{userID}, func(r driver.Rows) error { return r.Scan(&n) })
+	return int(n), err
+}
+
+func (c *ClickHouse) BoxOpens(ctx context.Context, userID string) ([]BoxOpen, error) {
+	var out []BoxOpen
+	err := c.query(ctx, "SELECT id, box, animal, cost, refund, opened_at FROM box_opens FINAL WHERE user_id = ? ORDER BY opened_at, id", []any{userID}, func(r driver.Rows) error {
+		var b BoxOpen
+		var a, co, rf int32
+		if err := r.Scan(&b.ID, &b.Box, &a, &co, &rf, &b.At); err != nil {
+			return err
+		}
+		b.UserID, b.Animal, b.Cost, b.Refund = userID, int(a), int(co), int(rf)
+		out = append(out, b)
+		return nil
+	})
+	return out, err
+}
+
+func (c *ClickHouse) AddBoxOpen(ctx context.Context, b *BoxOpen) error {
+	return c.insert(ctx, "box_opens", []string{"id", "user_id", "box", "animal", "cost", "refund", "opened_at", "ver"},
+		b.ID, b.UserID, b.Box, int32(b.Animal), int32(b.Cost), int32(b.Refund), b.At.UTC(), ver())
 }
 
 // ---- даалгаврын хариу ----

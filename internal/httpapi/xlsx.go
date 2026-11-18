@@ -18,17 +18,17 @@ import (
 var quizSheetHeader = []string{"Төрөл", "Асуулт", "Хариулт 1", "Хариулт 2", "Хариулт 3", "Хариулт 4", "Хариулт 5", "Хариулт 6", "Зөв хариулт", "Оноо", "Тайлбар"}
 
 var quizSheetExamples = [][]string{
-	{"нэг", "Монгол улсын нийслэл аль вэ?", "Дархан", "Улаанбаатар", "Эрдэнэт", "", "", "", "2", "1", "Улаанбаатар 1639 оноос"},
+	{"нэг", "Монгол Улсын нийслэл аль вэ?", "Дархан", "Улаанбаатар", "Эрдэнэт", "", "", "", "2", "1", "Улаанбаатар 1639 онд үүсгэн байгуулагдсан"},
 	{"олон", "Аль нь анхны тоо вэ?", "2", "4", "5", "9", "", "", "1,3", "2", ""},
 	{"бичих", "5 × 6 = ?", "", "", "", "", "", "", "30; гучин", "1", ""},
-	{"харгалзуулах", "Улсыг нийслэлтэй нь холбоно уу", "Япон=Токио", "Франц=Парис", "Хятад=Бээжин", "", "", "", "", "3", "Хариулт баганад «зүүн=баруун» гэж бичнэ"},
+	{"харгалзуулах", "Улсыг нийслэлтэй нь холбоно уу", "Япон=Токио", "Франц=Парис", "Хятад=Бээжин", "", "", "", "", "3", "Хариултын баганад «зүүн=баруун» хэлбэрээр бичнэ"},
 }
 
 // handleQuizTemplate: GET /api/quiz-template.xlsx — багшид татаж бөглөх загвар.
 func (s *Server) handleQuizTemplate(w http.ResponseWriter, r *http.Request) {
 	rows := append([][]string{quizSheetHeader}, quizSheetExamples...)
-	rows = append(rows, []string{}, []string{"Төрөл: нэг (нэг сонголт), олон (олон сонголт), бичих (бичгээр), харгалзуулах (хос). Зөв хариулт: дугаараар (1,3), бичих төрөлд «;»-ээр тусгаарлана."})
-	b, err := writeXLSX("Тест", rows)
+	rows = append(rows, []string{}, []string{"Төрөл: нэг (нэг сонголттой), олон (олон сонголттой), бичих (бичгээр хариулах), харгалзуулах (хос). Зөв хариултыг дугаараар нь бичнэ (1,3); бичих төрөлд хэд хэдэн зөв хариултыг «;»-ээр тусгаарлана."})
+	b, err := writeXLSX("Асуултууд", rows)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "загвар үүсгэж чадсангүй")
 		return
@@ -67,7 +67,7 @@ func (s *Server) handleQuizImport(w http.ResponseWriter, r *http.Request) {
 		cr.FieldsPerRecord, cr.LazyQuotes = -1, true
 		rows, err = cr.ReadAll()
 	default:
-		writeErr(w, http.StatusBadRequest, "зөвхөн .xlsx эсвэл .csv файл")
+		writeErr(w, http.StatusBadRequest, "зөвхөн .xlsx эсвэл .csv файл оруулна уу")
 		return
 	}
 	if err != nil {
@@ -96,12 +96,12 @@ func parseQuizRows(rows [][]string, teacherID string) ([]store.Block, []string) 
 		kind := kinds[strings.ToLower(cell(row, 0))]
 		if n == 0 || kind == "" { // гарчиг, хоосон, тайлбар мөр
 			if n > 0 && cell(row, 0) != "" && cell(row, 1) != "" {
-				problems = append(problems, fmt.Sprintf("%d-р мөр: төрөл «%s» танигдсангүй", n+1, cell(row, 0)))
+				problems = append(problems, fmt.Sprintf("%d-р мөр: «%s» гэсэн төрөл танигдсангүй", n+1, cell(row, 0)))
 			}
 			continue
 		}
 		if len(out) >= maxBlocks {
-			problems = append(problems, "хэт олон асуулт — эхний 120-г авлаа")
+			problems = append(problems, "асуулт хэт олон байна — эхний 120 асуултыг авлаа")
 			break
 		}
 		q := &store.Quiz{Kind: kind, Question: cell(row, 1), Explain: cell(row, 10)}
@@ -151,13 +151,13 @@ func parseQuizRows(rows [][]string, teacherID string) ([]store.Block, []string) 
 func readXLSX(raw []byte) ([][]string, error) {
 	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
 	if err != nil {
-		return nil, fmt.Errorf("xlsx биш байна")
+		return nil, fmt.Errorf("энэ файл xlsx биш байна")
 	}
 	open := func(name string) ([]byte, error) {
 		for _, f := range zr.File {
 			if f.Name == name {
 				if f.UncompressedSize64 > 50<<20 {
-					return nil, fmt.Errorf("хэт том")
+					return nil, fmt.Errorf("файл хэт том байна")
 				}
 				rc, err := f.Open()
 				if err != nil {

@@ -11,12 +11,14 @@ import (
 // ---- Давтах сануулга (мартах муруй): хичээлийг анх үзсэнээс 1, 3, 7, 14, 30 хоногийн дараа суралцагчид ----
 
 // ReviewItem — суралцагчийн давтах хичээл: анх үзсэн цаг (lesson_progress.viewed_at), үе шат (хоног).
+// SentAt — сануулга илгээсэн мөч (ClaimReviews тавина; SentReviews уншина).
 type ReviewItem struct {
 	UserID   string
 	CourseID string
 	LessonID string
 	ViewedAt time.Time
 	Stage    int
+	SentAt   time.Time
 }
 
 func (r ReviewItem) key() string { return r.UserID + "|" + r.LessonID + "|" + strconv.Itoa(r.Stage) }
@@ -27,6 +29,26 @@ type ReviewStore interface {
 	// ClaimReviews — өмнө нь сануулаагүй (хэрэглэгч, хичээл, үе шат)-ыг тэмдэглээд буцаана. Түгжээтэй тул олон хуулбар,
 	// дахин эхлүүлэхэд давхар сануулахгүй.
 	ClaimReviews(ctx context.Context, items []ReviewItem) ([]ReviewItem, error)
+	// SentReviews — хэрэглэгчид since-ээс хойш (sent_at ≥ since) илгээсэн сануулгууд (UserID, CourseID, LessonID, Stage,
+	// SentAt; ViewedAt хоосон). Дараалал баталгаагүй. Давтах popup-ийн «хугацаа нь болсон» жагсаалтад (review_due.go).
+	SentReviews(ctx context.Context, userID string, since time.Time) ([]ReviewItem, error)
+}
+
+// SentReviews — review_reminders нь ORDER BY (user_id, …) тул нэг хэрэглэгчийн мөрүүдийг анхдагч түлхүүрээр уншина.
+func (c *ClickHouse) SentReviews(ctx context.Context, userID string, since time.Time) ([]ReviewItem, error) {
+	var out []ReviewItem
+	err := c.query(ctx, "SELECT lesson_id, stage, course_id, sent_at FROM review_reminders FINAL WHERE user_id = ? AND sent_at >= ?",
+		[]any{userID, since.UTC()}, func(r driver.Rows) error {
+			it := ReviewItem{UserID: userID}
+			var st int32
+			if err := r.Scan(&it.LessonID, &st, &it.CourseID, &it.SentAt); err != nil {
+				return err
+			}
+			it.Stage = int(st)
+			out = append(out, it)
+			return nil
+		})
+	return out, err
 }
 
 func (c *ClickHouse) ReviewDue(ctx context.Context, from, to time.Time) ([]ReviewItem, error) {
@@ -82,7 +104,9 @@ func (c *ClickHouse) ClaimReviews(ctx context.Context, items []ReviewItem) ([]Re
 		return nil, err
 	}
 	now, v := time.Now().UTC(), ver()
-	for _, it := range fresh {
+	for i := range fresh {
+		it := &fresh[i]
+		it.SentAt = now
 		if err := b.Append(it.UserID, it.LessonID, int32(it.Stage), it.CourseID, now, v); err != nil {
 			return nil, err
 		}
@@ -124,7 +148,44 @@ func (m *Memory) ClaimReviews(_ context.Context, items []ReviewItem) ([]ReviewIt
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.reviews == nil {
-		m.reviews = map[string]bool{}
+		m.reviews = map[string]ReviewItem{}
 	}
-	return freshReviews(items, m.reviews), nil
+	now := time.Now().UTC()
+	var out []ReviewItem
+	for _, it := range items {
+		k := it.key()
+		if _, ok := m.reviews[k]; ok {
+			continue
+		}
+		it.SentAt = now
+		m.reviews[k] = it
+		out = append(out, it)
+	}
+	return out, nil
+}
+
+func (m *Memory) SentReviews(_ context.Context, userID string, since time.Time) ([]ReviewItem, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var out []ReviewItem
+	for _, it := range m.reviews {
+		if it.UserID == userID && !it.SentAt.Before(since) {
+			it.ViewedAt = time.Time{} // ClickHouse-тэй адил: viewed_at хадгалагддаггүй
+			out = append(out, it)
+		}
+	}
+	return out, nil
+}
+
+// SetReviewSentAt — тестэд: илгээсэн сануулгын мөчийг өөрчилнө (7 хоногийн хязгаар, эрэмбийг шалгахад).
+func (m *Memory) SetReviewSentAt(userID, lessonID string, stage int, at time.Time) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	k := ReviewItem{UserID: userID, LessonID: lessonID, Stage: stage}.key()
+	it, ok := m.reviews[k]
+	if ok {
+		it.SentAt = at
+		m.reviews[k] = it
+	}
+	return ok
 }

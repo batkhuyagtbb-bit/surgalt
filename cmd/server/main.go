@@ -294,6 +294,7 @@ func run(log *slog.Logger) error {
 		// Content-Security-Policy: enforce (анхдагч) | report (зөвхөн мэдээлэх) | off. STATIC_MINIFY=0 — JS/CSS-ийг эхээр нь.
 		CSPMode:      env("CSP_MODE", "enforce"),
 		MinifyStatic: os.Getenv("STATIC_MINIFY") != "0",
+		IntroDir:     env("STORAGE_DIR", "./data") + "/intro",
 	}, st, tokens, hub, fstore, log)
 
 	base := env("PUBLIC_URL", "http://localhost"+env("ADDR", ":8080"))

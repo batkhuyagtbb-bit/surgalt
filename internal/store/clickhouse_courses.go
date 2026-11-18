@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"time"
 
@@ -136,6 +137,18 @@ func (c *ClickHouse) DeleteCourse(ctx context.Context, teacherID, courseID strin
 	}
 	if cur.TeacherID != teacherID {
 		return ErrNotFound
+	}
+	// Журналд суралцагчдад өгсөн нэр, бүлэг (course_student_meta) — устгалаас өмнө: алдаа гарвал сургалт хэвээр, дахин оролдоно.
+	if err := c.conn.Exec(ctx, "DELETE FROM course_student_meta WHERE course_id = ?", courseID); err != nil {
+		return fmt.Errorf("course_student_meta: %w", err)
+	}
+	// Багш гараар нээсэн хичээлүүд (lesson_grants) — мөн устгалаас өмнө.
+	if err := c.conn.Exec(ctx, "DELETE FROM lesson_grants WHERE course_id = ?", courseID); err != nil {
+		return fmt.Errorf("lesson_grants: %w", err)
+	}
+	// Бүлэг чатын харилцан үнэлгээ (peer_ratings) — мөн устгалаас өмнө.
+	if err := c.conn.Exec(ctx, "DELETE FROM peer_ratings WHERE course_id = ?", courseID); err != nil {
+		return fmt.Errorf("peer_ratings: %w", err)
 	}
 	cur.UpdatedAt = time.Now()
 	return c.writeCourse(ctx, cur, true)
@@ -514,10 +527,14 @@ func (c *ClickHouse) MarkLessonViewed(ctx context.Context, userID, courseID, les
 	}
 	defer unlock()
 	p, _, err := c.progressRow(ctx, userID, lessonID)
-	if err != nil || p != nil {
+	if err != nil || (p != nil && p.Viewed()) {
 		return err
 	}
-	return c.writeProgress(ctx, userID, courseID, &LessonProgress{LessonID: lessonID, ViewedAt: time.Now()})
+	if p == nil {
+		p = &LessonProgress{LessonID: lessonID}
+	}
+	p.ViewedAt = time.Now() // шинэ мөр, эсвэл зөвхөн төлсөн эрхтэй мөрийг анх нээж байна
+	return c.writeProgress(ctx, userID, courseID, p)
 }
 
 func (c *ClickHouse) MarkLessonCompleted(ctx context.Context, userID, courseID, lessonID string) error {
@@ -538,6 +555,9 @@ func (c *ClickHouse) MarkLessonCompleted(ctx context.Context, userID, courseID, 
 	}
 	now := time.Now()
 	p.CompletedAt = &now
+	if p.ViewedAt.Unix() <= 0 { // зөвхөн төлсөн эрхтэй мөр — анх нээж дуусгав
+		p.ViewedAt = now
+	}
 	return c.writeProgress(ctx, userID, courseID, p)
 }
 
@@ -561,7 +581,59 @@ func (c *ClickHouse) SaveQuizResult(ctx context.Context, userID, courseID, lesso
 		return nil // дахин судлахад зөв хариулсныг буруугаар дарахгүй (ахиц зөвхөн сайжирна)
 	}
 	p.Quiz[blockID] = correct
+	if !p.Viewed() && !isPassKey(blockID) { // зөвхөн төлсөн эрхтэй мөрөнд анхны жинхэнэ хариулт
+		p.ViewedAt = time.Now()
+	}
 	return c.writeProgress(ctx, userID, courseID, p)
+}
+
+// GrantLessonPass — төлсөн эрхийн тэмдгүүд; шинэ мөр нь хичээлийг үзээгүй (viewed_at = notViewedAt). Өөрчлөлтгүй бол бичихгүй.
+func (c *ClickHouse) GrantLessonPass(ctx context.Context, userID, courseID, lessonID string, keys ...string) error {
+	return c.grantLessonPass(ctx, userID, courseID, lessonID, false, keys)
+}
+
+// grantLessonPass — force бол мөр эрхтэй хэвээр харагдсан ч шинэ ver-тэй дахин бичнэ (course_reset.go: цуцлагдсан DELETE
+// сервер дээр үргэлжилж байж болно; түүнээс хойш оруулсан мөрийг тэр mutation хөндөхгүй).
+func (c *ClickHouse) grantLessonPass(ctx context.Context, userID, courseID, lessonID string, force bool, keys []string) error {
+	unlock, err := c.lock(ctx, "prog:"+userID+":"+lessonID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	p, _, err := c.progressRow(ctx, userID, lessonID)
+	if err != nil {
+		return err
+	}
+	p, write := passRow(p, lessonID, keys, force)
+	if !write {
+		return nil
+	}
+	return c.writeProgress(ctx, userID, courseID, p)
+}
+
+// passRow — эрх тавих мөр ба бичих эсэх: мөр байхгүй бол үзээгүй (notViewedAt) шинэ мөр; байгаа бол түүнийг (үзсэн бол
+// үзсэн хэвээр) эрхтэй нь. force биш бол өөрчлөлтгүйг бичихгүй.
+func passRow(p *LessonProgress, lessonID string, keys []string, force bool) (*LessonProgress, bool) {
+	if p == nil {
+		p = &LessonProgress{LessonID: lessonID, ViewedAt: notViewedAt}
+	}
+	changed := grantPass(p, keys)
+	return p, changed || force
+}
+
+// grantPass — p.Quiz-д keys-ийг тавина; өөрчлөгдсөн эсэх.
+func grantPass(p *LessonProgress, keys []string) bool {
+	changed := false
+	for _, k := range keys {
+		if !isPassKey(k) || p.Quiz[k] {
+			continue
+		}
+		if p.Quiz == nil {
+			p.Quiz = map[string]bool{}
+		}
+		p.Quiz[k], changed = true, true
+	}
+	return changed
 }
 
 func (c *ClickHouse) MarkQuizDone(ctx context.Context, userID, courseID, lessonID string) error {
@@ -582,11 +654,14 @@ func (c *ClickHouse) MarkQuizDone(ctx context.Context, userID, courseID, lessonI
 	}
 	now := time.Now()
 	p.QuizDoneAt = &now
+	if !p.Viewed() {
+		p.ViewedAt = now
+	}
 	return c.writeProgress(ctx, userID, courseID, p)
 }
 
 func (c *ClickHouse) LessonProgress(ctx context.Context, userID, courseID string) (map[string]LessonProgress, error) {
-	all, err := c.progressWhere(ctx, "user_id = ? AND course_id = ?", userID, courseID)
+	all, err := c.progressWhere(ctx, false, "user_id = ? AND course_id = ?", userID, courseID)
 	if err != nil {
 		return nil, err
 	}
@@ -597,10 +672,35 @@ func (c *ClickHouse) LessonProgress(ctx context.Context, userID, courseID string
 }
 
 func (c *ClickHouse) CourseProgress(ctx context.Context, courseID string) (map[string]map[string]LessonProgress, error) {
-	return c.progressWhere(ctx, "course_id = ?", courseID)
+	return c.progressWhere(ctx, false, "course_id = ?", courseID)
 }
 
-func (c *ClickHouse) progressWhere(ctx context.Context, where string, args ...any) (map[string]map[string]LessonProgress, error) {
+func (c *ClickHouse) LessonPasses(ctx context.Context, userID, courseID string) (map[string]map[string]bool, error) {
+	all, err := c.progressWhere(ctx, true, "user_id = ? AND course_id = ?", userID, courseID)
+	if err != nil {
+		return nil, err
+	}
+	return passesOf(all[userID]), nil
+}
+
+// passesOf — явцын мөрүүдээс зөвхөн төлсөн эрхийн тэмдгүүд.
+func passesOf(rows map[string]LessonProgress) map[string]map[string]bool {
+	out := map[string]map[string]bool{}
+	for lid, p := range rows {
+		for k, v := range p.Quiz {
+			if v && isPassKey(k) {
+				if out[lid] == nil {
+					out[lid] = map[string]bool{}
+				}
+				out[lid][k] = true
+			}
+		}
+	}
+	return out
+}
+
+// progressWhere — withUnviewed=false бол зөвхөн төлсөн эрхтэй (үзээгүй) мөрийг алгасна (LessonProgress.Viewed).
+func (c *ClickHouse) progressWhere(ctx context.Context, withUnviewed bool, where string, args ...any) (map[string]map[string]LessonProgress, error) {
 	out := map[string]map[string]LessonProgress{}
 	err := c.query(ctx, `SELECT user_id, lesson_id, viewed_at, completed_at, quiz, quiz_done_at FROM lesson_progress FINAL
 		WHERE `+where, args, func(r driver.Rows) error {
@@ -613,6 +713,9 @@ func (c *ClickHouse) progressWhere(ctx context.Context, where string, args ...an
 		lp.CompletedAt, lp.QuizDoneAt = done, qdone
 		if len(lp.Quiz) == 0 {
 			lp.Quiz = nil
+		}
+		if !withUnviewed && !lp.Viewed() {
+			return nil
 		}
 		if out[uid] == nil {
 			out[uid] = map[string]LessonProgress{}

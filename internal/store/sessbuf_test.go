@@ -167,3 +167,107 @@ func TestLocalLockerFreesKeys(t *testing.T) {
 		t.Fatalf("суларсан түлхүүр санах ойд үлдлээ: %d", l.size())
 	}
 }
+
+// Суралцагчийн өгөгдөл устгах үед: hold нь flush-ийг зогсоож, drop нь тохирох сессүүдийг (бичигдээгүй beat-ийн хамт)
+// хаяна — сангаас устгасан сессийг буфер дахин бичихгүй, дараагийн beat ErrNotFound.
+func TestSessionBufferDrop(t *testing.T) {
+	ctx := context.Background()
+	db := &fakeSessDB{rows: map[string]StudySession{
+		"s1": {ID: "s1", UserID: "u1", CourseID: "c1", Counts: map[string]int{}},
+		"s2": {ID: "s2", UserID: "u1", CourseID: "c2", Counts: map[string]int{}},
+		"s3": {ID: "s3", UserID: "u2", CourseID: "c1", Counts: map[string]int{}},
+	}}
+	b := &sessionBuffer{load: db.load, write: db.write, m: map[string]*bufSess{}}
+	for _, id := range []string{"s1", "s2", "s3"} {
+		if err := b.beat(ctx, id, SessionBeat{ActiveSec: 10}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	release := b.hold()
+	done := make(chan struct{})
+	go func() { b.flush(ctx); close(done) }()
+	select {
+	case <-done:
+		t.Fatal("hold-ийн үед flush бичлээ")
+	case <-time.After(50 * time.Millisecond):
+	}
+	if n := b.drop(func(s *StudySession) bool { return s.UserID == "u1" && s.CourseID == "c1" }); n != 1 {
+		t.Fatalf("хаясан сесс: %d", n)
+	}
+	db.mu.Lock()
+	delete(db.rows, "s1") // сангаас устгасан (DELETE)
+	db.mu.Unlock()
+	release()
+	release() // давтан дуудахад аюулгүй
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("hold тавьсны дараа flush үргэлжилсэнгүй")
+	}
+	db.mu.Lock()
+	_, s1 := db.rows["s1"]
+	s2, s3 := db.rows["s2"].ActiveSec, db.rows["s3"].ActiveSec
+	db.mu.Unlock()
+	if s1 || s2 != 10 || s3 != 10 {
+		t.Fatalf("flush: s1 дахин бичигдсэн=%v, s2=%d, s3=%d", s1, s2, s3)
+	}
+	if _, ok := b.get("s1"); ok {
+		t.Fatal("хаясан сесс буферт үлдлээ")
+	}
+	if err := b.beat(ctx, "s1", SessionBeat{ActiveSec: 5}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("устгасан сессийн beat: %v", err)
+	}
+	if err := b.beat(ctx, "s2", SessionBeat{ActiveSec: 5}); err != nil {
+		t.Fatalf("бусад сесс: %v", err)
+	}
+}
+
+// B4: сангаас ачаалж эхэлсний дараа (DELETE-ээс өмнө уншсан) drop болж энэ сессийг хамарвал буферт дахин орохгүй —
+// beat ErrNotFound; өөр суралцагчийн зэрэг ачаалсан сесс хэвийн.
+func TestSessionBufferDropDuringLoad(t *testing.T) {
+	ctx := context.Background()
+	rows := map[string]StudySession{
+		"s1": {ID: "s1", UserID: "u1", CourseID: "c1", Counts: map[string]int{}},
+		"s2": {ID: "s2", UserID: "u2", CourseID: "c1", Counts: map[string]int{}},
+	}
+	started, proceed := make(chan string, 2), make(chan struct{})
+	db := &fakeSessDB{rows: map[string]StudySession{}}
+	b := &sessionBuffer{write: db.write, m: map[string]*bufSess{}, load: func(_ context.Context, id string) (*StudySession, error) {
+		s := deepCopy(rows[id]) // уншилт DELETE-ээс өмнө
+		started <- id
+		<-proceed
+		return &s, nil
+	}}
+	errs := make(chan error, 2)
+	for _, id := range []string{"s1", "s2"} {
+		go func() { errs <- b.beat(ctx, id, SessionBeat{ActiveSec: 5}) }()
+	}
+	<-started
+	<-started
+	b.drop(func(s *StudySession) bool { return s.UserID == "u1" && s.CourseID == "c1" })
+	close(proceed)
+	got := map[bool]int{}
+	for range 2 {
+		got[errors.Is(<-errs, ErrNotFound)]++
+	}
+	if got[true] != 1 || got[false] != 1 {
+		t.Fatalf("нэг нь ErrNotFound, нөгөө нь амжилттай байх ёстой: %v", got)
+	}
+	if _, ok := b.get("s1"); ok {
+		t.Fatal("устгасан сесс буферт дахин орлоо")
+	}
+	if s, ok := b.get("s2"); !ok || s.ActiveSec != 5 {
+		t.Fatalf("өөр суралцагчийн сесс: %+v %v", s, ok)
+	}
+	// Бүртгэлээс хэтэрсэн олон drop — болгоомжтой татгалзана.
+	gen := b.generation()
+	for range bufDropLog + 1 {
+		b.drop(func(*StudySession) bool { return false })
+	}
+	if b.keepFrom(&StudySession{ID: "s9", UserID: "u9"}, gen) {
+		t.Fatal("бүртгэлээс хэтэрсэн үед буферт оруулах ёсгүй")
+	}
+	if !b.keepFrom(&StudySession{ID: "s9", UserID: "u9"}, b.generation()) {
+		t.Fatal("drop-гүй үед буферт орох ёстой")
+	}
+}

@@ -39,6 +39,18 @@ func (m *Memory) DeleteUserData(_ context.Context, uid string) error {
 			delete(m.unlocks, k)
 		}
 	}
+	for k := range m.grants {
+		if k[0] == uid {
+			delete(m.grants, k)
+		}
+	}
+	// Бүлэг чатын харилцан үнэлгээ: өгсөн ба авсан.
+	m.deletePeersLocked(func(k peerKey) bool { return k[1] == uid || k[2] == uid })
+	for k := range m.cmeta { // (сургалт, суралцагч): суралцагчийн мөр, мөн багшийн өөрийн сургалтуудын журнал
+		if co := m.courses[k[0]]; k[1] == uid || (co != nil && co.TeacherID == uid) {
+			delete(m.cmeta, k)
+		}
+	}
 	for k := range m.enrollments {
 		if k[0] == uid {
 			delete(m.enrollments, k)
@@ -134,6 +146,7 @@ func (m *Memory) DeleteUserData(_ context.Context, uid string) error {
 		}
 	}
 	delete(l.rankLvl, uid)
+	delete(l.boxes, uid)
 	for id, s := range l.subs {
 		if s.UserID == uid {
 			delete(l.subs, id)

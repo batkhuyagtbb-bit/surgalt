@@ -100,25 +100,25 @@ func (in *bookInput) validate(teacherID string) string {
 	}
 	switch {
 	case in.Title == "" || utf8.RuneCountInString(in.Title) > 200:
-		return "нэр 1-200 тэмдэгт"
+		return "номын нэр 1-200 тэмдэгт байх ёстой"
 	case utf8.RuneCountInString(in.Author) > 120:
-		return "зохиогчийн нэр хэт урт"
+		return "зохиогчийн нэр хэт урт байна"
 	case utf8.RuneCountInString(in.Description) > 5000:
-		return "тайлбар хэт урт"
+		return "тайлбар хэт урт байна"
 	case in.Price < 0 || in.Price > maxPrice:
-		return "үнэ 0-100,000,000₮"
+		return "үнэ 0-100,000,000₮ хооронд байх ёстой"
 	case in.PreviewN < 1 || in.PreviewN > 20:
-		return "үнэгүй үзүүлэх хуудас 1-20"
+		return "үнэгүй үзүүлэх хуудасны тоо 1-20 хооронд байх ёстой"
 	case in.DownloadPrice < 0 || in.DownloadPrice > maxPrice:
-		return "татаж авах эрхийн үнэ 0-100,000,000₮"
+		return "татаж авах эрхийн үнэ 0-100,000,000₮ хооронд байх ёстой"
 	case in.Download && in.Price > 0 && in.DownloadPrice <= in.Price:
 		return "татаж авах эрхийн үнэ онлайн унших эрхийн үнээс их байх ёстой"
 	case in.FileURL != "" && (!files.OwnedBy(in.FileURL, teacherID) || strings.Contains(in.FileURL, "..") || len(in.FileURL) > maxBlockURL):
-		return "татах файл: өөрийн файлын сангийн файл"
+		return "татах файлаа өөрийн файлын сангаас сонгоно уу"
 	case in.Download && in.FileURL == "":
 		return "татаж авах эрхээр зарахын тулд номын файлаа оруулна уу"
 	case in.CoverURL != "" && !validURL(in.CoverURL) && !(files.OwnedBy(in.CoverURL, teacherID) && strings.Contains(in.CoverURL, "/"+files.Public+"/")):
-		return "нүүр зураг: өөрийн нээлттэй зураг эсвэл http(s) холбоос"
+		return "нүүр зураг нь өөрийн нээлттэй зураг эсвэл http(s) холбоос байх ёстой"
 	}
 	return ""
 }
@@ -245,7 +245,7 @@ func (s *Server) handleDeleteBook(w http.ResponseWriter, r *http.Request) {
 	// Зарагдсан номыг багш санамсаргүй устгахаас сэргийлнэ: ?force=1 гэж баталгаажуулсан үед л устгана
 	// (худалдаж авсан хүмүүс хандах эрхээ алдана гэдгийг UI анхааруулна).
 	if b.Sales > 0 && r.URL.Query().Get("force") != "1" {
-		writeErr(w, http.StatusConflict, "худалдаж авсан хүмүүс байгаа тул устгах боломжгүй — нийтлэлээс хасна уу")
+		writeErr(w, http.StatusConflict, "энэ номыг худалдаж авсан уншигч байгаа тул устгах боломжгүй — нийтлэлээс хасаж нууна уу")
 		return
 	}
 	if err := s.store.DeleteBook(r.Context(), b.ID, c.UID); s.storeErr(w, r, err) {
@@ -303,7 +303,7 @@ func (s *Server) handleBookPagesDone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Total < 1 || in.Total > files.MaxBookPages {
-		writeErr(w, http.StatusBadRequest, "хуудасны тоо буруу")
+		writeErr(w, http.StatusBadRequest, "хуудасны тоо буруу байна")
 		return
 	}
 	if err := s.files.BookPagesReady(c.UID, b.ID, in.Total); err != nil {
@@ -409,10 +409,10 @@ func (s *Server) handleBookPage(w http.ResponseWriter, r *http.Request) {
 	}
 	full := s.bookFull(r, b, uid)
 	if !full && n > b.PreviewN {
-		s.logBook(r, b, uid, name, "paywall", fmt.Sprintf("%d-р хуудаснаас цааш унших гэсэн", b.PreviewN), time.Hour)
-		msg := "Цааш унших бол номыг худалдаж авна уу"
+		s.logBook(r, b, uid, name, "paywall", fmt.Sprintf("%d-р хуудаснаас цааш уншихыг оролдсон", b.PreviewN), time.Hour)
+		msg := "Цааш уншихын тулд номыг худалдаж авна уу"
 		if b.Price == 0 {
-			msg = "Цааш унших бол нэвтэрнэ үү"
+			msg = "Цааш уншихын тулд нэвтэрнэ үү"
 		}
 		writeJSON(w, http.StatusPaymentRequired, map[string]any{"error": msg, "price": b.Price, "need_login": uid == ""})
 		return
@@ -422,9 +422,9 @@ func (s *Server) handleBookPage(w http.ResponseWriter, r *http.Request) {
 		who = s.clientIP(r)
 	}
 	if uid != b.TeacherID && !bookLim.allow(who+"|"+b.ID) {
-		s.logBook(r, b, uid, name, "limit", "Минутад 40-өөс олон хуудас татах гэсэн", 10*time.Minute)
+		s.logBook(r, b, uid, name, "limit", "Минутад 40-өөс олон хуудас татахыг оролдсон", 10*time.Minute)
 		if uid != "" && bookLim.once("notify-limit|"+uid+"|"+b.ID, 30*time.Minute) {
-			s.notify(r.Context(), &store.Notification{UserID: b.TeacherID, Type: "violation", ActorID: uid, Title: "⚠️ " + s.displayName(r.Context(), uid, name) + ": номыг хэт хурдан татах гэсэн", Body: short(b.Title), Link: "/me#books"})
+			s.notify(r.Context(), &store.Notification{UserID: b.TeacherID, Type: "violation", ActorID: uid, Title: "⚠️ " + s.displayName(r.Context(), uid, name) + ": номыг хэт хурдан татахыг оролдлоо", Body: short(b.Title), Link: "/me#books"})
 		}
 		writeErr(w, http.StatusTooManyRequests, "Хэт хурдан эргүүлж байна — түр хүлээгээд үргэлжлүүлнэ үү")
 		return
@@ -445,7 +445,7 @@ func (s *Server) handleBookPage(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := watermark(raw, mark)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "хуудсыг бэлтгэж чадсангүй")
+		writeErr(w, http.StatusInternalServerError, "хуудсыг бэлтгэж чадсангүй — дахин оролдоно уу")
 		return
 	}
 	h := w.Header()
@@ -463,17 +463,17 @@ func (s *Server) handleBookCover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if b.Pages == 0 {
-		writeErr(w, http.StatusNotFound, "нүүр алга")
+		writeErr(w, http.StatusNotFound, "нүүр зураг алга")
 		return
 	}
 	raw, err := s.files.BookPage(b.TeacherID, b.ID, 1)
 	if err != nil {
-		writeErr(w, http.StatusNotFound, "нүүр алга")
+		writeErr(w, http.StatusNotFound, "нүүр зураг алга")
 		return
 	}
 	src, _, err := image.Decode(bytes.NewReader(raw))
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "нүүр уншигдсангүй")
+		writeErr(w, http.StatusInternalServerError, "нүүр зургийг уншиж чадсангүй")
 		return
 	}
 	sb := src.Bounds()
@@ -541,7 +541,7 @@ func (s *Server) handleBookInterest(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	s.logBook(r, b, uid, name, "interest", "Сонирхож байна гэж дарсан", 24*time.Hour)
+	s.logBook(r, b, uid, name, "interest", "«Сонирхож байна» товч дарсан", 24*time.Hour)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
