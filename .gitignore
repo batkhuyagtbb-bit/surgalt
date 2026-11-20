@@ -8,3 +8,6 @@ clickhouse-ca.crt
 /logs/
 surgalt.bad.exe
 *.exe~
+
+*.rar
+*.zip
